@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# WXT build output
+.output/
+.wxt/
+web-ext-artifacts/
+stats.html
+
+# Tests
+coverage/
+
+# Env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
