@@ -1,0 +1,34 @@
+:root {
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --color-bg: #111;
+  --color-fg: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-display);
+}
+
+.app {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.clock {
+  font-size: clamp(4rem, 12vw, 9rem);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}

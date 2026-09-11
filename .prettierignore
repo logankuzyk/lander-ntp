@@ -1,0 +1,6 @@
+.output/
+.wxt/
+coverage/
+web-ext-artifacts/
+package-lock.json
+CHANGELOG.md
