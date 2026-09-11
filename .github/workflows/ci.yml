@@ -74,3 +74,5 @@ jobs:
           name: ntp-${{ matrix.browser }}
           path: .output/*.zip
           if-no-files-found: error
+          # WXT's output dir is dot-prefixed, which upload-artifact skips by default.
+          include-hidden-files: true
