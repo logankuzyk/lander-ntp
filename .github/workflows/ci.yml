@@ -71,7 +71,7 @@ jobs:
         run: npm run lint:firefox
       - uses: actions/upload-artifact@v7
         with:
-          name: ntp-${{ matrix.browser }}
+          name: lander-ntp-${{ matrix.browser }}
           path: .output/*.zip
           if-no-files-found: error
           # WXT's output dir is dot-prefixed, which upload-artifact skips by default.

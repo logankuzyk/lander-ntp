@@ -14,8 +14,7 @@ export default defineConfig({
     return { plugins: [preact()] }
   },
   manifest: ({ browser }) => ({
-    name: 'Logan Kuzyk Photography — New Tab',
-    short_name: 'New Tab',
+    name: 'Lander NTP',
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
     // storage.local caches the photo manifest and rotation state. No host permissions: the
@@ -25,7 +24,7 @@ export default defineConfig({
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
-          id: 'ntp@logankuzyk.com',
+          id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',
           data_collection_permissions: { required: ['none'] },
         },
