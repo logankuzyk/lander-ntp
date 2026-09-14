@@ -36,8 +36,9 @@ export const DEFAULT_SETTINGS: Settings = {
   font: 'system',
   dim: true,
   favourites: {
-    // Off until there is something to show: an empty favourites bar is just a gap.
-    enabled: false,
+    // On: the bar only draws itself once there is something in it (see widgets/Favourites),
+    // so the default costs a fresh install nothing and keeps existing lists on screen.
+    enabled: true,
     style: 'list',
     size: 'm',
   },
