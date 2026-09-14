@@ -11,14 +11,22 @@ export type StorageItemLike<T> = {
 /**
  * Read and write a storage item. Starts from the item's fallback, then swaps in the stored
  * value, and watches for changes so other open tabs (and other synced devices) stay current.
+ *
+ * The third element says whether the stored value has arrived. Anything that would act on a
+ * setting — rather than just render it — must wait for that, or it acts on the fallback.
  */
-export function useStorageItem<T>(item: StorageItemLike<T>): [T, (value: T) => void] {
+export function useStorageItem<T>(
+  item: StorageItemLike<T>,
+): [T, (value: T) => void, loaded: boolean] {
   const [value, setValue] = useState<T>(item.fallback)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     let active = true
     void item.getValue().then((stored) => {
-      if (active) setValue(stored)
+      if (!active) return
+      setValue(stored)
+      setLoaded(true)
     })
     const unwatch = item.watch((next) => setValue(next ?? item.fallback))
     return () => {
@@ -35,5 +43,5 @@ export function useStorageItem<T>(item: StorageItemLike<T>): [T, (value: T) => v
     [item],
   )
 
-  return [value, update]
+  return [value, update, loaded]
 }

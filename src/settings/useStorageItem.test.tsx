@@ -5,11 +5,14 @@ import { settingsItem } from './storage'
 import { useStorageItem } from './useStorageItem'
 
 function FontPicker() {
-  const [settings, setSettings] = useStorageItem(settingsItem)
+  const [settings, setSettings, loaded] = useStorageItem(settingsItem)
   return (
-    <button type="button" onClick={() => setSettings({ ...settings, font: 'inter' })}>
-      {settings.font}
-    </button>
+    <>
+      <button type="button" onClick={() => setSettings({ ...settings, font: 'inter' })}>
+        {settings.font}
+      </button>
+      <span data-testid="loaded">{String(loaded)}</span>
+    </>
   )
 }
 
@@ -22,6 +25,14 @@ describe('useStorageItem', () => {
 
     expect(button.textContent).toBe('system')
     await waitFor(() => expect(button.textContent).toBe('fraunces'))
+  })
+
+  it('says whether the stored value has arrived, so callers need not act on the fallback', async () => {
+    render(<FontPicker />)
+
+    expect(screen.getByTestId('loaded').textContent).toBe('false')
+
+    await waitFor(() => expect(screen.getByTestId('loaded').textContent).toBe('true'))
   })
 
   it('writes updates to storage', async () => {
