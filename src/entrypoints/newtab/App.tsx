@@ -2,23 +2,23 @@ import { useEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Controls } from '@/components/Controls/Controls'
+import { SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
 import { preloadNext } from '@/photos/image'
-import type { Frequency } from '@/photos/rotation'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
-import { formatTime } from '@/utils/time'
+import { FONTS } from '@/settings/fonts'
+import { settingsItem } from '@/settings/storage'
+import { useStorageItem } from '@/settings/useStorageItem'
+import { Clock } from '@/widgets/Clock/Clock'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
 
-// Hard-coded until the settings panel lands.
-const FREQUENCY: Frequency = 'every-visit'
-
 export function App() {
-  const [now, setNow] = useState(() => new Date())
-  const { photo, upcoming, next } = usePhotoRotation(FREQUENCY)
+  const [settings, setSettings] = useStorageItem(settingsItem)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { photo, upcoming, next } = usePhotoRotation(settings.frequency)
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
+    document.documentElement.style.setProperty('--font-display', FONTS[settings.font].stack)
+  }, [settings.font])
 
   return (
     <main class="app">
@@ -31,11 +31,16 @@ export function App() {
           }}
         />
       )}
-      <time class="clock" dateTime={now.toISOString()}>
-        {formatTime(now)}
-      </time>
-      {photo && <PhotoCredit photo={photo} />}
-      <Controls onNext={next} />
+      {settings.clock.enabled && <Clock {...settings.clock} />}
+      {photo && settings.widgets.credit && <PhotoCredit photo={photo} />}
+      <Controls onNext={next} onOpenSettings={() => setSettingsOpen(true)} />
+      {settingsOpen && (
+        <SettingsPanel
+          settings={settings}
+          onChange={setSettings}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </main>
   )
 }
