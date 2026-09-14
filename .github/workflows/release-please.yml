@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     branches: [main]
+  # Lets a stuck or stale release PR be regenerated without needing an unrelated commit
+  # to main to provoke a push event.
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
