@@ -269,22 +269,6 @@ export function SettingsPanel({
             onChange={(font) => onChange({ ...settings, font })}
           />
         </section>
-
-        <section>
-          <h3>Widgets</h3>
-          <Toggle
-            label="Show photo credit"
-            checked={settings.widgets.credit}
-            onChange={(credit) =>
-              onChange({ ...settings, widgets: { ...settings.widgets, credit } })
-            }
-          />
-          <Toggle
-            label="Show photo details"
-            checked={settings.widgets.info}
-            onChange={(info) => onChange({ ...settings, widgets: { ...settings.widgets, info } })}
-          />
-        </section>
       </div>
     </div>
   )

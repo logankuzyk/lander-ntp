@@ -12,7 +12,6 @@ describe('DEFAULT_SETTINGS', () => {
       font: 'system',
       dim: true,
       favourites: { enabled: false, style: 'list', size: 'm' },
-      widgets: { credit: true, info: true },
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()
@@ -59,6 +58,16 @@ describe('settingsItem', () => {
     await settingsItem.migrate()
 
     expect(await settingsItem.getValue()).toMatchObject({ dim: false })
+  })
+
+  it('drops the widget switches an older install still has stored', async () => {
+    const withWidgets = { ...DEFAULT_SETTINGS, widgets: { credit: false, info: false } }
+    await settingsItem.setValue(withWidgets as unknown as Settings)
+    await settingsItem.setMeta({ v: 3 })
+
+    await settingsItem.migrate()
+
+    expect(await settingsItem.getValue()).not.toHaveProperty('widgets')
   })
 
   it('leaves the rest of the settings alone while migrating', async () => {

@@ -134,6 +134,27 @@ describe('Background', () => {
       expect(fulls(container)[0]?.getAttribute('src')).toBe(`${MEDIA}/c/pic-1920.webp`)
     })
 
+    it('settles on the top photo when an earlier one lands after it', () => {
+      // The incoming photo is preloaded, so it often loads before the one it was stacked on.
+      const onLoadingChange = vi.fn()
+      const { container, rerender } = render(
+        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+      )
+      fireEvent.load(fulls(container)[0] as HTMLImageElement)
+      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
+      rerender(<Background photo={makePhoto('c')} onLoadingChange={onLoadingChange} />)
+
+      fireEvent.load(fulls(container)[2] as HTMLImageElement)
+      fireEvent.load(fulls(container)[1] as HTMLImageElement)
+      act(() => {
+        vi.runAllTimers()
+      })
+
+      expect(layers(container)).toHaveLength(1)
+      expect(fulls(container)[0]?.getAttribute('src')).toBe(`${MEDIA}/c/pic-1920.webp`)
+      expect(onLoadingChange).toHaveBeenLastCalledWith(false)
+    })
+
     it('reports the wait while the replacement photo loads', () => {
       const onLoadingChange = vi.fn()
       const { container, rerender } = render(

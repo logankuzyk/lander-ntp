@@ -87,6 +87,16 @@ describe('Controls', () => {
     expect(button.classList.contains('control--busy')).toBe(true)
   })
 
+  it('ignores the button and the arrow key while the photo is loading', () => {
+    // Each press stacks another full-resolution image over the one already being waited on.
+    const { onNext } = renderControls({ busy: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+
+    expect(onNext).not.toHaveBeenCalled()
+  })
+
   it('leaves the button alone when nothing is loading', () => {
     renderControls()
     const button = screen.getByRole('button', { name: 'Next photo' })

@@ -73,26 +73,27 @@ describe('App', () => {
     expect(await currentPhotoSrc()).toMatch(/\/fallback\.webp$/)
   })
 
-  it('hides the clock and the credit when they are switched off', async () => {
-    // The credit only has anything to show when the photo carries a location.
+  it('shows the credit whenever the photo carries a location', async () => {
     await manifestCache.setValue({
       etag: null,
       fetchedAt: Date.now(),
       data: makeManifest([makePhoto('a', { location: 'Tofino, BC' })]),
     })
-    const { unmount } = render(<App />)
-    expect(await screen.findByText('Tofino, BC')).toBeTruthy()
+    render(<App />)
 
-    unmount()
+    expect(await screen.findByText('Tofino, BC')).toBeTruthy()
+  })
+
+  it('hides the clock when it is switched off', async () => {
+    await seedPhotos()
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
-      widgets: { ...DEFAULT_SETTINGS.widgets, credit: false },
     })
     const { container } = render(<App />)
 
-    await waitFor(() => expect(container.querySelector('time')).toBeNull())
-    expect(container.querySelector('.credit')).toBeNull()
+    await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+    expect(container.querySelector('time')).toBeNull()
   })
 
   it('shows saved favourite sites once they are switched on', async () => {
@@ -114,13 +115,13 @@ describe('App', () => {
     )
   })
 
-  it('opens the photo details panel, and hides it when the widget is off', async () => {
+  it('opens the photo details panel', async () => {
     await manifestCache.setValue({
       etag: null,
       fetchedAt: Date.now(),
       data: makeManifest([makePhoto('a', { exif: { camera: 'Canon, EOS R5' } })]),
     })
-    const { unmount } = render(<App />)
+    render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Photo details' }))
     const panel = await screen.findByRole('dialog', { name: 'Photo details' })
@@ -128,15 +129,6 @@ describe('App', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
-
-    unmount()
-    await settingsItem.setValue({
-      ...DEFAULT_SETTINGS,
-      widgets: { ...DEFAULT_SETTINGS.widgets, info: false },
-    })
-    render(<App />)
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Photo details' })).toBeNull())
   })
 
   it('opening a new tab keeps the photo when the frequency is not every-new-tab', async () => {

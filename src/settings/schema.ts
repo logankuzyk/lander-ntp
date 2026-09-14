@@ -19,12 +19,6 @@ export type Settings = {
     style: 'list' | 'grid'
     size: 's' | 'm' | 'l'
   }
-  widgets: {
-    /** Location and the link back to logankuzyk.com. */
-    credit: boolean
-    /** EXIF panel. */
-    info: boolean
-  }
 }
 
 /** Whether this browser's locale writes times as 12-hour. */
@@ -46,9 +40,5 @@ export const DEFAULT_SETTINGS: Settings = {
     enabled: false,
     style: 'list',
     size: 'm',
-  },
-  widgets: {
-    credit: true,
-    info: true,
   },
 }

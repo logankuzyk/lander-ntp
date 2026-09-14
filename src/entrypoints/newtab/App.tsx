@@ -23,7 +23,7 @@ export function App() {
   // Wait for the stored frequency: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
   const { photo, upcoming, next } = usePhotoRotation(settingsLoaded ? settings.frequency : null)
-  const canShowInfo = Boolean(photo) && settings.widgets.info
+  const canShowInfo = Boolean(photo)
 
   // Before paint, so the clock is never drawn in one font and then redrawn in another.
   useLayoutEffect(() => {
@@ -56,7 +56,7 @@ export function App() {
         />
       )}
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
-      {photo && settings.widgets.credit && <PhotoCredit photo={photo} />}
+      {photo && <PhotoCredit photo={photo} />}
       {canShowInfo && photo && infoOpen && (
         <PhotoInfo photo={photo} onClose={() => setInfoOpen(false)} />
       )}

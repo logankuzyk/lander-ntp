@@ -118,18 +118,11 @@ describe('SettingsPanel', () => {
     expect(onFavouritesChange).toHaveBeenCalledWith([])
   })
 
-  it.each([
-    ['Show photo credit', 'credit'],
-    ['Show photo details', 'info'],
-  ])('toggles %s', (label, key) => {
-    const { onChange } = renderPanel()
+  it('has no widget switches: the credit and details panel are always available', () => {
+    renderPanel()
 
-    fireEvent.click(screen.getByLabelText(label))
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...settings,
-      widgets: { ...settings.widgets, [key]: false },
-    })
+    expect(screen.queryByLabelText('Show photo credit')).toBeNull()
+    expect(screen.queryByLabelText('Show photo details')).toBeNull()
   })
 
   it('closes with the button, the backdrop and Escape', () => {
@@ -205,7 +198,10 @@ describe('SettingsPanel', () => {
       ...screen.getByRole('dialog').querySelectorAll<HTMLElement>('button, select, input'),
     ]
 
-    expect(focusable.map((element) => element.getAttribute('aria-label'))).not.toContain('Style')
-    expect(focusable.some((element) => element.getAttribute('type') === 'text')).toBe(false)
+    // `type` as a property, not an attribute: the editor's inputs leave it off and default
+    // to text, so reading the attribute would find nothing whether they are rendered or not.
+    expect(focusable.some((element) => (element as HTMLInputElement).type === 'text')).toBe(false)
+    // Choice names its select through the wrapping label, so look it up the same way.
+    expect(screen.queryByLabelText('Style')).toBeNull()
   })
 })

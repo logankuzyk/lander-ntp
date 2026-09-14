@@ -30,7 +30,7 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
       }
       if (event.key === 'ArrowRight') {
         event.preventDefault()
-        onNext()
+        if (!busy) onNext()
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
@@ -38,7 +38,7 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onNext, onToggleInfo])
+  }, [onNext, busy, onToggleInfo])
 
   return (
     <div class="controls">
@@ -48,7 +48,10 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
         aria-label="Next photo"
         title="Next photo (→)"
         aria-busy={busy === true}
-        onClick={onNext}
+        // Ignored rather than disabled while the next photo loads: each press would stack
+        // another full-resolution image over the one the wait is already for. The button
+        // keeps its place in the Tab order so focus does not jump away mid-press.
+        onClick={busy ? undefined : onNext}
       >
         <svg
           aria-hidden="true"

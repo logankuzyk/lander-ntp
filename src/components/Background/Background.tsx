@@ -113,6 +113,7 @@ export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundPr
   const [layers, setLayers] = useState<Layer[]>(() => [{ key: 0, photo, covering: false }])
   const [revealedKey, setRevealedKey] = useState(0)
   const nextKey = useRef(0)
+  const topKey = useRef(0)
   const settling = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
@@ -128,6 +129,10 @@ export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundPr
 
   /** Once the top layer has finished fading in, the ones under it can go. */
   const settle = useCallback((key: number) => {
+    // Only the top layer settles the stack. The incoming photo is usually preloaded, so it
+    // can land before the one it was stacked on: letting that straggler through would cancel
+    // the pending trim and leave `loading` pointing at a key that is no longer on top.
+    if (key !== topKey.current) return
     setRevealedKey(key)
     clearTimeout(settling.current)
     settling.current = setTimeout(() => {
@@ -139,6 +144,8 @@ export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundPr
   }, [])
 
   const top = layers[layers.length - 1]
+  // Set during render, and read by `settle` from a layer's effect once this render is on screen.
+  topKey.current = top?.key ?? 0
   const loading = top !== undefined && top.covering && top.key !== revealedKey
 
   useEffect(() => {
