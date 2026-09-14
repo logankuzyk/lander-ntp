@@ -88,6 +88,31 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Portfolio' })).toBeNull())
   })
 
+  it('opens the photo details panel, and hides it when the widget is off', async () => {
+    await manifestCache.setValue({
+      etag: null,
+      fetchedAt: Date.now(),
+      data: makeManifest([makePhoto('a', { exif: { camera: 'Canon, EOS R5' } })]),
+    })
+    const { unmount } = render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Photo details' }))
+    const panel = await screen.findByRole('dialog', { name: 'Photo details' })
+    expect(panel.textContent).toContain('Canon, EOS R5')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
+
+    unmount()
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      widgets: { ...DEFAULT_SETTINGS.widgets, info: false },
+    })
+    render(<App />)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Photo details' })).toBeNull())
+  })
+
   it('applies the chosen font and keeps it', async () => {
     render(<App />)
 

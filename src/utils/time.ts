@@ -22,6 +22,17 @@ export function formatTime(
     .trim()
 }
 
+/**
+ * Format an ISO date from the manifest in the viewer's locale, e.g. "30 June 2025". Returns
+ * an empty string when there is no date or it can't be read.
+ */
+export function formatDateTaken(value: string | undefined, locale?: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date)
+}
+
 /** Format a date as a weekday and day, e.g. "Friday, 11 September". */
 export function formatDate(date: Date, locale?: string): string {
   return new Intl.DateTimeFormat(locale, {

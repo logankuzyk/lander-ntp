@@ -132,6 +132,89 @@ body {
   opacity: 1;
 }
 
+/* Photo details */
+
+.photo-info {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 4rem;
+  z-index: 1;
+  width: min(20rem, calc(100% - 2.5rem));
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgb(0 0 0 / 55%);
+  backdrop-filter: blur(12px);
+  font-size: 0.85rem;
+  text-shadow: none;
+}
+
+.photo-info__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.photo-info h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.photo-info__close {
+  display: grid;
+  place-items: center;
+  padding: 0.25rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.photo-info__close:hover,
+.photo-info__close:focus-visible {
+  opacity: 1;
+}
+
+.photo-info__rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.photo-info__row {
+  display: contents;
+}
+
+.photo-info dt {
+  opacity: 0.65;
+}
+
+.photo-info dd {
+  margin: 0;
+}
+
+.photo-info__empty {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.photo-info__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+.photo-info__links a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
 /* Controls */
 
 .controls {
