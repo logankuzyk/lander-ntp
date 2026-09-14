@@ -5,6 +5,7 @@ import {
   msUntilAdvance,
   nextPhoto,
   photoForVisit,
+  shouldAdvance,
   type Frequency,
   type PhotoState,
 } from './rotation'
@@ -12,6 +13,12 @@ import type { Manifest, Photo } from './schema'
 import { photoState } from './storage'
 
 const photoIds = (manifest: Manifest) => manifest.photos.map((photo) => photo.id)
+
+/**
+ * `every-visit` is the only frequency where each tab gets its own photo. Every other mode
+ * shows one photo at a time, so open tabs follow the shared state instead of drifting apart.
+ */
+const sharesPhoto = (frequency: Frequency) => frequency !== 'every-visit'
 
 export type PhotoRotation = {
   photo: Photo | null
@@ -49,20 +56,56 @@ export function usePhotoRotation(frequency: Frequency): PhotoRotation {
     }
   }, [])
 
+  /**
+   * Draw the next photo. `onlyIfDue` is for the timer: another tab may have advanced first,
+   * and following it beats taking a second photo out of the bag.
+   */
+  const advance = useCallback(
+    async ({ onlyIfDue = false } = {}) => {
+      if (!manifest) return
+      const stored = await photoState.getValue()
+
+      if (onlyIfDue && stored && !shouldAdvance(frequencyRef.current, stored, Date.now())) {
+        setState(stored)
+        return
+      }
+
+      const advanced = nextPhoto(stored, photoIds(manifest), Date.now())
+      setState(advanced)
+      await photoState.setValue(advanced)
+    },
+    [manifest],
+  )
+
   const next = useCallback(() => {
-    if (!manifest) return
-    const advanced = nextPhoto(state, photoIds(manifest), Date.now())
-    setState(advanced)
-    void photoState.setValue(advanced)
-  }, [manifest, state])
+    void advance()
+  }, [advance])
+
+  // Follow the shared photo: another tab's timer, or its next-photo button.
+  useEffect(() => {
+    if (!sharesPhoto(frequency)) return
+    let active = true
+    void photoState.getValue().then((stored) => {
+      if (active && stored) setState(stored)
+    })
+    const unwatch = photoState.watch((stored) => {
+      if (stored) setState(stored)
+    })
+    return () => {
+      active = false
+      unwatch()
+    }
+  }, [frequency])
 
   useEffect(() => {
     if (!state) return
     const delay = msUntilAdvance(frequency, state, Date.now())
     if (delay === null) return
-    const timer = setTimeout(next, delay)
+    const timer = setTimeout(() => {
+      void advance({ onlyIfDue: true })
+    }, delay)
     return () => clearTimeout(timer)
-  }, [frequency, state, next])
+  }, [frequency, state, advance])
 
   return useMemo(() => {
     const find = (id: string | null | undefined) =>
