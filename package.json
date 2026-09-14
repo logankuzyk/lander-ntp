@@ -1,7 +1,7 @@
 {
   "name": "ntp",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A minimal new tab page featuring photography from logankuzyk.com",
   "type": "module",
   "engines": {
