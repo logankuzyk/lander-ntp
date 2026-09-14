@@ -89,22 +89,23 @@ describe('App', () => {
     expect(container.querySelector('.credit')).toBeNull()
   })
 
-  it('shows saved favourite sites, and hides them when switched off', async () => {
+  it('shows saved favourite sites once they are switched on', async () => {
     await favouritesItem.setValue([{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }])
     const { unmount } = render(<App />)
 
-    expect((await screen.findByRole('link', { name: 'Portfolio' })).getAttribute('href')).toBe(
-      'https://logankuzyk.com/',
-    )
+    // Off by default: a saved list alone is not enough to put the bar on screen.
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Portfolio' })).toBeNull())
 
     unmount()
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
-      favourites: { ...DEFAULT_SETTINGS.favourites, enabled: false },
+      favourites: { ...DEFAULT_SETTINGS.favourites, enabled: true },
     })
     render(<App />)
 
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Portfolio' })).toBeNull())
+    expect((await screen.findByRole('link', { name: 'Portfolio' })).getAttribute('href')).toBe(
+      'https://logankuzyk.com/',
+    )
   })
 
   it('opens the photo details panel, and hides it when the widget is off', async () => {

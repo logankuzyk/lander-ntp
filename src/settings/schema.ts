@@ -39,7 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   font: 'system',
   favourites: {
-    enabled: true,
+    // Off until there is something to show: an empty favourites bar is just a gap.
+    enabled: false,
     style: 'list',
     size: 'm',
   },

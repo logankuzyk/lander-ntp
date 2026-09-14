@@ -5,12 +5,12 @@ import { DEFAULT_SETTINGS, type Settings } from './schema'
 import { settingsItem } from './storage'
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts on a new photo every tab, with the clock on and the system font', () => {
+  it('starts on a new photo every tab, with the clock on, favourites off and the system font', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       frequency: 'every-visit',
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
-      favourites: { enabled: true, style: 'list', size: 'm' },
+      favourites: { enabled: false, style: 'list', size: 'm' },
       widgets: { credit: true, info: true },
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
