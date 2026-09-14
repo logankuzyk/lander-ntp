@@ -3,13 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Controls } from './Controls'
 
-const renderControls = ({ withInfo = true } = {}) => {
+const renderControls = ({ withInfo = true, busy = false } = {}) => {
   const onNext = vi.fn()
   const onOpenSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
     <Controls
       onNext={onNext}
+      busy={busy}
       onOpenSettings={onOpenSettings}
       onToggleInfo={withInfo ? onToggleInfo : undefined}
       infoOpen={false}
@@ -74,5 +75,23 @@ describe('Controls', () => {
 
     expect(onNext).not.toHaveBeenCalled()
     expect(onToggleInfo).not.toHaveBeenCalled()
+  })
+
+  it('marks the next-photo button busy while the photo is loading', () => {
+    // The cross-fade holds the old photo until the new one is ready, so without this the
+    // press looks like it did nothing.
+    renderControls({ busy: true })
+    const button = screen.getByRole('button', { name: 'Next photo' })
+
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(button.classList.contains('control--busy')).toBe(true)
+  })
+
+  it('leaves the button alone when nothing is loading', () => {
+    renderControls()
+    const button = screen.getByRole('button', { name: 'Next photo' })
+
+    expect(button.getAttribute('aria-busy')).toBe('false')
+    expect(button.classList.contains('control--busy')).toBe(false)
   })
 })

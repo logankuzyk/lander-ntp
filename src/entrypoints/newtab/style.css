@@ -268,6 +268,7 @@ body {
 }
 
 .control {
+  position: relative;
   display: grid;
   place-items: center;
   width: 2.5rem;
@@ -297,6 +298,30 @@ body {
 
 .control svg {
   filter: drop-shadow(var(--text-shadow));
+}
+
+/* A cross-fade holds the old photo until the new one is ready, so the button that was
+   pressed carries the wait. */
+.control--busy::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 1.5px solid rgb(255 255 255 / 25%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: control-spin 800ms linear infinite;
+}
+
+@keyframes control-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control--busy::after {
+    animation: none;
+  }
 }
 
 /* Favourites */
@@ -516,6 +541,18 @@ body {
   padding: 0.5rem;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 0.5rem;
+}
+
+.favourites-editor__field {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.favourites-editor__field > span {
+  font-size: 0.75rem;
+  opacity: 0.6;
 }
 
 .favourites-editor input {

@@ -123,6 +123,44 @@ describe('Background', () => {
       expect(fulls(container)[0]?.getAttribute('src')).toBe(`${MEDIA}/c/pic-1920.webp`)
     })
 
+    it('reports the wait while the replacement photo loads', () => {
+      const onLoadingChange = vi.fn()
+      const { container, rerender } = render(
+        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+      )
+      fireEvent.load(fulls(container)[0] as HTMLImageElement)
+      onLoadingChange.mockClear()
+
+      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
+
+      expect(onLoadingChange).toHaveBeenLastCalledWith(true)
+
+      fireEvent.load(fulls(container)[1] as HTMLImageElement)
+
+      expect(onLoadingChange).toHaveBeenLastCalledWith(false)
+    })
+
+    it('never reports a wait for the first photo, which shows its thumbnail', () => {
+      const onLoadingChange = vi.fn()
+      render(<Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />)
+
+      expect(onLoadingChange).not.toHaveBeenCalledWith(true)
+    })
+
+    it('clears the wait when it unmounts mid-load', () => {
+      const onLoadingChange = vi.fn()
+      const { container, rerender, unmount } = render(
+        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+      )
+      fireEvent.load(fulls(container)[0] as HTMLImageElement)
+      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
+      expect(onLoadingChange).toHaveBeenLastCalledWith(true)
+
+      unmount()
+
+      expect(onLoadingChange).toHaveBeenLastCalledWith(false)
+    })
+
     it('ignores a re-render that keeps the same photo', () => {
       const { container, rerender } = render(<Background photo={makePhoto('a')} />)
 

@@ -19,6 +19,7 @@ export function App() {
   const [favourites, setFavourites] = useStorageItem(favouritesItem)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [photoLoading, setPhotoLoading] = useState(false)
   // Wait for the stored frequency: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
   const { photo, upcoming, next } = usePhotoRotation(settingsLoaded ? settings.frequency : null)
@@ -36,6 +37,7 @@ export function App() {
           onLoad={() => {
             if (upcoming) preloadNext(upcoming)
           }}
+          onLoadingChange={setPhotoLoading}
         />
       )}
       {settings.favourites.enabled && (
@@ -52,6 +54,7 @@ export function App() {
       )}
       <Controls
         onNext={next}
+        busy={photoLoading}
         onOpenSettings={() => setSettingsOpen(true)}
         onToggleInfo={canShowInfo ? () => setInfoOpen((open) => !open) : undefined}
         infoOpen={infoOpen}

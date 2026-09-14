@@ -6,6 +6,8 @@ const isEditable = (target: EventTarget | null) =>
 
 type ControlsProps = {
   onNext: () => void
+  /** True while the photo being faded in is still loading. */
+  busy?: boolean
   onOpenSettings: () => void
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
@@ -13,7 +15,7 @@ type ControlsProps = {
 }
 
 /** Bottom-right controls. The → and i keys do the same as the buttons. */
-export function Controls({ onNext, onOpenSettings, onToggleInfo, infoOpen }: ControlsProps) {
+export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen }: ControlsProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -42,9 +44,10 @@ export function Controls({ onNext, onOpenSettings, onToggleInfo, infoOpen }: Con
     <div class="controls">
       <button
         type="button"
-        class="control"
+        class={busy ? 'control control--busy' : 'control'}
         aria-label="Next photo"
         title="Next photo (→)"
+        aria-busy={busy === true}
         onClick={onNext}
       >
         <svg

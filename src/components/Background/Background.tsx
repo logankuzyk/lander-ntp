@@ -92,6 +92,12 @@ type BackgroundProps = {
   photo: Photo
   /** Called once the full-resolution image has loaded. */
   onLoad?: () => void
+  /**
+   * Called as a replacement photo starts and finishes loading. A cross-fade holds the photo
+   * on screen until the new one is ready, so pressing "next photo" on a cold cache would
+   * otherwise look like nothing happened. Must be a stable reference.
+   */
+  onLoadingChange?: (loading: boolean) => void
 }
 
 /**
@@ -101,8 +107,9 @@ type BackgroundProps = {
  *
  * Under prefers-reduced-motion the swap is instant.
  */
-export function Background({ photo, onLoad }: BackgroundProps) {
+export function Background({ photo, onLoad, onLoadingChange }: BackgroundProps) {
   const [layers, setLayers] = useState<Layer[]>(() => [{ key: 0, photo, covering: false }])
+  const [revealedKey, setRevealedKey] = useState(0)
   const nextKey = useRef(0)
   const settling = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -119,6 +126,7 @@ export function Background({ photo, onLoad }: BackgroundProps) {
 
   /** Once the top layer has finished fading in, the ones under it can go. */
   const settle = useCallback((key: number) => {
+    setRevealedKey(key)
     clearTimeout(settling.current)
     settling.current = setTimeout(() => {
       setLayers((current) => {
@@ -127,6 +135,17 @@ export function Background({ photo, onLoad }: BackgroundProps) {
       })
     }, FADE_MS)
   }, [])
+
+  const top = layers[layers.length - 1]
+  const loading = top !== undefined && top.covering && top.key !== revealedKey
+
+  useEffect(() => {
+    onLoadingChange?.(loading)
+  }, [loading, onLoadingChange])
+
+  useEffect(() => {
+    return () => onLoadingChange?.(false)
+  }, [onLoadingChange])
 
   return (
     <div class="background">
