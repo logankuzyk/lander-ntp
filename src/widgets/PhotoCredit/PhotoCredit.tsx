@@ -6,19 +6,21 @@ type PhotoCreditProps = {
   photo: Photo
 }
 
-/** Bottom-left: location · View on logankuzyk.com · Buy a print (when available). */
+/**
+ * Bottom-left: location · Buy a print (when available). The link through to the photo's page
+ * on logankuzyk.com lives in the photo details panel, not here.
+ */
 export function PhotoCredit({ photo }: PhotoCreditProps) {
   const items = [
     photo.location && <span key="location">{photo.location}</span>,
-    <a key="page" href={photo.pageUrl}>
-      View on logankuzyk.com
-    </a>,
     photo.printUrl && (
       <a key="print" href={photo.printUrl}>
         Buy a print
       </a>
     ),
   ].filter(Boolean)
+
+  if (items.length === 0) return null
 
   return (
     <p class="credit">

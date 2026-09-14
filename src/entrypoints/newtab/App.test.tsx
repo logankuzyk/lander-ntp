@@ -9,7 +9,19 @@ import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import { App } from './App'
 
-const creditLink = () => screen.findByRole('link', { name: 'View on logankuzyk.com' })
+/**
+ * The photo on screen: the topmost background layer's full-resolution source. A replacement
+ * photo is appended over the one it is cross-fading out, so the last layer is the current one.
+ */
+const currentPhotoSrc = async () =>
+  (
+    await waitFor(() => {
+      const images = document.querySelectorAll<HTMLImageElement>('.background__full')
+      const top = images[images.length - 1]
+      if (!top) throw new Error('no photo rendered yet')
+      return top
+    })
+  ).getAttribute('src')
 
 const seedPhotos = () =>
   manifestCache.setValue({
@@ -40,25 +52,32 @@ describe('App', () => {
     await seedPhotos()
     render(<App />)
 
-    const first = (await creditLink()).getAttribute('href')
-    // The → key is covered in Controls.test.tsx. Here, click: the button's handler updates in
-    // the same render as the credit link, while the key listener re-binds after paint.
+    const first = await currentPhotoSrc()
+    // The → key is covered in Controls.test.tsx.
     fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
 
-    const link = await creditLink()
-    await waitFor(() => expect(link.getAttribute('href')).not.toBe(first))
+    await waitFor(async () => expect(await currentPhotoSrc()).not.toBe(first))
     const stored = await photoState.getValue()
-    expect(link.getAttribute('href')).toContain(`photo=${stored?.currentId}`)
+    expect(await currentPhotoSrc()).toContain(`/photos/${stored?.currentId}/`)
   })
 
   it('shows the bundled photo when offline with nothing cached', async () => {
     render(<App />)
 
-    expect((await creditLink()).getAttribute('href')).toBe('https://logankuzyk.com/photography')
+    expect(await currentPhotoSrc()).toMatch(/\/fallback\.webp$/)
   })
 
   it('hides the clock and the credit when they are switched off', async () => {
-    await seedPhotos()
+    // The credit only has anything to show when the photo carries a location.
+    await manifestCache.setValue({
+      etag: null,
+      fetchedAt: Date.now(),
+      data: makeManifest([makePhoto('a', { location: 'Tofino, BC' })]),
+    })
+    const { unmount } = render(<App />)
+    expect(await screen.findByText('Tofino, BC')).toBeTruthy()
+
+    unmount()
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
@@ -67,7 +86,7 @@ describe('App', () => {
     const { container } = render(<App />)
 
     await waitFor(() => expect(container.querySelector('time')).toBeNull())
-    expect(screen.queryByRole('link', { name: 'View on logankuzyk.com' })).toBeNull()
+    expect(container.querySelector('.credit')).toBeNull()
   })
 
   it('shows saved favourite sites, and hides them when switched off', async () => {
@@ -120,7 +139,7 @@ describe('App', () => {
 
     render(<App />)
 
-    expect((await creditLink()).getAttribute('href')).toContain('photo=a')
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
     // Nothing written, so other open tabs see no change either.
     expect((await photoState.getValue())?.currentId).toBe('a')
   })
