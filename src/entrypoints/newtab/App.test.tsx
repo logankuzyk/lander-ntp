@@ -129,12 +129,14 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
-    fireEvent.change(await screen.findByLabelText('Font'), { target: { value: 'inter' } })
+    fireEvent.change(await screen.findByLabelText('Font'), { target: { value: 'geist' } })
 
     await waitFor(() =>
-      expect(document.documentElement.style.getPropertyValue('--font-display')).toContain('Inter'),
+      expect(document.documentElement.style.getPropertyValue('--font-display')).toContain(
+        'Geist Sans',
+      ),
     )
-    expect((await settingsItem.getValue()).font).toBe('inter')
+    expect((await settingsItem.getValue()).font).toBe('geist')
   })
 
   it('closes the settings panel with Escape', async () => {

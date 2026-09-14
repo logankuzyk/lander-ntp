@@ -41,23 +41,25 @@ export function FavouritesEditor({ favourites, onChange }: FavouritesEditorProps
   return (
     <div class="favourites-editor">
       <ul class="favourites-editor__list">
+        {/* Address above name, matching the add form: a new site keeps its field order
+            when it moves out of the form and into the list. */}
         {favourites.map((favourite, index) => (
           <li key={favourite.id} class="favourites-editor__row">
-            <input
-              aria-label={`Name for ${favourite.title}`}
-              value={favourite.title}
-              onChange={(event) =>
-                onChange(
-                  updateFavourite(favourites, favourite.id, { title: event.currentTarget.value }),
-                )
-              }
-            />
             <input
               aria-label={`Address for ${favourite.title}`}
               value={favourite.url}
               onChange={(event) =>
                 onChange(
                   updateFavourite(favourites, favourite.id, { url: event.currentTarget.value }),
+                )
+              }
+            />
+            <input
+              aria-label={`Name for ${favourite.title}`}
+              value={favourite.title}
+              onChange={(event) =>
+                onChange(
+                  updateFavourite(favourites, favourite.id, { title: event.currentTarget.value }),
                 )
               }
             />

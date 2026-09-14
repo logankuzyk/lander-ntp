@@ -3,6 +3,9 @@
   --color-bg: #111;
   --color-fg: #fff;
   --text-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  /* Photo cross-fade. --photo-fade is mirrored by FADE_MS in components/Background. */
+  --photo-fade: 1200ms;
+  --photo-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -20,6 +23,8 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-display);
+  /* Instrument Serif ships one weight; render it as drawn rather than faux-bolding it. */
+  font-synthesis-weight: none;
 }
 
 .app {
@@ -76,6 +81,21 @@ body {
   );
 }
 
+.background__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* A layer covering an earlier photo cross-fades in as a whole, once its image is ready. */
+.background__layer--cover {
+  opacity: 0;
+  transition: opacity var(--photo-fade) var(--photo-ease);
+}
+
+.background__layer--cover.is-visible {
+  opacity: 1;
+}
+
 .background__thumb,
 .background__full {
   position: absolute;
@@ -92,14 +112,23 @@ body {
 
 .background__full {
   opacity: 0;
-  transition: opacity 600ms ease;
 }
 
 .background__full.is-loaded {
   opacity: 1;
 }
 
+/*
+ * The first photo has nothing to cross-fade over, so it fades in over its own blurred
+ * thumbnail instead. Covering layers are opaque by the time their layer is revealed, so
+ * they never stack two fades on top of each other.
+ */
+.background__layer:not(.background__layer--cover) .background__full {
+  transition: opacity var(--photo-fade) var(--photo-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .background__layer,
   .background__full {
     transition: none;
   }

@@ -6,7 +6,7 @@ import { SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
 import { favouritesItem } from '@/favourites/storage'
 import { preloadNext } from '@/photos/image'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
-import { FONTS } from '@/settings/fonts'
+import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
 import { Clock } from '@/widgets/Clock/Clock'
@@ -25,14 +25,13 @@ export function App() {
   const canShowInfo = Boolean(photo) && settings.widgets.info
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--font-display', FONTS[settings.font].stack)
+    document.documentElement.style.setProperty('--font-display', fontStack(settings.font))
   }, [settings.font])
 
   return (
     <main class="app">
       {photo && (
         <Background
-          key={photo.id}
           photo={photo}
           onLoad={() => {
             if (upcoming) preloadNext(upcoming)

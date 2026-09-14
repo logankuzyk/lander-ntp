@@ -78,9 +78,9 @@ describe('SettingsPanel', () => {
   it('changes the font', () => {
     const { onChange } = renderPanel()
 
-    fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'fraunces' } })
+    fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'instrument-serif' } })
 
-    expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'fraunces' })
+    expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
   })
 
   it.each([

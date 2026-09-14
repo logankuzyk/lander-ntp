@@ -125,7 +125,6 @@ export function SettingsPanel({
   return (
     <div class="settings">
       {/* Convenience only: Escape and the close button cover keyboard users. */}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div class="settings__backdrop" aria-hidden="true" onClick={onClose} />
       <div
         class="settings__panel"
