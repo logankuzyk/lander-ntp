@@ -38,4 +38,25 @@ describe('Background', () => {
     expect(images).toHaveLength(2)
     images.forEach((image) => expect(image.getAttribute('alt')).toBe(''))
   })
+
+  it('falls back to the bundled photo when the image fails to load', () => {
+    // A cached manifest can outlive the images it points at.
+    const onLoad = vi.fn()
+    const { container } = render(<Background photo={makePhoto('a')} onLoad={onLoad} />)
+
+    const full = () => container.querySelector('.background__full') as HTMLImageElement
+    fireEvent.error(full())
+
+    expect(full().getAttribute('src')).toMatch(/\/fallback\.webp$/)
+    expect(full().getAttribute('srcset')).toBeNull()
+    expect(full().classList.contains('is-loaded')).toBe(false)
+    // The blurred thumbnail came from the same dead manifest entry.
+    expect(container.querySelector('.background__thumb')).toBeNull()
+
+    fireEvent.load(full())
+
+    expect(full().classList.contains('is-loaded')).toBe(true)
+    // The next photo is only worth preloading if the current one actually rendered.
+    expect(onLoad).not.toHaveBeenCalled()
+  })
 })

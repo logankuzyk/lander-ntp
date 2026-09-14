@@ -7,6 +7,8 @@ const HttpUrlSchema = v.pipe(
   v.url(),
 )
 
+const Percentage = v.pipe(v.number(), v.minValue(0), v.maxValue(100))
+
 const SizeSchema = v.object({
   url: HttpUrlSchema,
   width: v.pipe(v.number(), v.integer(), v.minValue(1)),
@@ -17,8 +19,9 @@ const PhotoSchema = v.object({
   alt: v.nullable(v.string()),
   width: v.pipe(v.number(), v.minValue(1)),
   height: v.pipe(v.number(), v.minValue(1)),
-  focalX: v.nullable(v.number()),
-  focalY: v.nullable(v.number()),
+  // Percentages: they go straight into `object-position`, so keep them in range.
+  focalX: v.nullable(Percentage),
+  focalY: v.nullable(Percentage),
   sizes: v.pipe(
     v.array(SizeSchema),
     v.minLength(1),

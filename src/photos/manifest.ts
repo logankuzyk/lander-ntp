@@ -10,6 +10,12 @@ export const MANIFEST_URL =
 /** Serve the cache for this long before revalidating in the background. */
 export const MAX_AGE_MS = 6 * 60 * 60 * 1000
 
+/**
+ * Give up on the network after this long. A first run behind a captive portal or a stalled
+ * connection would otherwise hang forever, leaving the page with no background at all.
+ */
+export const FETCH_TIMEOUT_MS = 5000
+
 /** Shown when there is no usable cache and the network is unavailable. */
 export function fallbackManifest(): Manifest {
   return {
@@ -36,15 +42,19 @@ export function fallbackManifest(): Manifest {
 /**
  * Fetch the manifest, sending If-None-Match when there is a cache. Updates the cache on a
  * valid 200 or a 304 and returns it; returns null (leaving the cache alone) on network
- * errors, bad statuses and invalid data.
+ * errors, timeouts, bad statuses and invalid data.
  */
 export async function revalidateManifest(
   cached: ManifestCache | null,
   now: number,
 ): Promise<ManifestCache | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
   try {
     const response = await fetch(MANIFEST_URL, {
       headers: cached?.etag ? { 'If-None-Match': cached.etag } : {},
+      signal: controller.signal,
     })
 
     if (response.status === 304 && cached) {
@@ -62,6 +72,8 @@ export async function revalidateManifest(
     return next
   } catch {
     return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

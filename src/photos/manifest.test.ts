@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
-import { getManifest, MANIFEST_URL, MAX_AGE_MS } from './manifest'
+import { FETCH_TIMEOUT_MS, getManifest, MANIFEST_URL, MAX_AGE_MS } from './manifest'
 import { manifestCache, type ManifestCache } from './storage'
 
 const NOW = Date.parse('2026-09-11T12:00:00Z')
@@ -41,7 +41,10 @@ describe('getManifest', () => {
       const result = await getManifest(NOW)
 
       expect(result).toMatchObject({ source: 'network', manifest })
-      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, { headers: {} })
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
       expect(await manifestCache.getValue()).toEqual({
         etag: '"v2"',
         fetchedAt: NOW,
@@ -68,6 +71,8 @@ describe('getManifest', () => {
         'a non-http image',
         makeManifest([makePhoto('a', { sizes: [{ url: 'data:x', width: 1 }] })]),
       ],
+      // focalX/focalY go straight into `object-position`.
+      ['an out-of-range focal point', makeManifest([makePhoto('a', { focalX: 150 })])],
     ])('rejects %s', async (_, body) => {
       fetchMock.mockResolvedValueOnce(json(body))
 
@@ -112,7 +117,10 @@ describe('getManifest', () => {
       expect(result).toMatchObject({ source: 'cache', manifest })
       await result.revalidation
 
-      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, { headers: { 'If-None-Match': '"v1"' } })
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: { 'If-None-Match': '"v1"' },
+        signal: expect.any(AbortSignal),
+      })
       expect(await manifestCache.getValue()).toEqual({
         etag: '"v1"',
         fetchedAt: NOW,
@@ -162,7 +170,33 @@ describe('getManifest', () => {
       const result = await getManifest(NOW)
 
       expect(result.source).toBe('network')
-      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, { headers: {} })
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
     })
+  })
+
+  it('gives up on a hanging network and falls back', async () => {
+    // Without the timeout this never settles and the page renders no background at all.
+    vi.useFakeTimers()
+    fetchMock.mockImplementationOnce(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('', 'AbortError')))
+        }),
+    )
+
+    try {
+      const pending = getManifest(NOW)
+      await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS + 1)
+      const result = await pending
+
+      expect(result.source).toBe('fallback')
+      expect(result.manifest.photos).toHaveLength(1)
+      expect(await manifestCache.getValue()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
