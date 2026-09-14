@@ -10,6 +10,8 @@ import { SettingsPanel } from './SettingsPanel'
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
+  // Both features on, so their settings are on screen; collapsing has its own tests.
+  favourites: { ...DEFAULT_SETTINGS.favourites, enabled: true },
 }
 
 const favourites: Favourite[] = [{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }]
@@ -146,5 +148,56 @@ describe('SettingsPanel', () => {
 
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
     expect(document.activeElement).toBe(last)
+  })
+
+  it('puts a feature switch in line with its heading', () => {
+    renderPanel()
+
+    const clock = screen.getByLabelText('Show clock').closest('.settings__section-header')
+    const favourites = screen.getByLabelText('Show favourites').closest('.settings__section-header')
+
+    expect(clock?.querySelector('h3')?.textContent).toBe('Clock')
+    expect(favourites?.querySelector('h3')?.textContent).toBe('Favourites')
+  })
+
+  it('collapses the clock settings when the clock is off', () => {
+    renderPanel({ clock: { ...settings.clock, enabled: false } })
+
+    expect((screen.getByLabelText('Show clock') as HTMLInputElement).checked).toBe(false)
+    expect(screen.queryByLabelText('24-hour time')).toBeNull()
+    expect(screen.queryByLabelText('Show date')).toBeNull()
+    expect(screen.queryByLabelText('Show seconds')).toBeNull()
+  })
+
+  it('collapses the favourites settings, editor included, when favourites are off', () => {
+    renderPanel({ favourites: { ...settings.favourites, enabled: false } })
+
+    expect(screen.queryByLabelText('Style')).toBeNull()
+    expect(screen.queryByLabelText('Size')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove Portfolio' })).toBeNull()
+  })
+
+  it('switches a collapsed feature back on from its heading', () => {
+    const { onChange } = renderPanel({ clock: { ...settings.clock, enabled: false } })
+
+    fireEvent.click(screen.getByLabelText('Show clock'))
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...settings,
+      clock: { ...settings.clock, enabled: true },
+    })
+  })
+
+  it('keeps collapsed settings out of the Tab order', () => {
+    renderPanel({
+      clock: { ...settings.clock, enabled: false },
+      favourites: { ...settings.favourites, enabled: false },
+    })
+    const focusable = [
+      ...screen.getByRole('dialog').querySelectorAll<HTMLElement>('button, select, input'),
+    ]
+
+    expect(focusable.map((element) => element.getAttribute('aria-label'))).not.toContain('Style')
+    expect(focusable.some((element) => element.getAttribute('type') === 'text')).toBe(false)
   })
 })

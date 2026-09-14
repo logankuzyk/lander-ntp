@@ -470,6 +470,19 @@ body {
   opacity: 0.6;
 }
 
+/* Sections that can be switched off carry the switch beside their heading. */
+.settings__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.5rem 0 0.25rem;
+}
+
+.settings__section-header h3 {
+  margin: 0;
+}
+
 .settings__row {
   display: flex;
   align-items: center;
@@ -479,9 +492,12 @@ body {
   font-size: 0.9rem;
 }
 
+.settings input[type='checkbox'] {
+  accent-color: var(--color-fg);
+}
+
 .settings__row input[type='checkbox'] {
   order: 2;
-  accent-color: var(--color-fg);
 }
 
 .settings__row select {
