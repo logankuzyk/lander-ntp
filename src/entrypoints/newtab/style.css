@@ -86,14 +86,27 @@ body {
   inset: 0;
 }
 
-/* A layer covering an earlier photo cross-fades in as a whole, once its image is ready. */
+/*
+ * A layer covering an earlier photo cross-fades in as a whole, once its image is ready.
+ *
+ * This is an animation rather than a transition on purpose. A preloaded photo can fire its
+ * load event in the same frame the layer mounts, before the browser has ever painted the
+ * layer at opacity 0 — a transition then has no start value and the photo simply appears.
+ * An animation carries its own start value, so the fade plays either way.
+ */
 .background__layer--cover {
   opacity: 0;
-  transition: opacity var(--photo-fade) var(--photo-ease);
 }
 
 .background__layer--cover.is-visible {
   opacity: 1;
+  animation: photo-fade-in var(--photo-fade) var(--photo-ease);
+}
+
+@keyframes photo-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .background__thumb,
@@ -123,14 +136,14 @@ body {
  * thumbnail instead. Covering layers are opaque by the time their layer is revealed, so
  * they never stack two fades on top of each other.
  */
-.background__layer:not(.background__layer--cover) .background__full {
-  transition: opacity var(--photo-fade) var(--photo-ease);
+.background__layer:not(.background__layer--cover) .background__full.is-loaded {
+  animation: photo-fade-in var(--photo-fade) var(--photo-ease);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .background__layer,
-  .background__full {
-    transition: none;
+  .background__layer--cover.is-visible,
+  .background__full.is-loaded {
+    animation: none;
   }
 }
 
