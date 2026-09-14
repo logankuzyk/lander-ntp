@@ -20,7 +20,16 @@ jobs:
       # Keeps a release PR open that bumps package.json (the only source of the manifest
       # version) and writes CHANGELOG.md. Merging it tags vX.Y.Z and publishes a GitHub
       # release, which is what triggers publish.yml.
+      #
+      # The token matters. Anything GITHUB_TOKEN does is treated as this workflow's own
+      # doing, and GitHub won't start further runs from it: the release PR gets no
+      # `pull_request_target` run (so the required "Conventional PR title" check never
+      # reports and the PR can't be merged), and the published release never reaches
+      # publish.yml. A PAT or GitHub App token is a separate identity, so both fire.
+      # Falls back to GITHUB_TOKEN so the release PR is still opened if the secret is
+      # missing — it just won't trigger anything downstream.
       - uses: googleapis/release-please-action@v5
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
