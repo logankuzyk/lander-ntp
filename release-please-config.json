@@ -1,5 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "pull-request-header": "Merging this tags the release and starts store submission, which waits on a reviewer.",
   "packages": {
     ".": {
       "release-type": "node",
