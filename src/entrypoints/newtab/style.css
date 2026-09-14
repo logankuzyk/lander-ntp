@@ -2,6 +2,7 @@
   --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --color-bg: #111;
   --color-fg: #fff;
+  --text-shadow: 0 1px 3px rgb(0 0 0 / 45%);
 }
 
 * {
@@ -9,7 +10,8 @@
 }
 
 html,
-body {
+body,
+#app {
   height: 100%;
   margin: 0;
 }
@@ -21,9 +23,12 @@ body {
 }
 
 .app {
+  position: relative;
+  isolation: isolate;
   display: grid;
   place-items: center;
   height: 100%;
+  text-shadow: var(--text-shadow);
 }
 
 .clock {
@@ -31,4 +36,126 @@ body {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+/* Background photo */
+
+.background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* Scrim: keeps text legible over bright skies and snow. */
+.background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 30%),
+    transparent 30%,
+    transparent 65%,
+    rgb(0 0 0 / 45%)
+  );
+}
+
+.background__thumb,
+.background__full {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.background__thumb {
+  filter: blur(24px);
+  transform: scale(1.1);
+}
+
+.background__full {
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.background__full.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background__full {
+    transition: none;
+  }
+}
+
+/* Photo credit */
+
+.credit {
+  position: fixed;
+  left: 1.5rem;
+  bottom: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5em;
+  max-width: calc(100% - 6rem);
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+.credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.credit a:hover,
+.credit a:focus-visible {
+  opacity: 1;
+}
+
+/* Controls */
+
+.controls {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.control {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 25%);
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+  transition:
+    opacity 150ms,
+    background-color 150ms;
+}
+
+.control:hover,
+.control:focus-visible {
+  background: rgb(0 0 0 / 45%);
+  opacity: 1;
+}
+
+.control:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.control svg {
+  filter: drop-shadow(var(--text-shadow));
 }

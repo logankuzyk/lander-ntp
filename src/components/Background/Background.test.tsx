@@ -1,0 +1,62 @@
+import { fireEvent, render, screen } from '@testing-library/preact'
+import { describe, expect, it, vi } from 'vitest'
+
+import { makePhoto } from '@/test/fixtures'
+
+import { Background } from './Background'
+
+const MEDIA = 'https://media.logankuzyk.com/photos/a'
+
+describe('Background', () => {
+  it('shows the blurred thumbnail, then fades in the full image once it loads', () => {
+    const onLoad = vi.fn()
+    const photo = makePhoto('a', { alt: 'Sunset over the Olympics', focalX: 30, focalY: 70 })
+    const { container } = render(<Background photo={photo} onLoad={onLoad} />)
+
+    const thumbnail = container.querySelector('.background__thumb')
+    const full = screen.getByRole('img', { name: 'Sunset over the Olympics' })
+
+    expect(thumbnail?.getAttribute('src')).toBe(`${MEDIA}/pic-300.webp`)
+    expect(full.getAttribute('srcset')).toBe(
+      `${MEDIA}/pic-300.webp 300w, ${MEDIA}/pic-1920.webp 1920w`,
+    )
+    expect(full.getAttribute('sizes')).toBe('100vw')
+    expect(full.getAttribute('src')).toBe(`${MEDIA}/pic-1920.webp`)
+    expect(full.style.objectPosition).toBe('30% 70%')
+    expect(full.classList.contains('is-loaded')).toBe(false)
+
+    fireEvent.load(full)
+
+    expect(full.classList.contains('is-loaded')).toBe(true)
+    expect(onLoad).toHaveBeenCalledOnce()
+  })
+
+  it('treats a photo without alt text as decorative', () => {
+    const { container } = render(<Background photo={makePhoto('a', { alt: null })} />)
+    const images = container.querySelectorAll('img')
+
+    expect(images).toHaveLength(2)
+    images.forEach((image) => expect(image.getAttribute('alt')).toBe(''))
+  })
+
+  it('falls back to the bundled photo when the image fails to load', () => {
+    // A cached manifest can outlive the images it points at.
+    const onLoad = vi.fn()
+    const { container } = render(<Background photo={makePhoto('a')} onLoad={onLoad} />)
+
+    const full = () => container.querySelector('.background__full') as HTMLImageElement
+    fireEvent.error(full())
+
+    expect(full().getAttribute('src')).toMatch(/\/fallback\.webp$/)
+    expect(full().getAttribute('srcset')).toBeNull()
+    expect(full().classList.contains('is-loaded')).toBe(false)
+    // The blurred thumbnail came from the same dead manifest entry.
+    expect(container.querySelector('.background__thumb')).toBeNull()
+
+    fireEvent.load(full())
+
+    expect(full().classList.contains('is-loaded')).toBe(true)
+    // The next photo is only worth preloading if the current one actually rendered.
+    expect(onLoad).not.toHaveBeenCalled()
+  })
+})

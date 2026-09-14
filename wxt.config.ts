@@ -18,6 +18,9 @@ export default defineConfig({
     short_name: 'New Tab',
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
+    // storage.local caches the photo manifest and rotation state. No host permissions: the
+    // manifest endpoint sends `Access-Control-Allow-Origin: *`.
+    permissions: ['storage'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
