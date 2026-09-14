@@ -46,7 +46,12 @@ body {
 }
 
 .clock__time {
-  font-size: clamp(4rem, 12vw, 9rem);
+  /*
+   * 16vw reaches the 9rem cap around a 900px window, so the clock only starts giving up size
+   * on genuinely narrow ones. The 4rem floor is what keeps the longest reading — 12-hour with
+   * seconds, in the widest of the four fonts — inside a 320px window.
+   */
+  font-size: clamp(4rem, 16vw, 9rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -73,13 +78,21 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
+  background-image: linear-gradient(
     to bottom,
     rgb(0 0 0 / 30%),
     transparent 30%,
     transparent 65%,
     rgb(0 0 0 / 45%)
   );
+}
+
+/*
+ * The scrim only reaches the top and bottom edges, leaving the clock over bare photo. This
+ * lays a wash over the whole thing so light text keeps its footing on a bright one.
+ */
+.background--dim::after {
+  background-color: rgb(0 0 0 / 12%);
 }
 
 .background__layer {
