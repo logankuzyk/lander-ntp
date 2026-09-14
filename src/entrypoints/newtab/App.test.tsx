@@ -40,9 +40,15 @@ afterEach(() => {
 })
 
 describe('App', () => {
-  it('renders the clock', () => {
+  it('renders the clock', async () => {
     // <time> has no implicit ARIA role, so query the element directly.
     const { container } = render(<App />)
+
+    // Nothing on the first paint: the clock waits for the stored settings rather than being
+    // drawn from the defaults and corrected.
+    expect(container.querySelector('time')).toBeNull()
+
+    await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
     const clock = container.querySelector('time')
     expect(clock?.getAttribute('datetime')).toBeTruthy()
     expect(clock?.textContent).toMatch(/^\d{1,2}:\d{2}$/)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Controls } from '@/components/Controls/Controls'
@@ -25,7 +25,8 @@ export function App() {
   const { photo, upcoming, next } = usePhotoRotation(settingsLoaded ? settings.frequency : null)
   const canShowInfo = Boolean(photo) && settings.widgets.info
 
-  useEffect(() => {
+  // Before paint, so the clock is never drawn in one font and then redrawn in another.
+  useLayoutEffect(() => {
     document.documentElement.style.setProperty('--font-display', fontStack(settings.font))
   }, [settings.font])
 
@@ -41,14 +42,20 @@ export function App() {
           onLoadingChange={setPhotoLoading}
         />
       )}
-      {settings.favourites.enabled && (
+      {/*
+        Stored settings land a beat after the first paint. Drawing the defaults and then
+        correcting them is a visible jolt — a clock that jumps fonts, or a bar that appears
+        out of nowhere — so anything that depends on them waits for them. The photo already
+        does: usePhotoRotation is held back until the frequency is known.
+      */}
+      {settingsLoaded && settings.favourites.enabled && (
         <Favourites
           favourites={favourites}
           style={settings.favourites.style}
           size={settings.favourites.size}
         />
       )}
-      {settings.clock.enabled && <Clock {...settings.clock} />}
+      {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
       {photo && settings.widgets.credit && <PhotoCredit photo={photo} />}
       {canShowInfo && photo && infoOpen && (
         <PhotoInfo photo={photo} onClose={() => setInfoOpen(false)} />
