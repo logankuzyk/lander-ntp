@@ -30,22 +30,30 @@ export type PhotoRotation = {
 /**
  * Loads the manifest, picks the photo for this visit and, for interval frequencies, moves on
  * while the tab stays open. `next()` always works; with `off` the new photo stays pinned.
+ *
+ * Pass null until the stored frequency has loaded: deciding against the default would move
+ * the photo on in every new tab, whatever the setting says.
  */
-export function usePhotoRotation(frequency: Frequency): PhotoRotation {
+export function usePhotoRotation(frequency: Frequency | null): PhotoRotation {
   const [manifest, setManifest] = useState<Manifest | null>(null)
   const [state, setState] = useState<PhotoState | null>(null)
   const frequencyRef = useRef(frequency)
+  const visited = useRef(false)
 
   useEffect(() => {
     frequencyRef.current = frequency
   }, [frequency])
 
+  // Runs once, on the first known frequency.
   useEffect(() => {
+    if (frequency === null || visited.current) return
+    visited.current = true
+
     let cancelled = false
     void (async () => {
       const { manifest } = await getManifest()
       const stored = await photoState.getValue()
-      const visit = photoForVisit(frequencyRef.current, stored, photoIds(manifest), Date.now())
+      const visit = photoForVisit(frequency, stored, photoIds(manifest), Date.now())
       if (visit !== stored) await photoState.setValue(visit)
       if (cancelled) return
       setManifest(manifest)
@@ -54,7 +62,7 @@ export function usePhotoRotation(frequency: Frequency): PhotoRotation {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [frequency])
 
   /**
    * Draw the next photo. `onlyIfDue` is for the timer: another tab may have advanced first,
@@ -64,8 +72,9 @@ export function usePhotoRotation(frequency: Frequency): PhotoRotation {
     async ({ onlyIfDue = false } = {}) => {
       if (!manifest) return
       const stored = await photoState.getValue()
+      const current = frequencyRef.current
 
-      if (onlyIfDue && stored && !shouldAdvance(frequencyRef.current, stored, Date.now())) {
+      if (onlyIfDue && stored && current && !shouldAdvance(current, stored, Date.now())) {
         setState(stored)
         return
       }
@@ -83,7 +92,7 @@ export function usePhotoRotation(frequency: Frequency): PhotoRotation {
 
   // Follow the shared photo: another tab's timer, or its next-photo button.
   useEffect(() => {
-    if (!sharesPhoto(frequency)) return
+    if (frequency === null || !sharesPhoto(frequency)) return
     let active = true
     void photoState.getValue().then((stored) => {
       if (active && stored) setState(stored)
@@ -98,7 +107,7 @@ export function usePhotoRotation(frequency: Frequency): PhotoRotation {
   }, [frequency])
 
   useEffect(() => {
-    if (!state) return
+    if (!state || frequency === null) return
     const delay = msUntilAdvance(frequency, state, Date.now())
     if (delay === null) return
     const timer = setTimeout(() => {

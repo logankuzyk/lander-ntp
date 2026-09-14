@@ -113,6 +113,18 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Photo details' })).toBeNull())
   })
 
+  it('opening a new tab keeps the photo when the frequency is not every-new-tab', async () => {
+    await seedPhotos()
+    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: 'daily' })
+
+    render(<App />)
+
+    expect((await creditLink()).getAttribute('href')).toContain('photo=a')
+    // Nothing written, so other open tabs see no change either.
+    expect((await photoState.getValue())?.currentId).toBe('a')
+  })
+
   it('applies the chosen font and keeps it', async () => {
     render(<App />)
 

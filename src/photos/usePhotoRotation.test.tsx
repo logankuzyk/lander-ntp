@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
+import type { Frequency } from './rotation'
 import { manifestCache, photoState } from './storage'
 import { usePhotoRotation } from './usePhotoRotation'
 
@@ -94,6 +95,39 @@ describe('usePhotoRotation', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('waits for the stored frequency before deciding anything', async () => {
+    await seed()
+    const { result, rerender } = renderHook(
+      (frequency: Frequency | null) => usePhotoRotation(frequency),
+      { initialProps: null as Frequency | null },
+    )
+
+    // Settings haven't loaded yet: nothing decided, nothing written.
+    await act(async () => {})
+    expect(result.current.photo).toBeNull()
+    expect((await photoState.getValue())?.currentId).toBe('a')
+
+    rerender('daily')
+
+    // The stored setting says daily, so this tab shows the photo it was already on.
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+    expect((await photoState.getValue())?.currentId).toBe('a')
+  })
+
+  it('decides once, and does not re-decide when the setting is changed later', async () => {
+    await seed()
+    const { result, rerender } = renderHook(
+      (frequency: Frequency | null) => usePhotoRotation(frequency),
+      { initialProps: 'daily' as Frequency | null },
+    )
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    rerender('every-visit')
+
+    await act(async () => {})
+    expect(result.current.photo?.id).toBe('a')
   })
 
   it('preloads the photo that comes next', async () => {

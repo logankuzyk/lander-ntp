@@ -15,11 +15,13 @@ import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
 
 export function App() {
-  const [settings, setSettings] = useStorageItem(settingsItem)
+  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
   const [favourites, setFavourites] = useStorageItem(favouritesItem)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
-  const { photo, upcoming, next } = usePhotoRotation(settings.frequency)
+  // Wait for the stored frequency: the fallback is every-visit, which would move the photo on
+  // in every new tab regardless of the setting.
+  const { photo, upcoming, next } = usePhotoRotation(settingsLoaded ? settings.frequency : null)
   const canShowInfo = Boolean(photo) && settings.widgets.info
 
   useEffect(() => {
