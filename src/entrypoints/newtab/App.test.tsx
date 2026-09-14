@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { favouritesItem } from '@/favourites/storage'
 import { manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
@@ -67,6 +68,24 @@ describe('App', () => {
 
     await waitFor(() => expect(container.querySelector('time')).toBeNull())
     expect(screen.queryByRole('link', { name: 'View on logankuzyk.com' })).toBeNull()
+  })
+
+  it('shows saved favourite sites, and hides them when switched off', async () => {
+    await favouritesItem.setValue([{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }])
+    const { unmount } = render(<App />)
+
+    expect((await screen.findByRole('link', { name: 'Portfolio' })).getAttribute('href')).toBe(
+      'https://logankuzyk.com/',
+    )
+
+    unmount()
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      favourites: { ...DEFAULT_SETTINGS.favourites, enabled: false },
+    })
+    render(<App />)
+
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Portfolio' })).toBeNull())
   })
 
   it('applies the chosen font and keeps it', async () => {
