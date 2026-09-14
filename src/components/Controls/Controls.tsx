@@ -6,6 +6,8 @@ const isEditable = (target: EventTarget | null) =>
 
 type ControlsProps = {
   onNext: () => void
+  /** True while the photo being faded in is still loading. */
+  busy?: boolean
   onOpenSettings: () => void
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
@@ -13,7 +15,7 @@ type ControlsProps = {
 }
 
 /** Bottom-right controls. The → and i keys do the same as the buttons. */
-export function Controls({ onNext, onOpenSettings, onToggleInfo, infoOpen }: ControlsProps) {
+export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen }: ControlsProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -28,7 +30,7 @@ export function Controls({ onNext, onOpenSettings, onToggleInfo, infoOpen }: Con
       }
       if (event.key === 'ArrowRight') {
         event.preventDefault()
-        onNext()
+        if (!busy) onNext()
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
@@ -36,16 +38,20 @@ export function Controls({ onNext, onOpenSettings, onToggleInfo, infoOpen }: Con
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onNext, onToggleInfo])
+  }, [onNext, busy, onToggleInfo])
 
   return (
     <div class="controls">
       <button
         type="button"
-        class="control"
+        class={busy ? 'control control--busy' : 'control'}
         aria-label="Next photo"
         title="Next photo (→)"
-        onClick={onNext}
+        aria-busy={busy === true}
+        // Ignored rather than disabled while the next photo loads: each press would stack
+        // another full-resolution image over the one the wait is already for. The button
+        // keeps its place in the Tab order so focus does not jump away mid-press.
+        onClick={busy ? undefined : onNext}
       >
         <svg
           aria-hidden="true"

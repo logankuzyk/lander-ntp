@@ -2,7 +2,11 @@
   --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --color-bg: #111;
   --color-fg: #fff;
-  --text-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  /* Barely there: the scrim over the photo does the work of keeping text legible. */
+  --text-shadow: 0 1px 5px rgb(0 0 0 / 10%);
+  /* Photo cross-fade. --photo-fade is mirrored by FADE_MS in components/Background. */
+  --photo-fade: 1200ms;
+  --photo-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -20,6 +24,8 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-display);
+  /* Instrument Serif ships one weight; render it as drawn rather than faux-bolding it. */
+  font-synthesis-weight: none;
 }
 
 .app {
@@ -40,7 +46,12 @@ body {
 }
 
 .clock__time {
-  font-size: clamp(4rem, 12vw, 9rem);
+  /*
+   * 16vw reaches the 9rem cap around a 900px window, so the clock only starts giving up size
+   * on genuinely narrow ones. The 4rem floor is what keeps the longest reading — 12-hour with
+   * seconds, in the widest of the four fonts — inside a 320px window.
+   */
+  font-size: clamp(4rem, 16vw, 9rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -67,13 +78,49 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
+  background-image: linear-gradient(
     to bottom,
     rgb(0 0 0 / 30%),
     transparent 30%,
     transparent 65%,
     rgb(0 0 0 / 45%)
   );
+}
+
+/*
+ * The scrim only reaches the top and bottom edges, leaving the clock over bare photo. This
+ * lays a wash over the whole thing so light text keeps its footing on a bright one.
+ */
+.background--dim::after {
+  background-color: rgb(0 0 0 / 12%);
+}
+
+.background__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * A layer covering an earlier photo cross-fades in as a whole, once its image is ready.
+ *
+ * This is an animation rather than a transition on purpose. A preloaded photo can fire its
+ * load event in the same frame the layer mounts, before the browser has ever painted the
+ * layer at opacity 0 — a transition then has no start value and the photo simply appears.
+ * An animation carries its own start value, so the fade plays either way.
+ */
+.background__layer--cover {
+  opacity: 0;
+}
+
+.background__layer--cover.is-visible {
+  opacity: 1;
+  animation: photo-fade-in var(--photo-fade) var(--photo-ease);
+}
+
+@keyframes photo-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .background__thumb,
@@ -92,16 +139,25 @@ body {
 
 .background__full {
   opacity: 0;
-  transition: opacity 600ms ease;
 }
 
 .background__full.is-loaded {
   opacity: 1;
 }
 
+/*
+ * The first photo has nothing to cross-fade over, so it fades in over its own blurred
+ * thumbnail instead. Covering layers are opaque by the time their layer is revealed, so
+ * they never stack two fades on top of each other.
+ */
+.background__layer:not(.background__layer--cover) .background__full.is-loaded {
+  animation: photo-fade-in var(--photo-fade) var(--photo-ease);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .background__full {
-    transition: none;
+  .background__layer--cover.is-visible,
+  .background__full.is-loaded {
+    animation: none;
   }
 }
 
@@ -226,6 +282,7 @@ body {
 }
 
 .control {
+  position: relative;
   display: grid;
   place-items: center;
   width: 2.5rem;
@@ -255,6 +312,30 @@ body {
 
 .control svg {
   filter: drop-shadow(var(--text-shadow));
+}
+
+/* A cross-fade holds the old photo until the new one is ready, so the button that was
+   pressed carries the wait. */
+.control--busy::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 1.5px solid rgb(255 255 255 / 25%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: control-spin 800ms linear infinite;
+}
+
+@keyframes control-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control--busy::after {
+    animation: none;
+  }
 }
 
 /* Favourites */
@@ -403,6 +484,19 @@ body {
   opacity: 0.6;
 }
 
+/* Sections that can be switched off carry the switch beside their heading. */
+.settings__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.5rem 0 0.25rem;
+}
+
+.settings__section-header h3 {
+  margin: 0;
+}
+
 .settings__row {
   display: flex;
   align-items: center;
@@ -412,9 +506,12 @@ body {
   font-size: 0.9rem;
 }
 
+.settings input[type='checkbox'] {
+  accent-color: var(--color-fg);
+}
+
 .settings__row input[type='checkbox'] {
   order: 2;
-  accent-color: var(--color-fg);
 }
 
 .settings__row select {
@@ -474,6 +571,18 @@ body {
   padding: 0.5rem;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 0.5rem;
+}
+
+.favourites-editor__field {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.favourites-editor__field > span {
+  font-size: 0.75rem;
+  opacity: 0.6;
 }
 
 .favourites-editor input {

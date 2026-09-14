@@ -3,11 +3,14 @@ import { useState } from 'preact/hooks'
 import {
   addFavourite,
   moveFavourite,
+  normalizeUrl,
   removeFavourite,
   updateFavourite,
   MAX_FAVOURITES,
   type Favourite,
 } from '@/favourites/schema'
+
+const ADDRESS_ERROR = 'Enter a site address, like logankuzyk.com'
 
 type FavouritesEditorProps = {
   favourites: Favourite[]
@@ -28,7 +31,7 @@ export function FavouritesEditor({ favourites, onChange }: FavouritesEditorProps
 
     const next = addFavourite(favourites, { title, url })
     if (next.length === favourites.length) {
-      setError('Enter a site address, like logankuzyk.com')
+      setError(ADDRESS_ERROR)
       return
     }
 
@@ -41,26 +44,43 @@ export function FavouritesEditor({ favourites, onChange }: FavouritesEditorProps
   return (
     <div class="favourites-editor">
       <ul class="favourites-editor__list">
+        {/* Address above name, matching the add form: a new site keeps its field order
+            when it moves out of the form and into the list. */}
         {favourites.map((favourite, index) => (
           <li key={favourite.id} class="favourites-editor__row">
-            <input
-              aria-label={`Name for ${favourite.title}`}
-              value={favourite.title}
-              onChange={(event) =>
-                onChange(
-                  updateFavourite(favourites, favourite.id, { title: event.currentTarget.value }),
-                )
-              }
-            />
-            <input
-              aria-label={`Address for ${favourite.title}`}
-              value={favourite.url}
-              onChange={(event) =>
-                onChange(
-                  updateFavourite(favourites, favourite.id, { url: event.currentTarget.value }),
-                )
-              }
-            />
+            {/* The captions are decorative: each input keeps an aria-label naming its site,
+                so the rows stay tellable apart when read out one after another. */}
+            <label class="favourites-editor__field">
+              <span aria-hidden="true">Address</span>
+              <input
+                aria-label={`Address for ${favourite.title}`}
+                value={favourite.url}
+                onChange={(event) => {
+                  const input = event.currentTarget
+                  if (!normalizeUrl(input.value)) {
+                    // An address that can't be used leaves the stored one in place, so say so
+                    // and put it back rather than letting the field show something that isn't.
+                    setError(ADDRESS_ERROR)
+                    input.value = favourite.url
+                    return
+                  }
+                  setError(null)
+                  onChange(updateFavourite(favourites, favourite.id, { url: input.value }))
+                }}
+              />
+            </label>
+            <label class="favourites-editor__field">
+              <span aria-hidden="true">Name</span>
+              <input
+                aria-label={`Name for ${favourite.title}`}
+                value={favourite.title}
+                onChange={(event) =>
+                  onChange(
+                    updateFavourite(favourites, favourite.id, { title: event.currentTarget.value }),
+                  )
+                }
+              />
+            </label>
             <div class="favourites-editor__actions">
               <button
                 type="button"
@@ -91,18 +111,24 @@ export function FavouritesEditor({ favourites, onChange }: FavouritesEditorProps
       </ul>
 
       <form class="favourites-editor__add" onSubmit={add}>
-        <input
-          aria-label="Site address"
-          placeholder="logankuzyk.com"
-          value={url}
-          onInput={(event) => setUrl(event.currentTarget.value)}
-        />
-        <input
-          aria-label="Name (optional)"
-          placeholder="Name (optional)"
-          value={title}
-          onInput={(event) => setTitle(event.currentTarget.value)}
-        />
+        <label class="favourites-editor__field">
+          <span aria-hidden="true">Address</span>
+          <input
+            aria-label="Site address"
+            placeholder="logankuzyk.com"
+            value={url}
+            onInput={(event) => setUrl(event.currentTarget.value)}
+          />
+        </label>
+        <label class="favourites-editor__field">
+          <span aria-hidden="true">Name</span>
+          <input
+            aria-label="Name (optional)"
+            placeholder="Optional"
+            value={title}
+            onInput={(event) => setTitle(event.currentTarget.value)}
+          />
+        </label>
         <button type="submit">Add site</button>
       </form>
       {error && (

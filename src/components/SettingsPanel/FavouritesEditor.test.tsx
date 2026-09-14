@@ -101,4 +101,43 @@ describe('FavouritesEditor', () => {
 
     expect(onChange.mock.calls[0]?.[0]?.map((f: Favourite) => f.id)).toEqual(['2', '1'])
   })
+
+  it('explains an address it cannot use instead of silently keeping the old one', () => {
+    const { onChange } = renderEditor()
+    const address = screen.getByLabelText('Address for Docs') as HTMLInputElement
+
+    fireEvent.change(address, { target: { value: 'not a url' } })
+
+    expect(screen.getByRole('alert').textContent).toContain('Enter a site address')
+    expect(onChange).not.toHaveBeenCalled()
+    // The field goes back to what is actually stored, rather than showing an address that is not.
+    expect(address.value).toBe('https://example.com/')
+  })
+
+  it('clears the complaint once a usable address is typed', () => {
+    const { onChange } = renderEditor()
+    const address = screen.getByLabelText('Address for Docs')
+
+    fireEvent.change(address, { target: { value: 'not a url' } })
+    fireEvent.change(address, { target: { value: 'docs.dev' } })
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(onChange.mock.calls[0]?.[0]?.[1]).toMatchObject({ url: 'https://docs.dev/' })
+  })
+
+  it('captions both fields so the two boxes in a row can be told apart', () => {
+    renderEditor()
+    // Decorative: the inputs keep aria-labels that name their site.
+    const captions = document.querySelectorAll('.favourites-editor__field > span')
+
+    expect([...captions].map((caption) => caption.textContent)).toEqual([
+      'Address',
+      'Name',
+      'Address',
+      'Name',
+      'Address',
+      'Name',
+    ])
+    captions.forEach((caption) => expect(caption.getAttribute('aria-hidden')).toBe('true'))
+  })
 })

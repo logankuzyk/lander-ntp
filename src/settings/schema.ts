@@ -12,16 +12,12 @@ export type Settings = {
     showSeconds: boolean
   }
   font: FontId
+  /** Lay a slight wash over the photo, so light text holds up over bright ones. */
+  dim: boolean
   favourites: {
     enabled: boolean
     style: 'list' | 'grid'
     size: 's' | 'm' | 'l'
-  }
-  widgets: {
-    /** Location and the link back to logankuzyk.com. */
-    credit: boolean
-    /** EXIF panel. */
-    info: boolean
   }
 }
 
@@ -38,13 +34,12 @@ export const DEFAULT_SETTINGS: Settings = {
     showSeconds: false,
   },
   font: 'system',
+  dim: true,
   favourites: {
+    // On: the bar only draws itself once there is something in it (see widgets/Favourites),
+    // so the default costs a fresh install nothing and keeps existing lists on screen.
     enabled: true,
     style: 'list',
     size: 'm',
-  },
-  widgets: {
-    credit: true,
-    info: true,
   },
 }

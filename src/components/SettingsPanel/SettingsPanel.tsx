@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact'
 import { useEffect, useRef } from 'preact/hooks'
 
 import type { Favourite } from '@/favourites/schema'
@@ -64,6 +65,43 @@ function Choice<T extends string>({ label, value, options, onChange }: ChoicePro
   )
 }
 
+type FeatureSectionProps = {
+  title: string
+  /** Names the switch, which has the heading beside it rather than a label of its own. */
+  toggleLabel: string
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+  children: ComponentChildren
+}
+
+/**
+ * A section whose heading carries the switch for the whole feature. Settings that only apply
+ * while the feature is on are left unrendered when it is off, so they are out of the way of
+ * both the eye and Tab.
+ */
+function FeatureSection({
+  title,
+  toggleLabel,
+  enabled,
+  onEnabledChange,
+  children,
+}: FeatureSectionProps) {
+  return (
+    <section>
+      <div class="settings__section-header">
+        <h3>{title}</h3>
+        <input
+          type="checkbox"
+          aria-label={toggleLabel}
+          checked={enabled}
+          onChange={(event) => onEnabledChange(event.currentTarget.checked)}
+        />
+      </div>
+      {enabled && children}
+    </section>
+  )
+}
+
 type SettingsPanelProps = {
   settings: Settings
   onChange: (settings: Settings) => void
@@ -125,7 +163,6 @@ export function SettingsPanel({
   return (
     <div class="settings">
       {/* Convenience only: Escape and the close button cover keyboard users. */}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div class="settings__backdrop" aria-hidden="true" onClick={onClose} />
       <div
         class="settings__panel"
@@ -165,15 +202,19 @@ export function SettingsPanel({
             options={FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const)}
             onChange={(frequency) => onChange({ ...settings, frequency })}
           />
+          <Toggle
+            label="Dim the photo"
+            checked={settings.dim}
+            onChange={(dim) => onChange({ ...settings, dim })}
+          />
         </section>
 
-        <section>
-          <h3>Clock</h3>
-          <Toggle
-            label="Show clock"
-            checked={settings.clock.enabled}
-            onChange={(enabled) => clock({ enabled })}
-          />
+        <FeatureSection
+          title="Clock"
+          toggleLabel="Show clock"
+          enabled={settings.clock.enabled}
+          onEnabledChange={(enabled) => clock({ enabled })}
+        >
           <Toggle
             label="24-hour time"
             checked={!settings.clock.hour12}
@@ -189,15 +230,14 @@ export function SettingsPanel({
             checked={settings.clock.showSeconds}
             onChange={(showSeconds) => clock({ showSeconds })}
           />
-        </section>
+        </FeatureSection>
 
-        <section>
-          <h3>Favourites</h3>
-          <Toggle
-            label="Show favourites"
-            checked={settings.favourites.enabled}
-            onChange={(enabled) => favouriteSettings({ enabled })}
-          />
+        <FeatureSection
+          title="Favourites"
+          toggleLabel="Show favourites"
+          enabled={settings.favourites.enabled}
+          onEnabledChange={(enabled) => favouriteSettings({ enabled })}
+        >
           <Choice<Settings['favourites']['style']>
             label="Style"
             value={settings.favourites.style}
@@ -218,7 +258,7 @@ export function SettingsPanel({
             onChange={(size) => favouriteSettings({ size })}
           />
           <FavouritesEditor favourites={favourites} onChange={onFavouritesChange} />
-        </section>
+        </FeatureSection>
 
         <section>
           <h3>Appearance</h3>
@@ -227,22 +267,6 @@ export function SettingsPanel({
             value={settings.font}
             options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
             onChange={(font) => onChange({ ...settings, font })}
-          />
-        </section>
-
-        <section>
-          <h3>Widgets</h3>
-          <Toggle
-            label="Show photo credit"
-            checked={settings.widgets.credit}
-            onChange={(credit) =>
-              onChange({ ...settings, widgets: { ...settings.widgets, credit } })
-            }
-          />
-          <Toggle
-            label="Show photo details"
-            checked={settings.widgets.info}
-            onChange={(info) => onChange({ ...settings, widgets: { ...settings.widgets, info } })}
           />
         </section>
       </div>
