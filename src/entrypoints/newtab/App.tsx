@@ -34,6 +34,7 @@ export function App() {
       {photo && (
         <Background
           photo={photo}
+          dim={settings.dim}
           onLoad={() => {
             if (upcoming) preloadNext(upcoming)
           }}

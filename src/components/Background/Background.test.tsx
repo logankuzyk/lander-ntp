@@ -67,6 +67,17 @@ describe('Background', () => {
     expect(onLoad).not.toHaveBeenCalled()
   })
 
+  it('washes the photo when asked, and leaves it alone otherwise', () => {
+    const { container, rerender } = render(<Background photo={makePhoto('a')} dim />)
+    const background = () => container.querySelector('.background') as HTMLElement
+
+    expect(background().classList.contains('background--dim')).toBe(true)
+
+    rerender(<Background photo={makePhoto('a')} dim={false} />)
+
+    expect(background().classList.contains('background--dim')).toBe(false)
+  })
+
   describe('changing photo', () => {
     beforeEach(() => vi.useFakeTimers())
     afterEach(() => vi.useRealTimers())

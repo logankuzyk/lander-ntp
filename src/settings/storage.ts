@@ -3,6 +3,9 @@ import { storage } from 'wxt/utils/storage'
 import type { FontId } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 
+/** Everything up to v2, before the photo wash was a setting. */
+type SettingsBeforeDim = Omit<Settings, 'dim'>
+
 /** v1's font choices, mapped onto the logankuzyk.com typefaces that replaced them. */
 const REPLACED_FONTS: Record<string, FontId> = {
   inter: 'geist',
@@ -17,12 +20,14 @@ const REPLACED_FONTS: Record<string, FontId> = {
  */
 export const settingsItem = storage.defineItem<Settings>('sync:settings', {
   fallback: DEFAULT_SETTINGS,
-  version: 2,
+  version: 3,
   migrations: {
     // v2 swapped the font list for the ones the website uses.
-    2: (settings: Settings): Settings => ({
+    2: (settings: SettingsBeforeDim): SettingsBeforeDim => ({
       ...settings,
       font: REPLACED_FONTS[settings.font] ?? settings.font,
     }),
+    // v3 added the photo wash. Installs from before it get it on, like a fresh one.
+    3: (settings: SettingsBeforeDim): Settings => ({ ...settings, dim: true }),
   },
 })

@@ -202,6 +202,11 @@ export function SettingsPanel({
             options={FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const)}
             onChange={(frequency) => onChange({ ...settings, frequency })}
           />
+          <Toggle
+            label="Dim the photo"
+            checked={settings.dim}
+            onChange={(dim) => onChange({ ...settings, dim })}
+          />
         </section>
 
         <FeatureSection

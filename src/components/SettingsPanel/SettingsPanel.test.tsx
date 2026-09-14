@@ -49,6 +49,14 @@ describe('SettingsPanel', () => {
     expect(onChange).toHaveBeenCalledWith({ ...settings, frequency: 'daily' })
   })
 
+  it('switches the photo wash off', () => {
+    const { onChange } = renderPanel()
+
+    fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+    expect(onChange).toHaveBeenCalledWith({ ...settings, dim: false })
+  })
+
   it('switches to 24-hour time', () => {
     const { onChange } = renderPanel()
     const toggle = screen.getByLabelText('24-hour time') as HTMLInputElement

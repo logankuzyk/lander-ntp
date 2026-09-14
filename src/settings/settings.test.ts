@@ -10,6 +10,7 @@ describe('DEFAULT_SETTINGS', () => {
       frequency: 'every-visit',
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
+      dim: true,
       favourites: { enabled: false, style: 'list', size: 'm' },
       widgets: { credit: true, info: true },
     })
@@ -38,6 +39,26 @@ describe('settingsItem', () => {
     await settingsItem.migrate()
 
     expect(await settingsItem.getValue()).toMatchObject({ font: 'instrument-serif' })
+  })
+
+  it('switches the photo wash on for installs that predate it', async () => {
+    const beforeDim: Record<string, unknown> = { ...DEFAULT_SETTINGS }
+    delete beforeDim.dim
+    await settingsItem.setValue(beforeDim as unknown as Settings)
+    await settingsItem.setMeta({ v: 2 })
+
+    await settingsItem.migrate()
+
+    expect(await settingsItem.getValue()).toMatchObject({ dim: true })
+  })
+
+  it('leaves a stored photo wash choice alone', async () => {
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, dim: false })
+    await settingsItem.setMeta({ v: 3 })
+
+    await settingsItem.migrate()
+
+    expect(await settingsItem.getValue()).toMatchObject({ dim: false })
   })
 
   it('leaves the rest of the settings alone while migrating', async () => {

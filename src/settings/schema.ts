@@ -12,6 +12,8 @@ export type Settings = {
     showSeconds: boolean
   }
   font: FontId
+  /** Lay a slight wash over the photo, so light text holds up over bright ones. */
+  dim: boolean
   favourites: {
     enabled: boolean
     style: 'list' | 'grid'
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
     showSeconds: false,
   },
   font: 'system',
+  dim: true,
   favourites: {
     // Off until there is something to show: an empty favourites bar is just a gap.
     enabled: false,

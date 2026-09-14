@@ -90,6 +90,8 @@ type Layer = {
 
 type BackgroundProps = {
   photo: Photo
+  /** Lay a slight wash over the photo, so light text holds up over bright ones. */
+  dim?: boolean
   /** Called once the full-resolution image has loaded. */
   onLoad?: () => void
   /**
@@ -107,7 +109,7 @@ type BackgroundProps = {
  *
  * Under prefers-reduced-motion the swap is instant.
  */
-export function Background({ photo, onLoad, onLoadingChange }: BackgroundProps) {
+export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundProps) {
   const [layers, setLayers] = useState<Layer[]>(() => [{ key: 0, photo, covering: false }])
   const [revealedKey, setRevealedKey] = useState(0)
   const nextKey = useRef(0)
@@ -148,7 +150,7 @@ export function Background({ photo, onLoad, onLoadingChange }: BackgroundProps) 
   }, [onLoadingChange])
 
   return (
-    <div class="background">
+    <div class={dim ? 'background background--dim' : 'background'}>
       {layers.map((layer) => (
         <PhotoLayer
           key={layer.key}
