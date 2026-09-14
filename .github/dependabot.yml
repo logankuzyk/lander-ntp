@@ -10,6 +10,16 @@ updates:
     groups:
       dependencies:
         patterns: ['*']
+    ignore:
+      # Vite 8 (rolldown) breaks WXT 0.21's config loader: "Class extends value undefined",
+      # reported as "Builder not found. Make sure vite is installed."
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
+      # eslint-plugin-jsx-a11y doesn't support ESLint 10 yet, so npm fails with ERESOLVE.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: '@eslint/js'
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
