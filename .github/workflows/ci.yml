@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # Every PR, not just those into main, so stacked branches are checked too.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 

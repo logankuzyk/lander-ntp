@@ -19,8 +19,9 @@ export default defineConfig({
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
     // storage.local caches the photo manifest and rotation state. No host permissions: the
-    // manifest endpoint sends `Access-Control-Allow-Origin: *`.
-    permissions: ['storage'],
+    // manifest endpoint sends `Access-Control-Allow-Origin: *`. `favicon` reads Chromium's own
+    // favicon cache for favourite sites; Firefox has no such API and uses a letter monogram.
+    permissions: browser === 'firefox' ? ['storage'] : ['storage', 'favicon'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {

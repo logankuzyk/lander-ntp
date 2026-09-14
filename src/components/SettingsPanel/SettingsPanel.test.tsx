@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { Favourite } from '@/favourites/schema'
+
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 
 import { SettingsPanel } from './SettingsPanel'
@@ -10,17 +12,22 @@ const settings: Settings = {
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
 }
 
+const favourites: Favourite[] = [{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }]
+
 const renderPanel = (overrides: Partial<Settings> = {}) => {
   const onChange = vi.fn()
   const onClose = vi.fn()
+  const onFavouritesChange = vi.fn()
   render(
     <SettingsPanel
       settings={{ ...settings, ...overrides }}
       onChange={onChange}
+      favourites={favourites}
+      onFavouritesChange={onFavouritesChange}
       onClose={onClose}
     />,
   )
-  return { onChange, onClose }
+  return { onChange, onClose, onFavouritesChange }
 }
 
 describe('SettingsPanel', () => {
@@ -74,6 +81,31 @@ describe('SettingsPanel', () => {
     fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'fraunces' } })
 
     expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'fraunces' })
+  })
+
+  it.each([
+    ['Show favourites', 'enabled', false],
+    ['Style', 'style', 'grid'],
+    ['Size', 'size', 'l'],
+  ])('changes the favourites %s setting', (label, key, value) => {
+    const { onChange } = renderPanel()
+    const control = screen.getByLabelText(label)
+
+    if (typeof value === 'boolean') fireEvent.click(control)
+    else fireEvent.change(control, { target: { value } })
+
+    expect(onChange).toHaveBeenCalledWith({
+      ...settings,
+      favourites: { ...settings.favourites, [key]: value },
+    })
+  })
+
+  it('edits the favourites list', () => {
+    const { onFavouritesChange } = renderPanel()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Portfolio' }))
+
+    expect(onFavouritesChange).toHaveBeenCalledWith([])
   })
 
   it('toggles the photo credit', () => {
