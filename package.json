@@ -1,5 +1,5 @@
 {
-  "name": "ntp",
+  "name": "lander-ntp",
   "private": true,
   "version": "0.1.0",
   "description": "A minimal new tab page featuring photography from logankuzyk.com",

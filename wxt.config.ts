@@ -25,7 +25,7 @@ export default defineConfig({
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
-          id: 'ntp@logankuzyk.com',
+          id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',
           data_collection_permissions: { required: ['none'] },
         },
