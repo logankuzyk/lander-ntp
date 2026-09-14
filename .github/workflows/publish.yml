@@ -23,6 +23,18 @@ jobs:
     runs-on: ubuntu-latest
     # Gated on a required reviewer, and holds the store credentials.
     environment: store-publish
+    # Job-wide so the credential check and the submission itself read the same values.
+    env:
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+      FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+      FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -34,25 +46,55 @@ jobs:
       # Also builds the Firefox sources zip that AMO review needs.
       - run: npm run zip:all
 
+      # Every run keeps the zips, so a manual run is a way to get installable builds
+      # without any store credentials set up.
+      - name: Upload the zips as artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ntp-zips
+          path: .output/*.zip
+          if-no-files-found: error
+          # WXT's output dir is dot-prefixed, which upload-artifact skips by default.
+          include-hidden-files: true
+
       - name: Attach the zips to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" .output/*.zip --clobber
 
+      # Submitting is opt-in: until the store secrets exist this workflow is just a builder.
+      # A half-filled set is treated as a mistake rather than a reason to skip, so a typo in
+      # one secret name can't quietly turn a real release into a no-op.
+      - name: Check for store credentials
+        id: credentials
+        run: |
+          set -euo pipefail
+
+          required=(
+            CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN
+            FIREFOX_EXTENSION_ID FIREFOX_JWT_ISSUER FIREFOX_JWT_SECRET
+            EDGE_PRODUCT_ID EDGE_CLIENT_ID EDGE_API_KEY
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name:-}" ] || missing+=("$name")
+          done
+
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          elif [ "${#missing[@]}" -eq "${#required[@]}" ]; then
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::No store credentials configured, so nothing was submitted. Download the zips from this run and upload them to the stores by hand.'
+          else
+            echo "::error::Store credentials are only partially configured. Missing: ${missing[*]}"
+            exit 1
+          fi
+
       - name: Submit to the stores
+        if: steps.credentials.outputs.configured == 'true'
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
-          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
-          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
-          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
-          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
-          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
         run: |
           set -euo pipefail
           if [ "$DRY_RUN" = "true" ]; then
