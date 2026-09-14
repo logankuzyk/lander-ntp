@@ -12,12 +12,15 @@ import { useStorageItem } from '@/settings/useStorageItem'
 import { Clock } from '@/widgets/Clock/Clock'
 import { Favourites } from '@/widgets/Favourites/Favourites'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
+import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
 
 export function App() {
   const [settings, setSettings] = useStorageItem(settingsItem)
   const [favourites, setFavourites] = useStorageItem(favouritesItem)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
   const { photo, upcoming, next } = usePhotoRotation(settings.frequency)
+  const canShowInfo = Boolean(photo) && settings.widgets.info
 
   useEffect(() => {
     document.documentElement.style.setProperty('--font-display', FONTS[settings.font].stack)
@@ -43,7 +46,15 @@ export function App() {
       )}
       {settings.clock.enabled && <Clock {...settings.clock} />}
       {photo && settings.widgets.credit && <PhotoCredit photo={photo} />}
-      <Controls onNext={next} onOpenSettings={() => setSettingsOpen(true)} />
+      {canShowInfo && photo && infoOpen && (
+        <PhotoInfo photo={photo} onClose={() => setInfoOpen(false)} />
+      )}
+      <Controls
+        onNext={next}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onToggleInfo={canShowInfo ? () => setInfoOpen((open) => !open) : undefined}
+        infoOpen={infoOpen}
+      />
       {settingsOpen && (
         <SettingsPanel
           settings={settings}

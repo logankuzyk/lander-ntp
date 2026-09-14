@@ -108,14 +108,17 @@ describe('SettingsPanel', () => {
     expect(onFavouritesChange).toHaveBeenCalledWith([])
   })
 
-  it('toggles the photo credit', () => {
+  it.each([
+    ['Show photo credit', 'credit'],
+    ['Show photo details', 'info'],
+  ])('toggles %s', (label, key) => {
     const { onChange } = renderPanel()
 
-    fireEvent.click(screen.getByLabelText('Show photo credit'))
+    fireEvent.click(screen.getByLabelText(label))
 
     expect(onChange).toHaveBeenCalledWith({
       ...settings,
-      widgets: { ...settings.widgets, credit: false },
+      widgets: { ...settings.widgets, [key]: false },
     })
   })
 

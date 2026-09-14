@@ -239,6 +239,11 @@ export function SettingsPanel({
               onChange({ ...settings, widgets: { ...settings.widgets, credit } })
             }
           />
+          <Toggle
+            label="Show photo details"
+            checked={settings.widgets.info}
+            onChange={(info) => onChange({ ...settings, widgets: { ...settings.widgets, info } })}
+          />
         </section>
       </div>
     </div>
