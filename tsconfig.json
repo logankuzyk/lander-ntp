@@ -7,5 +7,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "types": ["vitest/globals"]
-  }
+  },
+  // Replaces WXT's list, so it repeats it. The Worker has its own tsconfig and runtime types.
+  "exclude": ["**/node_modules", ".output", "telemetry-worker"]
 }

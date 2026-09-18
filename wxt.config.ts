@@ -18,15 +18,21 @@ export default defineConfig({
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
     // storage.local caches the photo manifest and rotation state. No host permissions: the
-    // manifest endpoint sends `Access-Control-Allow-Origin: *`. `favicon` reads Chromium's own
-    // favicon cache for favourite sites; Firefox has no such API and uses a letter monogram.
+    // manifest and telemetry endpoints send `Access-Control-Allow-Origin: *`. `favicon` reads
+    // Chromium's own favicon cache for favourite sites; Firefox has no such API and uses a
+    // letter monogram.
     permissions: browser === 'firefox' ? ['storage'] : ['storage', 'favicon'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
           id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',
-          data_collection_permissions: { required: ['none'] },
+          // Nothing is needed to install. Usage data (src/telemetry) is the optional switch
+          // Firefox shows in the install prompt and in about:addons.
+          data_collection_permissions: {
+            required: ['none'],
+            optional: ['technicalAndInteraction'],
+          },
         },
         // data_collection_permissions landed in Firefox for Android 142.
         gecko_android: { strict_min_version: '142.0' },
