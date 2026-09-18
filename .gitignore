@@ -5,6 +5,7 @@ node_modules/
 .output/
 .wxt/
 web-ext-artifacts/
+web-ext.config.ts
 stats.html
 
 # Tests
