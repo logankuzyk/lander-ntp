@@ -1,11 +1,12 @@
 import type { ComponentChildren } from 'preact'
-import { useEffect, useRef } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import type { Favourite } from '@/favourites/schema'
 
 import { FREQUENCIES, type Frequency } from '@/photos/rotation'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
+import { browserConsent, setBrowserConsent } from '@/telemetry/consent'
 
 import { FavouritesEditor } from './FavouritesEditor'
 
@@ -98,6 +99,54 @@ function FeatureSection({
         />
       </div>
       {enabled && children}
+    </section>
+  )
+}
+
+type PrivacySectionProps = {
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+}
+
+/**
+ * The usage data switch. On Firefox it also drives the browser's own consent, which gates
+ * sending as well, so the switch shows the two together and flipping it sets both.
+ */
+function PrivacySection({ enabled, onEnabledChange }: PrivacySectionProps) {
+  // Undefined until known; null where the browser has no consent of its own (Chrome, Edge).
+  const [browserAllows, setBrowserAllows] = useState<boolean | null>()
+
+  useEffect(() => {
+    let active = true
+    browserConsent()
+      .catch(() => null)
+      .then((allows) => {
+        if (active) setBrowserAllows(allows)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const onChange = (next: boolean) => {
+    onEnabledChange(next)
+    if (browserAllows === null || browserAllows === undefined) return
+    setBrowserConsent(next)
+      .catch(() => !next)
+      .then(setBrowserAllows)
+  }
+
+  return (
+    <section>
+      <h3>Privacy</h3>
+      <Toggle
+        label="Share anonymous usage data"
+        checked={enabled && browserAllows !== false}
+        onChange={onChange}
+      />
+      <p class="settings__note">
+        A daily check-in with your settings, from a random id. Never the sites you visit.
+      </p>
     </section>
   )
 }
@@ -269,6 +318,11 @@ export function SettingsPanel({
             onChange={(font) => onChange({ ...settings, font })}
           />
         </section>
+
+        <PrivacySection
+          enabled={settings.telemetry}
+          onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
+        />
       </div>
     </div>
   )

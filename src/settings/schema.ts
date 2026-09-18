@@ -19,6 +19,8 @@ export type Settings = {
     style: 'list' | 'grid'
     size: 's' | 'm' | 'l'
   }
+  /** Send anonymous usage data (see src/telemetry). Firefox also asks at install. */
+  telemetry: boolean
 }
 
 /** Whether this browser's locale writes times as 12-hour. */
@@ -42,4 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
     style: 'list',
     size: 'm',
   },
+  // On, with the switch in settings and a line in each store listing. Firefox users answer
+  // its own prompt at install, which gates this too (see telemetry/consent).
+  telemetry: true,
 }

@@ -7,10 +7,13 @@ import { DEFAULT_SETTINGS, type Settings } from './schema'
 type Widgets = { widgets?: { credit: boolean; info: boolean } }
 
 /** Everything up to v2, before the photo wash was a setting. */
-type SettingsBeforeDim = Omit<Settings, 'dim'> & Widgets
+type SettingsBeforeDim = Omit<SettingsBeforeTelemetry, 'dim'> & Widgets
+
+/** Everything up to v4, before usage data was a setting. */
+type SettingsBeforeTelemetry = Omit<Settings, 'telemetry'>
 
 /** v3: the wash had arrived, the widget switches had not gone yet. */
-type SettingsWithWidgets = Settings & Widgets
+type SettingsWithWidgets = SettingsBeforeTelemetry & Widgets
 
 /** v1's font choices, mapped onto the logankuzyk.com typefaces that replaced them. */
 const REPLACED_FONTS: Record<string, FontId> = {
@@ -26,7 +29,7 @@ const REPLACED_FONTS: Record<string, FontId> = {
  */
 export const settingsItem = storage.defineItem<Settings>('sync:settings', {
   fallback: DEFAULT_SETTINGS,
-  version: 4,
+  version: 5,
   migrations: {
     // v2 swapped the font list for the ones the website uses.
     2: (settings: SettingsBeforeDim): SettingsBeforeDim => ({
@@ -36,10 +39,12 @@ export const settingsItem = storage.defineItem<Settings>('sync:settings', {
     // v3 added the photo wash. Installs from before it get it on, like a fresh one.
     3: (settings: SettingsBeforeDim): SettingsWithWidgets => ({ ...settings, dim: true }),
     // v4 dropped the widget switches: the credit and the details panel are always available.
-    4: (settings: SettingsWithWidgets): Settings => {
+    4: (settings: SettingsWithWidgets): SettingsBeforeTelemetry => {
       const migrated = { ...settings }
       delete migrated.widgets
       return migrated
     },
+    // v5 added the usage data switch, on as for a fresh install.
+    5: (settings: SettingsBeforeTelemetry): Settings => ({ ...settings, telemetry: true }),
   },
 })
