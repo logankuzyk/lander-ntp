@@ -80,6 +80,8 @@ export function Controls({
           type="button"
           class="control"
           aria-label="Photo details"
+          // Opens and closes the popover itself, so pressing it isn't a click outside.
+          data-popover-toggle
           title="Photo details (i)"
           aria-expanded={infoOpen === true}
           onClick={onToggleInfo}
@@ -105,6 +107,7 @@ export function Controls({
         type="button"
         class="control"
         aria-label="Settings"
+        data-popover-toggle
         title="Settings"
         aria-expanded={settingsOpen === true}
         onClick={onToggleSettings}

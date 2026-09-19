@@ -92,12 +92,27 @@ describe('PhotoInfo', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close photo details' }))
   })
 
-  it('closes with the button and with Escape', () => {
+  it('closes with the button, with Escape and with a click outside', () => {
     const { onClose } = renderInfo(makePhoto('a'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Close photo details' }))
     fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.pointerDown(document.body)
 
-    expect(onClose).toHaveBeenCalledTimes(2)
+    expect(onClose).toHaveBeenCalledTimes(3)
+  })
+
+  it('stays open for a click inside, or on a button that toggles it', () => {
+    const { onClose } = renderInfo(makePhoto('a'))
+    render(
+      <button type="button" data-popover-toggle>
+        Toggle
+      </button>,
+    )
+
+    fireEvent.pointerDown(screen.getByRole('dialog').querySelector('dd, p') as Element)
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Toggle' }))
+
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

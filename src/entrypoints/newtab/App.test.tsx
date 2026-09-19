@@ -169,6 +169,35 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
+  it('closes a popover with a click outside, but not with its own button', async () => {
+    await seedPhotos()
+    render(<App />)
+    // The details button waits for a photo.
+    await currentPhotoSrc()
+    /** A real press: pointerdown, then click. */
+    const press = (element: Element) => {
+      fireEvent.pointerDown(element)
+      fireEvent.click(element)
+    }
+
+    press(await screen.findByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+
+    // The other popover's button switches straight to it.
+    press(screen.getByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: 'Photo details' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+
+    // Its own button closes it, rather than closing and reopening it.
+    press(screen.getByRole('button', { name: 'Photo details' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    press(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    press(document.querySelector('.background') as Element)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
   it('has no gallery button', async () => {
     await seedPhotos()
     render(<App />)

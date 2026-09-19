@@ -52,13 +52,23 @@ describe('SettingsPanel', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
   })
 
-  it('closes with the button and with Escape', () => {
+  it('closes with the button, with Escape and with a click outside', () => {
     const { onClose } = renderPanel()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
     fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.pointerDown(document.body)
 
-    expect(onClose).toHaveBeenCalledTimes(2)
+    expect(onClose).toHaveBeenCalledTimes(3)
+  })
+
+  it('stays open for clicks inside it', () => {
+    const { onClose } = renderPanel()
+
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'Clock' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Tide pools' }))
+
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   describe('sections', () => {
