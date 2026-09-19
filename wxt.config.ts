@@ -48,9 +48,7 @@ export default defineConfig({
     permissions: browser === 'firefox' ? ['storage'] : ['storage', 'favicon'],
     ...(browser === 'firefox' && {
       // Lists the page under Settings > Home > "Homepage and new windows". Firefox keeps that
-      // separate from new tabs, which chrome_url_overrides covers. Chromium rejects non-HTTP(S)
-      // homepage URLs, and its own "New Tab page" homepage/startup options already use the
-      // overridden page, so this is Firefox-only.
+      // separate from new tabs, which chrome_url_overrides covers.
       chrome_settings_overrides: { homepage: 'newtab.html' },
       browser_specific_settings: {
         gecko: {
