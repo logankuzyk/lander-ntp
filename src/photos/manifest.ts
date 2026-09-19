@@ -32,6 +32,7 @@ export function fallbackManifest(): Manifest {
         sizes: [{ url: browser.runtime.getURL('/fallback.webp'), width: 1920 }],
         exif: {},
         location: null,
+        tags: [],
         pageUrl: 'https://logankuzyk.com/photography',
         printUrl: null,
       },
@@ -93,8 +94,10 @@ const usable = (manifest: Manifest) => (manifest.photos.length > 0 ? manifest : 
  */
 export async function getManifest(now = Date.now()): Promise<ManifestResult> {
   const stored = await manifestCache.getValue()
-  // A cache written by an older version may no longer match the schema.
-  const cached = stored && v.is(ManifestSchema, stored.data) ? stored : null
+  // A cache written by an older version may no longer match the schema, or may predate a field
+  // that has a default. Parsing fills those in.
+  const parsed = stored && v.safeParse(ManifestSchema, stored.data)
+  const cached = stored && parsed?.success ? { ...stored, data: parsed.output } : null
 
   if (cached) {
     const stale = now - cached.fetchedAt >= MAX_AGE_MS

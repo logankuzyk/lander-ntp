@@ -3,11 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import { FETCH_TIMEOUT_MS, getManifest, MANIFEST_URL, MAX_AGE_MS } from './manifest'
+import type { Photo } from './schema'
 import { manifestCache, type ManifestCache } from './storage'
 
 const NOW = Date.parse('2026-09-11T12:00:00Z')
 const manifest = makeManifest([makePhoto('a'), makePhoto('b')])
 const updated = makeManifest([makePhoto('c')])
+
+/** A photo as served, or cached, before the manifest carried tags. */
+const withoutTags = (photo: Photo) => {
+  const copy: Partial<Photo> = { ...photo }
+  delete copy.tags
+  return copy as Photo
+}
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -86,6 +94,18 @@ describe('getManifest', () => {
       expect((await getManifest(NOW)).manifest.photos[0]?.id).toBe('fallback')
     })
 
+    it('reads photo tags, and gives photos from a manifest without them none', async () => {
+      const tagged = makePhoto('a', { tags: [{ slug: 'water', name: 'Water' }] })
+      fetchMock.mockResolvedValueOnce(json(makeManifest([tagged, withoutTags(makePhoto('b'))])))
+
+      const { manifest: result } = await getManifest(NOW)
+
+      expect(result.photos.map((photo) => photo.tags)).toEqual([
+        [{ slug: 'water', name: 'Water' }],
+        [],
+      ])
+    })
+
     it('sorts sizes ascending', async () => {
       const [small, large] = makePhoto('a').sizes
       fetchMock.mockResolvedValueOnce(
@@ -157,6 +177,19 @@ describe('getManifest', () => {
 
       expect(result.manifest).toEqual(manifest)
       expect(await manifestCache.getValue()).toEqual({ etag: '"v1"', fetchedAt, data: manifest })
+    })
+
+    it('gives photos in a cache from before tags none', async () => {
+      await manifestCache.setValue({
+        etag: '"v1"',
+        fetchedAt: NOW,
+        data: makeManifest([withoutTags(makePhoto('a'))]),
+      })
+
+      const result = await getManifest(NOW)
+
+      expect(result.source).toBe('cache')
+      expect(result.manifest.photos[0]?.tags).toEqual([])
     })
 
     it('ignores a cache that no longer matches the schema', async () => {

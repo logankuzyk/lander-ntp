@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
+import { storage } from 'wxt/utils/storage'
 
 import { FONTS, fontStack } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 import { settingsItem } from './storage'
 
+/** Settings as 0.1.1 stored them: a flat frequency, and favourite sites. */
+const RELEASE_0_1_1 = {
+  frequency: 'daily',
+  clock: { enabled: false, hour12: true, showDate: true, showSeconds: false },
+  font: 'geist',
+  dim: false,
+  favourites: { enabled: true, style: 'list', size: 'm' },
+}
+
 describe('DEFAULT_SETTINGS', () => {
-  it('starts on a new photo every tab, with the clock on, favourites on and the system font', () => {
+  it('starts cycling all photos every tab, with the clock on and the system font', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      frequency: 'every-visit',
+      photos: { mode: 'cycle', frequency: 'every-visit', tag: null, pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
-      favourites: { enabled: true, style: 'list', size: 'm' },
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()
@@ -25,59 +34,33 @@ describe('settingsItem', () => {
   })
 
   it('round-trips a change', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: 'daily' })
+    const photos = { ...DEFAULT_SETTINGS.photos, frequency: 'daily' as const }
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, photos })
 
-    expect(await settingsItem.getValue()).toMatchObject({ frequency: 'daily' })
+    expect(await settingsItem.getValue()).toMatchObject({ photos })
   })
 
-  it('moves a v1 font choice onto the typeface that replaced it', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, font: 'fraunces' } as unknown as Settings)
-    // setValue stamps the current version, so rewind it to make the migration run.
-    await settingsItem.setMeta({ v: 1 })
+  it('replaces settings stored by 0.1.1 with the defaults', async () => {
+    await storage.setItem('sync:settings', RELEASE_0_1_1)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ font: 'instrument-serif' })
+    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
   })
 
-  it('switches the photo wash on for installs that predate it', async () => {
-    const beforeDim: Record<string, unknown> = { ...DEFAULT_SETTINGS }
-    delete beforeDim.dim
-    await settingsItem.setValue(beforeDim as unknown as Settings)
-    await settingsItem.setMeta({ v: 2 })
+  it('replaces settings synced from a device on 0.1.1 with the defaults', async () => {
+    const seen: (Settings | null)[] = []
+    const unwatch = settingsItem.watch((value) => seen.push(value))
 
-    await settingsItem.migrate()
+    await storage.setItem('sync:settings', RELEASE_0_1_1)
+    unwatch()
 
-    expect(await settingsItem.getValue()).toMatchObject({ dim: true })
+    expect(seen).toEqual([DEFAULT_SETTINGS])
   })
 
-  it('leaves a stored photo wash choice alone', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, dim: false })
-    await settingsItem.setMeta({ v: 3 })
+  it('keeps a font it does not know, which a newer version may have added', async () => {
+    const settings = { ...DEFAULT_SETTINGS, font: 'from-the-future' } as unknown as Settings
+    await settingsItem.setValue(settings)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ dim: false })
-  })
-
-  it('drops the widget switches an older install still has stored', async () => {
-    const withWidgets = { ...DEFAULT_SETTINGS, widgets: { credit: false, info: false } }
-    await settingsItem.setValue(withWidgets as unknown as Settings)
-    await settingsItem.setMeta({ v: 3 })
-
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).not.toHaveProperty('widgets')
-  })
-
-  it('leaves the rest of the settings alone while migrating', async () => {
-    const stored: Settings = { ...DEFAULT_SETTINGS, frequency: 'daily', font: 'system' }
-    await settingsItem.setValue(stored)
-    await settingsItem.setMeta({ v: 1 })
-
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toEqual(stored)
+    expect(await settingsItem.getValue()).toEqual(settings)
   })
 })
 

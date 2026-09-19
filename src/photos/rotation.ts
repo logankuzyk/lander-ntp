@@ -1,5 +1,5 @@
+/** How often cycling moves on to a new photo. */
 export const FREQUENCIES = [
-  'off',
   'every-visit',
   '30s',
   '1m',
@@ -12,6 +12,24 @@ export const FREQUENCIES = [
 ] as const
 
 export type Frequency = (typeof FREQUENCIES)[number]
+
+/** What the rotation runs at: the cycling frequency, or `off` while a photo is pinned. */
+export type Pace = Frequency | 'off'
+
+/** The photo settings (settings.photos). */
+export type PhotoSettings = {
+  /** Cycle through photos, or keep one on screen. */
+  mode: 'cycle' | 'pinned'
+  /** How fast to cycle. Kept while a photo is pinned, for when cycling resumes. */
+  frequency: Frequency
+  /** Only cycle photos with this tag slug; null for all of them. */
+  tag: string | null
+  /** The photo to keep while pinned. Null keeps whichever photo is showing. */
+  pinnedId: string | null
+}
+
+export const paceOf = (photos: PhotoSettings): Pace =>
+  photos.mode === 'pinned' ? 'off' : photos.frequency
 
 export type PhotoState = {
   currentId: string | null
@@ -28,7 +46,7 @@ const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
-const INTERVALS: Partial<Record<Frequency, number>> = {
+const INTERVALS: Partial<Record<Pace, number>> = {
   '30s': 30 * SECOND,
   '1m': MINUTE,
   '5m': 5 * MINUTE,
@@ -42,7 +60,7 @@ const INTERVALS: Partial<Record<Frequency, number>> = {
  * When the current photo is due to change, or null for modes that don't change on a timer
  * (`off`, `every-visit`). `daily` changes at the next local midnight.
  */
-export function nextAdvanceAt(frequency: Frequency, state: PhotoState): number | null {
+export function nextAdvanceAt(frequency: Pace, state: PhotoState): number | null {
   if (frequency === 'daily') {
     const midnight = new Date(state.shownAt)
     midnight.setHours(24, 0, 0, 0)
@@ -53,11 +71,7 @@ export function nextAdvanceAt(frequency: Frequency, state: PhotoState): number |
 }
 
 /** Whether a new visit (or a due timer) should move on from the current photo. */
-export function shouldAdvance(
-  frequency: Frequency,
-  state: PhotoState | null,
-  now: number,
-): boolean {
+export function shouldAdvance(frequency: Pace, state: PhotoState | null, now: number): boolean {
   if (!state?.currentId) return true
   if (frequency === 'off') return false
   if (frequency === 'every-visit') return true
@@ -66,11 +80,7 @@ export function shouldAdvance(
 }
 
 /** Delay for the in-tab timer, or null when the frequency has no timer. */
-export function msUntilAdvance(
-  frequency: Frequency,
-  state: PhotoState,
-  now: number,
-): number | null {
+export function msUntilAdvance(frequency: Pace, state: PhotoState, now: number): number | null {
   const at = nextAdvanceAt(frequency, state)
   return at === null ? null : Math.max(0, at - now)
 }
@@ -120,7 +130,7 @@ export function nextPhoto(
  * to move on or it has left the manifest.
  */
 export function photoForVisit(
-  frequency: Frequency,
+  frequency: Pace,
   state: PhotoState | null,
   ids: readonly string[],
   now: number,
@@ -134,4 +144,60 @@ export function photoForVisit(
     return state
   }
   return nextPhoto(state, ids, now, random)
+}
+
+/**
+ * Show a photo picked by hand. It leaves the bag, so it isn't drawn again straight after.
+ * Ids not in the manifest are ignored.
+ */
+export function choosePhoto(
+  state: PhotoState | null,
+  id: string,
+  ids: readonly string[],
+  now: number,
+  random: () => number = Math.random,
+): PhotoState | null {
+  const available = new Set(ids)
+  if (!available.has(id)) return state
+  const bag = (state?.bag ?? []).filter((queued) => queued !== id && available.has(queued))
+  return { currentId: id, shownAt: now, bag: bag.length > 0 ? bag : refill(ids, id, random) }
+}
+
+export type PhotoIds = {
+  /** Every photo in the manifest. */
+  all: readonly string[]
+  /** The photos being cycled: those with the chosen tag, or all of them. */
+  pool: readonly string[]
+}
+
+/**
+ * The photo to show under the photo settings, when a new tab opens (`visit`) or when the
+ * settings change in an open one.
+ *
+ * - Pinned to a photo in the manifest: that photo.
+ * - Pinned otherwise (no photo named, or it has left): the photo already showing.
+ * - Cycling, on a visit: whatever the frequency says, drawn from the pool.
+ * - Cycling, on a change: the photo showing, unless the pool no longer has it.
+ */
+export function photoForSettings(
+  photos: PhotoSettings,
+  state: PhotoState | null,
+  ids: PhotoIds,
+  now: number,
+  visit: boolean,
+  random: () => number = Math.random,
+): PhotoState {
+  if (photos.mode === 'pinned') {
+    const { pinnedId } = photos
+    if (pinnedId !== null && ids.all.includes(pinnedId)) {
+      if (state?.currentId === pinnedId) return state
+      return choosePhoto(state, pinnedId, ids.all, now, random) ?? nextPhoto(state, ids.all, now)
+    }
+    return photoForVisit('off', state, ids.all, now, random)
+  }
+  if (visit) return photoForVisit(photos.frequency, state, ids.pool, now, random)
+  const current = state?.currentId
+  return state && current != null && ids.pool.includes(current)
+    ? state
+    : nextPhoto(state, ids.pool, now, random)
 }

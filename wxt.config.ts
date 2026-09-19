@@ -23,7 +23,7 @@ export default defineConfig({
   // `npm run dev` browser. Personal overrides (e.g. a Chrome Canary binary) go in a
   // gitignored web-ext.config.ts, which takes precedence.
   webExt: {
-    // Reuse the same profile between runs, so settings, favourites and the cached photo
+    // Reuse the same profile between runs, so settings and the cached photo
     // manifest survive a restart instead of starting from a blank install every time.
     keepProfileChanges: true,
   },
@@ -43,9 +43,8 @@ export default defineConfig({
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
     // storage.local caches the photo manifest and rotation state. No host permissions: the
-    // manifest endpoint sends `Access-Control-Allow-Origin: *`. `favicon` reads Chromium's own
-    // favicon cache for favourite sites; Firefox has no such API and uses a letter monogram.
-    permissions: browser === 'firefox' ? ['storage'] : ['storage', 'favicon'],
+    // manifest endpoint sends `Access-Control-Allow-Origin: *`.
+    permissions: ['storage'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {

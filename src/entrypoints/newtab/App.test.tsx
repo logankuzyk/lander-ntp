@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { favouritesItem } from '@/favourites/storage'
 import { manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
@@ -96,25 +95,6 @@ describe('App', () => {
     expect(container.querySelector('time')).toBeNull()
   })
 
-  it('shows saved favourite sites, and hides them when switched off', async () => {
-    await favouritesItem.setValue([{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }])
-    const { unmount } = render(<App />)
-
-    // On by default, so a list saved before the settings were ever touched stays on screen.
-    expect((await screen.findByRole('link', { name: 'Portfolio' })).getAttribute('href')).toBe(
-      'https://logankuzyk.com/',
-    )
-
-    unmount()
-    await settingsItem.setValue({
-      ...DEFAULT_SETTINGS,
-      favourites: { ...DEFAULT_SETTINGS.favourites, enabled: false },
-    })
-    render(<App />)
-
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Portfolio' })).toBeNull())
-  })
-
   it('opens the photo details panel', async () => {
     await manifestCache.setValue({
       etag: null,
@@ -131,10 +111,108 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
   })
 
+  it('pins a photo picked from the gallery in settings', async () => {
+    await seedPhotos()
+    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: '1h' },
+    })
+    render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('dialog', { name: 'Settings' })
+    fireEvent.click(await within(settings).findByRole('button', { name: 'Photo b' }))
+
+    await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/b/'))
+    await waitFor(async () =>
+      expect((await settingsItem.getValue()).photos).toEqual({
+        mode: 'pinned',
+        frequency: '1h',
+        tag: null,
+        pinnedId: 'b',
+      }),
+    )
+    expect((await photoState.getValue())?.currentId).toBe('b')
+  })
+
+  it('pins the next photo when → is pressed while pinned', async () => {
+    await seedPhotos()
+    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, mode: 'pinned', pinnedId: 'a' },
+    })
+    render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+
+    await waitFor(async () => expect((await settingsItem.getValue()).photos.pinnedId).toBe('b'))
+    expect(await currentPhotoSrc()).toContain('/photos/b/')
+  })
+
+  it('opens one popover at a time', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: 'Photo details' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull()
+
+    // The gear closes what it opened.
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('closes a popover with a click outside, but not with its own button', async () => {
+    await seedPhotos()
+    render(<App />)
+    // The details button waits for a photo.
+    await currentPhotoSrc()
+    /** A real press: pointerdown, then click. */
+    const press = (element: Element) => {
+      fireEvent.pointerDown(element)
+      fireEvent.click(element)
+    }
+
+    press(await screen.findByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+
+    // The other popover's button switches straight to it.
+    press(screen.getByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: 'Photo details' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
+
+    // Its own button closes it, rather than closing and reopening it.
+    press(screen.getByRole('button', { name: 'Photo details' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    press(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    press(document.querySelector('.background') as Element)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('has no gallery button', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    await currentPhotoSrc()
+    expect(screen.queryByRole('button', { name: 'Choose a photo' })).toBeNull()
+  })
+
   it('opening a new tab keeps the photo when the frequency is not every-new-tab', async () => {
     await seedPhotos()
     await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: 'daily' })
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily' },
+    })
 
     render(<App />)
 
@@ -147,6 +225,7 @@ describe('App', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'General' }))
     fireEvent.change(await screen.findByLabelText('Font'), { target: { value: 'geist' } })
 
     await waitFor(() =>

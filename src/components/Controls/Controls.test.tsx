@@ -5,18 +5,19 @@ import { Controls } from './Controls'
 
 const renderControls = ({ withInfo = true, busy = false } = {}) => {
   const onNext = vi.fn()
-  const onOpenSettings = vi.fn()
+  const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
     <Controls
       onNext={onNext}
       busy={busy}
-      onOpenSettings={onOpenSettings}
+      onToggleSettings={onToggleSettings}
+      settingsOpen={false}
       onToggleInfo={withInfo ? onToggleInfo : undefined}
       infoOpen={false}
     />,
   )
-  return { onNext, onOpenSettings, onToggleInfo }
+  return { onNext, onToggleSettings, onToggleInfo }
 }
 
 describe('Controls', () => {
@@ -36,12 +37,14 @@ describe('Controls', () => {
     expect(onNext).toHaveBeenCalledOnce()
   })
 
-  it('opens the settings panel', () => {
-    const { onOpenSettings } = renderControls()
+  it('toggles the settings', () => {
+    const { onToggleSettings } = renderControls()
+    const button = screen.getByRole('button', { name: 'Settings' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(button)
 
-    expect(onOpenSettings).toHaveBeenCalledOnce()
+    expect(onToggleSettings).toHaveBeenCalledOnce()
+    expect(button.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('toggles the photo details from the button and the i key', () => {
@@ -60,6 +63,12 @@ describe('Controls', () => {
     fireEvent.keyDown(window, { key: 'i' })
 
     expect(onNext).not.toHaveBeenCalled()
+  })
+
+  it('has no gallery button: the gallery is in settings', () => {
+    renderControls()
+
+    expect(screen.queryByRole('button', { name: 'Choose a photo' })).toBeNull()
   })
 
   it('ignores shortcuts with modifiers, other keys and typing in a field', () => {

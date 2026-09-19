@@ -23,12 +23,17 @@ export function useStorageItem<T>(
 
   useEffect(() => {
     let active = true
+    // A change can land before the first read resolves; the read is older, so it loses.
+    let changed = false
     void item.getValue().then((stored) => {
       if (!active) return
-      setValue(stored)
+      if (!changed) setValue(stored)
       setLoaded(true)
     })
-    const unwatch = item.watch((next) => setValue(next ?? item.fallback))
+    const unwatch = item.watch((next) => {
+      changed = true
+      setValue(next ?? item.fallback)
+    })
     return () => {
       active = false
       unwatch()
