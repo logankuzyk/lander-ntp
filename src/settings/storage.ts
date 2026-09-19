@@ -1,62 +1,47 @@
+import * as v from 'valibot'
 import { storage } from 'wxt/utils/storage'
 
-import type { Frequency } from '@/photos/rotation'
+import { FREQUENCIES } from '@/photos/rotation'
 
-import type { FontId } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 
-/** The photo credit and details switches, dropped in v4. */
-type Widgets = { widgets?: { credit: boolean; info: boolean } }
-
-/** Up to v4: a flat frequency (`off` pinned whatever was showing) and favourite sites. */
-type SettingsBeforePhotos = Omit<Settings, 'photos'> & {
-  frequency: Frequency | 'off'
-  favourites?: { enabled: boolean; style: 'list' | 'grid'; size: 's' | 'm' | 'l' }
-}
-
-/** Everything up to v2, before the photo wash was a setting. */
-type SettingsBeforeDim = Omit<SettingsBeforePhotos, 'dim'> & Widgets
-
-/** v3: the wash had arrived, the widget switches had not gone yet. */
-type SettingsWithWidgets = SettingsBeforePhotos & Widgets
-
-/** v1's font choices, mapped onto the logankuzyk.com typefaces that replaced them. */
-const REPLACED_FONTS: Record<string, FontId> = {
-  inter: 'geist',
-  'space-grotesk': 'geist',
-  'jetbrains-mono': 'geist-mono',
-  fraunces: 'instrument-serif',
-}
+/**
+ * The shape the page reads. Fonts stay loose: fontStack falls back for one it doesn't know,
+ * as happens when another device is on a newer version.
+ */
+const SettingsSchema = v.object({
+  photos: v.object({
+    mode: v.picklist(['cycle', 'pinned']),
+    frequency: v.picklist(FREQUENCIES),
+    tag: v.nullable(v.string()),
+    pinnedId: v.nullable(v.string()),
+  }),
+  clock: v.object({
+    enabled: v.boolean(),
+    hour12: v.boolean(),
+    showDate: v.boolean(),
+    showSeconds: v.boolean(),
+  }),
+  font: v.string(),
+  dim: v.boolean(),
+})
 
 /**
- * Synced by the browser, so settings follow you between devices. Bump `version` and add a
- * migration when the shape changes.
+ * Settings in any other shape are replaced by the defaults rather than migrated: those stored
+ * by an older release (0.1.1 kept a flat `frequency` and favourite sites), or synced from a
+ * device still running one.
  */
-export const settingsItem = storage.defineItem<Settings>('sync:settings', {
+const current = (value: unknown): Settings =>
+  v.is(SettingsSchema, value) ? (value as Settings) : DEFAULT_SETTINGS
+
+const stored = storage.defineItem<Settings>('sync:settings', { fallback: DEFAULT_SETTINGS })
+
+/** Synced by the browser, so settings follow you between devices. */
+export const settingsItem = {
+  key: stored.key,
   fallback: DEFAULT_SETTINGS,
-  version: 5,
-  migrations: {
-    // v2 swapped the font list for the ones the website uses.
-    2: (settings: SettingsBeforeDim): SettingsBeforeDim => ({
-      ...settings,
-      font: REPLACED_FONTS[settings.font] ?? settings.font,
-    }),
-    // v3 added the photo wash. Installs from before it get it on, like a fresh one.
-    3: (settings: SettingsBeforeDim): SettingsWithWidgets => ({ ...settings, dim: true }),
-    // v4 dropped the widget switches: the credit and the details panel are always available.
-    4: (settings: SettingsWithWidgets): SettingsBeforePhotos => {
-      const migrated = { ...settings }
-      delete migrated.widgets
-      return migrated
-    },
-    // v5 grouped the photo settings, so a picked photo keeps the cycling frequency, and
-    // dropped favourite sites. `off` becomes pinned to the photo already showing.
-    5: ({ frequency, favourites: _, ...settings }: SettingsBeforePhotos): Settings => ({
-      ...settings,
-      photos:
-        frequency === 'off'
-          ? { mode: 'pinned', frequency: 'every-visit', tag: null, pinnedId: null }
-          : { mode: 'cycle', frequency, tag: null, pinnedId: null },
-    }),
-  },
-})
+  getValue: async (): Promise<Settings> => current(await stored.getValue()),
+  setValue: (value: Settings): Promise<void> => stored.setValue(value),
+  watch: (callback: (value: Settings | null) => void): (() => void) =>
+    stored.watch((value) => callback(value === null ? null : current(value))),
+}

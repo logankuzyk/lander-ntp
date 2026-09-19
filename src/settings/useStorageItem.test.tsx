@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/preact
 import { describe, expect, it } from 'vitest'
 
 import { settingsItem } from './storage'
-import { useStorageItem } from './useStorageItem'
+import { useStorageItem, type StorageItemLike } from './useStorageItem'
 
 function FontPicker() {
   const [settings, setSettings, loaded] = useStorageItem(settingsItem)
@@ -53,5 +53,29 @@ describe('useStorageItem', () => {
     })
 
     await waitFor(() => expect(screen.getByRole('button').textContent).toBe('geist-mono'))
+  })
+
+  it('keeps a change that lands before the first read resolves', async () => {
+    let resolveRead: (value: string) => void = () => {}
+    let notify: (value: string | null) => void = () => {}
+    const item: StorageItemLike<string> = {
+      fallback: 'fallback',
+      getValue: () => new Promise((resolve) => (resolveRead = resolve)),
+      setValue: async () => {},
+      watch: (callback) => {
+        notify = callback
+        return () => {}
+      },
+    }
+    function Value() {
+      const [value, , loaded] = useStorageItem(item)
+      return <output>{`${value} ${String(loaded)}`}</output>
+    }
+    render(<Value />)
+
+    act(() => notify('newer'))
+    await act(async () => resolveRead('older'))
+
+    expect(screen.getByRole('status').textContent).toBe('newer true')
   })
 })

@@ -1,23 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { storage } from 'wxt/utils/storage'
 
 import { FONTS, fontStack } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 import { settingsItem } from './storage'
 
-/** Settings as v4 stored them, before the photo settings were grouped. */
-const V4 = {
-  frequency: 'every-visit',
-  clock: DEFAULT_SETTINGS.clock,
-  font: 'system',
-  dim: true,
+/** Settings as 0.1.1 stored them: a flat frequency, and favourite sites. */
+const RELEASE_0_1_1 = {
+  frequency: 'daily',
+  clock: { enabled: false, hour12: true, showDate: true, showSeconds: false },
+  font: 'geist',
+  dim: false,
   favourites: { enabled: true, style: 'list', size: 'm' },
-}
-
-/** Store settings from an older version, so migrate() has something to do. */
-const storeOld = async (settings: Record<string, unknown>, version: number) => {
-  await settingsItem.setValue(settings as unknown as Settings)
-  // setValue stamps the current version, so rewind it to make the migration run.
-  await settingsItem.setMeta({ v: version })
 }
 
 describe('DEFAULT_SETTINGS', () => {
@@ -46,80 +40,27 @@ describe('settingsItem', () => {
     expect(await settingsItem.getValue()).toMatchObject({ photos })
   })
 
-  it('moves a v1 font choice onto the typeface that replaced it', async () => {
-    await storeOld({ ...V4, font: 'fraunces' }, 1)
+  it('replaces settings stored by 0.1.1 with the defaults', async () => {
+    await storage.setItem('sync:settings', RELEASE_0_1_1)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ font: 'instrument-serif' })
+    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
   })
 
-  it('switches the photo wash on for installs that predate it', async () => {
-    const beforeDim: Record<string, unknown> = { ...V4 }
-    delete beforeDim.dim
-    await storeOld(beforeDim, 2)
+  it('replaces settings synced from a device on 0.1.1 with the defaults', async () => {
+    const seen: (Settings | null)[] = []
+    const unwatch = settingsItem.watch((value) => seen.push(value))
 
-    await settingsItem.migrate()
+    await storage.setItem('sync:settings', RELEASE_0_1_1)
+    unwatch()
 
-    expect(await settingsItem.getValue()).toMatchObject({ dim: true })
+    expect(seen).toEqual([DEFAULT_SETTINGS])
   })
 
-  it('leaves a stored photo wash choice alone', async () => {
-    await storeOld({ ...V4, dim: false }, 3)
+  it('keeps a font it does not know, which a newer version may have added', async () => {
+    const settings = { ...DEFAULT_SETTINGS, font: 'from-the-future' } as unknown as Settings
+    await settingsItem.setValue(settings)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ dim: false })
-  })
-
-  it('drops the widget switches an older install still has stored', async () => {
-    await storeOld({ ...V4, widgets: { credit: false, info: false } }, 3)
-
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).not.toHaveProperty('widgets')
-  })
-
-  it('groups the photo settings, keeping the frequency and dropping favourites', async () => {
-    await storeOld({ ...V4, frequency: 'daily' }, 4)
-
-    await settingsItem.migrate()
-
-    const migrated = await settingsItem.getValue()
-    expect(migrated.photos).toEqual({
-      mode: 'cycle',
-      frequency: 'daily',
-      tag: null,
-      pinnedId: null,
-    })
-    expect(migrated).not.toHaveProperty('frequency')
-    expect(migrated).not.toHaveProperty('favourites')
-  })
-
-  it('turns a frequency of never into keeping the photo on screen', async () => {
-    await storeOld({ ...V4, frequency: 'off' }, 4)
-
-    await settingsItem.migrate()
-
-    expect((await settingsItem.getValue()).photos).toEqual({
-      mode: 'pinned',
-      frequency: 'every-visit',
-      tag: null,
-      pinnedId: null,
-    })
-  })
-
-  it('leaves the rest of the settings alone while migrating', async () => {
-    await storeOld({ ...V4, frequency: 'daily' }, 1)
-
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toEqual({
-      photos: { mode: 'cycle', frequency: 'daily', tag: null, pinnedId: null },
-      clock: V4.clock,
-      font: 'system',
-      dim: true,
-    })
+    expect(await settingsItem.getValue()).toEqual(settings)
   })
 })
 
