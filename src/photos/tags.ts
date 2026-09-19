@@ -21,3 +21,9 @@ export function filterByTag(photos: readonly Photo[], slug: string | null): read
     ? photos
     : photos.filter((photo) => photo.tags.some((tag) => tag.slug === slug))
 }
+
+/** Ids of the photos to cycle: those with the tag, or every photo when none has it. */
+export function poolIds(photos: readonly Photo[], slug: string | null): string[] {
+  const tagged = filterByTag(photos, slug)
+  return (tagged.length > 0 ? tagged : photos).map((photo) => photo.id)
+}

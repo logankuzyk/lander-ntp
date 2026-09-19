@@ -8,22 +8,19 @@ type ControlsProps = {
   onNext: () => void
   /** True while the photo being faded in is still loading. */
   busy?: boolean
-  onOpenSettings: () => void
-  /** Omitted while there is nothing to choose between. */
-  onToggleGallery?: () => void
-  galleryOpen?: boolean
+  onToggleSettings: () => void
+  settingsOpen?: boolean
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
   infoOpen?: boolean
 }
 
-/** Bottom-right controls. The →, g and i keys do the same as the buttons. */
+/** Bottom-right controls. The → and i keys do the same as the buttons. */
 export function Controls({
   onNext,
   busy,
-  onOpenSettings,
-  onToggleGallery,
-  galleryOpen,
+  onToggleSettings,
+  settingsOpen,
   onToggleInfo,
   infoOpen,
 }: ControlsProps) {
@@ -42,9 +39,6 @@ export function Controls({
       if (event.key === 'ArrowRight') {
         event.preventDefault()
         if (!busy) onNext()
-      } else if (event.key === 'g' && onToggleGallery) {
-        event.preventDefault()
-        onToggleGallery()
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
@@ -52,7 +46,7 @@ export function Controls({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onNext, busy, onToggleGallery, onToggleInfo])
+  }, [onNext, busy, onToggleInfo])
 
   return (
     <div class="controls">
@@ -81,33 +75,6 @@ export function Controls({
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </button>
-      {onToggleGallery && (
-        <button
-          type="button"
-          class="control"
-          aria-label="Choose a photo"
-          title="Choose a photo (g)"
-          aria-expanded={galleryOpen === true}
-          onClick={onToggleGallery}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <rect x="4" y="4" width="6.5" height="6.5" rx="1" />
-            <rect x="13.5" y="4" width="6.5" height="6.5" rx="1" />
-            <rect x="4" y="13.5" width="6.5" height="6.5" rx="1" />
-            <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1" />
-          </svg>
-        </button>
-      )}
       {onToggleInfo && (
         <button
           type="button"
@@ -139,7 +106,8 @@ export function Controls({
         class="control"
         aria-label="Settings"
         title="Settings"
-        onClick={onOpenSettings}
+        aria-expanded={settingsOpen === true}
+        onClick={onToggleSettings}
       >
         <svg
           aria-hidden="true"

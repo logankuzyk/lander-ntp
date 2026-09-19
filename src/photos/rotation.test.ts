@@ -7,9 +7,11 @@ import {
   FREQUENCIES,
   msUntilAdvance,
   nextPhoto,
+  photoForSettings,
   photoForVisit,
   shouldAdvance,
   type Frequency,
+  type PhotoSettings,
   type PhotoState,
 } from './rotation'
 
@@ -203,5 +205,57 @@ describe('photoForVisit', () => {
     expect(photoForVisit('off', state({ currentId: 'gone' }), ids, T0)).toMatchObject({
       currentId: 'b',
     })
+  })
+})
+
+describe('photoForSettings', () => {
+  const ids = { all: ['a', 'b', 'c', 'd'], pool: ['c', 'd'] }
+  const cycling = (frequency: Frequency = '1h'): PhotoSettings => ({
+    mode: 'cycle',
+    frequency,
+    tag: 'water',
+    pinnedId: null,
+  })
+  const pinned = (pinnedId: string | null): PhotoSettings => ({
+    mode: 'pinned',
+    frequency: '1h',
+    tag: 'water',
+    pinnedId,
+  })
+
+  it('shows the pinned photo, even outside the pool', () => {
+    expect(photoForSettings(pinned('a'), state({ currentId: 'c' }), ids, T0, true)).toMatchObject({
+      currentId: 'a',
+      shownAt: T0,
+    })
+  })
+
+  it('keeps the state when the pinned photo is already showing', () => {
+    const current = state({ currentId: 'b' })
+    expect(photoForSettings(pinned('b'), current, ids, T0 + 24 * HOUR, true)).toBe(current)
+  })
+
+  it('keeps the photo on screen when pinned without one, or to one that has left', () => {
+    const current = state({ currentId: 'b' })
+    expect(photoForSettings(pinned(null), current, ids, T0 + 24 * HOUR, true)).toBe(current)
+    expect(photoForSettings(pinned('gone'), current, ids, T0, false)).toBe(current)
+  })
+
+  it('follows the frequency on a visit, drawing from the pool', () => {
+    const current = state({ currentId: 'c', bag: ['a', 'd'] })
+    expect(photoForSettings(cycling('1h'), current, ids, T0 + HOUR - 1, true)).toBe(current)
+    expect(photoForSettings(cycling('1h'), current, ids, T0 + HOUR, true)).toMatchObject({
+      currentId: 'd',
+    })
+  })
+
+  it('keeps a photo from the pool when the settings change', () => {
+    const current = state({ currentId: 'd' })
+    expect(photoForSettings(cycling('every-visit'), current, ids, T0, false)).toBe(current)
+  })
+
+  it('moves on when the pool no longer has the photo', () => {
+    const next = photoForSettings(cycling(), state({ currentId: 'a' }), ids, T0, false)
+    expect(ids.pool).toContain(next.currentId)
   })
 })

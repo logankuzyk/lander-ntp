@@ -3,23 +3,21 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Controls } from './Controls'
 
-const renderControls = ({ withInfo = true, withGallery = true, busy = false } = {}) => {
+const renderControls = ({ withInfo = true, busy = false } = {}) => {
   const onNext = vi.fn()
-  const onOpenSettings = vi.fn()
+  const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
-  const onToggleGallery = vi.fn()
   render(
     <Controls
       onNext={onNext}
       busy={busy}
-      onOpenSettings={onOpenSettings}
-      onToggleGallery={withGallery ? onToggleGallery : undefined}
-      galleryOpen={false}
+      onToggleSettings={onToggleSettings}
+      settingsOpen={false}
       onToggleInfo={withInfo ? onToggleInfo : undefined}
       infoOpen={false}
     />,
   )
-  return { onNext, onOpenSettings, onToggleInfo, onToggleGallery }
+  return { onNext, onToggleSettings, onToggleInfo }
 }
 
 describe('Controls', () => {
@@ -39,12 +37,14 @@ describe('Controls', () => {
     expect(onNext).toHaveBeenCalledOnce()
   })
 
-  it('opens the settings panel', () => {
-    const { onOpenSettings } = renderControls()
+  it('toggles the settings', () => {
+    const { onToggleSettings } = renderControls()
+    const button = screen.getByRole('button', { name: 'Settings' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(button)
 
-    expect(onOpenSettings).toHaveBeenCalledOnce()
+    expect(onToggleSettings).toHaveBeenCalledOnce()
+    expect(button.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('toggles the photo details from the button and the i key', () => {
@@ -65,26 +65,14 @@ describe('Controls', () => {
     expect(onNext).not.toHaveBeenCalled()
   })
 
-  it('toggles the gallery from the button and the g key', () => {
-    const { onToggleGallery } = renderControls()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Choose a photo' }))
-    fireEvent.keyDown(window, { key: 'g' })
-
-    expect(onToggleGallery).toHaveBeenCalledTimes(2)
-  })
-
-  it('hides the gallery button when there is nothing to choose between', () => {
-    const { onNext } = renderControls({ withGallery: false })
+  it('has no gallery button: the gallery is in settings', () => {
+    renderControls()
 
     expect(screen.queryByRole('button', { name: 'Choose a photo' })).toBeNull()
-    fireEvent.keyDown(window, { key: 'g' })
-
-    expect(onNext).not.toHaveBeenCalled()
   })
 
   it('ignores shortcuts with modifiers, other keys and typing in a field', () => {
-    const { onNext, onToggleInfo, onToggleGallery } = renderControls()
+    const { onNext, onToggleInfo } = renderControls()
     render(<input aria-label="Search" />)
 
     fireEvent.keyDown(window, { key: 'ArrowRight', metaKey: true })
@@ -93,12 +81,9 @@ describe('Controls', () => {
     fireEvent.keyDown(window, { key: 'i', ctrlKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'ArrowRight' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'i' })
-    fireEvent.keyDown(window, { key: 'g', metaKey: true })
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'g' })
 
     expect(onNext).not.toHaveBeenCalled()
     expect(onToggleInfo).not.toHaveBeenCalled()
-    expect(onToggleGallery).not.toHaveBeenCalled()
   })
 
   it('marks the next-photo button busy while the photo is loading', () => {

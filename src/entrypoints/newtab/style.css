@@ -188,7 +188,7 @@ body {
   opacity: 1;
 }
 
-/* Popovers: photo details and the gallery share the corner above the controls. */
+/* Popovers: settings and photo details share the corner above the controls. */
 
 .popover {
   position: fixed;
@@ -200,18 +200,31 @@ body {
   background: rgb(0 0 0 / 55%);
   backdrop-filter: blur(12px);
   font-size: 0.85rem;
+  /* One rhythm for everything inside: every line of text sits on --popover-line, every
+     control is --popover-control tall, a heading and what follows it (and one row and the
+     next) are --popover-gap apart, and blocks are --popover-block apart. */
+  --popover-line: 1.25rem;
+  --popover-control: 1.75rem;
+  --popover-gap: 0.5rem;
+  --popover-block: 1rem;
+  line-height: var(--popover-line);
   text-shadow: none;
+}
+
+.popover h2,
+.popover h3,
+.popover p {
+  margin: 0;
 }
 
 .popover__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--popover-block);
 }
 
 .popover h2 {
-  margin: 0;
   font-size: 0.95rem;
   font-weight: 500;
 }
@@ -219,6 +232,8 @@ body {
 .popover__close {
   display: grid;
   place-items: center;
+  /* A bigger target than it looks, without making the header taller than its title. */
+  margin: -0.25rem;
   padding: 0.25rem;
   border: 0;
   background: none;
@@ -241,7 +256,7 @@ body {
 .photo-info__rows {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.25rem 0.75rem;
+  gap: var(--popover-gap) 0.75rem;
   margin: 0;
 }
 
@@ -258,15 +273,14 @@ body {
 }
 
 .photo-info__empty {
-  margin: 0;
   opacity: 0.7;
 }
 
-.photo-info__links {
+.popover .photo-info__links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin: 0.75rem 0 0;
+  margin-top: var(--popover-block);
 }
 
 .photo-info__links a {
@@ -276,28 +290,177 @@ body {
   text-underline-offset: 0.2em;
 }
 
-/* Gallery */
+/* Settings */
 
-.gallery {
+.settings {
   display: flex;
   flex-direction: column;
-  width: min(32rem, calc(100% - 2.5rem));
-  /* The grid gives way first, so the header and the tags always fit. */
+  width: min(40rem, calc(100% - 2.5rem));
+  /* The section area gives way first, so the header always fits. */
   max-height: calc(100vh - 5.5rem);
-  /* About two and a half rows at rest, so it reads as scrollable. */
-  --gallery-base: min(13rem, 40vh);
+  /* Tall enough at rest for the cycling options and a couple of rows of the gallery. */
+  --settings-base: min(24rem, 50vh);
 }
+
+.settings__layout {
+  display: flex;
+  flex: 0 1 auto;
+  gap: var(--popover-block);
+  min-height: 0;
+}
+
+/* Tabs are spaced like rows, so they line up with the rows beside them. */
+.settings__nav {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--popover-gap);
+  width: 7.5rem;
+}
+
+.settings__tab {
+  display: flex;
+  align-items: center;
+  height: var(--popover-control);
+  padding: 0 0.625rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 150ms,
+    background-color 150ms;
+}
+
+.settings__tab:hover {
+  opacity: 1;
+}
+
+.settings__tab[aria-selected='true'] {
+  background: rgb(255 255 255 / 12%);
+  opacity: 1;
+}
+
+.settings__body {
+  flex: 1;
+  min-width: 0;
+  /* Short sections fit their content; the photos grow by --popover-grow as they are scrolled
+     (see Popover/useGrowOnScroll), up to the cap. At least as tall as the sidebar. */
+  min-height: 7.5rem;
+  max-height: calc(var(--settings-base) + var(--popover-grow, 0px));
+  margin: -0.25rem -0.5rem -0.25rem 0;
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 30%) transparent;
+}
+
+/* Each section stacks its heading and rows with the same gap. */
+.settings__body section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--popover-gap);
+}
+
+.settings__body section + section {
+  margin-top: var(--popover-block);
+}
+
+.settings h3 {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  /* The same height with a switch as with a menu. */
+  min-height: var(--popover-control);
+}
+
+.settings input[type='checkbox'] {
+  accent-color: var(--color-fg);
+}
+
+.settings__row select {
+  max-width: 60%;
+  height: var(--popover-control);
+  padding: 0 0.5rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 0.375rem;
+  background: rgb(255 255 255 / 10%);
+  color: inherit;
+  font: inherit;
+}
+
+.settings__row option {
+  background: #1a1a1a;
+  color: var(--color-fg);
+}
+
+.settings__note {
+  opacity: 0.75;
+}
+
+.settings__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.settings :focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Narrow windows: the sections go across the top. */
+@media (max-width: 32rem) {
+  .settings__layout {
+    flex-direction: column;
+    gap: var(--popover-gap);
+  }
+
+  .settings__nav {
+    flex-direction: row;
+    width: auto;
+  }
+
+  .settings__body {
+    margin: 0 -0.5rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Gallery (in settings) */
 
 .gallery__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-bottom: 0.75rem;
+  gap: var(--popover-gap);
 }
 
 .chip {
+  display: inline-flex;
   flex: none;
-  padding: 0.25rem 0.75rem;
+  align-items: center;
+  height: var(--popover-control);
+  padding: 0 0.75rem;
   border: 1px solid rgb(255 255 255 / 25%);
   border-radius: 999px;
   background: none;
@@ -327,23 +490,10 @@ body {
   outline-offset: 2px;
 }
 
-.gallery__scroller {
-  /* Grows by --gallery-grow as it is scrolled (see widgets/Gallery), up to the popover's cap. */
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: calc(var(--gallery-base) + var(--gallery-grow, 0px));
-  margin: 0 -0.5rem;
-  padding: 0.25rem 0.5rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 30%) transparent;
-}
-
 .gallery__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
-  gap: 0.5rem;
+  gap: var(--popover-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -463,295 +613,4 @@ body {
   .control--busy::after {
     animation: none;
   }
-}
-
-/* Favourites */
-
-.favourites {
-  position: fixed;
-  top: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: min(60rem, calc(100% - 3rem));
-}
-
-.favourite {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-  color: inherit;
-  text-decoration: none;
-  opacity: 0.9;
-}
-
-.favourite:hover,
-.favourite:focus-visible {
-  opacity: 1;
-}
-
-.favourite__icon {
-  flex: none;
-  border-radius: 0.25rem;
-}
-
-.favourite__icon--monogram {
-  display: inline-grid;
-  place-items: center;
-  border-radius: 50%;
-  color: #fff;
-  font-weight: 600;
-  line-height: 1;
-  text-shadow: none;
-}
-
-/* List: inline mentions that wrap, like Notion. */
-.favourites--list {
-  gap: 0.25rem 1rem;
-  font-size: 0.95rem;
-}
-
-.favourites--list.is-s {
-  font-size: 0.85rem;
-}
-
-.favourites--list.is-l {
-  font-size: 1.1rem;
-}
-
-.favourites--list .favourite__title {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
-}
-
-/* Grid: cards. */
-.favourites--grid {
-  gap: 0.75rem;
-}
-
-.favourites--grid .favourite {
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 6rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  background: rgb(0 0 0 / 25%);
-  backdrop-filter: blur(8px);
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.favourites--grid.is-s .favourite {
-  width: 4.5rem;
-  padding: 0.5rem;
-  font-size: 0.75rem;
-}
-
-.favourites--grid.is-l .favourite {
-  width: 7.5rem;
-  padding: 1rem;
-  font-size: 0.95rem;
-}
-
-.favourites--grid .favourite__title {
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* Settings */
-
-.settings {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: flex-end;
-  text-shadow: none;
-}
-
-.settings__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgb(0 0 0 / 35%);
-}
-
-.settings__panel {
-  position: relative;
-  width: min(22rem, 100%);
-  height: 100%;
-  overflow-y: auto;
-  padding: 1.25rem 1.25rem 2rem;
-  background: rgb(17 17 17 / 92%);
-  backdrop-filter: blur(12px);
-}
-
-.settings__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.settings h2 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 500;
-}
-
-.settings h3 {
-  margin: 1.5rem 0 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.6;
-}
-
-/* Sections that can be switched off carry the switch beside their heading. */
-.settings__section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 1.5rem 0 0.25rem;
-}
-
-.settings__section-header h3 {
-  margin: 0;
-}
-
-.settings__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.4rem 0;
-  font-size: 0.9rem;
-}
-
-.settings input[type='checkbox'] {
-  accent-color: var(--color-fg);
-}
-
-.settings__row input[type='checkbox'] {
-  order: 2;
-}
-
-.settings__row select {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 10%);
-  color: inherit;
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.settings__row option {
-  background: #1a1a1a;
-  color: var(--color-fg);
-}
-
-.settings__close {
-  display: grid;
-  place-items: center;
-  padding: 0.25rem;
-  border: 0;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  opacity: 0.8;
-}
-
-.settings__close:hover,
-.settings__close:focus-visible {
-  opacity: 1;
-}
-
-.settings :focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
-}
-
-/* Favourites editor */
-
-.favourites-editor {
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.favourites-editor__list {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.favourites-editor__row {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 0.5rem;
-}
-
-.favourites-editor__field {
-  display: grid;
-  grid-template-columns: 3.5rem 1fr;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.favourites-editor__field > span {
-  font-size: 0.75rem;
-  opacity: 0.6;
-}
-
-.favourites-editor input {
-  width: 100%;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 10%);
-  color: inherit;
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.favourites-editor button {
-  padding: 0.15rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 8%);
-  color: inherit;
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.favourites-editor button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.favourites-editor__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-
-.favourites-editor__add {
-  display: grid;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
-}
-
-.favourites-editor__error {
-  margin: 0.5rem 0 0;
-  color: #ffb4a8;
 }

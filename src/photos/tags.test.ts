@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { makePhoto } from '@/test/fixtures'
 
 import type { Tag } from './schema'
-import { availableTags, filterByTag } from './tags'
+import { availableTags, filterByTag, poolIds } from './tags'
 
 const tag = (slug: string): Tag => ({ slug, name: slug[0]?.toUpperCase() + slug.slice(1) })
 const tagged = (id: string, ...slugs: string[]) => makePhoto(id, { tags: slugs.map(tag) })
@@ -35,5 +35,18 @@ describe('filterByTag', () => {
 
   it('keeps everything without one', () => {
     expect(filterByTag(photos, null)).toBe(photos)
+  })
+})
+
+describe('poolIds', () => {
+  const photos = [tagged('a', 'water'), tagged('b', 'urban'), tagged('c', 'water')]
+
+  it('cycles the photos with the tag', () => {
+    expect(poolIds(photos, 'water')).toEqual(['a', 'c'])
+  })
+
+  it('cycles everything with no tag, or one no photo has', () => {
+    expect(poolIds(photos, null)).toEqual(['a', 'b', 'c'])
+    expect(poolIds(photos, 'gone')).toEqual(['a', 'b', 'c'])
   })
 })

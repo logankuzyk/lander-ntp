@@ -1,16 +1,17 @@
-import type { ComponentChildren } from 'preact'
-import { useEffect, useRef } from 'preact/hooks'
+import { useMemo, useRef, useState } from 'preact/hooks'
 
-import type { Favourite } from '@/favourites/schema'
-
-import { FREQUENCIES, type Frequency } from '@/photos/rotation'
+import { CloseIcon } from '@/components/Popover/CloseIcon'
+import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
+import { usePopover } from '@/components/Popover/usePopover'
+import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
+import type { Photo } from '@/photos/schema'
+import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
 
-import { FavouritesEditor } from './FavouritesEditor'
+import { Gallery } from './Gallery'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
-  off: 'Never',
   'every-visit': 'Every new tab',
   '30s': 'Every 30 seconds',
   '1m': 'Every minute',
@@ -22,7 +23,16 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   daily: 'Every day',
 }
 
-const FOCUSABLE = 'button, select, input, a[href]'
+/** The "Change photo" choice that pins the photo on screen. */
+const NEVER = 'never'
+
+const SECTIONS = [
+  ['photos', 'Photos'],
+  ['clock', 'Clock'],
+  ['general', 'General'],
+] as const
+
+type SectionId = (typeof SECTIONS)[number][0]
 
 type ToggleProps = {
   label: string
@@ -33,12 +43,12 @@ type ToggleProps = {
 function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
     <label class="settings__row">
+      <span>{label}</span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
-      <span>{label}</span>
     </label>
   )
 }
@@ -65,156 +75,95 @@ function Choice<T extends string>({ label, value, options, onChange }: ChoicePro
   )
 }
 
-type FeatureSectionProps = {
-  title: string
-  /** Names the switch, which has the heading beside it rather than a label of its own. */
-  toggleLabel: string
-  enabled: boolean
-  onEnabledChange: (enabled: boolean) => void
-  children: ComponentChildren
+type PhotosSectionProps = {
+  settings: Settings
+  onChange: (settings: Settings) => void
+  photos: readonly Photo[]
+  currentId: string | null
 }
 
-/**
- * A section whose heading carries the switch for the whole feature. Settings that only apply
- * while the feature is on are left unrendered when it is off, so they are out of the way of
- * both the eye and Tab.
- */
-function FeatureSection({
-  title,
-  toggleLabel,
-  enabled,
-  onEnabledChange,
-  children,
-}: FeatureSectionProps) {
+function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionProps) {
+  const cycling = settings.photos
+  const pinned = cycling.mode === 'pinned'
+  const tags = useMemo(() => availableTags(photos), [photos])
+
+  const update = (changes: Partial<PhotoSettings>) =>
+    onChange({ ...settings, photos: { ...cycling, ...changes } })
+
   return (
-    <section>
-      <div class="settings__section-header">
-        <h3>{title}</h3>
-        <input
-          type="checkbox"
-          aria-label={toggleLabel}
-          checked={enabled}
-          onChange={(event) => onEnabledChange(event.currentTarget.checked)}
+    <>
+      <section aria-labelledby="cycling-heading">
+        <h3 id="cycling-heading">Cycling</h3>
+        <Choice<Frequency | typeof NEVER>
+          label="Change photo"
+          value={pinned ? NEVER : cycling.frequency}
+          options={[
+            ...FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const),
+            [NEVER, 'Never'],
+          ]}
+          onChange={(choice) =>
+            choice === NEVER
+              ? update({ mode: 'pinned', pinnedId: currentId })
+              : update({ mode: 'cycle', frequency: choice })
+          }
         />
-      </div>
-      {enabled && children}
-    </section>
+        {tags.length > 0 && (
+          <Choice
+            label="Photos from"
+            value={cycling.tag ?? ''}
+            options={[['', 'All photos'], ...tags.map(({ slug, name }) => [slug, name] as const)]}
+            // Choosing what to cycle is asking for cycling.
+            onChange={(tag) => update({ mode: 'cycle', tag: tag || null })}
+          />
+        )}
+        {pinned && (
+          <p class="settings__note">
+            Keeping this photo.{' '}
+            <button type="button" class="settings__link" onClick={() => update({ mode: 'cycle' })}>
+              Resume cycling
+            </button>
+          </p>
+        )}
+        <Toggle
+          label="Dim the photo"
+          checked={settings.dim}
+          onChange={(dim) => onChange({ ...settings, dim })}
+        />
+      </section>
+
+      {photos.length > 1 && (
+        <Gallery
+          // Remounted when the cycled tag changes, so the filter follows it.
+          key={cycling.tag ?? ''}
+          photos={photos}
+          currentId={currentId}
+          initialTag={cycling.tag}
+          onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
+        />
+      )}
+    </>
   )
 }
 
-type SettingsPanelProps = {
+type SectionProps = {
   settings: Settings
   onChange: (settings: Settings) => void
-  favourites: Favourite[]
-  onFavouritesChange: (favourites: Favourite[]) => void
-  onClose: () => void
 }
 
-export function SettingsPanel({
-  settings,
-  onChange,
-  favourites,
-  onFavouritesChange,
-  onClose,
-}: SettingsPanelProps) {
-  const panel = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const opener = document.activeElement
-    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
-    return () => {
-      if (opener instanceof HTMLElement) opener.focus()
-    }
-  }, [])
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-        return
-      }
-      // Keep Tab inside the dialog.
-      if (event.key !== 'Tab' || !panel.current) return
-      const focusable = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (!first || !last) return
-
-      const active = document.activeElement
-      if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      } else if (event.shiftKey && (active === first || !panel.current.contains(active))) {
-        event.preventDefault()
-        last.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
+function ClockSection({ settings, onChange }: SectionProps) {
   const clock = (changes: Partial<Settings['clock']>) =>
     onChange({ ...settings, clock: { ...settings.clock, ...changes } })
 
-  const favouriteSettings = (changes: Partial<Settings['favourites']>) =>
-    onChange({ ...settings, favourites: { ...settings.favourites, ...changes } })
-
   return (
-    <div class="settings">
-      {/* Convenience only: Escape and the close button cover keyboard users. */}
-      <div class="settings__backdrop" aria-hidden="true" onClick={onClose} />
-      <div
-        class="settings__panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        ref={panel}
-      >
-        <header class="settings__header">
-          <h2>Settings</h2>
-          <button
-            type="button"
-            class="settings__close"
-            aria-label="Close settings"
-            onClick={onClose}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </header>
-
-        <section>
-          <h3>Photos</h3>
-          <Choice
-            label="New photo"
-            value={settings.frequency}
-            options={FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const)}
-            onChange={(frequency) => onChange({ ...settings, frequency })}
-          />
-          <Toggle
-            label="Dim the photo"
-            checked={settings.dim}
-            onChange={(dim) => onChange({ ...settings, dim })}
-          />
-        </section>
-
-        <FeatureSection
-          title="Clock"
-          toggleLabel="Show clock"
-          enabled={settings.clock.enabled}
-          onEnabledChange={(enabled) => clock({ enabled })}
-        >
+    <section>
+      <Toggle
+        label="Show clock"
+        checked={settings.clock.enabled}
+        onChange={(enabled) => clock({ enabled })}
+      />
+      {/* Out of the way of both the eye and Tab while the clock is off. */}
+      {settings.clock.enabled && (
+        <>
           <Toggle
             label="24-hour time"
             checked={!settings.clock.hour12}
@@ -230,46 +179,131 @@ export function SettingsPanel({
             checked={settings.clock.showSeconds}
             onChange={(showSeconds) => clock({ showSeconds })}
           />
-        </FeatureSection>
+        </>
+      )}
+    </section>
+  )
+}
 
-        <FeatureSection
-          title="Favourites"
-          toggleLabel="Show favourites"
-          enabled={settings.favourites.enabled}
-          onEnabledChange={(enabled) => favouriteSettings({ enabled })}
+function GeneralSection({ settings, onChange }: SectionProps) {
+  return (
+    <section>
+      <Choice<FontId>
+        label="Font"
+        value={settings.font}
+        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
+        onChange={(font) => onChange({ ...settings, font })}
+      />
+    </section>
+  )
+}
+
+type SettingsPanelProps = {
+  settings: Settings
+  onChange: (settings: Settings) => void
+  /** Every photo in the manifest, for the gallery. */
+  photos: readonly Photo[]
+  currentId: string | null
+  onClose: () => void
+}
+
+/** Settings, in the popover corner above the controls. Opened with the gear button. */
+export function SettingsPanel({
+  settings,
+  onChange,
+  photos,
+  currentId,
+  onClose,
+}: SettingsPanelProps) {
+  const { container, close } = usePopover(onClose)
+  const body = useRef<HTMLDivElement>(null)
+  const tabs = useRef<(HTMLButtonElement | null)[]>([])
+  const [section, setSection] = useState<SectionId>('photos')
+  const resetGrowth = useGrowOnScroll(container, body)
+
+  // Each section starts at rest, from the top.
+  const show = (id: SectionId) => {
+    setSection(id)
+    resetGrowth()
+  }
+
+  // Arrow keys move between tabs, as in any tab list; Tab moves on to the section.
+  const onTabKeyDown = (event: KeyboardEvent, index: number) => {
+    const last = SECTIONS.length - 1
+    const target = {
+      ArrowDown: index + 1,
+      ArrowRight: index + 1,
+      ArrowUp: index - 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: last,
+    }[event.key]
+    if (target === undefined) return
+    event.preventDefault()
+    const wrapped = (target + SECTIONS.length) % SECTIONS.length
+    const next = SECTIONS[wrapped]
+    if (!next) return
+    show(next[0])
+    tabs.current[wrapped]?.focus()
+  }
+
+  return (
+    <aside ref={container} class="popover settings" role="dialog" aria-label="Settings">
+      <header class="popover__header">
+        <h2>Settings</h2>
+        <button
+          ref={close}
+          type="button"
+          class="popover__close"
+          aria-label="Close settings"
+          onClick={onClose}
         >
-          <Choice<Settings['favourites']['style']>
-            label="Style"
-            value={settings.favourites.style}
-            options={[
-              ['list', 'List'],
-              ['grid', 'Grid'],
-            ]}
-            onChange={(style) => favouriteSettings({ style })}
-          />
-          <Choice<Settings['favourites']['size']>
-            label="Size"
-            value={settings.favourites.size}
-            options={[
-              ['s', 'Small'],
-              ['m', 'Medium'],
-              ['l', 'Large'],
-            ]}
-            onChange={(size) => favouriteSettings({ size })}
-          />
-          <FavouritesEditor favourites={favourites} onChange={onFavouritesChange} />
-        </FeatureSection>
+          <CloseIcon />
+        </button>
+      </header>
 
-        <section>
-          <h3>Appearance</h3>
-          <Choice<FontId>
-            label="Font"
-            value={settings.font}
-            options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
-            onChange={(font) => onChange({ ...settings, font })}
-          />
-        </section>
+      <div class="settings__layout">
+        <div class="settings__nav" role="tablist" aria-orientation="vertical">
+          {SECTIONS.map(([id, label], index) => (
+            <button
+              key={id}
+              ref={(el) => {
+                tabs.current[index] = el
+              }}
+              type="button"
+              role="tab"
+              id={`settings-tab-${id}`}
+              aria-controls="settings-section"
+              aria-selected={section === id}
+              tabIndex={section === id ? 0 : -1}
+              class="settings__tab"
+              onClick={() => show(id)}
+              onKeyDown={(event) => onTabKeyDown(event, index)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          ref={body}
+          id="settings-section"
+          class="settings__body"
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${section}`}
+        >
+          {section === 'photos' && (
+            <PhotosSection
+              settings={settings}
+              onChange={onChange}
+              photos={photos}
+              currentId={currentId}
+            />
+          )}
+          {section === 'clock' && <ClockSection settings={settings} onChange={onChange} />}
+          {section === 'general' && <GeneralSection settings={settings} onChange={onChange} />}
+        </div>
       </div>
-    </div>
+    </aside>
   )
 }
