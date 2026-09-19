@@ -1,7 +1,7 @@
 {
   "name": "lander-ntp",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A minimal new tab page featuring photography from logankuzyk.com",
   "type": "module",
   "engines": {

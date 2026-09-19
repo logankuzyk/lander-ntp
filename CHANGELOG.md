@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/logankuzyk/lander-ntp/compare/v0.1.1...v0.1.2) (2026-09-19)
+
+
+### Bug Fixes
+
+* let Firefox use the new tab page as its homepage ([#24](https://github.com/logankuzyk/lander-ntp/issues/24)) ([6d6f108](https://github.com/logankuzyk/lander-ntp/commit/6d6f1080a11021b6665cf532e0de86342cf68c80))
+
 ## [0.1.1](https://github.com/logankuzyk/ntp/compare/v0.1.0...v0.1.1) (2026-09-14)
 
 
