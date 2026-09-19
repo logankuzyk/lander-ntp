@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { favouritesItem } from '@/favourites/storage'
@@ -129,6 +129,41 @@ describe('App', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
+  })
+
+  it('shows a photo picked from the gallery and stops rotating', async () => {
+    await seedPhotos()
+    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: '1h' })
+    render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose a photo' }))
+    const gallery = await screen.findByRole('dialog', { name: 'Choose a photo' })
+    fireEvent.click(within(gallery).getByRole('button', { name: 'Photo b' }))
+
+    await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/b/'))
+    expect((await photoState.getValue())?.currentId).toBe('b')
+    await waitFor(async () => expect((await settingsItem.getValue()).frequency).toBe('off'))
+  })
+
+  it('opens one popover at a time', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: 'Photo details' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a photo' }))
+    expect(await screen.findByRole('dialog', { name: 'Choose a photo' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull()
+  })
+
+  it('has no gallery with only the bundled photo', async () => {
+    render(<App />)
+
+    await currentPhotoSrc()
+    expect(screen.queryByRole('button', { name: 'Choose a photo' })).toBeNull()
   })
 
   it('opening a new tab keeps the photo when the frequency is not every-new-tab', async () => {

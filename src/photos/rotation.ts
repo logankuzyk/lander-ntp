@@ -135,3 +135,20 @@ export function photoForVisit(
   }
   return nextPhoto(state, ids, now, random)
 }
+
+/**
+ * Show a photo picked by hand. It leaves the bag, so it isn't drawn again straight after.
+ * Ids not in the manifest are ignored.
+ */
+export function choosePhoto(
+  state: PhotoState | null,
+  id: string,
+  ids: readonly string[],
+  now: number,
+  random: () => number = Math.random,
+): PhotoState | null {
+  const available = new Set(ids)
+  if (!available.has(id)) return state
+  const bag = (state?.bag ?? []).filter((queued) => queued !== id && available.has(queued))
+  return { currentId: id, shownAt: now, bag: bag.length > 0 ? bag : refill(ids, id, random) }
+}

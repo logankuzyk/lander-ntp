@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { getManifest } from './manifest'
 import {
+  choosePhoto,
   msUntilAdvance,
   nextPhoto,
   photoForVisit,
@@ -20,16 +21,23 @@ const photoIds = (manifest: Manifest) => manifest.photos.map((photo) => photo.id
  */
 const sharesPhoto = (frequency: Frequency) => frequency !== 'every-visit'
 
+const NO_PHOTOS: Photo[] = []
+
 export type PhotoRotation = {
+  /** Every photo in the manifest; empty until it has loaded. */
+  photos: Photo[]
   photo: Photo | null
   /** The photo that comes next, for preloading. */
   upcoming: Photo | null
   next: () => void
+  /** Show a photo picked from the gallery. Settles once it is shared with other tabs. */
+  select: (id: string) => Promise<void>
 }
 
 /**
  * Loads the manifest, picks the photo for this visit and, for interval frequencies, moves on
- * while the tab stays open. `next()` always works; with `off` the new photo stays pinned.
+ * while the tab stays open. `next()` and `select()` always work; with `off` the new photo
+ * stays pinned.
  *
  * Pass null until the stored frequency has loaded: deciding against the default would move
  * the photo on in every new tab, whatever the setting says.
@@ -90,6 +98,18 @@ export function usePhotoRotation(frequency: Frequency | null): PhotoRotation {
     void advance()
   }, [advance])
 
+  const select = useCallback(
+    async (id: string) => {
+      if (!manifest) return
+      const stored = await photoState.getValue()
+      const chosen = choosePhoto(stored, id, photoIds(manifest), Date.now())
+      if (!chosen || chosen === stored) return
+      setState(chosen)
+      await photoState.setValue(chosen)
+    },
+    [manifest],
+  )
+
   // Follow the shared photo: another tab's timer, or its next-photo button.
   useEffect(() => {
     if (frequency === null || !sharesPhoto(frequency)) return
@@ -121,6 +141,12 @@ export function usePhotoRotation(frequency: Frequency | null): PhotoRotation {
       manifest?.photos.find((photo) => photo.id === id) ?? null
     const photo = find(state?.currentId)
     const upcoming = find(state?.bag[0])
-    return { photo, upcoming: upcoming === photo ? null : upcoming, next }
-  }, [manifest, state, next])
+    return {
+      photos: manifest?.photos ?? NO_PHOTOS,
+      photo,
+      upcoming: upcoming === photo ? null : upcoming,
+      next,
+      select,
+    }
+  }, [manifest, state, next, select])
 }

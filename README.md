@@ -1,6 +1,6 @@
 # lander-ntp
 
-A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a clock, favourite sites and photo details.
+A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a clock, favourite sites, photo details and a gallery for picking a photo.
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 

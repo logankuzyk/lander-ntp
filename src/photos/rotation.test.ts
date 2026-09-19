@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { seededRandom } from '@/test/fixtures'
 
 import {
+  choosePhoto,
   FREQUENCIES,
   msUntilAdvance,
   nextPhoto,
@@ -135,6 +136,41 @@ describe('nextPhoto', () => {
 
   it('shows nothing when the manifest is empty', () => {
     expect(nextPhoto(state(), [], T0)).toEqual({ currentId: null, shownAt: T0, bag: [] })
+  })
+})
+
+describe('choosePhoto', () => {
+  const ids = ['a', 'b', 'c', 'd']
+
+  it('shows the photo now and takes it out of the bag', () => {
+    expect(choosePhoto(state({ bag: ['b', 'c', 'd'] }), 'c', ids, T0 + 5)).toEqual({
+      currentId: 'c',
+      shownAt: T0 + 5,
+      bag: ['b', 'd'],
+    })
+  })
+
+  it('refills the bag when the chosen photo was the last one in it', () => {
+    const chosen = choosePhoto(state({ bag: ['b'] }), 'b', ids, T0, seededRandom(3))
+    expect(chosen?.currentId).toBe('b')
+    expect([...(chosen?.bag ?? [])].sort()).toEqual(ids)
+    expect(chosen?.bag[0]).not.toBe('b')
+  })
+
+  it('works before any photo has been shown', () => {
+    const chosen = choosePhoto(null, 'd', ids, T0, seededRandom(5))
+    expect(chosen?.currentId).toBe('d')
+    expect(chosen?.bag[0]).not.toBe('d')
+  })
+
+  it('drops ids that have left the manifest', () => {
+    expect(choosePhoto(state({ bag: ['gone', 'c'] }), 'b', ids, T0)?.bag).toEqual(['c'])
+  })
+
+  it('ignores a photo that is not in the manifest', () => {
+    const current = state()
+    expect(choosePhoto(current, 'gone', ids, T0)).toBe(current)
+    expect(choosePhoto(null, 'gone', ids, T0)).toBeNull()
   })
 })
 

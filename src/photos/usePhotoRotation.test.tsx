@@ -75,6 +75,29 @@ describe('usePhotoRotation', () => {
     expect((await photoState.getValue())?.currentId).toBe(shown)
   })
 
+  it('shows a chosen photo and shares it with other tabs', async () => {
+    await seed()
+    const { result } = renderHook(() => usePhotoRotation('daily'))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+    expect(result.current.photos.map((photo) => photo.id)).toEqual(IDS)
+
+    await act(() => result.current.select('c'))
+
+    expect(result.current.photo?.id).toBe('c')
+    expect((await photoState.getValue())?.currentId).toBe('c')
+  })
+
+  it('ignores a chosen photo that is not in the manifest', async () => {
+    await seed()
+    const { result } = renderHook(() => usePhotoRotation('daily'))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    await act(() => result.current.select('gone'))
+
+    expect(result.current.photo?.id).toBe('a')
+    expect((await photoState.getValue())?.currentId).toBe('a')
+  })
+
   it('moves on by itself once the interval is up', async () => {
     vi.useFakeTimers()
     try {
