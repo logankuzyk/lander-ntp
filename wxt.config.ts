@@ -47,6 +47,9 @@ export default defineConfig({
     // favicon cache for favourite sites; Firefox has no such API and uses a letter monogram.
     permissions: browser === 'firefox' ? ['storage'] : ['storage', 'favicon'],
     ...(browser === 'firefox' && {
+      // Lists the page under Settings > Home > "Homepage and new windows". Firefox keeps that
+      // separate from new tabs, which chrome_url_overrides covers.
+      chrome_settings_overrides: { homepage: 'newtab.html' },
       browser_specific_settings: {
         gecko: {
           id: 'lander-ntp@logankuzyk.com',
