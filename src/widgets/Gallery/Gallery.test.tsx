@@ -6,13 +6,14 @@ import { makePhoto } from '@/test/fixtures'
 
 import { Gallery } from './Gallery'
 
-const inCollection = (id: string, slug: string, overrides: Partial<Photo> = {}) =>
-  makePhoto(id, { pageUrl: `https://logankuzyk.com/photography/${slug}?photo=${id}`, ...overrides })
+const FOREST = { slug: 'forest', name: 'Forest' }
+const WATER = { slug: 'water', name: 'Water' }
+const BEACH = { slug: 'beach', name: 'Beach' }
 
 const PHOTOS = [
-  inCollection('a', 'nature', { alt: 'Waterfall' }),
-  inCollection('b', 'beach', { alt: 'Tide pools' }),
-  inCollection('c', 'nature', { alt: 'Old growth' }),
+  makePhoto('a', { alt: 'Waterfall', tags: [WATER, FOREST] }),
+  makePhoto('b', { alt: 'Tide pools', tags: [BEACH, WATER] }),
+  makePhoto('c', { alt: 'Old growth', tags: [FOREST] }),
 ]
 
 const renderGallery = (photos: Photo[] = PHOTOS, currentId: string | null = 'b') => {
@@ -74,20 +75,25 @@ describe('Gallery', () => {
 
     expect(filters.getAllByRole('button').map((chip) => chip.textContent)).toEqual([
       'All',
-      'Nature',
+      'Forest',
+      'Water',
       'Beach',
     ])
     expect(filters.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true')
 
-    fireEvent.click(filters.getByRole('button', { name: 'Nature' }))
+    fireEvent.click(filters.getByRole('button', { name: 'Forest' }))
 
     expect(photoNames()).toEqual(['Waterfall', 'Old growth'])
-    expect(filters.getByRole('button', { name: 'Nature' }).getAttribute('aria-pressed')).toBe(
+    expect(filters.getByRole('button', { name: 'Forest' }).getAttribute('aria-pressed')).toBe(
       'true',
     )
 
+    // A photo shows under each of its tags.
+    fireEvent.click(filters.getByRole('button', { name: 'Water' }))
+    expect(photoNames()).toEqual(['Waterfall', 'Tide pools'])
+
     // Pressing it again, or All, shows everything.
-    fireEvent.click(filters.getByRole('button', { name: 'Nature' }))
+    fireEvent.click(filters.getByRole('button', { name: 'Water' }))
     expect(photoNames()).toHaveLength(3)
     fireEvent.click(filters.getByRole('button', { name: 'Beach' }))
     fireEvent.click(filters.getByRole('button', { name: 'All' }))
@@ -95,10 +101,7 @@ describe('Gallery', () => {
   })
 
   it('leaves out the tags when no photo has one', () => {
-    renderGallery([
-      makePhoto('a', { pageUrl: 'https://logankuzyk.com/photography' }),
-      makePhoto('b', { pageUrl: 'https://logankuzyk.com/photography' }),
-    ])
+    renderGallery([makePhoto('a'), makePhoto('b')])
 
     expect(screen.queryByRole('group', { name: 'Filter photos' })).toBeNull()
   })

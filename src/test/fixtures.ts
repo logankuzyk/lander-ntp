@@ -13,6 +13,7 @@ export const makePhoto = (id: string, overrides: Partial<Photo> = {}): Photo => 
   ],
   exif: {},
   location: null,
+  tags: [],
   pageUrl: `https://logankuzyk.com/photography/coast?photo=${id}`,
   printUrl: null,
   ...overrides,

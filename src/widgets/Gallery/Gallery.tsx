@@ -75,7 +75,7 @@ export function Gallery({ photos, currentId, onSelect, onClose }: GalleryProps) 
 
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [container])
 
   const chooseTag = (slug: string | null) => {
     setTag(slug)
