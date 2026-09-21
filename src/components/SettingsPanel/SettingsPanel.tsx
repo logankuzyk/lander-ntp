@@ -131,6 +131,7 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
         />
       </section>
 
+      {photos.length === 0 && <p class="settings__note">Loading photos…</p>}
       {photos.length > 1 && (
         <Gallery
           // Remounted when the cycled tag changes, so the filter follows it.
@@ -198,6 +199,24 @@ function GeneralSection({ settings, onChange }: SectionProps) {
   )
 }
 
+/**
+ * The settings with a cycled tag that no photo carries read as all photos. It may have been
+ * synced from a device with a newer manifest, or the photos may have lost it; either way it
+ * filters nothing and has no choice to clear it by. Every section writes from these, so the
+ * next change clears it. Left alone while the photos load, when no tag is known yet.
+ */
+function useKnownTag(settings: Settings, photos: readonly Photo[]): Settings {
+  const { tag } = settings.photos
+  const unknown =
+    tag !== null &&
+    photos.length > 0 &&
+    !photos.some((photo) => photo.tags.some(({ slug }) => slug === tag))
+  return useMemo(
+    () => (unknown ? { ...settings, photos: { ...settings.photos, tag: null } } : settings),
+    [settings, unknown],
+  )
+}
+
 type SettingsPanelProps = {
   settings: Settings
   onChange: (settings: Settings) => void
@@ -215,6 +234,7 @@ export function SettingsPanel({
   currentId,
   onClose,
 }: SettingsPanelProps) {
+  const known = useKnownTag(settings, photos)
   const { container, close } = usePopover(onClose)
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
@@ -294,14 +314,14 @@ export function SettingsPanel({
         >
           {section === 'photos' && (
             <PhotosSection
-              settings={settings}
+              settings={known}
               onChange={onChange}
               photos={photos}
               currentId={currentId}
             />
           )}
-          {section === 'clock' && <ClockSection settings={settings} onChange={onChange} />}
-          {section === 'general' && <GeneralSection settings={settings} onChange={onChange} />}
+          {section === 'clock' && <ClockSection settings={known} onChange={onChange} />}
+          {section === 'general' && <GeneralSection settings={known} onChange={onChange} />}
         </div>
       </div>
     </aside>

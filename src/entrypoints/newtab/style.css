@@ -537,6 +537,16 @@ body {
   opacity: 1;
 }
 
+/* The thumbnail didn't load: an empty, outlined tile rather than a broken image. */
+.gallery__photo--broken {
+  background: rgb(255 255 255 / 4%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
+}
+
+.gallery__photo.gallery__photo--broken img {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gallery__photo img {
     transition: opacity 150ms;

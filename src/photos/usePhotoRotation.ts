@@ -53,6 +53,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
   const settingsRef = useRef(settings)
   const stateRef = useRef(state)
   const visited = useRef(false)
+  const unmounted = useRef(false)
 
   settingsRef.current = settings
   stateRef.current = state
@@ -62,31 +63,40 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
   const tag = settings?.tag ?? null
   const pinnedId = settings?.pinnedId ?? null
 
-  // Runs once, on the first known settings.
+  // Runs once, on the first known settings. Keyed on whether they are known rather than on
+  // the settings object: App passes a new one on every settings write, and a change landing
+  // mid-fetch must not cancel the only first visit this tab gets.
+  const settingsKnown = settings !== null
   useEffect(() => {
-    if (settings === null || visited.current) return
+    const first = settingsRef.current
+    if (!first || visited.current) return
     visited.current = true
 
-    let cancelled = false
     void (async () => {
       const { manifest } = await getManifest()
       const stored = await photoState.getValue()
+      // The latest settings, in case they changed while the manifest loaded.
+      const current = settingsRef.current ?? first
       const visit = photoForSettings(
-        settings,
+        current,
         stored,
-        idsFor(manifest, settings.tag),
+        idsFor(manifest, current.tag),
         Date.now(),
         true,
       )
       if (visit !== stored) await photoState.setValue(visit)
-      if (cancelled) return
+      if (unmounted.current) return
       setManifest(manifest)
       setState(visit)
     })()
-    return () => {
-      cancelled = true
-    }
-  }, [settings])
+  }, [settingsKnown])
+
+  useEffect(
+    () => () => {
+      unmounted.current = true
+    },
+    [],
+  )
 
   // The settings changed while the tab is open (here, in another tab or on another device).
   useEffect(() => {

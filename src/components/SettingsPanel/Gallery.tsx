@@ -28,6 +28,8 @@ export function Gallery({ photos, currentId, initialTag, onSelect }: GalleryProp
     tags.some(({ slug }) => slug === initialTag) ? initialTag : null,
   )
   const shown = useMemo(() => filterByTag(photos, tag), [photos, tag])
+  // Thumbnails that failed to load, drawn as empty tiles rather than broken images.
+  const [broken, setBroken] = useState<ReadonlySet<string>>(() => new Set())
 
   return (
     <section class="gallery" aria-labelledby="gallery-heading">
@@ -62,7 +64,9 @@ export function Gallery({ photos, currentId, initialTag, onSelect }: GalleryProp
           <li key={photo.id}>
             <button
               type="button"
-              class="gallery__photo"
+              class={
+                broken.has(photo.id) ? 'gallery__photo gallery__photo--broken' : 'gallery__photo'
+              }
               aria-current={photo.id === currentId ? 'true' : undefined}
               onClick={() => onSelect(photo.id)}
             >
@@ -74,6 +78,7 @@ export function Gallery({ photos, currentId, initialTag, onSelect }: GalleryProp
                 loading="lazy"
                 decoding="async"
                 style={{ objectPosition: objectPosition(photo) }}
+                onError={() => setBroken((failed) => new Set(failed).add(photo.id))}
               />
             </button>
           </li>

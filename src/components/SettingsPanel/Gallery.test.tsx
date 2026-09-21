@@ -72,6 +72,18 @@ describe('Gallery', () => {
     expect(photoNames()).toEqual(['Tofino, BC', 'Photo 2'])
   })
 
+  it('marks a thumbnail that fails to load, keeping it pickable', () => {
+    const { onSelect } = renderGallery()
+    const [first, second] = photoButtons()
+
+    fireEvent.error(first!.querySelector('img')!)
+
+    expect(first?.classList.contains('gallery__photo--broken')).toBe(true)
+    expect(second?.classList.contains('gallery__photo--broken')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Waterfall' }))
+    expect(onSelect).toHaveBeenCalledWith('a')
+  })
+
   it('picks a photo', () => {
     const { onSelect } = renderGallery()
 

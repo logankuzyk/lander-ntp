@@ -136,6 +136,32 @@ describe('usePhotoRotation', () => {
     expect((await photoState.getValue())?.currentId).toBe('a')
   })
 
+  it('still shows a photo when the settings change while the manifest is fetched', async () => {
+    // No cache, so the first visit waits on the network.
+    let respond: (response: Response) => void = () => {}
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          respond = resolve
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { result, rerender } = renderRotation(cycle('daily'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+
+    // Any settings write hands the hook a new, equal object: here, mid-fetch.
+    rerender(cycle('daily'))
+    respond(
+      new Response(JSON.stringify(makeManifest(IDS.map((id) => makePhoto(id)))), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await waitFor(() => expect(result.current.photo).not.toBeNull())
+    expect(result.current.photos.map((photo) => photo.id)).toEqual(IDS)
+  })
+
   it('does not move on when only the frequency changes', async () => {
     await seed()
     const { result, rerender } = renderRotation(cycle('daily'))
