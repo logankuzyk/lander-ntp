@@ -9,6 +9,7 @@ import {
   DATA_COLLECTION,
   isTelemetryEnabled,
   setBrowserConsent,
+  telemetryBuilt,
 } from './consent'
 
 const chrome = () => vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({})
@@ -18,6 +19,7 @@ const firefox = (granted: string[]) =>
 
 beforeEach(() => {
   vi.stubEnv('DEV', false)
+  vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
 })
 
 afterEach(() => {
@@ -25,9 +27,32 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('telemetryBuilt', () => {
+  it('is off unless the build turns it on', () => {
+    expect(telemetryBuilt()).toBe(true)
+
+    vi.stubEnv('WXT_TELEMETRY_ENABLED', undefined)
+    expect(telemetryBuilt()).toBe(false)
+  })
+})
+
 describe('buildSends', () => {
   it('sends from a production build', () => {
     expect(buildSends()).toBe(true)
+  })
+
+  it('sends nothing from a build without telemetry', () => {
+    vi.stubEnv('WXT_TELEMETRY_ENABLED', undefined)
+
+    expect(buildSends()).toBe(false)
+  })
+
+  it('keeps a dev build without telemetry quiet even when asked to send', () => {
+    vi.stubEnv('WXT_TELEMETRY_ENABLED', undefined)
+    vi.stubEnv('DEV', true)
+    vi.stubEnv('WXT_TELEMETRY_DEV', '1')
+
+    expect(buildSends()).toBe(false)
   })
 
   it('keeps a dev build quiet', () => {
@@ -49,6 +74,12 @@ describe('browserConsent', () => {
     chrome()
 
     expect(await browserConsent()).toBeNull()
+  })
+
+  it('takes no answer on a Firefox build as a no', async () => {
+    chrome()
+
+    expect(await browserConsent(true)).toBe(false)
   })
 
   it("follows Firefox's usage data switch", async () => {

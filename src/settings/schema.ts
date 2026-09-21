@@ -19,7 +19,7 @@ export type Settings = {
     style: 'list' | 'grid'
     size: 's' | 'm' | 'l'
   }
-  /** Send anonymous usage data (see src/telemetry). Firefox also asks at install. */
+  /** Send usage data (see src/telemetry). Firefox also asks at install. */
   telemetry: boolean
 }
 
@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
     size: 'm',
   },
   // On, with the switch in settings and a line in each store listing. Firefox users answer
-  // its own prompt at install, which gates this too (see telemetry/consent).
+  // its own prompt at install, which gates this too, and nothing is sent at all unless the
+  // build turns telemetry on (see telemetry/consent).
   telemetry: true,
 }

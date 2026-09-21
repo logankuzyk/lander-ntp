@@ -1,6 +1,8 @@
 # Telemetry Worker
 
-Takes anonymous usage events from the extension at `https://ntp.logankuzyk.com/events` and writes them to the Workers Analytics Engine dataset `lander_ntp_events`. The extension side is in [`src/telemetry`](../src/telemetry).
+Takes usage events from the extension at `https://ntp.logankuzyk.com/events` and writes them to the Workers Analytics Engine dataset `lander_ntp_events`. The extension side is in [`src/telemetry`](../src/telemetry).
+
+It never stores or logs client IPs, `request.cf` or headers. `CF-Connecting-IP` is used only as a rate-limiter key (30 requests a minute per IP, and per install id), and Workers Logs invocation logs are turned off in `wrangler.jsonc` because they would record each request's metadata. The code logs nothing about requests.
 
 ## Development
 
@@ -15,6 +17,7 @@ To send events from a dev build of the extension, add this to the root `.env.loc
 
 ```bash
 WXT_TELEMETRY_URL=http://localhost:8787/events
+WXT_TELEMETRY_ENABLED=1
 WXT_TELEMETRY_DEV=1
 ```
 

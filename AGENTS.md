@@ -16,10 +16,10 @@ Telemetry exists to answer a few questions: how many installs are active, which 
 
 ### Rules
 
-- **Anonymous.** The only identifier is a random UUID kept in `local:` storage. It counts installs, not people, and is deleted on uninstall. The Worker never stores IPs, `request.cf` or headers.
+- **Pseudonymous, not anonymous.** The only identifier is a random UUID kept in `local:` storage. It counts installs, not people, and is deleted on uninstall. It is stable, and the Worker sees it next to the client IP, so don't call the data anonymous. The Worker never stores or logs IPs, `request.cf` or headers: it uses `CF-Connecting-IP` only as a rate-limiter key, and `wrangler.jsonc` turns Workers Logs invocation logs off because they would record request metadata. Never `console.log` a request or its headers.
 - **No browsing data.** Never send URLs, page titles, favourite sites or free text. Values must be enums, booleans, counts, or ids of photos published on logankuzyk.com.
 - **Name each property.** Build props field by field, as `heartbeatProps` does. Never spread settings or objects into an event, because a setting added later would then leave the browser unnoticed.
-- **Consent.** `track()` sends only when `settings.telemetry` is on (the default), _and_ Firefox's `technicalAndInteraction` consent is granted where the browser has one. Dev builds send nothing unless `WXT_TELEMETRY_DEV=1` is set.
+- **Consent.** Nothing is sent, and the settings switch is hidden, unless the build sets `WXT_TELEMETRY_ENABLED=1` (see [Turning telemetry on](#turning-telemetry-on)). With it, `track()` sends only when `settings.telemetry` is on (the default), _and_ Firefox's `technicalAndInteraction` consent is granted (a Firefox build that finds no answer takes it as a no). Dev builds send nothing unless `WXT_TELEMETRY_DEV=1` is set as well.
 - **Fire and forget.** `track()` never throws and never retries. Call it as `void track(…)`, and don't let UI wait on it.
 - **Naming.** `snake_case`, object then past-tense verb: `photo_liked`, `link_clicked`.
 
@@ -39,7 +39,7 @@ The Worker's own timestamp is the event time. Clients don't send one.
 
 | Event                           | Status  | Fired when                                                        | Props                                                                                                                  |
 | ------------------------------- | ------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `heartbeat`                     | Live    | The first new tab at least 24h after the last heartbeat           | `frequency`, `font`, `dim`, `clock.{enabled,hour12,showDate,showSeconds}`, `favourites.{enabled,style,size,count}`     |
+| `heartbeat`                     | Live    | The first new tab of each UTC day                                 | `frequency`, `font`, `dim`, `clock.{enabled,hour12,showDate,showSeconds}`, `favourites.{enabled,style,size,count}`     |
 | `photo_liked` / `photo_unliked` | Planned | The thumbs-up button (or `l` key) is toggled                      | `photoId`                                                                                                              |
 | `setting_changed`               | Planned | A setting changes in the settings panel, once per changed setting | `key` (dotted path, e.g. `clock.showSeconds`), `value` (enum or boolean). Never sent for the usage data switch itself. |
 | `favourites_edited`             | Planned | The favourites list is added to, edited or reordered              | `count`                                                                                                                |
@@ -61,4 +61,12 @@ The Worker's own timestamp is the event time. Clients don't send one.
 
 ### Checking it locally
 
-Run `npm run dev` in `telemetry-worker/`. Then set `WXT_TELEMETRY_URL=http://localhost:8787/events` and `WXT_TELEMETRY_DEV=1` in the root `.env.local`, and run `npm run dev`. Events show up in the `wrangler dev` log as `POST /events 204`.
+Run `npm run dev` in `telemetry-worker/`. Then set `WXT_TELEMETRY_URL=http://localhost:8787/events`, `WXT_TELEMETRY_ENABLED=1` and `WXT_TELEMETRY_DEV=1` in the root `.env.local`, and run `npm run dev`. Events show up in the `wrangler dev` log as `POST /events 204`.
+
+### Turning telemetry on
+
+Telemetry is built in only when `WXT_TELEMETRY_ENABLED=1` is set at build time (read through `import.meta.env` in `src/telemetry/consent.ts`). Without it, which is the default, the extension sends nothing and the settings panel has no **Privacy** section, so merging or releasing this code starts no collection. Set it (for example as an `env` entry on the build step of `publish.yml`) only once all of these are done:
+
+- [ ] The Worker is deployed (secrets, or `npm run deploy` in `telemetry-worker/`). Until then heartbeats fail silently.
+- [ ] A privacy policy page is published on logankuzyk.com.
+- [ ] Usage data is declared in the Chrome Web Store and Edge Add-ons privacy practices, and the listings mention the setting.

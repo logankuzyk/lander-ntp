@@ -55,8 +55,31 @@ describe('POST /events', () => {
     limit.mockResolvedValueOnce({ success: false })
 
     expect((await post(heartbeat)).status).toBe(429)
-    expect(limit).toHaveBeenCalledWith({ key: INSTALL_ID })
+    expect(limit).toHaveBeenCalledWith({ key: `install:${INSTALL_ID}` })
     expect(writeDataPoint).not.toHaveBeenCalled()
+  })
+
+  it('rate-limits by IP too, so a fresh install id per request gets around nothing', async () => {
+    limit.mockResolvedValueOnce({ success: false })
+
+    const response = await post(heartbeat, {
+      headers: { 'Content-Type': 'text/plain', 'CF-Connecting-IP': '203.0.113.7' },
+    })
+
+    expect(response.status).toBe(429)
+    expect(limit).toHaveBeenCalledTimes(1)
+    expect(limit).toHaveBeenCalledWith({ key: 'ip:203.0.113.7' })
+    expect(writeDataPoint).not.toHaveBeenCalled()
+  })
+
+  it('never writes the IP it rate-limits on', async () => {
+    await post(heartbeat, {
+      headers: { 'Content-Type': 'text/plain', 'CF-Connecting-IP': '203.0.113.7' },
+    })
+
+    expect(limit).toHaveBeenCalledTimes(2)
+    expect(writeDataPoint).toHaveBeenCalledOnce()
+    expect(JSON.stringify(writeDataPoint.mock.calls)).not.toContain('203.0.113.7')
   })
 
   it('drops keys the schema does not name', async () => {
@@ -94,6 +117,28 @@ describe('POST /events', () => {
 
   it('refuses an oversized body that does not say how big it is', async () => {
     expect((await post('x'.repeat(MAX_BODY_LENGTH + 1))).status).toBe(413)
+  })
+
+  it('stops reading a streamed body once it is too big', async () => {
+    let pulled = 0
+    const chunk = new TextEncoder().encode('x'.repeat(1024))
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled++
+        controller.enqueue(chunk)
+      },
+    })
+
+    const response = await post('', { body, duplex: 'half' } as RequestInit)
+
+    expect(response.status).toBe(413)
+    expect(pulled).toBeLessThanOrEqual(MAX_BODY_LENGTH / chunk.byteLength + 2)
+  })
+
+  it('counts bytes rather than characters', async () => {
+    const padded = { ...heartbeat, pad: 'é'.repeat(MAX_BODY_LENGTH / 2) }
+
+    expect((await post(padded)).status).toBe(413)
   })
 })
 

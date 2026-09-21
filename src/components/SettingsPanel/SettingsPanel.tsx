@@ -6,7 +6,7 @@ import type { Favourite } from '@/favourites/schema'
 import { FREQUENCIES, type Frequency } from '@/photos/rotation'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
-import { browserConsent, setBrowserConsent } from '@/telemetry/consent'
+import { browserConsent, setBrowserConsent, telemetryBuilt } from '@/telemetry/consent'
 
 import { FavouritesEditor } from './FavouritesEditor'
 
@@ -140,12 +140,13 @@ function PrivacySection({ enabled, onEnabledChange }: PrivacySectionProps) {
     <section>
       <h3>Privacy</h3>
       <Toggle
-        label="Share anonymous usage data"
+        label="Share usage data"
         checked={enabled && browserAllows !== false}
         onChange={onChange}
       />
       <p class="settings__note">
-        A daily check-in with your settings, from a random id. Never the sites you visit.
+        A daily check-in with your settings, tagged with a random id for this browser. Never the
+        sites you visit.
       </p>
     </section>
   )
@@ -319,10 +320,13 @@ export function SettingsPanel({
           />
         </section>
 
-        <PrivacySection
-          enabled={settings.telemetry}
-          onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
-        />
+        {/* A build without telemetry has nothing to switch. */}
+        {telemetryBuilt() && (
+          <PrivacySection
+            enabled={settings.telemetry}
+            onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
+          />
+        )}
       </div>
     </div>
   )

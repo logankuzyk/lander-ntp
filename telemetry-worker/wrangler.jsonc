@@ -8,9 +8,13 @@
   "routes": [{ "pattern": "ntp.logankuzyk.com", "custom_domain": true }],
   "workers_dev": false,
   "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "lander_ntp_events" }],
-  // Per install id. Far above anything the extension sends; only here to blunt abuse.
+  // Keyed per client IP and per install id (see src/handler.ts). Far above anything the
+  // extension sends; only here to blunt abuse.
   "ratelimits": [
     { "name": "LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
   ],
-  "observability": { "enabled": true },
+  // Logs only what the code logs, which is nothing about the request. Invocation logs would
+  // record each request's metadata (headers, and with them the client IP), which the Worker
+  // promises never to keep.
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
 }

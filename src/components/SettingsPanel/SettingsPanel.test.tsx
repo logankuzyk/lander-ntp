@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Favourite } from '@/favourites/schema'
 
@@ -207,8 +207,15 @@ describe('SettingsPanel', () => {
     expect(screen.queryByLabelText('Style')).toBeNull()
   })
 
+  it('has no usage data switch in a build without telemetry', () => {
+    renderPanel()
+
+    expect(screen.queryByText('Privacy')).toBeNull()
+    expect(screen.queryByLabelText('Share usage data')).toBeNull()
+  })
+
   describe('usage data', () => {
-    const usageData = () => screen.getByLabelText('Share anonymous usage data') as HTMLInputElement
+    const usageData = () => screen.getByLabelText('Share usage data') as HTMLInputElement
 
     /** Firefox, with its usage data switch as given. */
     const firefox = (granted: boolean) =>
@@ -216,7 +223,12 @@ describe('SettingsPanel', () => {
         data_collection: granted ? [DATA_COLLECTION] : [],
       })
 
+    beforeEach(() => {
+      vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
+    })
+
     afterEach(() => {
+      vi.unstubAllEnvs()
       vi.restoreAllMocks()
     })
 

@@ -17,6 +17,7 @@ const sentBody = (call = 0) =>
 
 beforeEach(() => {
   vi.stubEnv('DEV', false)
+  vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
   vi.stubGlobal('fetch', fetchMock)
   fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
   vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({})
@@ -75,6 +76,13 @@ describe('track', () => {
 
   it('sends nothing from a dev build', async () => {
     vi.stubEnv('DEV', true)
+
+    expect(await track(event)).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('sends nothing from a build without telemetry', async () => {
+    vi.stubEnv('WXT_TELEMETRY_ENABLED', undefined)
 
     expect(await track(event)).toBe(false)
     expect(fetchMock).not.toHaveBeenCalled()
