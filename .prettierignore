@@ -4,5 +4,3 @@ coverage/
 web-ext-artifacts/
 package-lock.json
 CHANGELOG.md
-telemetry-worker/.wrangler/
-telemetry-worker/worker-configuration.d.ts

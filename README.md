@@ -34,7 +34,3 @@ Photos come from `https://logankuzyk.com/new-tab/photos.json` (photos with **Sho
 ```bash
 WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 ```
-
-## Usage data
-
-Builds made with `WXT_TELEMETRY_ENABLED=1` send a heartbeat once a day: a random per-install id, the extension version and browser, and your settings (with how many tags you cycle, never which ones). It goes to the Cloudflare Worker in [`telemetry-worker/`](telemetry-worker), which sees your IP address as any web request does but uses it only for rate limiting and never stores it. You can switch it off under **Settings → Privacy**. On Firefox it is also off unless you allow it in the install prompt or in `about:addons`. Without that variable, which is the default until the privacy policy is published, nothing is sent and the switch isn't shown. Dev builds send nothing unless `WXT_TELEMETRY_DEV=1` is set too. See [AGENTS.md](AGENTS.md#turning-telemetry-on) before turning it on.

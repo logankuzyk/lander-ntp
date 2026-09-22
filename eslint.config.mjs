@@ -7,14 +7,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores([
-    '.output/',
-    '.wxt/',
-    'coverage/',
-    'web-ext-artifacts/',
-    'telemetry-worker/.wrangler/',
-    'telemetry-worker/worker-configuration.d.ts',
-  ]),
+  globalIgnores(['.output/', '.wxt/', 'coverage/', 'web-ext-artifacts/']),
   js.configs.recommended,
   tseslint.configs.recommended,
   jsxA11y.flatConfigs.recommended,

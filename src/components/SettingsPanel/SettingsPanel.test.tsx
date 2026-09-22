@@ -1,11 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/preact'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
-import { DATA_COLLECTION } from '@/telemetry/consent'
-import { fakePermissions } from '@/test/permissions'
 import { makePhoto } from '@/test/fixtures'
 
 import { SettingsPanel } from './SettingsPanel'
@@ -368,79 +366,6 @@ describe('SettingsPanel', () => {
       fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
 
       expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
-    })
-
-    it('has no usage data switch in a build without telemetry', () => {
-      renderPanel()
-      openSection('General')
-
-      expect(screen.queryByText('Privacy')).toBeNull()
-      expect(screen.queryByLabelText('Share usage data')).toBeNull()
-    })
-
-    describe('usage data', () => {
-      const usageData = () => screen.getByLabelText('Share usage data') as HTMLInputElement
-
-      /** Firefox, with its usage data switch as given. */
-      const firefox = (granted: boolean) =>
-        vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({
-          data_collection: granted ? [DATA_COLLECTION] : [],
-        })
-
-      beforeEach(() => {
-        vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
-      })
-
-      afterEach(() => {
-        vi.unstubAllEnvs()
-        vi.restoreAllMocks()
-      })
-
-      it('switches usage data off on Chrome and Edge, where only the setting decides', async () => {
-        const getAll = vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({})
-        const { onChange } = renderPanel()
-        openSection('General')
-        await waitFor(() => expect(getAll).toHaveBeenCalled())
-
-        expect(usageData().checked).toBe(true)
-        fireEvent.click(usageData())
-
-        expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
-      })
-
-      it("shows the switch off while Firefox's own consent is withheld", async () => {
-        firefox(false)
-        renderPanel()
-        openSection('General')
-
-        await waitFor(() => expect(usageData().checked).toBe(false))
-      })
-
-      it('asks Firefox for consent when switched on there', async () => {
-        firefox(false)
-        const request = vi.spyOn(fakePermissions, 'request').mockResolvedValue(true)
-        renderPanel()
-        openSection('General')
-        await waitFor(() => expect(usageData().checked).toBe(false))
-
-        fireEvent.click(usageData())
-
-        expect(request).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
-        await waitFor(() => expect(usageData().checked).toBe(true))
-      })
-
-      it("withdraws Firefox's consent too when switched off there", async () => {
-        firefox(true)
-        const remove = vi.spyOn(fakePermissions, 'remove').mockResolvedValue(true)
-        const { onChange } = renderPanel()
-        openSection('General')
-        await waitFor(() => expect(fakePermissions.getAll).toHaveBeenCalled())
-
-        fireEvent.click(usageData())
-
-        expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
-        expect(remove).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
-      })
     })
   })
 })
