@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0](https://github.com/logankuzyk/lander-ntp/compare/v0.1.1...v0.2.0) (2026-09-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* settings popover with a photo gallery and tag cycling; remove favourites ([#23](https://github.com/logankuzyk/lander-ntp/issues/23))
+
+### Features
+
+* settings popover with a photo gallery and tag cycling; remove favourites ([#23](https://github.com/logankuzyk/lander-ntp/issues/23)) ([8a394d5](https://github.com/logankuzyk/lander-ntp/commit/8a394d52de18e217ad1e6c227252c4ad92d293e5))
+
+
+### Bug Fixes
+
+* let Firefox use the new tab page as its homepage ([#24](https://github.com/logankuzyk/lander-ntp/issues/24)) ([6d6f108](https://github.com/logankuzyk/lander-ntp/commit/6d6f1080a11021b6665cf532e0de86342cf68c80))
+* shorten extension display name to "Lander" ([#29](https://github.com/logankuzyk/lander-ntp/issues/29)) ([92773ce](https://github.com/logankuzyk/lander-ntp/commit/92773ce1e48877321e5cd41411b25261d96ee273))
+
 ## [0.1.1](https://github.com/logankuzyk/ntp/compare/v0.1.0...v0.1.1) (2026-09-14)
 
 
