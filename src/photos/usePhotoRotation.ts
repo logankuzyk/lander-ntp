@@ -16,9 +16,9 @@ import type { Manifest, Photo } from './schema'
 import { photoState } from './storage'
 import { poolIds } from './tags'
 
-const idsFor = (manifest: Manifest, tag: string | null): PhotoIds => ({
+const idsFor = (manifest: Manifest, tags: readonly string[]): PhotoIds => ({
   all: manifest.photos.map((photo) => photo.id),
-  pool: poolIds(manifest.photos, tag),
+  pool: poolIds(manifest.photos, tags),
 })
 
 /**
@@ -42,7 +42,7 @@ export type PhotoRotation = {
 /**
  * Loads the manifest, picks the photo for this visit and, while cycling on an interval, moves
  * on as the tab stays open. Follows the photo settings as they change: pinning a photo shows
- * it, and cycling a tag moves off a photo without it.
+ * it, and cycling tags moves off a photo without any of them.
  *
  * Pass null until the stored settings have loaded: deciding against the defaults would move
  * the photo on in every new tab, whatever the settings say.
@@ -59,7 +59,8 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
 
   const pace = settings ? paceOf(settings) : null
   const mode = settings?.mode
-  const tag = settings?.tag ?? null
+  // A string, so the effect below only reruns when the tags themselves change.
+  const tagKey = settings?.tags.join(' ') ?? ''
   const pinnedId = settings?.pinnedId ?? null
 
   // Runs once, on the first known settings.
@@ -74,7 +75,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       const visit = photoForSettings(
         settings,
         stored,
-        idsFor(manifest, settings.tag),
+        idsFor(manifest, settings.tags),
         Date.now(),
         true,
       )
@@ -93,11 +94,12 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
     const current = settingsRef.current
     const shown = stateRef.current
     if (!manifest || !current || !shown) return
-    const next = photoForSettings(current, shown, idsFor(manifest, tag), Date.now(), false)
+    const next = photoForSettings(current, shown, idsFor(manifest, current.tags), Date.now(), false)
     if (next === shown) return
     setState(next)
     void photoState.setValue(next)
-  }, [manifest, mode, tag, pinnedId])
+    // tagKey stands in for current.tags, which is read through the ref.
+  }, [manifest, mode, tagKey, pinnedId])
 
   /**
    * Draw the next photo from the pool. `onlyIfDue` is for the timer: another tab may have
@@ -114,7 +116,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
         return stored.currentId
       }
 
-      const advanced = nextPhoto(stored, idsFor(manifest, current.tag).pool, Date.now())
+      const advanced = nextPhoto(stored, idsFor(manifest, current.tags).pool, Date.now())
       setState(advanced)
       await photoState.setValue(advanced)
       return advanced.currentId
@@ -154,12 +156,14 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
     const find = (id: string | null | undefined) =>
       manifest?.photos.find((photo) => photo.id === id) ?? null
     const photo = find(state?.currentId)
-    const upcoming = mode === 'pinned' ? null : find(state?.bag[0])
+    // The bag can still hold photos from before the tags changed; the next draw skips them.
+    const pool = new Set(manifest ? poolIds(manifest.photos, tagKey ? tagKey.split(' ') : []) : [])
+    const upcoming = mode === 'pinned' ? null : find(state?.bag.find((id) => pool.has(id)))
     return {
       photos: manifest?.photos ?? NO_PHOTOS,
       photo,
       upcoming: upcoming === photo ? null : upcoming,
       next,
     }
-  }, [manifest, state, mode, next])
+  }, [manifest, state, mode, tagKey, next])
 }

@@ -39,14 +39,18 @@ describe('filterByTag', () => {
 })
 
 describe('poolIds', () => {
-  const photos = [tagged('a', 'water'), tagged('b', 'urban'), tagged('c', 'water')]
+  const photos = [tagged('a', 'water'), tagged('b', 'urban'), tagged('c', 'water'), tagged('d')]
 
   it('cycles the photos with the tag', () => {
-    expect(poolIds(photos, 'water')).toEqual(['a', 'c'])
+    expect(poolIds(photos, ['water'])).toEqual(['a', 'c'])
   })
 
-  it('cycles everything with no tag, or one no photo has', () => {
-    expect(poolIds(photos, null)).toEqual(['a', 'b', 'c'])
-    expect(poolIds(photos, 'gone')).toEqual(['a', 'b', 'c'])
+  it('cycles the photos with any of the tags', () => {
+    expect(poolIds(photos, ['urban', 'water'])).toEqual(['a', 'b', 'c'])
+  })
+
+  it('cycles everything with no tags, or ones no photo has', () => {
+    expect(poolIds(photos, [])).toEqual(['a', 'b', 'c', 'd'])
+    expect(poolIds(photos, ['gone'])).toEqual(['a', 'b', 'c', 'd'])
   })
 })

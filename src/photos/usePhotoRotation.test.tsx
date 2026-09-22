@@ -10,17 +10,17 @@ import { usePhotoRotation } from './usePhotoRotation'
 const IDS = ['a', 'b', 'c']
 const WATER = { slug: 'water', name: 'Water' }
 
-const cycle = (frequency: Frequency, tag: string | null = null): PhotoSettings => ({
+const cycle = (frequency: Frequency, tags: string[] = []): PhotoSettings => ({
   mode: 'cycle',
   frequency,
-  tag,
+  tags,
   pinnedId: null,
 })
 
 const pinned = (pinnedId: string | null): PhotoSettings => ({
   mode: 'pinned',
   frequency: 'every-visit',
-  tag: null,
+  tags: [],
   pinnedId,
 })
 
@@ -167,12 +167,12 @@ describe('usePhotoRotation', () => {
     await waitFor(() => expect(result.current.photo?.id).toBe('b'))
   })
 
-  it('moves to a photo with the tag when cycling one', async () => {
+  it('moves to a photo with the tag when cycling it', async () => {
     await seed()
     const { result, rerender } = renderRotation(cycle('daily'))
     await waitFor(() => expect(result.current.photo?.id).toBe('a'))
 
-    rerender(cycle('daily', 'water'))
+    rerender(cycle('daily', ['water']))
 
     await waitFor(() => expect(result.current.photo?.id).toBe('c'))
     let shown: string | null = null
@@ -181,6 +181,15 @@ describe('usePhotoRotation', () => {
     })
     // Only c has the tag.
     expect(shown).toBe('c')
+  })
+
+  it('preloads the next photo with the tags, skipping ones queued before they changed', async () => {
+    // c has the tag and stays up (daily); the bag holds b, queued before, which has none.
+    await seed('c')
+    const { result } = renderRotation(cycle('daily', ['water']))
+
+    await waitFor(() => expect(result.current.photo?.id).toBe('c'))
+    expect(result.current.upcoming).toBeNull()
   })
 
   it('preloads the photo that comes next', async () => {

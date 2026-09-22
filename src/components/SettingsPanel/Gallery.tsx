@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'preact/hooks'
 
+import { Chip } from '@/components/Chip/Chip'
 import { buildSrcSet, objectPosition, thumbnailUrl } from '@/photos/image'
 import type { Photo } from '@/photos/schema'
 import { availableTags, filterByTag } from '@/photos/tags'
@@ -10,7 +11,7 @@ const TILE_SIZES = '8rem'
 type GalleryProps = {
   photos: readonly Photo[]
   currentId: string | null
-  /** The tag being cycled, which the filter starts on. */
+  /** The tag the filter starts on: the one being cycled, when there is just one. */
   initialTag: string | null
   onSelect: (id: string) => void
 }
@@ -35,24 +36,14 @@ export function Gallery({ photos, currentId, initialTag, onSelect }: GalleryProp
 
       {tags.length > 0 && (
         <div class="gallery__tags" role="group" aria-label="Filter photos">
-          <button
-            type="button"
-            class="chip"
-            aria-pressed={tag === null}
-            onClick={() => setTag(null)}
-          >
-            All
-          </button>
+          <Chip label="All" pressed={tag === null} onClick={() => setTag(null)} />
           {tags.map(({ slug, name }) => (
-            <button
+            <Chip
               key={slug}
-              type="button"
-              class="chip"
-              aria-pressed={tag === slug}
+              label={name}
+              pressed={tag === slug}
               onClick={() => setTag(tag === slug ? null : slug)}
-            >
-              {name}
-            </button>
+            />
           ))}
         </div>
       )}

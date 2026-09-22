@@ -22,7 +22,8 @@ export function usePopover(onClose: () => void) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      // A dropdown inside handles its own Escape first.
+      if (event.key !== 'Escape' || event.defaultPrevented) return
       event.preventDefault()
       onClose()
     }

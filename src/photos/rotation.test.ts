@@ -213,13 +213,13 @@ describe('photoForSettings', () => {
   const cycling = (frequency: Frequency = '1h'): PhotoSettings => ({
     mode: 'cycle',
     frequency,
-    tag: 'water',
+    tags: ['water'],
     pinnedId: null,
   })
   const pinned = (pinnedId: string | null): PhotoSettings => ({
     mode: 'pinned',
     frequency: '1h',
-    tag: 'water',
+    tags: ['water'],
     pinnedId,
   })
 

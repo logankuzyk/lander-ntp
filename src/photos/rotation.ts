@@ -22,8 +22,9 @@ export type PhotoSettings = {
   mode: 'cycle' | 'pinned'
   /** How fast to cycle. Kept while a photo is pinned, for when cycling resumes. */
   frequency: Frequency
-  /** Only cycle photos with this tag slug; null for all of them. */
-  tag: string | null
+  /** Only cycle photos with one of these tag slugs; empty for all of them. Kept while a
+   * photo is pinned, for when cycling resumes. */
+  tags: string[]
   /** The photo to keep while pinned. Null keeps whichever photo is showing. */
   pinnedId: string | null
 }
@@ -166,7 +167,7 @@ export function choosePhoto(
 export type PhotoIds = {
   /** Every photo in the manifest. */
   all: readonly string[]
-  /** The photos being cycled: those with the chosen tag, or all of them. */
+  /** The photos being cycled: those with one of the chosen tags, or all of them. */
   pool: readonly string[]
 }
 

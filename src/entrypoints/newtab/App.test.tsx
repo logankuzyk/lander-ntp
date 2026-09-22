@@ -130,7 +130,7 @@ describe('App', () => {
       expect((await settingsItem.getValue()).photos).toEqual({
         mode: 'pinned',
         frequency: '1h',
-        tag: null,
+        tags: [],
         pinnedId: 'b',
       }),
     )
@@ -226,7 +226,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     fireEvent.click(await screen.findByRole('tab', { name: 'General' }))
-    fireEvent.change(await screen.findByLabelText('Font'), { target: { value: 'geist' } })
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Font' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Geist' }))
 
     await waitFor(() =>
       expect(document.documentElement.style.getPropertyValue('--font-display')).toContain(

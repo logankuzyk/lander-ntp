@@ -10,7 +10,7 @@ import { SettingsPanel } from './SettingsPanel'
 
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
-  photos: { mode: 'cycle', frequency: '1h', tag: null, pinnedId: null },
+  photos: { mode: 'cycle', frequency: '1h', tags: [], pinnedId: null },
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
 }
 
@@ -115,65 +115,106 @@ describe('SettingsPanel', () => {
   })
 
   describe('photos', () => {
+    /** Open a dropdown by its label and pick an option. */
+    const choose = (field: string, option: string) => {
+      fireEvent.click(screen.getByRole('combobox', { name: field }))
+      fireEvent.click(screen.getByRole('option', { name: option }))
+    }
+
     it('changes how often the photo changes', () => {
       const { onChange } = renderPanel()
 
-      fireEvent.change(screen.getByLabelText('Change photo'), { target: { value: 'daily' } })
+      expect(screen.getByRole('combobox', { name: 'Change photo' }).textContent).toBe('Every hour')
+      choose('Change photo', 'Every day')
 
       expect(onChange).toHaveBeenCalledWith(withPhotos({ frequency: 'daily' }))
+      // A choice closes the menu.
+      expect(screen.queryByRole('listbox')).toBeNull()
+    })
+
+    it('closes only the menu with Escape, not the settings', () => {
+      const { onClose } = renderPanel()
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Change photo' }))
+      fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' })
+
+      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(onClose).not.toHaveBeenCalled()
     })
 
     it('keeps the photo on screen when set to never, remembering the frequency', () => {
       const { onChange } = renderPanel()
 
-      fireEvent.change(screen.getByLabelText('Change photo'), { target: { value: 'never' } })
+      choose('Change photo', 'Never')
 
       expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'a' }))
     })
 
-    it('cycles one tag', () => {
+    it('cycles tags chosen from the multi-select', () => {
       const { onChange } = renderPanel()
-      const from = screen.getByLabelText('Photos from') as HTMLSelectElement
+      const field = screen.getByRole('combobox', { name: 'Tags' })
 
-      expect([...from.options].map((option) => option.textContent)).toEqual([
-        'All photos',
+      expect(field.textContent).toBe('All')
+      fireEvent.click(field)
+      const menu = within(screen.getByRole('dialog', { name: 'Tags' }))
+      expect(menu.getAllByRole('option').map((option) => option.textContent)).toEqual([
         'Beach',
         'Water',
       ])
-      fireEvent.change(from, { target: { value: 'water' } })
+      fireEvent.click(menu.getByRole('option', { name: 'Water' }))
 
-      expect(onChange).toHaveBeenCalledWith(withPhotos({ tag: 'water' }))
+      expect(onChange).toHaveBeenCalledWith(withPhotos({ tags: ['water'] }))
     })
 
-    it('filters the gallery to the tag being cycled', () => {
-      renderPanel({ overrides: withPhotos({ tag: 'beach' }) })
+    it('shows the cycled tags as chips, and removes or resets them from the menu', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['water', 'beach'] }) })
+      const field = screen.getByRole('combobox', { name: 'Tags' })
+
+      expect(field.textContent).toBe('WaterBeach')
+      fireEvent.click(field)
+      const menu = within(screen.getByRole('dialog', { name: 'Tags' }))
+      // Only the tags not already chosen are offered.
+      expect(menu.queryAllByRole('option')).toEqual([])
+
+      fireEvent.click(menu.getByRole('button', { name: 'Remove Water' }))
+      expect(onChange).toHaveBeenLastCalledWith(withPhotos({ tags: ['beach'] }))
+
+      fireEvent.click(menu.getByRole('button', { name: 'Reset to all' }))
+      expect(onChange).toHaveBeenLastCalledWith(withPhotos({ tags: [] }))
+    })
+
+    it('offers the tags only while cycling, and keeps them for when it resumes', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'b', tags: ['water'] }),
+      })
+
+      expect(screen.getByRole('combobox', { name: 'Change photo' }).textContent).toBe('Never')
+      expect(screen.queryByRole('combobox', { name: 'Tags' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Resume cycling' }))
+
+      expect(onChange).toHaveBeenCalledWith(
+        withPhotos({ mode: 'cycle', pinnedId: 'b', tags: ['water'] }),
+      )
+    })
+
+    it('keeps the tags when cycling is set to a frequency again', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'b', tags: ['water'] }),
+      })
+
+      choose('Change photo', 'Every day')
+
+      expect(onChange).toHaveBeenCalledWith(
+        withPhotos({ mode: 'cycle', frequency: 'daily', pinnedId: 'b', tags: ['water'] }),
+      )
+    })
+
+    it('filters the gallery to the tag being cycled, when there is one', () => {
+      renderPanel({ overrides: withPhotos({ tags: ['beach'] }) })
 
       const filters = within(screen.getByRole('group', { name: 'Filter photos' }))
       expect(filters.getByRole('button', { name: 'Beach' }).getAttribute('aria-pressed')).toBe(
         'true',
-      )
-    })
-
-    it('resumes cycling when a photo is pinned', () => {
-      const { onChange } = renderPanel({
-        overrides: withPhotos({ mode: 'pinned', pinnedId: 'b', tag: 'water' }),
-      })
-
-      expect((screen.getByLabelText('Change photo') as HTMLSelectElement).value).toBe('never')
-      fireEvent.click(screen.getByRole('button', { name: 'Resume cycling' }))
-
-      expect(onChange).toHaveBeenCalledWith(
-        withPhotos({ mode: 'cycle', pinnedId: 'b', tag: 'water' }),
-      )
-    })
-
-    it('resumes cycling when a tag is chosen while pinned', () => {
-      const { onChange } = renderPanel({ overrides: withPhotos({ mode: 'pinned', pinnedId: 'b' }) })
-
-      fireEvent.change(screen.getByLabelText('Photos from'), { target: { value: 'beach' } })
-
-      expect(onChange).toHaveBeenCalledWith(
-        withPhotos({ mode: 'cycle', pinnedId: 'b', tag: 'beach' }),
       )
     })
 
@@ -185,11 +226,11 @@ describe('SettingsPanel', () => {
       expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'b' }))
     })
 
-    it('has no gallery or tag choice with only one photo', () => {
+    it('has no gallery or tags with only one photo', () => {
       renderPanel({ photos: [makePhoto('fallback')] })
 
       expect(screen.queryByRole('heading', { name: 'Gallery' })).toBeNull()
-      expect(screen.queryByLabelText('Photos from')).toBeNull()
+      expect(screen.queryByRole('combobox', { name: 'Tags' })).toBeNull()
     })
 
     it('switches the photo wash off', () => {
@@ -286,7 +327,8 @@ describe('SettingsPanel', () => {
       const { onChange } = renderPanel()
       openSection('General')
 
-      fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'instrument-serif' } })
+      fireEvent.click(screen.getByRole('combobox', { name: 'Font' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
 
       expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
     })

@@ -22,8 +22,12 @@ export function filterByTag(photos: readonly Photo[], slug: string | null): read
     : photos.filter((photo) => photo.tags.some((tag) => tag.slug === slug))
 }
 
-/** Ids of the photos to cycle: those with the tag, or every photo when none has it. */
-export function poolIds(photos: readonly Photo[], slug: string | null): string[] {
-  const tagged = filterByTag(photos, slug)
+/**
+ * Ids of the photos to cycle: those with any of the tags, or every photo when there are no
+ * tags or no photo has one of them.
+ */
+export function poolIds(photos: readonly Photo[], slugs: readonly string[]): string[] {
+  const wanted = new Set(slugs)
+  const tagged = photos.filter((photo) => photo.tags.some(({ slug }) => wanted.has(slug)))
   return (tagged.length > 0 ? tagged : photos).map((photo) => photo.id)
 }

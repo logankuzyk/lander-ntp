@@ -392,20 +392,13 @@ body {
   accent-color: var(--color-fg);
 }
 
-.settings__row select {
-  max-width: 60%;
-  height: var(--popover-control);
-  padding: 0 0.5rem;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 10%);
-  color: inherit;
-  font: inherit;
+/* A field of chips can wrap onto more lines; its label stays level with the first. */
+.settings__row--wrap {
+  align-items: flex-start;
 }
 
-.settings__row option {
-  background: #1a1a1a;
-  color: var(--color-fg);
+.settings__row--wrap > span {
+  padding-top: calc((var(--popover-control) - var(--popover-line)) / 2);
 }
 
 .settings__note {
@@ -447,18 +440,13 @@ body {
   }
 }
 
-/* Gallery (in settings) */
-
-.gallery__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--popover-gap);
-}
+/* Chips: toggles in the gallery filter, labels and removable tags in dropdowns. */
 
 .chip {
   display: inline-flex;
   flex: none;
   align-items: center;
+  gap: 0.25rem;
   height: var(--popover-control);
   padding: 0 0.75rem;
   border: 1px solid rgb(255 255 255 / 25%);
@@ -466,6 +454,21 @@ body {
   background: none;
   color: inherit;
   font: inherit;
+  white-space: nowrap;
+}
+
+/* Sits on a line of text, inside a field or a menu. */
+.chip--s {
+  height: var(--popover-line);
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+}
+
+.chip--removable {
+  padding-right: 0.125rem;
+}
+
+button.chip {
   cursor: pointer;
   opacity: 0.85;
   transition:
@@ -473,7 +476,7 @@ body {
     background-color 150ms;
 }
 
-.chip:hover {
+button.chip:hover {
   opacity: 1;
 }
 
@@ -484,7 +487,167 @@ body {
   opacity: 1;
 }
 
-.chip:focus-visible,
+.chip__remove {
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.chip__remove:hover,
+.chip__remove:focus-visible {
+  background: rgb(255 255 255 / 15%);
+  opacity: 1;
+}
+
+.popover .chip:focus-visible,
+.popover .chip__remove:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Dropdowns: a field that opens a menu of options (components/Dropdown). */
+
+.dropdown__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  min-height: var(--popover-control);
+  padding: 0 0.5rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 0.375rem;
+  background: rgb(255 255 255 / 10%);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown__field:hover,
+.dropdown__field[aria-expanded='true'] {
+  background: rgb(255 255 255 / 15%);
+}
+
+/* Chips instead of text: the field keeps a control's height for one line of them. */
+.dropdown__field--chips {
+  padding: calc((var(--popover-control) - var(--popover-line) - 2px) / 2) 0.5rem;
+  padding-left: 0.25rem;
+}
+
+.dropdown__field--chips .dropdown__value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.dropdown__chevron {
+  flex: none;
+  opacity: 0.7;
+}
+
+.dropdown__menu {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  max-width: min(18rem, calc(100vw - 2rem));
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.5rem;
+  background: rgb(24 24 24 / 94%);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 40%);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 30%) transparent;
+}
+
+.dropdown__chosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+/* With chips and a reset around the options, only the options scroll. */
+.dropdown__menu--dialog {
+  overflow: hidden;
+}
+
+.dropdown__options {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 30%) transparent;
+}
+
+.dropdown__chosen {
+  flex: none;
+}
+
+.dropdown__option,
+.dropdown__reset {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--popover-control);
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dropdown__reset {
+  margin-top: 0.25rem;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0 0 0.25rem 0.25rem;
+  opacity: 0.8;
+}
+
+.dropdown__reset:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* The highlight shows where focus is, in place of an outline. */
+.popover .dropdown__option:hover,
+.popover .dropdown__option:focus-visible,
+.popover .dropdown__reset:not(:disabled):hover,
+.popover .dropdown__reset:focus-visible {
+  outline: none;
+  background: rgb(255 255 255 / 10%);
+  opacity: 1;
+}
+
+/* Gallery (in settings) */
+
+.gallery__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--popover-gap);
+}
+
 .gallery__photo:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;

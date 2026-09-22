@@ -1,5 +1,7 @@
-import { useMemo, useRef, useState } from 'preact/hooks'
+import { useId, useMemo, useRef, useState } from 'preact/hooks'
 
+import { MultiSelect } from '@/components/Dropdown/MultiSelect'
+import { Select } from '@/components/Dropdown/Select'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
@@ -61,17 +63,12 @@ type ChoiceProps<T extends string> = {
 }
 
 function Choice<T extends string>({ label, value, options, onChange }: ChoiceProps<T>) {
+  const labelId = useId()
   return (
-    <label class="settings__row">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.currentTarget.value as T)}>
-        {options.map(([id, text]) => (
-          <option key={id} value={id}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div class="settings__row">
+      <span id={labelId}>{label}</span>
+      <Select labelId={labelId} value={value} options={options} onChange={onChange} />
+    </div>
   )
 }
 
@@ -86,6 +83,8 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
   const cycling = settings.photos
   const pinned = cycling.mode === 'pinned'
   const tags = useMemo(() => availableTags(photos), [photos])
+
+  const tagsLabel = useId()
 
   const update = (changes: Partial<PhotoSettings>) =>
     onChange({ ...settings, photos: { ...cycling, ...changes } })
@@ -107,14 +106,18 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
               : update({ mode: 'cycle', frequency: choice })
           }
         />
-        {tags.length > 0 && (
-          <Choice
-            label="Photos from"
-            value={cycling.tag ?? ''}
-            options={[['', 'All photos'], ...tags.map(({ slug, name }) => [slug, name] as const)]}
-            // Choosing what to cycle is asking for cycling.
-            onChange={(tag) => update({ mode: 'cycle', tag: tag || null })}
-          />
+        {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
+        {!pinned && tags.length > 0 && (
+          <div class="settings__row settings__row--wrap">
+            <span id={tagsLabel}>Tags</span>
+            <MultiSelect
+              labelId={tagsLabel}
+              options={tags.map(({ slug, name }) => ({ value: slug, label: name }))}
+              value={cycling.tags}
+              onChange={(chosen) => update({ tags: chosen })}
+              allLabel="All"
+            />
+          </div>
         )}
         {pinned && (
           <p class="settings__note">
@@ -133,11 +136,11 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
 
       {photos.length > 1 && (
         <Gallery
-          // Remounted when the cycled tag changes, so the filter follows it.
-          key={cycling.tag ?? ''}
+          // Remounted when the cycled tags change, so the filter follows them.
+          key={cycling.tags.join(' ')}
           photos={photos}
           currentId={currentId}
-          initialTag={cycling.tag}
+          initialTag={cycling.tags.length === 1 ? (cycling.tags[0] ?? null) : null}
           onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
         />
       )}

@@ -13,7 +13,7 @@ const SettingsSchema = v.object({
   photos: v.object({
     mode: v.picklist(['cycle', 'pinned']),
     frequency: v.picklist(FREQUENCIES),
-    tag: v.nullable(v.string()),
+    tags: v.array(v.string()),
     pinnedId: v.nullable(v.string()),
   }),
   clock: v.object({

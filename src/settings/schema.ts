@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   photos: {
     mode: 'cycle',
     frequency: 'every-visit',
-    tag: null,
+    tags: [],
     pinnedId: null,
   },
   clock: {

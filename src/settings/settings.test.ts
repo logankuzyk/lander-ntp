@@ -17,7 +17,7 @@ const RELEASE_0_1_1 = {
 describe('DEFAULT_SETTINGS', () => {
   it('starts cycling all photos every tab, with the clock on and the system font', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      photos: { mode: 'cycle', frequency: 'every-visit', tag: null, pinnedId: null },
+      photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
