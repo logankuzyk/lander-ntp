@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/logankuzyk/lander-ntp/compare/v0.2.1...v0.2.2) (2026-09-22)
+
+
+### Features
+
+* pad icons to store guidelines and add Edge store logo ([#34](https://github.com/logankuzyk/lander-ntp/issues/34)) ([2f36ba7](https://github.com/logankuzyk/lander-ntp/commit/2f36ba7cf7427cf2281a0016022e7be81b838e75))
+
 ## [0.2.1](https://github.com/logankuzyk/lander-ntp/compare/v0.2.0...v0.2.1) (2026-09-22)
 
 
