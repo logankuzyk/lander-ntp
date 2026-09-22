@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config'
 import { WxtVitest } from 'wxt/testing/vitest-plugin'
 
 export default defineConfig({
@@ -8,8 +8,6 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    // The Worker runs its own tests, outside the browser environment set up here.
-    exclude: [...configDefaults.exclude, 'telemetry-worker/**'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

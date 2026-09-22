@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
+import { useCallback, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Controls } from '@/components/Controls/Controls'
@@ -8,7 +8,6 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
-import { maybeSendHeartbeat } from '@/telemetry/heartbeat'
 import { Clock } from '@/widgets/Clock/Clock'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
@@ -40,11 +39,6 @@ export function App() {
       }
     })()
   }
-
-  // Counts this install as active, once a day. Sends nothing without consent (telemetry/consent).
-  useEffect(() => {
-    void maybeSendHeartbeat()
-  }, [])
 
   // Before paint, so the clock is never drawn in one font and then redrawn in another.
   useLayoutEffect(() => {

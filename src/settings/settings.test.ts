@@ -15,13 +15,12 @@ const RELEASE_0_1_1 = {
 }
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts cycling all photos every tab, with the clock, system font and usage data on', () => {
+  it('starts cycling all photos every tab, with the clock and system font', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
-      telemetry: true,
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()
