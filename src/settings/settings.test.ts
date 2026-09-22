@@ -5,7 +5,7 @@ import { FONTS, fontStack } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 import { settingsItem } from './storage'
 
-/** Settings as 0.1.1 stored them: a flat frequency, and favourite sites. */
+/** Settings as 0.1.1 stored them: a flat frequency, favourite sites, and no usage data switch. */
 const RELEASE_0_1_1 = {
   frequency: 'daily',
   clock: { enabled: false, hour12: true, showDate: true, showSeconds: false },
@@ -15,12 +15,13 @@ const RELEASE_0_1_1 = {
 }
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts cycling all photos every tab, with the clock on and the system font', () => {
+  it('starts cycling all photos every tab, with the clock, system font and usage data on', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
+      telemetry: true,
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()

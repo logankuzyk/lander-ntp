@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { Select } from '@/components/Dropdown/Select'
@@ -10,6 +10,7 @@ import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
+import { browserConsent, setBrowserConsent, telemetryBuilt } from '@/telemetry/consent'
 
 import { Gallery } from './Gallery'
 
@@ -188,16 +189,75 @@ function ClockSection({ settings, onChange }: SectionProps) {
   )
 }
 
+/**
+ * The usage data switch. On Firefox it also drives the browser's own consent, which gates
+ * sending as well, so the switch shows the two together and flipping it sets both.
+ */
+function UsageData({ enabled, onEnabledChange }: PrivacyProps) {
+  // Undefined until known; null where the browser has no consent of its own (Chrome, Edge).
+  const [browserAllows, setBrowserAllows] = useState<boolean | null>()
+
+  useEffect(() => {
+    let active = true
+    browserConsent()
+      .catch(() => null)
+      .then((allows) => {
+        if (active) setBrowserAllows(allows)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const onChange = (next: boolean) => {
+    onEnabledChange(next)
+    if (browserAllows === null || browserAllows === undefined) return
+    setBrowserConsent(next)
+      .catch(() => !next)
+      .then(setBrowserAllows)
+  }
+
+  return (
+    <section aria-labelledby="privacy-heading">
+      <h3 id="privacy-heading">Privacy</h3>
+      <Toggle
+        label="Share usage data"
+        checked={enabled && browserAllows !== false}
+        onChange={onChange}
+      />
+      <p class="settings__note">
+        A daily check-in with your settings, tagged with a random id for this browser. Never the
+        sites you visit.
+      </p>
+    </section>
+  )
+}
+
+type PrivacyProps = {
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+}
+
 function GeneralSection({ settings, onChange }: SectionProps) {
   return (
-    <section>
-      <Choice<FontId>
-        label="Font"
-        value={settings.font}
-        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
-        onChange={(font) => onChange({ ...settings, font })}
-      />
-    </section>
+    <>
+      <section>
+        <Choice<FontId>
+          label="Font"
+          value={settings.font}
+          options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
+          onChange={(font) => onChange({ ...settings, font })}
+        />
+      </section>
+
+      {/* A build without telemetry has nothing to switch. */}
+      {telemetryBuilt() && (
+        <UsageData
+          enabled={settings.telemetry}
+          onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
+        />
+      )}
+    </>
   )
 }
 

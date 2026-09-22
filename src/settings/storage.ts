@@ -24,6 +24,7 @@ const SettingsSchema = v.object({
   }),
   font: v.string(),
   dim: v.boolean(),
+  telemetry: v.boolean(),
 })
 
 /**

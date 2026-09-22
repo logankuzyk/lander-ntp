@@ -14,6 +14,8 @@ export type Settings = {
   font: FontId
   /** Lay a slight wash over the photo, so light text holds up over bright ones. */
   dim: boolean
+  /** Send usage data (see src/telemetry). Firefox also asks at install. */
+  telemetry: boolean
 }
 
 /** Whether this browser's locale writes times as 12-hour. */
@@ -35,4 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   font: 'system',
   dim: true,
+  // On, with the switch in settings and a line in each store listing. Firefox users answer
+  // its own prompt at install, which gates this too (see telemetry/consent).
+  telemetry: true,
 }
