@@ -39,7 +39,7 @@ export default defineConfig({
     },
   },
   manifest: ({ browser }) => ({
-    name: 'Lander NTP',
+    name: 'Lander',
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
     // storage.local caches the photo manifest and rotation state. No host permissions: the
