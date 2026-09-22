@@ -9,7 +9,6 @@
 
 ### Features
 
-* send an anonymous daily heartbeat ([#20](https://github.com/logankuzyk/lander-ntp/issues/20)) ([1c8d5cd](https://github.com/logankuzyk/lander-ntp/commit/1c8d5cdcae7c60c35ad3c9358d9332640c4a1860))
 * settings popover with a photo gallery and tag cycling; remove favourites ([#23](https://github.com/logankuzyk/lander-ntp/issues/23)) ([8a394d5](https://github.com/logankuzyk/lander-ntp/commit/8a394d52de18e217ad1e6c227252c4ad92d293e5))
 
 
