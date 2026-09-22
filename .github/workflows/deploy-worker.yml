@@ -1,0 +1,56 @@
+name: Deploy telemetry Worker
+
+on:
+  push:
+    branches: [main]
+    paths: ['telemetry-worker/**']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: telemetry-worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      # Opt-in, like store submission: until the secrets exist this does nothing, and deploying
+      # by hand with `npm run deploy` works the same.
+      - name: Check for Cloudflare credentials
+        id: credentials
+        working-directory: .
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          elif [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::No Cloudflare credentials configured, so nothing was deployed.'
+          else
+            echo '::error::Set both CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, or neither.'
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.credentials.outputs.configured == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.credentials.outputs.configured == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: telemetry-worker/package-lock.json
+      - if: steps.credentials.outputs.configured == 'true'
+        run: npm ci
+      - if: steps.credentials.outputs.configured == 'true'
+        run: npm test
+      - if: steps.credentials.outputs.configured == 'true'
+        run: npm run deploy

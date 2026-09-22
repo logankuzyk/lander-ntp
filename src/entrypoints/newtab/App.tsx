@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Controls } from '@/components/Controls/Controls'
@@ -9,6 +9,7 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
+import { maybeSendHeartbeat } from '@/telemetry/heartbeat'
 import { Clock } from '@/widgets/Clock/Clock'
 import { Favourites } from '@/widgets/Favourites/Favourites'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
@@ -29,6 +30,11 @@ export function App() {
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--font-display', fontStack(settings.font))
   }, [settings.font])
+
+  // Counts this install as active, once a day. Sends nothing without consent (telemetry/consent).
+  useEffect(() => {
+    void maybeSendHeartbeat()
+  }, [])
 
   return (
     <main class="app">

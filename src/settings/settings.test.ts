@@ -5,13 +5,14 @@ import { DEFAULT_SETTINGS, type Settings } from './schema'
 import { settingsItem } from './storage'
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts on a new photo every tab, with the clock on, favourites on and the system font', () => {
+  it('starts on a new photo every tab, with the clock, favourites and usage data on', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       frequency: 'every-visit',
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
       favourites: { enabled: true, style: 'list', size: 'm' },
+      telemetry: true,
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()
@@ -68,6 +69,26 @@ describe('settingsItem', () => {
     await settingsItem.migrate()
 
     expect(await settingsItem.getValue()).not.toHaveProperty('widgets')
+  })
+
+  it('switches usage data on for installs that predate the setting', async () => {
+    const beforeTelemetry: Record<string, unknown> = { ...DEFAULT_SETTINGS }
+    delete beforeTelemetry.telemetry
+    await settingsItem.setValue(beforeTelemetry as unknown as Settings)
+    await settingsItem.setMeta({ v: 4 })
+
+    await settingsItem.migrate()
+
+    expect(await settingsItem.getValue()).toMatchObject({ telemetry: true })
+  })
+
+  it('leaves a stored usage data choice alone', async () => {
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, telemetry: false })
+    await settingsItem.setMeta({ v: 5 })
+
+    await settingsItem.migrate()
+
+    expect(await settingsItem.getValue()).toMatchObject({ telemetry: false })
   })
 
   it('leaves the rest of the settings alone while migrating', async () => {
