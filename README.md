@@ -37,4 +37,4 @@ WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 
 ## Icons
 
-The extension icons are in `public/icon/`. Following the Chrome Web Store guidelines, the 48px and larger icons have transparent padding of 1/8 of their width on each side, so the 128px icon's artwork is 96×96. The 16px and 32px icons fill the canvas so they stay legible in the browser's own UI. `store/edge-logo-300.png` is the 300×300 logo for the Edge Add-ons listing. You upload it in the Partner Center dashboard, and it isn't part of the extension.
+The extension icons are in `public/icon/`. Following the Chrome Web Store guidelines, the 48px and larger icons have transparent padding of 1/8 of their width on each side, so the 128px icon's artwork is 96×96. The 16px and 32px icons fill the canvas so they stay legible in the browser's own UI. `300.png` is also the logo for the Edge Add-ons listing, which you upload in the Partner Center dashboard.
