@@ -23,7 +23,9 @@ WXT_TELEMETRY_DEV=1
 
 ## Deploying
 
-`npm run deploy`, or push to `main`: [deploy-worker.yml](../.github/workflows/deploy-worker.yml) deploys once the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets are set. Create the token from the _Edit Cloudflare Workers_ template, scoped to the `logankuzyk.com` zone; querying needs a separate token with _Account Analytics: Read_. The first deploy creates the `ntp.logankuzyk.com` custom domain and the dataset.
+Cloudflare deploys it from this repo (Workers Builds) on every push to `main` that touches `telemetry-worker/`, running `npm test` first. The build is set up in the dashboard under **Workers & Pages → lander-ntp-telemetry → Settings → Build**: root directory `telemetry-worker`, build command `npm test`, deploy command `npx wrangler deploy`, build watch path `telemetry-worker/*`, and non-production branch builds off. The Worker's name there must match `name` in `wrangler.jsonc`. `npm run deploy` deploys by hand.
+
+The first deploy creates the `ntp.logankuzyk.com` custom domain, and the dataset is created by the first write. Querying needs an API token with _Account Analytics: Read_.
 
 ## Columns
 

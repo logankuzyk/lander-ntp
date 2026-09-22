@@ -81,6 +81,6 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   const { success } = await env.LIMITER.limit({ key: `install:${result.output.installId}` })
   if (!success) return respond(429)
 
-  env.EVENTS.writeDataPoint(toDataPoint(result.output))
+  env.LANDER_NTP_EVENTS.writeDataPoint(toDataPoint(result.output))
   return respond(204)
 }
