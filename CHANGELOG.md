@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/logankuzyk/lander-ntp/compare/v0.2.0...v0.2.1) (2026-09-22)
+
+
+### Features
+
+* viewfinder extension icon ([#32](https://github.com/logankuzyk/lander-ntp/issues/32)) ([7a5d864](https://github.com/logankuzyk/lander-ntp/commit/7a5d8647a695bca1d0904e13e763c7caec256685))
+
 ## [0.2.0](https://github.com/logankuzyk/lander-ntp/compare/v0.1.1...v0.2.0) (2026-09-22)
 
 
