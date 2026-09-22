@@ -3,7 +3,7 @@ import { storage } from 'wxt/utils/storage'
 
 import { FONTS, fontStack } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
-import { settingsItem } from './storage'
+import { fromLegacySettings, LEGACY_SETTINGS_KEY, settingsItem } from './storage'
 
 /** Settings as 0.1.1 stored them: a flat frequency, favourite sites, and no usage data switch. */
 const RELEASE_0_1_1 = {
@@ -30,7 +30,7 @@ describe('DEFAULT_SETTINGS', () => {
 
 describe('settingsItem', () => {
   it('syncs settings and falls back to the defaults', async () => {
-    expect(settingsItem.key).toBe('sync:settings')
+    expect(settingsItem.key).toBe('sync:settings2')
     expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
   })
 
@@ -41,20 +41,52 @@ describe('settingsItem', () => {
     expect(await settingsItem.getValue()).toMatchObject({ photos })
   })
 
-  it('replaces settings stored by 0.1.1 with the defaults', async () => {
-    await storage.setItem('sync:settings', RELEASE_0_1_1)
+  it('leaves the key 0.1.1 reads alone, so devices still on it keep working', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+    await storage.setMeta(LEGACY_SETTINGS_KEY, { v: 4 })
 
-    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
+    await settingsItem.getValue()
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, font: 'geist-mono' })
+
+    expect(await storage.getItem(LEGACY_SETTINGS_KEY)).toEqual(RELEASE_0_1_1)
+    expect(await storage.getMeta(LEGACY_SETTINGS_KEY)).toEqual({ v: 4 })
+    // Nor does the new key take on the old one's version.
+    expect(await storage.getMeta(settingsItem.key)).toEqual({})
   })
 
-  it('replaces settings synced from a device on 0.1.1 with the defaults', async () => {
+  it('carries settings over from 0.1.1 on the first read', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+
+    const expected: Settings = {
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily' },
+      clock: RELEASE_0_1_1.clock,
+      font: 'geist',
+      dim: false,
+      // 0.1.1 had no usage data switch, so it starts on, as for a fresh install.
+      telemetry: true,
+    }
+    expect(await settingsItem.getValue()).toEqual(expected)
+    expect(await storage.getItem(settingsItem.key)).toEqual(expected)
+  })
+
+  it('carries them over only once', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+    await settingsItem.getValue()
+
+    // A device still on 0.1.1 changes its settings afterwards.
+    await storage.setItem(LEGACY_SETTINGS_KEY, { ...RELEASE_0_1_1, font: 'instrument-serif' })
+
+    expect((await settingsItem.getValue()).font).toBe('geist')
+  })
+
+  it('ignores changes synced from a device on 0.1.1', async () => {
     const seen: (Settings | null)[] = []
     const unwatch = settingsItem.watch((value) => seen.push(value))
 
-    await storage.setItem('sync:settings', RELEASE_0_1_1)
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
     unwatch()
 
-    expect(seen).toEqual([DEFAULT_SETTINGS])
+    expect(seen).toEqual([])
   })
 
   it('keeps a font it does not know, which a newer version may have added', async () => {
@@ -62,6 +94,47 @@ describe('settingsItem', () => {
     await settingsItem.setValue(settings)
 
     expect(await settingsItem.getValue()).toEqual(settings)
+  })
+
+  it('replaces settings in a shape it does not know with the defaults', async () => {
+    await storage.setItem(settingsItem.key, { photos: 'everything' })
+
+    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
+  })
+})
+
+describe('fromLegacySettings', () => {
+  it('pins the photo on screen for a frequency of off', () => {
+    expect(fromLegacySettings({ ...RELEASE_0_1_1, frequency: 'off' }).photos).toEqual({
+      mode: 'pinned',
+      frequency: DEFAULT_SETTINGS.photos.frequency,
+      tags: [],
+      pinnedId: null,
+    })
+  })
+
+  it('cycles at the frequency it had', () => {
+    expect(fromLegacySettings({ ...RELEASE_0_1_1, frequency: '15m' }).photos).toEqual({
+      ...DEFAULT_SETTINGS.photos,
+      frequency: '15m',
+    })
+  })
+
+  it.each([null, undefined, 'settings', 42, [], {}])(
+    'falls back to the defaults for %o',
+    (value) => {
+      expect(fromLegacySettings(value)).toEqual(DEFAULT_SETTINGS)
+    },
+  )
+
+  it('replaces each malformed or missing setting with its default, keeping the rest', () => {
+    expect(
+      fromLegacySettings({ frequency: 'hourly', clock: { enabled: false }, font: 7, dim: false }),
+    ).toEqual({ ...DEFAULT_SETTINGS, dim: false })
+    expect(fromLegacySettings({ clock: RELEASE_0_1_1.clock })).toEqual({
+      ...DEFAULT_SETTINGS,
+      clock: RELEASE_0_1_1.clock,
+    })
   })
 })
 

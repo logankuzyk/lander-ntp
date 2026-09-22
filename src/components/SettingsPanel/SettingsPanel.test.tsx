@@ -228,6 +228,41 @@ describe('SettingsPanel', () => {
       expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'b' }))
     })
 
+    it('reads tags no photo has as all photos, and clears them on the next change', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['mountains'] }) })
+
+      expect(screen.getByRole('combobox', { name: 'Tags' }).textContent).toBe('All')
+      const filters = within(screen.getByRole('group', { name: 'Filter photos' }))
+      expect(filters.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true')
+      fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+      expect(onChange).toHaveBeenCalledWith({ ...settings, dim: false })
+    })
+
+    it('clears tags the photos lack from other sections too, such as with the fallback photo', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ tags: ['water'] }),
+        photos: [makePhoto('fallback')],
+      })
+      openSection('Clock')
+
+      fireEvent.click(screen.getByLabelText('Show date'))
+
+      expect(onChange).toHaveBeenCalledWith({
+        ...settings,
+        clock: { ...settings.clock, showDate: true },
+      })
+    })
+
+    it('keeps the tags while the photos are loading', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['water'] }), photos: [] })
+
+      expect(screen.getByText('Loading photos…')).toBeTruthy()
+      fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+      expect(onChange).toHaveBeenCalledWith({ ...withPhotos({ tags: ['water'] }), dim: false })
+    })
+
     it('has no gallery or tags with only one photo', () => {
       renderPanel({ photos: [makePhoto('fallback')] })
 

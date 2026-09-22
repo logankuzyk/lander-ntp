@@ -86,6 +86,22 @@ describe('Controls', () => {
     expect(onToggleInfo).not.toHaveBeenCalled()
   })
 
+  it('ignores shortcuts pressed inside a popover', () => {
+    const { onNext, onToggleInfo } = renderControls()
+    render(
+      <aside class="popover" role="dialog" aria-label="Settings">
+        <button type="button">Beach</button>
+      </aside>,
+    )
+    const button = screen.getByRole('button', { name: 'Beach' })
+
+    fireEvent.keyDown(button, { key: 'ArrowRight' })
+    fireEvent.keyDown(button, { key: 'i' })
+
+    expect(onNext).not.toHaveBeenCalled()
+    expect(onToggleInfo).not.toHaveBeenCalled()
+  })
+
   it('marks the next-photo button busy while the photo is loading', () => {
     // The cross-fade holds the old photo until the new one is ready, so without this the
     // press looks like it did nothing.

@@ -4,6 +4,10 @@ const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
+/** Keys pressed inside a popover belong to it: arrows move between its tabs and chips. */
+const inPopover = (target: EventTarget | null) =>
+  target instanceof Element && target.closest('.popover') !== null
+
 type ControlsProps = {
   onNext: () => void
   /** True while the photo being faded in is still loading. */
@@ -32,7 +36,8 @@ export function Controls({
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
-        isEditable(event.target)
+        isEditable(event.target) ||
+        inPopover(event.target)
       ) {
         return
       }
