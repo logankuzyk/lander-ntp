@@ -4,7 +4,7 @@ import { handle, MAX_BODY_LENGTH } from './handler'
 
 const writeDataPoint = vi.fn()
 const limit = vi.fn()
-const env = { EVENTS: { writeDataPoint }, LIMITER: { limit } } as unknown as Env
+const env = { LANDER_NTP_EVENTS: { writeDataPoint }, LIMITER: { limit } } as unknown as Env
 
 const INSTALL_ID = '6f1c1b0e-8d5f-4c1a-9b8e-2a7c3d4e5f60'
 

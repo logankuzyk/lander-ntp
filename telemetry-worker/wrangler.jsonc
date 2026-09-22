@@ -7,7 +7,7 @@
   // website itself goes through Cloudflare's proxy.
   "routes": [{ "pattern": "ntp.logankuzyk.com", "custom_domain": true }],
   "workers_dev": false,
-  "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "lander_ntp_events" }],
+  "analytics_engine_datasets": [{ "binding": "LANDER_NTP_EVENTS", "dataset": "lander_ntp_events" }],
   // Keyed per client IP and per install id (see src/handler.ts). Far above anything the
   // extension sends; only here to blunt abuse.
   "ratelimits": [

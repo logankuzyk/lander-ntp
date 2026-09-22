@@ -66,6 +66,6 @@ Run `npm run dev` in `telemetry-worker/`. Then set `WXT_TELEMETRY_URL=http://loc
 
 Telemetry is built in only when `WXT_TELEMETRY_ENABLED=1` is set at build time (read through `import.meta.env` in `src/telemetry/consent.ts`). Without it, which is the default, the extension sends nothing and the settings panel has no **Privacy** section, so merging or releasing this code starts no collection. Set it (for example as an `env` entry on the build step of `publish.yml`) only once all of these are done:
 
-- [ ] The Worker is deployed (secrets, or `npm run deploy` in `telemetry-worker/`). Until then heartbeats fail silently.
+- [ ] The Worker is deployed (Workers Builds on push to `main`, or `npm run deploy` in `telemetry-worker/`). Until then heartbeats fail silently.
 - [ ] A privacy policy page is published on logankuzyk.com.
 - [ ] Usage data is declared in the Chrome Web Store and Edge Add-ons privacy practices, and the listings mention the setting.
