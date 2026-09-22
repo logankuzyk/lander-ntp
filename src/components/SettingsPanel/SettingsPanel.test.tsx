@@ -1,277 +1,446 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Favourite } from '@/favourites/schema'
-
+import type { PhotoSettings } from '@/photos/rotation'
+import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { DATA_COLLECTION } from '@/telemetry/consent'
 import { fakePermissions } from '@/test/permissions'
+import { makePhoto } from '@/test/fixtures'
 
 import { SettingsPanel } from './SettingsPanel'
 
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
+  photos: { mode: 'cycle', frequency: '1h', tags: [], pinnedId: null },
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
-  // Both features on, so their settings are on screen; collapsing has its own tests.
-  favourites: { ...DEFAULT_SETTINGS.favourites, enabled: true },
 }
 
-const favourites: Favourite[] = [{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }]
+const PHOTOS = [
+  makePhoto('a', { alt: 'Waterfall', tags: [{ slug: 'water', name: 'Water' }] }),
+  makePhoto('b', { alt: 'Tide pools', tags: [{ slug: 'beach', name: 'Beach' }] }),
+]
 
-const renderPanel = (overrides: Partial<Settings> = {}) => {
+const renderPanel = ({
+  overrides = {},
+  photos = PHOTOS,
+}: { overrides?: Partial<Settings>; photos?: Photo[] } = {}) => {
   const onChange = vi.fn()
   const onClose = vi.fn()
-  const onFavouritesChange = vi.fn()
   render(
     <SettingsPanel
       settings={{ ...settings, ...overrides }}
       onChange={onChange}
-      favourites={favourites}
-      onFavouritesChange={onFavouritesChange}
+      photos={photos}
+      currentId="a"
       onClose={onClose}
     />,
   )
-  return { onChange, onClose, onFavouritesChange }
+  return { onChange, onClose }
 }
 
+const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
+  ...settings,
+  photos: { ...settings.photos, ...changes },
+})
+
+const openSection = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
+
 describe('SettingsPanel', () => {
-  it('opens as a labelled dialog with focus inside it', () => {
-    renderPanel()
-    const dialog = screen.getByRole('dialog', { name: 'Settings' })
-
-    expect(dialog.getAttribute('aria-modal')).toBe('true')
-    expect(dialog.contains(document.activeElement)).toBe(true)
-  })
-
-  it('changes how often the photo changes', () => {
-    const { onChange } = renderPanel()
-
-    fireEvent.change(screen.getByLabelText('New photo'), { target: { value: 'daily' } })
-
-    expect(onChange).toHaveBeenCalledWith({ ...settings, frequency: 'daily' })
-  })
-
-  it('switches the photo wash off', () => {
-    const { onChange } = renderPanel()
-
-    fireEvent.click(screen.getByLabelText('Dim the photo'))
-
-    expect(onChange).toHaveBeenCalledWith({ ...settings, dim: false })
-  })
-
-  it('switches to 24-hour time', () => {
-    const { onChange } = renderPanel()
-    const toggle = screen.getByLabelText('24-hour time') as HTMLInputElement
-
-    expect(toggle.checked).toBe(false)
-    fireEvent.click(toggle)
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...settings,
-      clock: { ...settings.clock, hour12: false },
-    })
-  })
-
-  it.each([
-    ['Show clock', 'enabled', false],
-    ['Show date', 'showDate', true],
-    ['Show seconds', 'showSeconds', true],
-  ])('toggles %s', (label, key, expected) => {
-    const { onChange } = renderPanel()
-
-    fireEvent.click(screen.getByLabelText(label))
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...settings,
-      clock: { ...settings.clock, [key]: expected },
-    })
-  })
-
-  it('changes the font', () => {
-    const { onChange } = renderPanel()
-
-    fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'instrument-serif' } })
-
-    expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
-  })
-
-  it.each([
-    ['Show favourites', 'enabled', false],
-    ['Style', 'style', 'grid'],
-    ['Size', 'size', 'l'],
-  ])('changes the favourites %s setting', (label, key, value) => {
-    const { onChange } = renderPanel()
-    const control = screen.getByLabelText(label)
-
-    if (typeof value === 'boolean') fireEvent.click(control)
-    else fireEvent.change(control, { target: { value } })
-
-    expect(onChange).toHaveBeenCalledWith({
-      ...settings,
-      favourites: { ...settings.favourites, [key]: value },
-    })
-  })
-
-  it('edits the favourites list', () => {
-    const { onFavouritesChange } = renderPanel()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Portfolio' }))
-
-    expect(onFavouritesChange).toHaveBeenCalledWith([])
-  })
-
-  it('has no widget switches: the credit and details panel are always available', () => {
+  it('opens as a labelled popover with the close button focused', () => {
     renderPanel()
 
-    expect(screen.queryByLabelText('Show photo credit')).toBeNull()
-    expect(screen.queryByLabelText('Show photo details')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
   })
 
-  it('closes with the button, the backdrop and Escape', () => {
+  it('closes with the button, with Escape and with a click outside', () => {
     const { onClose } = renderPanel()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
-    fireEvent.click(document.querySelector('.settings__backdrop') as HTMLElement)
     fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.pointerDown(document.body)
 
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps Tab inside the dialog', () => {
-    renderPanel()
-    const focusable = [
-      ...screen.getByRole('dialog').querySelectorAll<HTMLElement>('button, select, input'),
-    ]
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
+  it('stays open for clicks inside it', () => {
+    const { onClose } = renderPanel()
 
-    last?.focus()
-    fireEvent.keyDown(document, { key: 'Tab' })
-    expect(document.activeElement).toBe(first)
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'Clock' }))
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Tide pools' }))
 
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(last)
+    expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('puts a feature switch in line with its heading', () => {
-    renderPanel()
+  describe('sections', () => {
+    it('lists photos, clock and general settings, starting on photos', () => {
+      renderPanel()
 
-    const clock = screen.getByLabelText('Show clock').closest('.settings__section-header')
-    const favourites = screen.getByLabelText('Show favourites').closest('.settings__section-header')
+      const tabs = screen.getAllByRole('tab')
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'Clock', 'General'])
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
+      expect(screen.getByRole('tabpanel', { name: 'Photos' })).toBeTruthy()
+    })
 
-    expect(clock?.querySelector('h3')?.textContent).toBe('Clock')
-    expect(favourites?.querySelector('h3')?.textContent).toBe('Favourites')
-  })
+    it('switches section from the sidebar', () => {
+      renderPanel()
 
-  it('collapses the clock settings when the clock is off', () => {
-    renderPanel({ clock: { ...settings.clock, enabled: false } })
+      openSection('Clock')
 
-    expect((screen.getByLabelText('Show clock') as HTMLInputElement).checked).toBe(false)
-    expect(screen.queryByLabelText('24-hour time')).toBeNull()
-    expect(screen.queryByLabelText('Show date')).toBeNull()
-    expect(screen.queryByLabelText('Show seconds')).toBeNull()
-  })
+      expect(screen.getByRole('tabpanel', { name: 'Clock' })).toBeTruthy()
+      expect(screen.getByLabelText('Show clock')).toBeTruthy()
+      expect(screen.queryByLabelText('Change photo')).toBeNull()
+    })
 
-  it('collapses the favourites settings, editor included, when favourites are off', () => {
-    renderPanel({ favourites: { ...settings.favourites, enabled: false } })
+    it('moves between sections with the arrow keys', () => {
+      renderPanel()
+      const photos = screen.getByRole('tab', { name: 'Photos' })
 
-    expect(screen.queryByLabelText('Style')).toBeNull()
-    expect(screen.queryByLabelText('Size')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Remove Portfolio' })).toBeNull()
-  })
+      fireEvent.keyDown(photos, { key: 'ArrowDown' })
+      expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Clock' }))
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Clock')
 
-  it('switches a collapsed feature back on from its heading', () => {
-    const { onChange } = renderPanel({ clock: { ...settings.clock, enabled: false } })
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'End' })
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
 
-    fireEvent.click(screen.getByLabelText('Show clock'))
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowDown' })
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
+    })
 
-    expect(onChange).toHaveBeenCalledWith({
-      ...settings,
-      clock: { ...settings.clock, enabled: true },
+    it('has no favourites', () => {
+      renderPanel()
+
+      expect(screen.queryByRole('tab', { name: 'Favourites' })).toBeNull()
+      expect(screen.queryByText(/favourite/i)).toBeNull()
     })
   })
 
-  it('keeps collapsed settings out of the Tab order', () => {
-    renderPanel({
-      clock: { ...settings.clock, enabled: false },
-      favourites: { ...settings.favourites, enabled: false },
+  describe('photos', () => {
+    /** Open a dropdown by its label and pick an option. */
+    const choose = (field: string, option: string) => {
+      fireEvent.click(screen.getByRole('combobox', { name: field }))
+      fireEvent.click(screen.getByRole('option', { name: option }))
+    }
+
+    it('changes how often the photo changes', () => {
+      const { onChange } = renderPanel()
+
+      expect(screen.getByRole('combobox', { name: 'Change photo' }).textContent).toBe('Every hour')
+      choose('Change photo', 'Every day')
+
+      expect(onChange).toHaveBeenCalledWith(withPhotos({ frequency: 'daily' }))
+      // A choice closes the menu.
+      expect(screen.queryByRole('listbox')).toBeNull()
     })
-    const focusable = [
-      ...screen.getByRole('dialog').querySelectorAll<HTMLElement>('button, select, input'),
-    ]
 
-    // `type` as a property, not an attribute: the editor's inputs leave it off and default
-    // to text, so reading the attribute would find nothing whether they are rendered or not.
-    expect(focusable.some((element) => (element as HTMLInputElement).type === 'text')).toBe(false)
-    // Choice names its select through the wrapping label, so look it up the same way.
-    expect(screen.queryByLabelText('Style')).toBeNull()
-  })
+    it('closes only the menu with Escape, not the settings', () => {
+      const { onClose } = renderPanel()
 
-  it('has no usage data switch in a build without telemetry', () => {
-    renderPanel()
+      fireEvent.click(screen.getByRole('combobox', { name: 'Change photo' }))
+      fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' })
 
-    expect(screen.queryByText('Privacy')).toBeNull()
-    expect(screen.queryByLabelText('Share usage data')).toBeNull()
-  })
+      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(onClose).not.toHaveBeenCalled()
+    })
 
-  describe('usage data', () => {
-    const usageData = () => screen.getByLabelText('Share usage data') as HTMLInputElement
+    it('keeps the photo on screen when set to never, remembering the frequency', () => {
+      const { onChange } = renderPanel()
 
-    /** Firefox, with its usage data switch as given. */
-    const firefox = (granted: boolean) =>
-      vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({
-        data_collection: granted ? [DATA_COLLECTION] : [],
+      choose('Change photo', 'Never')
+
+      expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'a' }))
+    })
+
+    it('cycles tags chosen from the multi-select', () => {
+      const { onChange } = renderPanel()
+      const field = screen.getByRole('combobox', { name: 'Tags' })
+
+      expect(field.textContent).toBe('All')
+      fireEvent.click(field)
+      const menu = within(screen.getByRole('dialog', { name: 'Tags' }))
+      expect(menu.getAllByRole('option').map((option) => option.textContent)).toEqual([
+        'Beach',
+        'Water',
+      ])
+      fireEvent.click(menu.getByRole('option', { name: 'Water' }))
+
+      expect(onChange).toHaveBeenCalledWith(withPhotos({ tags: ['water'] }))
+    })
+
+    it('shows the cycled tags as chips, and removes or resets them from the menu', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['water', 'beach'] }) })
+      const field = screen.getByRole('combobox', { name: 'Tags' })
+
+      expect(field.textContent).toBe('WaterBeach')
+      fireEvent.click(field)
+      const menu = within(screen.getByRole('dialog', { name: 'Tags' }))
+      // Only the tags not already chosen are offered.
+      expect(menu.queryAllByRole('option')).toEqual([])
+
+      fireEvent.click(menu.getByRole('button', { name: 'Remove Water' }))
+      expect(onChange).toHaveBeenLastCalledWith(withPhotos({ tags: ['beach'] }))
+
+      fireEvent.click(menu.getByRole('button', { name: 'Reset to all' }))
+      expect(onChange).toHaveBeenLastCalledWith(withPhotos({ tags: [] }))
+    })
+
+    it('offers the tags only while cycling, and keeps them for when it resumes', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'b', tags: ['water'] }),
       })
 
-    beforeEach(() => {
-      vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
+      expect(screen.getByRole('combobox', { name: 'Change photo' }).textContent).toBe('Never')
+      expect(screen.queryByRole('combobox', { name: 'Tags' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Resume cycling' }))
+
+      expect(onChange).toHaveBeenCalledWith(
+        withPhotos({ mode: 'cycle', pinnedId: 'b', tags: ['water'] }),
+      )
     })
 
-    afterEach(() => {
-      vi.unstubAllEnvs()
-      vi.restoreAllMocks()
+    it('keeps the tags when cycling is set to a frequency again', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'b', tags: ['water'] }),
+      })
+
+      choose('Change photo', 'Every day')
+
+      expect(onChange).toHaveBeenCalledWith(
+        withPhotos({ mode: 'cycle', frequency: 'daily', pinnedId: 'b', tags: ['water'] }),
+      )
     })
 
-    it('switches usage data off on Chrome and Edge, where only the setting decides', async () => {
-      const getAll = vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({})
+    it('filters the gallery to the tag being cycled, when there is one', () => {
+      renderPanel({ overrides: withPhotos({ tags: ['beach'] }) })
+
+      const filters = within(screen.getByRole('group', { name: 'Filter photos' }))
+      expect(filters.getByRole('button', { name: 'Beach' }).getAttribute('aria-pressed')).toBe(
+        'true',
+      )
+    })
+
+    it('pins a photo picked from the gallery', () => {
       const { onChange } = renderPanel()
-      await waitFor(() => expect(getAll).toHaveBeenCalled())
 
-      expect(usageData().checked).toBe(true)
-      fireEvent.click(usageData())
+      fireEvent.click(screen.getByRole('button', { name: 'Tide pools' }))
 
-      expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
+      expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'b' }))
     })
 
-    it("shows the switch off while Firefox's own consent is withheld", async () => {
-      firefox(false)
-      renderPanel()
+    it('reads tags no photo has as all photos, and clears them on the next change', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['mountains'] }) })
 
-      await waitFor(() => expect(usageData().checked).toBe(false))
+      expect(screen.getByRole('combobox', { name: 'Tags' }).textContent).toBe('All')
+      const filters = within(screen.getByRole('group', { name: 'Filter photos' }))
+      expect(filters.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true')
+      fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+      expect(onChange).toHaveBeenCalledWith({ ...settings, dim: false })
     })
 
-    it('asks Firefox for consent when switched on there', async () => {
-      firefox(false)
-      const request = vi.spyOn(fakePermissions, 'request').mockResolvedValue(true)
-      renderPanel()
-      await waitFor(() => expect(usageData().checked).toBe(false))
+    it('clears tags the photos lack from other sections too, such as with the fallback photo', () => {
+      const { onChange } = renderPanel({
+        overrides: withPhotos({ tags: ['water'] }),
+        photos: [makePhoto('fallback')],
+      })
+      openSection('Clock')
 
-      fireEvent.click(usageData())
+      fireEvent.click(screen.getByLabelText('Show date'))
 
-      expect(request).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
-      await waitFor(() => expect(usageData().checked).toBe(true))
+      expect(onChange).toHaveBeenCalledWith({
+        ...settings,
+        clock: { ...settings.clock, showDate: true },
+      })
     })
 
-    it("withdraws Firefox's consent too when switched off there", async () => {
-      firefox(true)
-      const remove = vi.spyOn(fakePermissions, 'remove').mockResolvedValue(true)
+    it('keeps the tags while the photos are loading', () => {
+      const { onChange } = renderPanel({ overrides: withPhotos({ tags: ['water'] }), photos: [] })
+
+      expect(screen.getByText('Loading photos…')).toBeTruthy()
+      fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+      expect(onChange).toHaveBeenCalledWith({ ...withPhotos({ tags: ['water'] }), dim: false })
+    })
+
+    it('has no gallery or tags with only one photo', () => {
+      renderPanel({ photos: [makePhoto('fallback')] })
+
+      expect(screen.queryByRole('heading', { name: 'Gallery' })).toBeNull()
+      expect(screen.queryByRole('combobox', { name: 'Tags' })).toBeNull()
+    })
+
+    it('switches the photo wash off', () => {
       const { onChange } = renderPanel()
-      await waitFor(() => expect(fakePermissions.getAll).toHaveBeenCalled())
 
-      fireEvent.click(usageData())
+      fireEvent.click(screen.getByLabelText('Dim the photo'))
 
-      expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
-      expect(remove).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
+      expect(onChange).toHaveBeenCalledWith({ ...settings, dim: false })
+    })
+
+    it('grows before it scrolls, holding the top in place', () => {
+      renderPanel()
+      const dialog = screen.getByRole('dialog', { name: 'Settings' })
+      const body = screen.getByRole('tabpanel')
+      // No layout here: a 1000px section showing 200px, in a popover capped at 800px.
+      const grown = () => parseFloat(body.style.getPropertyValue('--popover-grow') || '0')
+      dialog.style.maxHeight = '800px'
+      Object.defineProperty(dialog, 'offsetHeight', { get: () => 300 + grown() })
+      Object.defineProperty(body, 'clientHeight', { get: () => 200 + grown() })
+      Object.defineProperty(body, 'scrollHeight', { value: 1000 })
+      Object.defineProperty(body, 'scrollTop', { value: 0, writable: true })
+
+      const first = new WheelEvent('wheel', { deltaY: 450, cancelable: true })
+      body.dispatchEvent(first)
+
+      expect(first.defaultPrevented).toBe(true)
+      expect(grown()).toBe(450)
+      expect(body.scrollTop).toBe(0)
+
+      // 50px short of the cap: the rest of the wheel scrolls.
+      body.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, cancelable: true }))
+      expect(grown()).toBe(500)
+      expect(body.scrollTop).toBe(50)
+
+      // At the cap, and scrolling up, the browser scrolls as usual.
+      const atCap = new WheelEvent('wheel', { deltaY: 100, cancelable: true })
+      body.dispatchEvent(atCap)
+      const up = new WheelEvent('wheel', { deltaY: -100, cancelable: true })
+      body.dispatchEvent(up)
+      expect(atCap.defaultPrevented).toBe(false)
+      expect(up.defaultPrevented).toBe(false)
+      expect(grown()).toBe(500)
+
+      // Another section starts at rest again.
+      openSection('Clock')
+      expect(grown()).toBe(0)
+      expect(body.scrollTop).toBe(0)
+    })
+  })
+
+  describe('clock', () => {
+    it('switches to 24-hour time', () => {
+      const { onChange } = renderPanel()
+      openSection('Clock')
+      const toggle = screen.getByLabelText('24-hour time') as HTMLInputElement
+
+      expect(toggle.checked).toBe(false)
+      fireEvent.click(toggle)
+
+      expect(onChange).toHaveBeenCalledWith({
+        ...settings,
+        clock: { ...settings.clock, hour12: false },
+      })
+    })
+
+    it.each([
+      ['Show clock', 'enabled', false],
+      ['Show date', 'showDate', true],
+      ['Show seconds', 'showSeconds', true],
+    ])('toggles %s', (label, key, expected) => {
+      const { onChange } = renderPanel()
+      openSection('Clock')
+
+      fireEvent.click(screen.getByLabelText(label))
+
+      expect(onChange).toHaveBeenCalledWith({
+        ...settings,
+        clock: { ...settings.clock, [key]: expected },
+      })
+    })
+
+    it('hides the clock options while the clock is off', () => {
+      renderPanel({ overrides: { clock: { ...settings.clock, enabled: false } } })
+      openSection('Clock')
+
+      const panel = within(screen.getByRole('tabpanel'))
+      expect(panel.getByLabelText('Show clock')).toBeTruthy()
+      expect(panel.queryByLabelText('Show seconds')).toBeNull()
+    })
+  })
+
+  describe('general', () => {
+    it('changes the font', () => {
+      const { onChange } = renderPanel()
+      openSection('General')
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Font' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
+
+      expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
+    })
+
+    it('has no usage data switch in a build without telemetry', () => {
+      renderPanel()
+      openSection('General')
+
+      expect(screen.queryByText('Privacy')).toBeNull()
+      expect(screen.queryByLabelText('Share usage data')).toBeNull()
+    })
+
+    describe('usage data', () => {
+      const usageData = () => screen.getByLabelText('Share usage data') as HTMLInputElement
+
+      /** Firefox, with its usage data switch as given. */
+      const firefox = (granted: boolean) =>
+        vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({
+          data_collection: granted ? [DATA_COLLECTION] : [],
+        })
+
+      beforeEach(() => {
+        vi.stubEnv('WXT_TELEMETRY_ENABLED', '1')
+      })
+
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.restoreAllMocks()
+      })
+
+      it('switches usage data off on Chrome and Edge, where only the setting decides', async () => {
+        const getAll = vi.spyOn(fakePermissions, 'getAll').mockResolvedValue({})
+        const { onChange } = renderPanel()
+        openSection('General')
+        await waitFor(() => expect(getAll).toHaveBeenCalled())
+
+        expect(usageData().checked).toBe(true)
+        fireEvent.click(usageData())
+
+        expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
+      })
+
+      it("shows the switch off while Firefox's own consent is withheld", async () => {
+        firefox(false)
+        renderPanel()
+        openSection('General')
+
+        await waitFor(() => expect(usageData().checked).toBe(false))
+      })
+
+      it('asks Firefox for consent when switched on there', async () => {
+        firefox(false)
+        const request = vi.spyOn(fakePermissions, 'request').mockResolvedValue(true)
+        renderPanel()
+        openSection('General')
+        await waitFor(() => expect(usageData().checked).toBe(false))
+
+        fireEvent.click(usageData())
+
+        expect(request).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
+        await waitFor(() => expect(usageData().checked).toBe(true))
+      })
+
+      it("withdraws Firefox's consent too when switched off there", async () => {
+        firefox(true)
+        const remove = vi.spyOn(fakePermissions, 'remove').mockResolvedValue(true)
+        const { onChange } = renderPanel()
+        openSection('General')
+        await waitFor(() => expect(fakePermissions.getAll).toHaveBeenCalled())
+
+        fireEvent.click(usageData())
+
+        expect(onChange).toHaveBeenCalledWith({ ...settings, telemetry: false })
+        expect(remove).toHaveBeenCalledWith({ data_collection: [DATA_COLLECTION] })
+      })
     })
   })
 })

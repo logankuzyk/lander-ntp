@@ -1,17 +1,20 @@
-import type { ComponentChildren } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
-import type { Favourite } from '@/favourites/schema'
-
-import { FREQUENCIES, type Frequency } from '@/photos/rotation'
+import { MultiSelect } from '@/components/Dropdown/MultiSelect'
+import { Select } from '@/components/Dropdown/Select'
+import { CloseIcon } from '@/components/Popover/CloseIcon'
+import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
+import { usePopover } from '@/components/Popover/usePopover'
+import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
+import type { Photo } from '@/photos/schema'
+import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
 import { browserConsent, setBrowserConsent, telemetryBuilt } from '@/telemetry/consent'
 
-import { FavouritesEditor } from './FavouritesEditor'
+import { Gallery } from './Gallery'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
-  off: 'Never',
   'every-visit': 'Every new tab',
   '30s': 'Every 30 seconds',
   '1m': 'Every minute',
@@ -23,7 +26,16 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   daily: 'Every day',
 }
 
-const FOCUSABLE = 'button, select, input, a[href]'
+/** The "Change photo" choice that pins the photo on screen. */
+const NEVER = 'never'
+
+const SECTIONS = [
+  ['photos', 'Photos'],
+  ['clock', 'Clock'],
+  ['general', 'General'],
+] as const
+
+type SectionId = (typeof SECTIONS)[number][0]
 
 type ToggleProps = {
   label: string
@@ -34,12 +46,12 @@ type ToggleProps = {
 function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
     <label class="settings__row">
+      <span>{label}</span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
-      <span>{label}</span>
     </label>
   )
 }
@@ -52,67 +64,137 @@ type ChoiceProps<T extends string> = {
 }
 
 function Choice<T extends string>({ label, value, options, onChange }: ChoiceProps<T>) {
+  const labelId = useId()
   return (
-    <label class="settings__row">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.currentTarget.value as T)}>
-        {options.map(([id, text]) => (
-          <option key={id} value={id}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div class="settings__row">
+      <span id={labelId}>{label}</span>
+      <Select labelId={labelId} value={value} options={options} onChange={onChange} />
+    </div>
   )
 }
 
-type FeatureSectionProps = {
-  title: string
-  /** Names the switch, which has the heading beside it rather than a label of its own. */
-  toggleLabel: string
-  enabled: boolean
-  onEnabledChange: (enabled: boolean) => void
-  children: ComponentChildren
+type PhotosSectionProps = {
+  settings: Settings
+  onChange: (settings: Settings) => void
+  photos: readonly Photo[]
+  currentId: string | null
 }
 
-/**
- * A section whose heading carries the switch for the whole feature. Settings that only apply
- * while the feature is on are left unrendered when it is off, so they are out of the way of
- * both the eye and Tab.
- */
-function FeatureSection({
-  title,
-  toggleLabel,
-  enabled,
-  onEnabledChange,
-  children,
-}: FeatureSectionProps) {
+function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionProps) {
+  const cycling = settings.photos
+  const pinned = cycling.mode === 'pinned'
+  const tags = useMemo(() => availableTags(photos), [photos])
+
+  const tagsLabel = useId()
+
+  const update = (changes: Partial<PhotoSettings>) =>
+    onChange({ ...settings, photos: { ...cycling, ...changes } })
+
+  return (
+    <>
+      <section aria-labelledby="cycling-heading">
+        <h3 id="cycling-heading">Cycling</h3>
+        <Choice<Frequency | typeof NEVER>
+          label="Change photo"
+          value={pinned ? NEVER : cycling.frequency}
+          options={[
+            ...FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const),
+            [NEVER, 'Never'],
+          ]}
+          onChange={(choice) =>
+            choice === NEVER
+              ? update({ mode: 'pinned', pinnedId: currentId })
+              : update({ mode: 'cycle', frequency: choice })
+          }
+        />
+        {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
+        {!pinned && tags.length > 0 && (
+          <div class="settings__row settings__row--wrap">
+            <span id={tagsLabel}>Tags</span>
+            <MultiSelect
+              labelId={tagsLabel}
+              options={tags.map(({ slug, name }) => ({ value: slug, label: name }))}
+              value={cycling.tags}
+              onChange={(chosen) => update({ tags: chosen })}
+              allLabel="All"
+            />
+          </div>
+        )}
+        {pinned && (
+          <p class="settings__note">
+            Keeping this photo.{' '}
+            <button type="button" class="settings__link" onClick={() => update({ mode: 'cycle' })}>
+              Resume cycling
+            </button>
+          </p>
+        )}
+        <Toggle
+          label="Dim the photo"
+          checked={settings.dim}
+          onChange={(dim) => onChange({ ...settings, dim })}
+        />
+      </section>
+
+      {photos.length === 0 && <p class="settings__note">Loading photos…</p>}
+      {photos.length > 1 && (
+        <Gallery
+          // Remounted when the cycled tags change, so the filter follows them.
+          key={cycling.tags.join(' ')}
+          photos={photos}
+          currentId={currentId}
+          initialTag={cycling.tags.length === 1 ? (cycling.tags[0] ?? null) : null}
+          onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
+        />
+      )}
+    </>
+  )
+}
+
+type SectionProps = {
+  settings: Settings
+  onChange: (settings: Settings) => void
+}
+
+function ClockSection({ settings, onChange }: SectionProps) {
+  const clock = (changes: Partial<Settings['clock']>) =>
+    onChange({ ...settings, clock: { ...settings.clock, ...changes } })
+
   return (
     <section>
-      <div class="settings__section-header">
-        <h3>{title}</h3>
-        <input
-          type="checkbox"
-          aria-label={toggleLabel}
-          checked={enabled}
-          onChange={(event) => onEnabledChange(event.currentTarget.checked)}
-        />
-      </div>
-      {enabled && children}
+      <Toggle
+        label="Show clock"
+        checked={settings.clock.enabled}
+        onChange={(enabled) => clock({ enabled })}
+      />
+      {/* Out of the way of both the eye and Tab while the clock is off. */}
+      {settings.clock.enabled && (
+        <>
+          <Toggle
+            label="24-hour time"
+            checked={!settings.clock.hour12}
+            onChange={(h24) => clock({ hour12: !h24 })}
+          />
+          <Toggle
+            label="Show date"
+            checked={settings.clock.showDate}
+            onChange={(showDate) => clock({ showDate })}
+          />
+          <Toggle
+            label="Show seconds"
+            checked={settings.clock.showSeconds}
+            onChange={(showSeconds) => clock({ showSeconds })}
+          />
+        </>
+      )}
     </section>
   )
-}
-
-type PrivacySectionProps = {
-  enabled: boolean
-  onEnabledChange: (enabled: boolean) => void
 }
 
 /**
  * The usage data switch. On Firefox it also drives the browser's own consent, which gates
  * sending as well, so the switch shows the two together and flipping it sets both.
  */
-function PrivacySection({ enabled, onEnabledChange }: PrivacySectionProps) {
+function UsageData({ enabled, onEnabledChange }: PrivacyProps) {
   // Undefined until known; null where the browser has no consent of its own (Chrome, Edge).
   const [browserAllows, setBrowserAllows] = useState<boolean | null>()
 
@@ -137,8 +219,8 @@ function PrivacySection({ enabled, onEnabledChange }: PrivacySectionProps) {
   }
 
   return (
-    <section>
-      <h3>Privacy</h3>
+    <section aria-labelledby="privacy-heading">
+      <h3 id="privacy-heading">Privacy</h3>
       <Toggle
         label="Share usage data"
         checked={enabled && browserAllows !== false}
@@ -152,182 +234,162 @@ function PrivacySection({ enabled, onEnabledChange }: PrivacySectionProps) {
   )
 }
 
+type PrivacyProps = {
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+}
+
+function GeneralSection({ settings, onChange }: SectionProps) {
+  return (
+    <>
+      <section>
+        <Choice<FontId>
+          label="Font"
+          value={settings.font}
+          options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
+          onChange={(font) => onChange({ ...settings, font })}
+        />
+      </section>
+
+      {/* A build without telemetry has nothing to switch. */}
+      {telemetryBuilt() && (
+        <UsageData
+          enabled={settings.telemetry}
+          onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * The settings without any cycled tag that no photo carries. They may have been synced from a
+ * device with a newer manifest, or the photos may have lost them; either way they filter
+ * nothing and there is no chip to clear them by. Every section writes from these, so the next
+ * change clears them. Left alone while the photos load, when no tag is known yet.
+ */
+function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
+  const { tags } = settings.photos
+  const known =
+    photos.length === 0
+      ? tags
+      : tags.filter((slug) => photos.some((photo) => photo.tags.some((tag) => tag.slug === slug)))
+  const changed = known.length !== tags.length
+  return useMemo(
+    () => (changed ? { ...settings, photos: { ...settings.photos, tags: known } } : settings),
+    // `known` is rebuilt on every render; its length changing is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings, changed],
+  )
+}
+
 type SettingsPanelProps = {
   settings: Settings
   onChange: (settings: Settings) => void
-  favourites: Favourite[]
-  onFavouritesChange: (favourites: Favourite[]) => void
+  /** Every photo in the manifest, for the gallery. */
+  photos: readonly Photo[]
+  currentId: string | null
   onClose: () => void
 }
 
+/** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
   settings,
   onChange,
-  favourites,
-  onFavouritesChange,
+  photos,
+  currentId,
   onClose,
 }: SettingsPanelProps) {
-  const panel = useRef<HTMLDivElement>(null)
+  const known = useKnownTags(settings, photos)
+  const { container, close } = usePopover(onClose)
+  const body = useRef<HTMLDivElement>(null)
+  const tabs = useRef<(HTMLButtonElement | null)[]>([])
+  const [section, setSection] = useState<SectionId>('photos')
+  const resetGrowth = useGrowOnScroll(container, body)
 
-  useEffect(() => {
-    const opener = document.activeElement
-    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
-    return () => {
-      if (opener instanceof HTMLElement) opener.focus()
-    }
-  }, [])
+  // Each section starts at rest, from the top.
+  const show = (id: SectionId) => {
+    setSection(id)
+    resetGrowth()
+  }
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-        return
-      }
-      // Keep Tab inside the dialog.
-      if (event.key !== 'Tab' || !panel.current) return
-      const focusable = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (!first || !last) return
-
-      const active = document.activeElement
-      if (!event.shiftKey && active === last) {
-        event.preventDefault()
-        first.focus()
-      } else if (event.shiftKey && (active === first || !panel.current.contains(active))) {
-        event.preventDefault()
-        last.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  const clock = (changes: Partial<Settings['clock']>) =>
-    onChange({ ...settings, clock: { ...settings.clock, ...changes } })
-
-  const favouriteSettings = (changes: Partial<Settings['favourites']>) =>
-    onChange({ ...settings, favourites: { ...settings.favourites, ...changes } })
+  // Arrow keys move between tabs, as in any tab list; Tab moves on to the section.
+  const onTabKeyDown = (event: KeyboardEvent, index: number) => {
+    const last = SECTIONS.length - 1
+    const target = {
+      ArrowDown: index + 1,
+      ArrowRight: index + 1,
+      ArrowUp: index - 1,
+      ArrowLeft: index - 1,
+      Home: 0,
+      End: last,
+    }[event.key]
+    if (target === undefined) return
+    event.preventDefault()
+    const wrapped = (target + SECTIONS.length) % SECTIONS.length
+    const next = SECTIONS[wrapped]
+    if (!next) return
+    show(next[0])
+    tabs.current[wrapped]?.focus()
+  }
 
   return (
-    <div class="settings">
-      {/* Convenience only: Escape and the close button cover keyboard users. */}
-      <div class="settings__backdrop" aria-hidden="true" onClick={onClose} />
-      <div
-        class="settings__panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Settings"
-        ref={panel}
-      >
-        <header class="settings__header">
-          <h2>Settings</h2>
-          <button
-            type="button"
-            class="settings__close"
-            aria-label="Close settings"
-            onClick={onClose}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
+    <aside ref={container} class="popover settings" role="dialog" aria-label="Settings">
+      <header class="popover__header">
+        <h2>Settings</h2>
+        <button
+          ref={close}
+          type="button"
+          class="popover__close"
+          aria-label="Close settings"
+          onClick={onClose}
+        >
+          <CloseIcon />
+        </button>
+      </header>
+
+      <div class="settings__layout">
+        <div class="settings__nav" role="tablist" aria-orientation="vertical">
+          {SECTIONS.map(([id, label], index) => (
+            <button
+              key={id}
+              ref={(el) => {
+                tabs.current[index] = el
+              }}
+              type="button"
+              role="tab"
+              id={`settings-tab-${id}`}
+              aria-controls="settings-section"
+              aria-selected={section === id}
+              tabIndex={section === id ? 0 : -1}
+              class="settings__tab"
+              onClick={() => show(id)}
+              onKeyDown={(event) => onTabKeyDown(event, index)}
             >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        </header>
+              {label}
+            </button>
+          ))}
+        </div>
 
-        <section>
-          <h3>Photos</h3>
-          <Choice
-            label="New photo"
-            value={settings.frequency}
-            options={FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const)}
-            onChange={(frequency) => onChange({ ...settings, frequency })}
-          />
-          <Toggle
-            label="Dim the photo"
-            checked={settings.dim}
-            onChange={(dim) => onChange({ ...settings, dim })}
-          />
-        </section>
-
-        <FeatureSection
-          title="Clock"
-          toggleLabel="Show clock"
-          enabled={settings.clock.enabled}
-          onEnabledChange={(enabled) => clock({ enabled })}
+        <div
+          ref={body}
+          id="settings-section"
+          class="settings__body"
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${section}`}
         >
-          <Toggle
-            label="24-hour time"
-            checked={!settings.clock.hour12}
-            onChange={(h24) => clock({ hour12: !h24 })}
-          />
-          <Toggle
-            label="Show date"
-            checked={settings.clock.showDate}
-            onChange={(showDate) => clock({ showDate })}
-          />
-          <Toggle
-            label="Show seconds"
-            checked={settings.clock.showSeconds}
-            onChange={(showSeconds) => clock({ showSeconds })}
-          />
-        </FeatureSection>
-
-        <FeatureSection
-          title="Favourites"
-          toggleLabel="Show favourites"
-          enabled={settings.favourites.enabled}
-          onEnabledChange={(enabled) => favouriteSettings({ enabled })}
-        >
-          <Choice<Settings['favourites']['style']>
-            label="Style"
-            value={settings.favourites.style}
-            options={[
-              ['list', 'List'],
-              ['grid', 'Grid'],
-            ]}
-            onChange={(style) => favouriteSettings({ style })}
-          />
-          <Choice<Settings['favourites']['size']>
-            label="Size"
-            value={settings.favourites.size}
-            options={[
-              ['s', 'Small'],
-              ['m', 'Medium'],
-              ['l', 'Large'],
-            ]}
-            onChange={(size) => favouriteSettings({ size })}
-          />
-          <FavouritesEditor favourites={favourites} onChange={onFavouritesChange} />
-        </FeatureSection>
-
-        <section>
-          <h3>Appearance</h3>
-          <Choice<FontId>
-            label="Font"
-            value={settings.font}
-            options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
-            onChange={(font) => onChange({ ...settings, font })}
-          />
-        </section>
-
-        {/* A build without telemetry has nothing to switch. */}
-        {telemetryBuilt() && (
-          <PrivacySection
-            enabled={settings.telemetry}
-            onEnabledChange={(telemetry) => onChange({ ...settings, telemetry })}
-          />
-        )}
+          {section === 'photos' && (
+            <PhotosSection
+              settings={known}
+              onChange={onChange}
+              photos={photos}
+              currentId={currentId}
+            />
+          )}
+          {section === 'clock' && <ClockSection settings={known} onChange={onChange} />}
+          {section === 'general' && <GeneralSection settings={known} onChange={onChange} />}
+        </div>
       </div>
-    </div>
+    </aside>
   )
 }

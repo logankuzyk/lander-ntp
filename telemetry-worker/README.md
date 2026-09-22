@@ -35,17 +35,15 @@ Analytics Engine columns are positional. Add new ones at the end and never reord
 | `blob1`   | event (`heartbeat`)                    |
 | `blob2`   | browser (`chrome`, `firefox`, `edge`)  |
 | `blob3`   | extension version                      |
-| `blob4`   | photo frequency                        |
-| `blob5`   | font                                   |
-| `blob6`   | favourites style                       |
-| `blob7`   | favourites size                        |
+| `blob4`   | photo mode (`cycle`, `pinned`)         |
+| `blob5`   | photo frequency                        |
+| `blob6`   | font                                   |
 | `double1` | dim (0/1)                              |
 | `double2` | clock enabled (0/1)                    |
 | `double3` | clock 12-hour (0/1)                    |
 | `double4` | clock shows date (0/1)                 |
 | `double5` | clock shows seconds (0/1)              |
-| `double6` | favourites enabled (0/1)               |
-| `double7` | favourites count                       |
+| `double6` | tags being cycled (count)              |
 
 ## Queries
 
@@ -70,7 +68,7 @@ ORDER BY day
 The most recent settings each install reported in the last week:
 
 ```sql
-SELECT index1, argMax(blob4, timestamp) AS frequency, argMax(blob5, timestamp) AS font
+SELECT index1, argMax(blob5, timestamp) AS frequency, argMax(blob6, timestamp) AS font
 FROM lander_ntp_events
 WHERE blob1 = 'heartbeat' AND timestamp > NOW() - INTERVAL '7' DAY
 GROUP BY index1

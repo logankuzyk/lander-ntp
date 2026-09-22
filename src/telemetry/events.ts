@@ -5,14 +5,15 @@ import type { Settings } from '@/settings/schema'
  * later (a weather location, say) must not start leaving the browser unnoticed.
  */
 export type HeartbeatProps = {
-  frequency: Settings['frequency']
+  photos: {
+    mode: Settings['photos']['mode']
+    frequency: Settings['photos']['frequency']
+    /** How many tags are being cycled. Never which ones. */
+    tags: number
+  }
   font: Settings['font']
   dim: boolean
   clock: Settings['clock']
-  favourites: Settings['favourites'] & {
-    /** How many there are. Never their addresses or titles. */
-    count: number
-  }
 }
 
 /** Everything the extension sends. telemetry-worker/src/schema.ts accepts the same shapes. */

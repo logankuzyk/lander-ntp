@@ -8,7 +8,7 @@ Notes for coding agents working on Lander NTP. Start with [README.md](README.md)
 - Before you finish, run `npm run typecheck`, `npm run lint`, `npm run format:check` and `npm test`. `npm run build:all` builds all three browsers, and `npm run lint:firefox` checks the Firefox build.
 - `telemetry-worker/` is a separate Cloudflare Worker package with its own `package.json`, and root tooling skips it. Run `npm test` and `npm run typecheck` inside it.
 - PR titles follow Conventional Commits (`feat:`, `fix:`, `chore:` …), because release-please builds the changelog from them.
-- Stored settings are versioned (`src/settings/storage.ts`). When their shape changes, bump `version` and add a migration with a test.
+- Stored settings are checked against their current shape (`src/settings/storage.ts`); anything else is replaced by the defaults. Nothing has shipped since 0.1.1, so there are no migrations. When the shape changes, update that check and its tests.
 
 ## Tracking plan
 
@@ -17,7 +17,7 @@ Telemetry exists to answer a few questions: how many installs are active, which 
 ### Rules
 
 - **Pseudonymous, not anonymous.** The only identifier is a random UUID kept in `local:` storage. It counts installs, not people, and is deleted on uninstall. It is stable, and the Worker sees it next to the client IP, so don't call the data anonymous. The Worker never stores or logs IPs, `request.cf` or headers: it uses `CF-Connecting-IP` only as a rate-limiter key, and `wrangler.jsonc` turns Workers Logs invocation logs off because they would record request metadata. Never `console.log` a request or its headers.
-- **No browsing data.** Never send URLs, page titles, favourite sites or free text. Values must be enums, booleans, counts, or ids of photos published on logankuzyk.com.
+- **No browsing data.** Never send URLs, page titles or free text. Values must be enums, booleans, counts, or ids of photos published on logankuzyk.com.
 - **Name each property.** Build props field by field, as `heartbeatProps` does. Never spread settings or objects into an event, because a setting added later would then leave the browser unnoticed.
 - **Consent.** Nothing is sent, and the settings switch is hidden, unless the build sets `WXT_TELEMETRY_ENABLED=1` (see [Turning telemetry on](#turning-telemetry-on)). With it, `track()` sends only when `settings.telemetry` is on (the default), _and_ Firefox's `technicalAndInteraction` consent is granted (a Firefox build that finds no answer takes it as a no). Dev builds send nothing unless `WXT_TELEMETRY_DEV=1` is set as well.
 - **Fire and forget.** `track()` never throws and never retries. Call it as `void track(…)`, and don't let UI wait on it.
@@ -37,13 +37,12 @@ The Worker's own timestamp is the event time. Clients don't send one.
 
 ### Events
 
-| Event                           | Status  | Fired when                                                        | Props                                                                                                                  |
-| ------------------------------- | ------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `heartbeat`                     | Live    | The first new tab of each UTC day                                 | `frequency`, `font`, `dim`, `clock.{enabled,hour12,showDate,showSeconds}`, `favourites.{enabled,style,size,count}`     |
-| `photo_liked` / `photo_unliked` | Planned | The thumbs-up button (or `l` key) is toggled                      | `photoId`                                                                                                              |
-| `setting_changed`               | Planned | A setting changes in the settings panel, once per changed setting | `key` (dotted path, e.g. `clock.showSeconds`), `value` (enum or boolean). Never sent for the usage data switch itself. |
-| `favourites_edited`             | Planned | The favourites list is added to, edited or reordered              | `count`                                                                                                                |
-| `link_clicked`                  | Planned | A link is opened                                                  | `kind`: `favourite` \| `print` \| `photo_page`. `photoId` for `print` and `photo_page`. Never the favourite's URL.     |
+| Event                           | Status  | Fired when                                                        | Props                                                                                                                        |
+| ------------------------------- | ------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `heartbeat`                     | Live    | The first new tab of each UTC day                                 | `photos.{mode,frequency,tags}` (tags is how many, never which), `font`, `dim`, `clock.{enabled,hour12,showDate,showSeconds}` |
+| `photo_liked` / `photo_unliked` | Planned | The thumbs-up button (or `l` key) is toggled                      | `photoId`                                                                                                                    |
+| `setting_changed`               | Planned | A setting changes in the settings panel, once per changed setting | `key` (dotted path, e.g. `clock.showSeconds`), `value` (enum or boolean). Never sent for the usage data switch itself.       |
+| `link_clicked`                  | Planned | A link is opened                                                  | `kind`: `print` \| `photo_page`, with `photoId`.                                                                             |
 
 `telemetry-worker/README.md` lists the Analytics Engine column each prop is stored in, with example queries.
 

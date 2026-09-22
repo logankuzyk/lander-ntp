@@ -15,7 +15,11 @@ const Heartbeat = v.object({
   ...Envelope,
   event: v.literal('heartbeat'),
   props: v.object({
-    frequency: Text(16),
+    photos: v.object({
+      mode: Text(8),
+      frequency: Text(16),
+      tags: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
+    }),
     font: Text(32),
     dim: v.boolean(),
     clock: v.object({
@@ -23,12 +27,6 @@ const Heartbeat = v.object({
       hour12: v.boolean(),
       showDate: v.boolean(),
       showSeconds: v.boolean(),
-    }),
-    favourites: v.object({
-      enabled: v.boolean(),
-      style: Text(8),
-      size: Text(8),
-      count: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
     }),
   }),
 })
@@ -50,10 +48,9 @@ export function toDataPoint(event: TelemetryEvent): AnalyticsEngineDataPoint {
       event.event,
       event.browser,
       event.version,
-      props.frequency,
+      props.photos.mode,
+      props.photos.frequency,
       props.font,
-      props.favourites.style,
-      props.favourites.size,
     ],
     doubles: [
       Number(props.dim),
@@ -61,8 +58,7 @@ export function toDataPoint(event: TelemetryEvent): AnalyticsEngineDataPoint {
       Number(props.clock.hour12),
       Number(props.clock.showDate),
       Number(props.clock.showSeconds),
-      Number(props.favourites.enabled),
-      props.favourites.count,
+      props.photos.tags,
     ],
   }
 }

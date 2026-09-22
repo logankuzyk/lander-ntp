@@ -1,4 +1,3 @@
-import { favouritesItem } from '@/favourites/storage'
 import type { Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 
@@ -20,8 +19,12 @@ const utcDay = (ms: number): number => Math.floor(ms / DAY_MS)
 export const isHeartbeatDue = (last: number | null, now: number): boolean =>
   last === null || now < last || utcDay(now) !== utcDay(last)
 
-export const heartbeatProps = (settings: Settings, favouritesCount: number): HeartbeatProps => ({
-  frequency: settings.frequency,
+export const heartbeatProps = (settings: Settings): HeartbeatProps => ({
+  photos: {
+    mode: settings.photos.mode,
+    frequency: settings.photos.frequency,
+    tags: settings.photos.tags.length,
+  },
   font: settings.font,
   dim: settings.dim,
   clock: {
@@ -29,12 +32,6 @@ export const heartbeatProps = (settings: Settings, favouritesCount: number): Hea
     hour12: settings.clock.hour12,
     showDate: settings.clock.showDate,
     showSeconds: settings.clock.showSeconds,
-  },
-  favourites: {
-    enabled: settings.favourites.enabled,
-    style: settings.favourites.style,
-    size: settings.favourites.size,
-    count: favouritesCount,
   },
 })
 
@@ -64,6 +61,5 @@ export async function maybeSendHeartbeat(now = Date.now()): Promise<void> {
   if (!(await isTelemetryEnabled(settings))) return
   if (!(await claimHeartbeat(now))) return
 
-  const favourites = await favouritesItem.getValue()
-  await track({ event: 'heartbeat', props: heartbeatProps(settings, favourites.length) })
+  await track({ event: 'heartbeat', props: heartbeatProps(settings) })
 }

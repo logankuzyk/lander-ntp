@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Controls } from '@/components/Controls/Controls'
 import { SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
-import { favouritesItem } from '@/favourites/storage'
 import { preloadNext } from '@/photos/image'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
@@ -11,30 +10,46 @@ import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
 import { maybeSendHeartbeat } from '@/telemetry/heartbeat'
 import { Clock } from '@/widgets/Clock/Clock'
-import { Favourites } from '@/widgets/Favourites/Favourites'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
 
+/** The popovers share the corner above the controls, so only one is open at a time. */
+type Popover = 'settings' | 'info' | null
+
 export function App() {
   const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
-  const [favourites, setFavourites] = useStorageItem(favouritesItem)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [infoOpen, setInfoOpen] = useState(false)
+  const [popover, setPopover] = useState<Popover>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
-  // Wait for the stored frequency: the fallback is every-visit, which would move the photo on
+  // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
-  const { photo, upcoming, next } = usePhotoRotation(settingsLoaded ? settings.frequency : null)
-  const canShowInfo = Boolean(photo)
+  const { photos, photo, upcoming, next } = usePhotoRotation(
+    settingsLoaded ? settings.photos : null,
+  )
 
-  // Before paint, so the clock is never drawn in one font and then redrawn in another.
-  useLayoutEffect(() => {
-    document.documentElement.style.setProperty('--font-display', fontStack(settings.font))
-  }, [settings.font])
+  const toggle = (which: Exclude<Popover, null>) =>
+    setPopover((open) => (open === which ? null : which))
+  const close = useCallback(() => setPopover(null), [])
+
+  // While a photo is pinned, → pins the next one instead, so the next tab keeps it too.
+  const showNext = () => {
+    void (async () => {
+      const id = await next()
+      const latest = await settingsItem.getValue()
+      if (id && latest.photos.mode === 'pinned' && latest.photos.pinnedId !== id) {
+        setSettings({ ...latest, photos: { ...latest.photos, pinnedId: id } })
+      }
+    })()
+  }
 
   // Counts this install as active, once a day. Sends nothing without consent (telemetry/consent).
   useEffect(() => {
     void maybeSendHeartbeat()
   }, [])
+
+  // Before paint, so the clock is never drawn in one font and then redrawn in another.
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--font-display', fontStack(settings.font))
+  }, [settings.font])
 
   return (
     <main class="app">
@@ -50,38 +65,30 @@ export function App() {
       )}
       {/*
         Stored settings land a beat after the first paint. Drawing the defaults and then
-        correcting them is a visible jolt — a clock that jumps fonts, or a bar that appears
-        out of nowhere — so anything that depends on them waits for them. The photo already
-        does: usePhotoRotation is held back until the frequency is known.
+        correcting them is a visible jolt — a clock that jumps fonts, say — so anything that
+        depends on them waits for them. The photo already does: usePhotoRotation is held back
+        until the settings are known.
       */}
-      {settingsLoaded && settings.favourites.enabled && (
-        <Favourites
-          favourites={favourites}
-          style={settings.favourites.style}
-          size={settings.favourites.size}
-        />
-      )}
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
       {photo && <PhotoCredit photo={photo} />}
-      {canShowInfo && photo && infoOpen && (
-        <PhotoInfo photo={photo} onClose={() => setInfoOpen(false)} />
-      )}
-      <Controls
-        onNext={next}
-        busy={photoLoading}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onToggleInfo={canShowInfo ? () => setInfoOpen((open) => !open) : undefined}
-        infoOpen={infoOpen}
-      />
-      {settingsOpen && (
+      {photo && popover === 'info' && <PhotoInfo photo={photo} onClose={close} />}
+      {popover === 'settings' && (
         <SettingsPanel
           settings={settings}
           onChange={setSettings}
-          favourites={favourites}
-          onFavouritesChange={setFavourites}
-          onClose={() => setSettingsOpen(false)}
+          photos={photos}
+          currentId={photo?.id ?? null}
+          onClose={close}
         />
       )}
+      <Controls
+        onNext={showNext}
+        busy={photoLoading}
+        onToggleSettings={() => toggle('settings')}
+        settingsOpen={popover === 'settings'}
+        onToggleInfo={photo ? () => toggle('info') : undefined}
+        infoOpen={popover === 'info'}
+      />
     </main>
   )
 }

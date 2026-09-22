@@ -14,11 +14,10 @@ const heartbeat = {
   version: '0.2.0',
   browser: 'firefox',
   props: {
-    frequency: 'every-visit',
+    photos: { mode: 'cycle', frequency: 'every-visit', tags: 2 },
     font: 'geist',
     dim: true,
     clock: { enabled: true, hour12: false, showDate: true, showSeconds: false },
-    favourites: { enabled: true, style: 'grid', size: 'm', count: 4 },
   },
 }
 
@@ -46,8 +45,8 @@ describe('POST /events', () => {
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*')
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: [INSTALL_ID],
-      blobs: ['heartbeat', 'firefox', '0.2.0', 'every-visit', 'geist', 'grid', 'm'],
-      doubles: [1, 1, 0, 1, 0, 1, 4],
+      blobs: ['heartbeat', 'firefox', '0.2.0', 'cycle', 'every-visit', 'geist'],
+      doubles: [1, 1, 0, 1, 0, 2],
     })
   })
 
@@ -96,10 +95,10 @@ describe('POST /events', () => {
     ['a missing setting', { ...heartbeat, props: { ...heartbeat.props, dim: undefined } }],
     ['an oversized value', { ...heartbeat, props: { ...heartbeat.props, font: 'x'.repeat(100) } }],
     [
-      'a negative favourites count',
+      'a negative tag count',
       {
         ...heartbeat,
-        props: { ...heartbeat.props, favourites: { ...heartbeat.props.favourites, count: -1 } },
+        props: { ...heartbeat.props, photos: { ...heartbeat.props.photos, tags: -1 } },
       },
     ],
   ])('rejects %s', async (_, body) => {

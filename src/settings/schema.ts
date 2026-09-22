@@ -1,10 +1,10 @@
-import type { Frequency } from '@/photos/rotation'
+import type { PhotoSettings } from '@/photos/rotation'
 
 import type { FontId } from './fonts'
 
 export type Settings = {
-  /** How often the photo changes. */
-  frequency: Frequency
+  /** Which photo is on screen, and how often it changes. */
+  photos: PhotoSettings
   clock: {
     enabled: boolean
     hour12: boolean
@@ -14,11 +14,6 @@ export type Settings = {
   font: FontId
   /** Lay a slight wash over the photo, so light text holds up over bright ones. */
   dim: boolean
-  favourites: {
-    enabled: boolean
-    style: 'list' | 'grid'
-    size: 's' | 'm' | 'l'
-  }
   /** Send usage data (see src/telemetry). Firefox also asks at install. */
   telemetry: boolean
 }
@@ -28,7 +23,12 @@ const localeUsesHour12 = (): boolean =>
   new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12 ?? false
 
 export const DEFAULT_SETTINGS: Settings = {
-  frequency: 'every-visit',
+  photos: {
+    mode: 'cycle',
+    frequency: 'every-visit',
+    tags: [],
+    pinnedId: null,
+  },
   clock: {
     enabled: true,
     hour12: localeUsesHour12(),
@@ -37,15 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   font: 'system',
   dim: true,
-  favourites: {
-    // On: the bar only draws itself once there is something in it (see widgets/Favourites),
-    // so the default costs a fresh install nothing and keeps existing lists on screen.
-    enabled: true,
-    style: 'list',
-    size: 'm',
-  },
   // On, with the switch in settings and a line in each store listing. Firefox users answer
-  // its own prompt at install, which gates this too, and nothing is sent at all unless the
-  // build turns telemetry on (see telemetry/consent).
+  // its own prompt at install, which gates this too (see telemetry/consent).
   telemetry: true,
 }

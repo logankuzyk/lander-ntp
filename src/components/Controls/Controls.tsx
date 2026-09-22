@@ -4,18 +4,30 @@ const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
+/** Keys pressed inside a popover belong to it: arrows move between its tabs and chips. */
+const inPopover = (target: EventTarget | null) =>
+  target instanceof Element && target.closest('.popover') !== null
+
 type ControlsProps = {
   onNext: () => void
   /** True while the photo being faded in is still loading. */
   busy?: boolean
-  onOpenSettings: () => void
+  onToggleSettings: () => void
+  settingsOpen?: boolean
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
   infoOpen?: boolean
 }
 
 /** Bottom-right controls. The → and i keys do the same as the buttons. */
-export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen }: ControlsProps) {
+export function Controls({
+  onNext,
+  busy,
+  onToggleSettings,
+  settingsOpen,
+  onToggleInfo,
+  infoOpen,
+}: ControlsProps) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -24,7 +36,8 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
-        isEditable(event.target)
+        isEditable(event.target) ||
+        inPopover(event.target)
       ) {
         return
       }
@@ -72,6 +85,8 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
           type="button"
           class="control"
           aria-label="Photo details"
+          // Opens and closes the popover itself, so pressing it isn't a click outside.
+          data-popover-toggle
           title="Photo details (i)"
           aria-expanded={infoOpen === true}
           onClick={onToggleInfo}
@@ -97,8 +112,10 @@ export function Controls({ onNext, busy, onOpenSettings, onToggleInfo, infoOpen 
         type="button"
         class="control"
         aria-label="Settings"
+        data-popover-toggle
         title="Settings"
-        onClick={onOpenSettings}
+        aria-expanded={settingsOpen === true}
+        onClick={onToggleSettings}
       >
         <svg
           aria-hidden="true"

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { favouritesItem } from '@/favourites/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { fakePermissions } from '@/test/permissions'
@@ -49,33 +48,48 @@ describe('isHeartbeatDue', () => {
 })
 
 describe('heartbeatProps', () => {
-  it('reports the settings and how many favourites there are', () => {
-    expect(heartbeatProps(DEFAULT_SETTINGS, 3)).toEqual({
-      frequency: DEFAULT_SETTINGS.frequency,
+  it('reports the settings, with how many tags are cycled rather than which', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      photos: {
+        mode: 'cycle' as const,
+        frequency: 'daily' as const,
+        tags: ['water'],
+        pinnedId: null,
+      },
+    }
+
+    const props = heartbeatProps(settings)
+
+    expect(props).toEqual({
+      photos: { mode: 'cycle', frequency: 'daily', tags: 1 },
       font: DEFAULT_SETTINGS.font,
       dim: DEFAULT_SETTINGS.dim,
       clock: DEFAULT_SETTINGS.clock,
-      favourites: { ...DEFAULT_SETTINGS.favourites, count: 3 },
     })
+    expect(JSON.stringify(props)).not.toContain('water')
   })
 
   it('leaves out settings it does not name', () => {
     const later = { ...DEFAULT_SETTINGS, weather: { location: 'Victoria, BC' } } as Settings
 
-    expect(JSON.stringify(heartbeatProps(later, 0))).not.toContain('Victoria')
+    expect(JSON.stringify(heartbeatProps(later))).not.toContain('Victoria')
   })
 })
 
 describe('maybeSendHeartbeat', () => {
-  it('sends the stored settings and favourites count on the first visit', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: 'daily' })
-    await favouritesItem.setValue([{ id: '1', title: 'Portfolio', url: 'https://logankuzyk.com/' }])
+  it('sends the stored settings on the first visit', async () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily' as const },
+    }
+    await settingsItem.setValue(settings)
 
     await maybeSendHeartbeat(NOW)
 
     expect(track).toHaveBeenCalledWith({
       event: 'heartbeat',
-      props: heartbeatProps({ ...DEFAULT_SETTINGS, frequency: 'daily' }, 1),
+      props: heartbeatProps(settings),
     })
     expect(await lastHeartbeat.getValue()).toBe(NOW)
   })

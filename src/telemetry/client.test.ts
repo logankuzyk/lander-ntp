@@ -10,7 +10,7 @@ import type { TelemetryEvent } from './events'
 import { heartbeatProps } from './heartbeat'
 
 const fetchMock = vi.fn<typeof fetch>()
-const event: TelemetryEvent = { event: 'heartbeat', props: heartbeatProps(DEFAULT_SETTINGS, 2) }
+const event: TelemetryEvent = { event: 'heartbeat', props: heartbeatProps(DEFAULT_SETTINGS) }
 
 const sentBody = (call = 0) =>
   JSON.parse(fetchMock.mock.calls[call]?.[1]?.body as string) as Record<string, unknown>

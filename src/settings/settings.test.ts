@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
+import { storage } from 'wxt/utils/storage'
 
 import { FONTS, fontStack } from './fonts'
 import { DEFAULT_SETTINGS, type Settings } from './schema'
-import { settingsItem } from './storage'
+import { fromLegacySettings, LEGACY_SETTINGS_KEY, settingsItem } from './storage'
+
+/** Settings as 0.1.1 stored them: a flat frequency, favourite sites, and no usage data switch. */
+const RELEASE_0_1_1 = {
+  frequency: 'daily',
+  clock: { enabled: false, hour12: true, showDate: true, showSeconds: false },
+  font: 'geist',
+  dim: false,
+  favourites: { enabled: true, style: 'list', size: 'm' },
+}
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts on a new photo every tab, with the clock, favourites and usage data on', () => {
+  it('starts cycling all photos every tab, with the clock, system font and usage data on', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      frequency: 'every-visit',
+      photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
       font: 'system',
       dim: true,
-      favourites: { enabled: true, style: 'list', size: 'm' },
       telemetry: true,
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
@@ -21,84 +30,111 @@ describe('DEFAULT_SETTINGS', () => {
 
 describe('settingsItem', () => {
   it('syncs settings and falls back to the defaults', async () => {
-    expect(settingsItem.key).toBe('sync:settings')
+    expect(settingsItem.key).toBe('sync:settings2')
     expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
   })
 
   it('round-trips a change', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, frequency: 'daily' })
+    const photos = { ...DEFAULT_SETTINGS.photos, frequency: 'daily' as const }
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, photos })
 
-    expect(await settingsItem.getValue()).toMatchObject({ frequency: 'daily' })
+    expect(await settingsItem.getValue()).toMatchObject({ photos })
   })
 
-  it('moves a v1 font choice onto the typeface that replaced it', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, font: 'fraunces' } as unknown as Settings)
-    // setValue stamps the current version, so rewind it to make the migration run.
-    await settingsItem.setMeta({ v: 1 })
+  it('leaves the key 0.1.1 reads alone, so devices still on it keep working', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+    await storage.setMeta(LEGACY_SETTINGS_KEY, { v: 4 })
 
-    await settingsItem.migrate()
+    await settingsItem.getValue()
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, font: 'geist-mono' })
 
-    expect(await settingsItem.getValue()).toMatchObject({ font: 'instrument-serif' })
+    expect(await storage.getItem(LEGACY_SETTINGS_KEY)).toEqual(RELEASE_0_1_1)
+    expect(await storage.getMeta(LEGACY_SETTINGS_KEY)).toEqual({ v: 4 })
+    // Nor does the new key take on the old one's version.
+    expect(await storage.getMeta(settingsItem.key)).toEqual({})
   })
 
-  it('switches the photo wash on for installs that predate it', async () => {
-    const beforeDim: Record<string, unknown> = { ...DEFAULT_SETTINGS }
-    delete beforeDim.dim
-    await settingsItem.setValue(beforeDim as unknown as Settings)
-    await settingsItem.setMeta({ v: 2 })
+  it('carries settings over from 0.1.1 on the first read', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ dim: true })
+    const expected: Settings = {
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily' },
+      clock: RELEASE_0_1_1.clock,
+      font: 'geist',
+      dim: false,
+      // 0.1.1 had no usage data switch, so it starts on, as for a fresh install.
+      telemetry: true,
+    }
+    expect(await settingsItem.getValue()).toEqual(expected)
+    expect(await storage.getItem(settingsItem.key)).toEqual(expected)
   })
 
-  it('leaves a stored photo wash choice alone', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, dim: false })
-    await settingsItem.setMeta({ v: 3 })
+  it('carries them over only once', async () => {
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+    await settingsItem.getValue()
 
-    await settingsItem.migrate()
+    // A device still on 0.1.1 changes its settings afterwards.
+    await storage.setItem(LEGACY_SETTINGS_KEY, { ...RELEASE_0_1_1, font: 'instrument-serif' })
 
-    expect(await settingsItem.getValue()).toMatchObject({ dim: false })
+    expect((await settingsItem.getValue()).font).toBe('geist')
   })
 
-  it('drops the widget switches an older install still has stored', async () => {
-    const withWidgets = { ...DEFAULT_SETTINGS, widgets: { credit: false, info: false } }
-    await settingsItem.setValue(withWidgets as unknown as Settings)
-    await settingsItem.setMeta({ v: 3 })
+  it('ignores changes synced from a device on 0.1.1', async () => {
+    const seen: (Settings | null)[] = []
+    const unwatch = settingsItem.watch((value) => seen.push(value))
 
-    await settingsItem.migrate()
+    await storage.setItem(LEGACY_SETTINGS_KEY, RELEASE_0_1_1)
+    unwatch()
 
-    expect(await settingsItem.getValue()).not.toHaveProperty('widgets')
+    expect(seen).toEqual([])
   })
 
-  it('switches usage data on for installs that predate the setting', async () => {
-    const beforeTelemetry: Record<string, unknown> = { ...DEFAULT_SETTINGS }
-    delete beforeTelemetry.telemetry
-    await settingsItem.setValue(beforeTelemetry as unknown as Settings)
-    await settingsItem.setMeta({ v: 4 })
+  it('keeps a font it does not know, which a newer version may have added', async () => {
+    const settings = { ...DEFAULT_SETTINGS, font: 'from-the-future' } as unknown as Settings
+    await settingsItem.setValue(settings)
 
-    await settingsItem.migrate()
-
-    expect(await settingsItem.getValue()).toMatchObject({ telemetry: true })
+    expect(await settingsItem.getValue()).toEqual(settings)
   })
 
-  it('leaves a stored usage data choice alone', async () => {
-    await settingsItem.setValue({ ...DEFAULT_SETTINGS, telemetry: false })
-    await settingsItem.setMeta({ v: 5 })
+  it('replaces settings in a shape it does not know with the defaults', async () => {
+    await storage.setItem(settingsItem.key, { photos: 'everything' })
 
-    await settingsItem.migrate()
+    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
+  })
+})
 
-    expect(await settingsItem.getValue()).toMatchObject({ telemetry: false })
+describe('fromLegacySettings', () => {
+  it('pins the photo on screen for a frequency of off', () => {
+    expect(fromLegacySettings({ ...RELEASE_0_1_1, frequency: 'off' }).photos).toEqual({
+      mode: 'pinned',
+      frequency: DEFAULT_SETTINGS.photos.frequency,
+      tags: [],
+      pinnedId: null,
+    })
   })
 
-  it('leaves the rest of the settings alone while migrating', async () => {
-    const stored: Settings = { ...DEFAULT_SETTINGS, frequency: 'daily', font: 'system' }
-    await settingsItem.setValue(stored)
-    await settingsItem.setMeta({ v: 1 })
+  it('cycles at the frequency it had', () => {
+    expect(fromLegacySettings({ ...RELEASE_0_1_1, frequency: '15m' }).photos).toEqual({
+      ...DEFAULT_SETTINGS.photos,
+      frequency: '15m',
+    })
+  })
 
-    await settingsItem.migrate()
+  it.each([null, undefined, 'settings', 42, [], {}])(
+    'falls back to the defaults for %o',
+    (value) => {
+      expect(fromLegacySettings(value)).toEqual(DEFAULT_SETTINGS)
+    },
+  )
 
-    expect(await settingsItem.getValue()).toEqual(stored)
+  it('replaces each malformed or missing setting with its default, keeping the rest', () => {
+    expect(
+      fromLegacySettings({ frequency: 'hourly', clock: { enabled: false }, font: 7, dim: false }),
+    ).toEqual({ ...DEFAULT_SETTINGS, dim: false })
+    expect(fromLegacySettings({ clock: RELEASE_0_1_1.clock })).toEqual({
+      ...DEFAULT_SETTINGS,
+      clock: RELEASE_0_1_1.clock,
+    })
   })
 })
 

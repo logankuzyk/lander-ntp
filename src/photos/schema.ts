@@ -14,6 +14,11 @@ const SizeSchema = v.object({
   width: v.pipe(v.number(), v.integer(), v.minValue(1)),
 })
 
+const TagSchema = v.object({
+  slug: v.pipe(v.string(), v.minLength(1)),
+  name: v.pipe(v.string(), v.minLength(1)),
+})
+
 const PhotoSchema = v.object({
   id: v.pipe(v.string(), v.minLength(1)),
   alt: v.nullable(v.string()),
@@ -36,6 +41,8 @@ const PhotoSchema = v.object({
     dateTaken: v.optional(v.string()),
   }),
   location: v.nullable(v.string()),
+  // Added to v1 after it shipped, so manifests (and caches) from before it have none.
+  tags: v.optional(v.array(TagSchema), []),
   pageUrl: HttpUrlSchema,
   printUrl: v.nullable(HttpUrlSchema),
 })
@@ -49,3 +56,4 @@ export const ManifestSchema = v.object({
 
 export type Manifest = v.InferOutput<typeof ManifestSchema>
 export type Photo = Manifest['photos'][number]
+export type Tag = Photo['tags'][number]
