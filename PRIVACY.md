@@ -43,4 +43,4 @@ If this policy changes, the new version will be published here with a new "Last 
 
 ## Contact
 
-Questions about this policy can be asked by [opening an issue](https://github.com/logankuzyk/ntp/issues) on GitHub.
+Questions about this policy can be asked by [opening an issue](https://github.com/logankuzyk/lander-ntp/issues) on GitHub.
