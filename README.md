@@ -34,3 +34,7 @@ Photos come from `https://logankuzyk.com/new-tab/photos.json` (photos with **Sho
 ```bash
 WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 ```
+
+## Privacy
+
+Lander collects no personal data. See [PRIVACY.md](PRIVACY.md), which is also the privacy policy linked from the store listings.
