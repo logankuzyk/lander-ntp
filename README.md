@@ -4,6 +4,11 @@ A minimal new tab page showing photography from [logankuzyk.com](https://loganku
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
+## Install
+
+- [Chrome Web Store](https://chromewebstore.google.com/detail/lander/ocglhjclnhfbgbccffinhioaangigioa)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/lander-ntp/)
+
 ## Development
 
 ```bash
