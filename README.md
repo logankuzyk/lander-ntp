@@ -4,6 +4,11 @@ A minimal new tab page showing photography from [logankuzyk.com](https://loganku
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
+## Install
+
+- [Chrome Web Store](https://chromewebstore.google.com/detail/lander/ocglhjclnhfbgbccffinhioaangigioa)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/lander-ntp/)
+
 ## Development
 
 ```bash
@@ -37,4 +42,4 @@ WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 
 ## Privacy
 
-Lander collects no personal data. See [PRIVACY.md](PRIVACY.md), which is also the privacy policy linked from the store listings.
+Lander collects no personal data. See [PRIVACY.md](PRIVACY.md) for more information.
