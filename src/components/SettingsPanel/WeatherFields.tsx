@@ -120,63 +120,89 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
     setDraft(null)
   }
 
+  /** The handle a row was last moved from with the keys, and what to say about the move. */
+  const moved = useRef<HTMLElement | null>(null)
+  const [announcement, setAnnouncement] = useState('')
+
+  // Moving a row's element in the document can take the focus off its handle; put it back, so
+  // the next arrow key moves the same row again.
+  useLayoutEffect(() => {
+    if (moved.current && document.activeElement !== moved.current) moved.current.focus()
+    moved.current = null
+  })
+
   const onHandleKeyDown = (event: KeyboardEvent, index: number) => {
     const to = { ArrowUp: index - 1, ArrowDown: index + 1 }[event.key]
-    if (to === undefined) return
+    const field = fields[index]
+    if (to === undefined || !field) return
     event.preventDefault()
     if (to < 0 || to >= fields.length) return
-    onChange(move(fields, index, to))
+    moved.current = event.currentTarget as HTMLElement
+    const next = move(fields, index, to)
+    const before = next[to - 1]
+    setAnnouncement(
+      before
+        ? `${LABELS[field.id]} moved to be shown after ${LABELS[before.id].toLowerCase()}`
+        : `${LABELS[field.id]} moved to be shown first`,
+    )
+    onChange(next)
   }
 
   return (
-    <ol ref={list} class="fields" aria-labelledby="weather-show-heading">
-      {shown.map((field, index) => {
-        const label = LABELS[field.id]
-        const classes = ['fields__row']
-        if (!field.shown) classes.push('fields__row--hidden')
-        if (draft?.dragging === field.id) classes.push('fields__row--dragging')
-        return (
-          <li
-            key={field.id}
-            ref={register(field.id)}
-            class={classes.join(' ')}
-            draggable
-            onDragStart={(event) => {
-              // Firefox only starts a drag that carries data.
-              event.dataTransfer?.setData('text/plain', label)
-              if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
-              setDraft({ dragging: field.id, fields: [...fields] })
-            }}
-            onDragOver={(event) => dragOver(event, index)}
-            onDrop={(event) => event.preventDefault()}
-            onDragEnd={finish}
-          >
-            <button
-              type="button"
-              class="fields__handle"
-              aria-label={`Reorder ${label}`}
-              title="Drag, or use the arrow keys, to reorder"
-              onKeyDown={(event) => onHandleKeyDown(event, index)}
+    <>
+      <ol ref={list} class="fields" aria-labelledby="weather-show-heading">
+        {shown.map((field, index) => {
+          const label = LABELS[field.id]
+          const classes = ['fields__row']
+          if (!field.shown) classes.push('fields__row--hidden')
+          if (draft?.dragging === field.id) classes.push('fields__row--dragging')
+          return (
+            <li
+              key={field.id}
+              ref={register(field.id)}
+              class={classes.join(' ')}
+              draggable
+              onDragStart={(event) => {
+                // Firefox only starts a drag that carries data.
+                event.dataTransfer?.setData('text/plain', label)
+                if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+                setDraft({ dragging: field.id, fields: [...fields] })
+              }}
+              onDragOver={(event) => dragOver(event, index)}
+              onDrop={(event) => event.preventDefault()}
+              onDragEnd={finish}
             >
-              <GripVertical aria-hidden="true" size={14} />
-            </button>
-            <span class="fields__label">{label}</span>
-            <button
-              type="button"
-              class="fields__eye"
-              aria-label={`Show ${label}`}
-              aria-pressed={field.shown}
-              onClick={() => onChange(toggle(fields, field.id))}
-            >
-              {field.shown ? (
-                <Eye aria-hidden="true" size={16} />
-              ) : (
-                <EyeOff aria-hidden="true" size={16} />
-              )}
-            </button>
-          </li>
-        )
-      })}
-    </ol>
+              <button
+                type="button"
+                class="fields__handle"
+                aria-label={`Reorder ${label}`}
+                title="Drag, or use the arrow keys, to reorder"
+                onKeyDown={(event) => onHandleKeyDown(event, index)}
+              >
+                <GripVertical aria-hidden="true" size={14} />
+              </button>
+              <span class="fields__label">{label}</span>
+              <button
+                type="button"
+                class="fields__eye"
+                aria-label={`Show ${label}`}
+                aria-pressed={field.shown}
+                onClick={() => onChange(toggle(fields, field.id))}
+              >
+                {field.shown ? (
+                  <Eye aria-hidden="true" size={16} />
+                ) : (
+                  <EyeOff aria-hidden="true" size={16} />
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ol>
+      {/* The list changing order says nothing by itself to a screen reader. */}
+      <p class="visually-hidden" aria-live="polite">
+        {announcement}
+      </p>
+    </>
   )
 }

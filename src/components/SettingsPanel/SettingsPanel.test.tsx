@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PhotoSettings } from '@/photos/rotation'
@@ -8,6 +9,7 @@ import { makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 
 import { SettingsPanel } from './SettingsPanel'
+import { WeatherFields } from './WeatherFields'
 
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
@@ -660,6 +662,7 @@ describe('SettingsPanel', () => {
           key: 'ArrowDown',
         })
         expect(ids(lastFields(onChange)).slice(0, 2)).toEqual(['sun', 'location'])
+        expect(screen.getByText('Location moved to be shown after sunrise and sunset')).toBeTruthy()
 
         onChange.mockClear()
         fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Location' }), {
@@ -667,6 +670,22 @@ describe('SettingsPanel', () => {
         })
         expect(onChange).not.toHaveBeenCalled()
       })
+    })
+
+    it('keeps the focus on a handle whose row the arrow keys moved', () => {
+      function Fields() {
+        const [fields, setFields] = useState(DEFAULT_SETTINGS.weather.fields)
+        return <WeatherFields fields={fields} onChange={setFields} />
+      }
+      render(<Fields />)
+      const handle = screen.getByRole('button', { name: 'Reorder Location' })
+      handle.focus()
+
+      fireEvent.keyDown(handle, { key: 'ArrowDown' })
+      fireEvent.keyDown(handle, { key: 'ArrowDown' })
+
+      expect(document.activeElement).toBe(handle)
+      expect(screen.getAllByRole('listitem')[2]?.contains(handle)).toBe(true)
     })
 
     it('credits the weather data', () => {

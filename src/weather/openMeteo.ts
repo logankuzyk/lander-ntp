@@ -71,9 +71,10 @@ export async function getJson<T extends v.GenericSchema>(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
-    const response = await fetch(`${url}?${new URLSearchParams(params)}`, {
-      signal: controller.signal,
-    })
+    // The manifest can move these addresses, and the new one may come with a query of its own.
+    const target = new URL(url)
+    for (const [name, value] of Object.entries(params)) target.searchParams.set(name, value)
+    const response = await fetch(target.href, { signal: controller.signal })
     if (!response.ok) return null
     const result = v.safeParse(schema, await response.json())
     return result.success ? result.output : null

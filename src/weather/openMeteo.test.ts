@@ -56,6 +56,25 @@ describe('fetchWeather', () => {
     expect(url.searchParams.get('timezone')).toBe('auto')
   })
 
+  it('keeps the query of an address the manifest has moved it to', async () => {
+    const fetch = respond(FORECAST)
+    await manifestCache.setValue({
+      etag: null,
+      fetchedAt: Date.now(),
+      data: {
+        ...makeManifest([makePhoto('a')]),
+        weather: { forecastUrl: 'https://weather.example/forecast?source=lander' },
+      },
+    })
+
+    await fetchWeather(PLACE, 'celsius')
+
+    const url = requested(fetch)
+    expect(url.origin + url.pathname).toBe('https://weather.example/forecast')
+    expect(url.searchParams.get('source')).toBe('lander')
+    expect(url.searchParams.get('latitude')).toBe('48.43')
+  })
+
   it('returns null for a bad status, an unknown shape and a network error', async () => {
     respond(FORECAST, false)
     expect(await fetchWeather(PLACE, 'celsius')).toBeNull()

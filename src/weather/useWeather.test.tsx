@@ -144,6 +144,22 @@ describe('useWeather', () => {
     expect(shown()).toBe('none')
   })
 
+  it('waits until the tab is looked at before asking', async () => {
+    const fetch = vi.fn().mockResolvedValue(forecast(12))
+    vi.stubGlobal('fetch', fetch)
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+
+    render(<Probe settings={ON} />)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(fetch).not.toHaveBeenCalled()
+
+    hidden.mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    await waitFor(() => expect(shown()).toBe('12'))
+    hidden.mockRestore()
+  })
+
   it('shows nothing, cached or fetched, when the manifest switches the weather off', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)

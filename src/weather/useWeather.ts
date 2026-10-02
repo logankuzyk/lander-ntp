@@ -110,7 +110,7 @@ function useDevicePosition(follow: boolean): DevicePosition | null {
  *
  * Stale-while-revalidate, like the photo manifest: a cached reading for this place and unit is
  * shown straight away and refreshed once older than MAX_AGE_MS, and again each time that
- * passes while the tab stays open. A failed refresh keeps the old reading until it is older
+ * passes while the tab stays open and in view. A failed refresh keeps the old reading until it is older
  * than MAX_STALE_MS.
  */
 export function useWeather(
@@ -132,29 +132,52 @@ export function useWeather(
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
 
-    const refresh = async () => {
-      const fresh = await fetchWeather(place, unit)
-      const reading = fresh && { key, fetchedAt: Date.now(), data: fresh }
-      if (reading) await weatherCache.setValue(reading)
-      if (!active) return
-      setShown((old) => reading ?? (old && Date.now() - old.fetchedAt < MAX_STALE_MS ? old : null))
-      timer = setTimeout(() => void refresh(), MAX_AGE_MS)
+    let checking = false
+
+    /** Check again after a wait; the manifest and the cache are both read anew each time. */
+    const again = (wait: number) => {
+      timer = setTimeout(() => void check(), wait)
     }
 
-    void (async () => {
-      // Switched off from the manifest: not even the cached reading, which would never refresh.
-      const [{ enabled }, cached] = await Promise.all([getEndpoints(), weatherCache.getValue()])
-      if (!active || !enabled) return
-      if (cached?.key !== key) return refresh()
-      const age = Date.now() - cached.fetchedAt
-      if (age >= MAX_STALE_MS) return refresh()
-      setShown(cached)
-      timer = setTimeout(() => void refresh(), Math.max(0, MAX_AGE_MS - age))
-    })()
+    const check = async () => {
+      // Every open tab runs this. One nobody is looking at waits until it is looked at, and the
+      // cache is read first, so a reading another tab has just fetched is not fetched again.
+      if (checking || document.hidden) return
+      checking = true
+      clearTimeout(timer)
+      try {
+        const [{ enabled }, cached] = await Promise.all([getEndpoints(), weatherCache.getValue()])
+        if (!active) return
+        // Switched off from the manifest: not even the cached reading, which would never refresh.
+        if (!enabled) {
+          setShown(null)
+          return again(MAX_AGE_MS)
+        }
+        const age = cached?.key === key ? Date.now() - cached.fetchedAt : Infinity
+        if (cached && age < MAX_STALE_MS) setShown(cached)
+        if (age < MAX_AGE_MS) return again(MAX_AGE_MS - age)
+
+        const fresh = await fetchWeather(place, unit)
+        const reading = fresh && { key, fetchedAt: Date.now(), data: fresh }
+        if (reading) await weatherCache.setValue(reading)
+        if (!active) return
+        setShown(
+          (old) => reading ?? (old && Date.now() - old.fetchedAt < MAX_STALE_MS ? old : null),
+        )
+        again(MAX_AGE_MS)
+      } finally {
+        checking = false
+      }
+    }
+
+    const onVisibilityChange = () => void check()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    void check()
 
     return () => {
       active = false
       clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
     // `place` is a new object whenever settings change; `key` says whether it really moved.
     // eslint-disable-next-line react-hooks/exhaustive-deps
