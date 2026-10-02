@@ -14,6 +14,7 @@ Lander uses the browser's extension storage (the `storage` permission) to keep:
 
 - **Your settings**: how photos rotate, which tags or photo you picked, clock options, weather options (including the place you picked), font and dimming. These are kept in the browser's synced storage, so if you are signed in to your browser with sync turned on, your browser carries them between your devices. That sync is run by your browser vendor (for example Google, Mozilla or Microsoft) under their privacy policy. Lander never receives this data.
 - **A cached copy of the photo list**, so the new tab loads quickly and works offline.
+- **Your device's last rounded position**, only if the weather is set to use your location. This is not synced.
 - **A cached copy of the latest weather**, when the weather widget is on, so it isn't fetched on every new tab.
 - **Which photo is showing** and which are up next, so the rotation continues where it left off.
 
@@ -31,7 +32,7 @@ If you switch on the weather widget, it also makes these requests to [Open-Meteo
 - It **searches for a place** by the name you type, when you press Search in the settings.
 - It **downloads the forecast** for the place you picked, at most about every half hour. The request carries that place's coordinates, rounded to about a kilometre, and your choice of Celsius or Fahrenheit.
 
-Lander does not use your device's location: the place is whichever one you pick from the search. With the widget off, none of these requests are made. The photo list can point these requests at a different weather service, or switch the widget off, if Open-Meteo stops being available; this policy will be updated if that happens. Open-Meteo's handling of them is covered by [its own terms and privacy policy](https://open-meteo.com/en/terms). In Firefox, the browser asks you to agree to sharing location information before the widget is switched on.
+The place is whichever one you pick from the search. If you instead choose "Use my location", your browser asks your permission, and Lander then reads your device's location when a new tab opens and about every half hour while it stays open, so the weather follows you. That position is rounded to about a kilometre, kept only on your device, and sent only to the weather service as the place to forecast and, when you have moved, to [BigDataCloud](https://www.bigdatacloud.com/) to look up the name of the town you are in. Lander never reads your device's location unless you choose this. With the widget off, none of these requests are made. The photo list can point these requests at a different weather service, or switch the widget off, if Open-Meteo stops being available; this policy will be updated if that happens. Open-Meteo's handling of them is covered by [its own terms and privacy policy](https://open-meteo.com/en/terms). In Firefox, the browser asks you to agree to sharing location information before the widget is switched on.
 
 Apart from the place you pick for the weather, these requests carry nothing about you, your settings or your browsing. As with any website visit, the servers that answer them can see standard request information such as your IP address and browser user agent. It is used only to serve the files, and is not used to identify or track you.
 

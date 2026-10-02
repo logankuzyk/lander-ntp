@@ -25,6 +25,7 @@ const SettingsSchema = v.object({
   weather: v.object({
     enabled: v.boolean(),
     place: v.nullable(v.object({ name: v.string(), latitude: v.number(), longitude: v.number() })),
+    followDevice: v.boolean(),
     unit: v.picklist(['celsius', 'fahrenheit']),
     background: v.boolean(),
     fields: v.pipe(

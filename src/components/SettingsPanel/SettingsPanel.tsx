@@ -11,6 +11,8 @@ import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
 import type { Place, Settings, WeatherSettings } from '@/settings/schema'
 import { allowLocation } from '@/weather/consent'
+import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
+import { placeName } from '@/weather/placeName'
 import { searchPlaces, type PlaceResult } from '@/weather/openMeteo'
 
 import { Gallery } from './Gallery'
@@ -252,9 +254,21 @@ function PlaceSearch({ onSelect }: PlaceSearchProps) {
 function WeatherSection({ settings, onChange }: SectionProps) {
   const current = settings.weather
   const [changingPlace, setChangingPlace] = useState(false)
+  const [locateFailed, setLocateFailed] = useState(false)
 
   const weather = (changes: Partial<WeatherSettings>) =>
     onChange({ ...settings, weather: { ...current, ...changes } })
+
+  // The click that shows the browser's prompt. The position goes to local storage, where the
+  // widget picks it up; the settings only record that the weather follows the device.
+  const follow = async () => {
+    setLocateFailed(false)
+    const position = await locate()
+    if (!position) return setLocateFailed(true)
+    await devicePosition.setValue({ ...position, name: await placeName(position) })
+    setChangingPlace(false)
+    weather({ followDevice: true })
+  }
 
   const enable = async (enabled: boolean) => {
     if (enabled && !(await allowLocation())) return
@@ -270,23 +284,31 @@ function WeatherSection({ settings, onChange }: SectionProps) {
           onChange={(enabled) => void enable(enabled)}
         />
         {current.enabled &&
-          (current.place && !changingPlace ? (
+          ((current.place || current.followDevice) && !changingPlace ? (
             <div class="settings__row">
               <span>Place</span>
               <span>
-                {current.place.name}{' '}
+                {current.followDevice ? CURRENT_LOCATION : current.place?.name}{' '}
                 <button type="button" class="settings__link" onClick={() => setChangingPlace(true)}>
                   Change
                 </button>
               </span>
             </div>
           ) : (
-            <PlaceSearch
-              onSelect={(place) => {
-                setChangingPlace(false)
-                weather({ place })
-              }}
-            />
+            <>
+              <PlaceSearch
+                onSelect={(place) => {
+                  setChangingPlace(false)
+                  weather({ place, followDevice: false })
+                }}
+              />
+              <p class="settings__note" aria-live="polite">
+                <button type="button" class="settings__link" onClick={() => void follow()}>
+                  Use my location
+                </button>
+                {locateFailed && ' Couldn’t get your location. Check that this page is allowed it.'}
+              </p>
+            </>
           ))}
         {current.enabled && (
           <>

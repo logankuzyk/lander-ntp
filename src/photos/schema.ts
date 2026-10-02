@@ -15,6 +15,7 @@ const WeatherSchema = v.object({
   enabled: v.optional(v.boolean()),
   forecastUrl: v.optional(HttpsUrlSchema),
   searchUrl: v.optional(HttpsUrlSchema),
+  placeNameUrl: v.optional(HttpsUrlSchema),
 })
 
 const Percentage = v.pipe(v.number(), v.minValue(0), v.maxValue(100))

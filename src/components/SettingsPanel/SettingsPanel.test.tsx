@@ -5,6 +5,7 @@ import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { makePhoto } from '@/test/fixtures'
+import { devicePosition } from '@/weather/deviceLocation'
 
 import { SettingsPanel } from './SettingsPanel'
 
@@ -428,7 +429,9 @@ describe('SettingsPanel', () => {
         await screen.findByRole('button', { name: 'Victoria, British Columbia, Canada' }),
       )
 
-      expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true, place: PLACE }))
+      expect(onChange).toHaveBeenCalledWith(
+        withWeather({ enabled: true, place: PLACE, followDevice: false }),
+      )
     })
 
     it('says when nothing matches and when the search fails', async () => {
@@ -458,6 +461,59 @@ describe('SettingsPanel', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Change' }))
       expect(screen.getByRole('searchbox')).toBeTruthy()
+    })
+
+    describe('using the device location', () => {
+      const locating = (coords: { latitude: number; longitude: number } | null) =>
+        vi.stubGlobal('navigator', {
+          language: 'en-CA',
+          geolocation: {
+            getCurrentPosition: (done: (position: unknown) => void, fail: () => void) =>
+              coords ? done({ coords }) : fail(),
+          },
+        })
+
+      it('follows the device once the browser gives a position, keeping it off the settings', async () => {
+        locating({ latitude: 48.4359, longitude: -123.35155 })
+        vi.stubGlobal(
+          'fetch',
+          vi
+            .fn()
+            .mockResolvedValue({ ok: true, json: () => Promise.resolve({ city: 'Victoria' }) }),
+        )
+        const { onChange } = renderWeather({ enabled: true })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+
+        await waitFor(() =>
+          expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true, followDevice: true })),
+        )
+        expect(await devicePosition.getValue()).toEqual({
+          latitude: 48.44,
+          longitude: -123.35,
+          name: 'Victoria',
+        })
+      })
+
+      it('says so when the position is refused', async () => {
+        locating(null)
+        const { onChange } = renderWeather({ enabled: true })
+
+        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+
+        expect(await screen.findByText(/Couldn’t get your location/)).toBeTruthy()
+        expect(onChange).not.toHaveBeenCalled()
+      })
+
+      it('shows that it follows the device, and stops when a place is searched for', () => {
+        renderWeather({ enabled: true, place: PLACE, followDevice: true })
+
+        expect(screen.getByText('Current location')).toBeTruthy()
+        expect(screen.queryByText('Victoria')).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+        expect(screen.getByRole('searchbox')).toBeTruthy()
+      })
     })
 
     it('changes the unit and the background', () => {
@@ -501,18 +557,32 @@ describe('SettingsPanel', () => {
         ).toContain('fields__row--hidden')
       })
 
-      it('shows and hides a field with its eye, keeping the order', () => {
+      it('moves a field switched on to the end of the shown ones', () => {
         const { onChange } = renderWeather(on)
 
         fireEvent.click(screen.getByRole('button', { name: 'Show High and low' }))
-        expect(lastFields(onChange)).toEqual(
-          settings.weather.fields.map((field) =>
-            field.id === 'highLow' ? { ...field, shown: true } : field,
-          ),
-        )
+
+        expect(lastFields(onChange)).toEqual([
+          { id: 'location', shown: true },
+          { id: 'sun', shown: true },
+          { id: 'highLow', shown: true },
+          { id: 'condition', shown: false },
+          { id: 'feelsLike', shown: false },
+        ])
+      })
+
+      it('moves a field switched off to just after the last shown one', () => {
+        const { onChange } = renderWeather(on)
 
         fireEvent.click(screen.getByRole('button', { name: 'Show Location' }))
-        expect(lastFields(onChange)[0]).toEqual({ id: 'location', shown: false })
+
+        expect(lastFields(onChange)).toEqual([
+          { id: 'sun', shown: true },
+          { id: 'location', shown: false },
+          { id: 'condition', shown: false },
+          { id: 'feelsLike', shown: false },
+          { id: 'highLow', shown: false },
+        ])
       })
 
       it('reorders by dragging a row onto another, writing only on the drop', () => {

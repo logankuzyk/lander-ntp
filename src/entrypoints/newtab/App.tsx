@@ -69,10 +69,10 @@ export function App() {
         until the settings are known.
       */}
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
-      {weather && settings.weather.place && (
+      {weather && (
         <Weather
-          weather={weather}
-          place={settings.weather.place.name}
+          weather={weather.weather}
+          place={weather.place}
           fields={settings.weather.fields}
           background={settings.weather.background}
           hour12={settings.clock.hour12}

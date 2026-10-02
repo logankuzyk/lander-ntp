@@ -5,6 +5,7 @@ import { manifestCache } from '@/photos/storage'
 import { DEFAULT_SETTINGS, type WeatherSettings } from '@/settings/schema'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
+import { devicePosition } from './deviceLocation'
 import { cacheKey, type Weather } from './openMeteo'
 import { weatherCache } from './storage'
 import { MAX_AGE_MS, useWeather } from './useWeather'
@@ -46,7 +47,11 @@ const forecast = (temperature: number) => ({
 
 function Probe({ settings }: { settings: WeatherSettings | null }) {
   const weather = useWeather(settings)
-  return <output>{weather ? String(weather.temperature) : 'none'}</output>
+  return (
+    <output data-place={weather?.place}>
+      {weather ? String(weather.weather.temperature) : 'none'}
+    </output>
+  )
 }
 
 const shown = () => screen.getByRole('status').textContent
@@ -156,5 +161,121 @@ describe('useWeather', () => {
     render(<Probe settings={{ ...ON, unit: 'fahrenheit' }} />)
 
     await waitFor(() => expect(shown()).toBe('54'))
+  })
+
+  describe('following the device', () => {
+    const FOLLOW: WeatherSettings = { ...ON, place: null, followDevice: true }
+    const HERE = { latitude: 48.43, longitude: -123.37 }
+    const AWAY = { latitude: 49.28, longitude: -123.12 }
+
+    /** The browser's answers: whether location is allowed, and where the device is. */
+    const device = (state: 'granted' | 'prompt', coords = HERE) => {
+      const getCurrentPosition = vi.fn((done: (position: unknown) => void) => done({ coords }))
+      vi.stubGlobal('navigator', {
+        language: 'en-CA',
+        geolocation: { getCurrentPosition },
+        permissions: { query: () => Promise.resolve({ state }) },
+      })
+      return getCurrentPosition
+    }
+
+    /** Answers the forecast with a temperature, and the name lookup with a town (or a failure). */
+    const answering = (temperature: number, city: string | null) => {
+      const fetch = vi.fn((url: string) =>
+        url.includes('reverse-geocode')
+          ? Promise.resolve({ ok: city !== null, json: () => Promise.resolve({ city }) })
+          : Promise.resolve(forecast(temperature)),
+      )
+      vi.stubGlobal('fetch', fetch)
+      return fetch
+    }
+
+    const requests = (fetch: ReturnType<typeof answering>, to: string) =>
+      fetch.mock.calls
+        .map(([url]) => new URL(url))
+        .filter((url) => url.href.includes(to))
+        .map(({ searchParams }) => ({
+          latitude: Number(searchParams.get('latitude')),
+          longitude: Number(searchParams.get('longitude')),
+        }))
+
+    const cached = (position: typeof HERE) =>
+      weatherCache.setValue({
+        key: cacheKey({ name: '', ...position }, ON.unit),
+        fetchedAt: Date.now(),
+        data: READING,
+      })
+
+    const place = () => screen.getByRole('status').getAttribute('data-place')
+
+    it('fetches the weather for where the device is, names it and remembers both', async () => {
+      device('granted')
+      const fetch = answering(12, 'Victoria')
+
+      render(<Probe settings={FOLLOW} />)
+
+      await waitFor(() => expect(shown()).toBe('12'))
+      expect(place()).toBe('Victoria')
+      expect(requests(fetch, 'forecast')).toEqual([HERE])
+      expect(requests(fetch, 'reverse-geocode')).toEqual([HERE])
+      expect(await devicePosition.getValue()).toEqual({ ...HERE, name: 'Victoria' })
+    })
+
+    it('moves to the new place when the device has moved since the last tab', async () => {
+      device('granted', AWAY)
+      const fetch = answering(15, 'Vancouver')
+      await devicePosition.setValue({ ...HERE, name: 'Victoria' })
+      await cached(HERE)
+
+      render(<Probe settings={FOLLOW} />)
+
+      await waitFor(() => expect(shown()).toBe('15'))
+      expect(place()).toBe('Vancouver')
+      expect(requests(fetch, 'forecast')).toEqual([AWAY])
+      expect(await devicePosition.getValue()).toEqual({ ...AWAY, name: 'Vancouver' })
+    })
+
+    it('stays put for a position close to the last one, asking for nothing', async () => {
+      device('granted', { latitude: 48.45, longitude: -123.36 })
+      const fetch = answering(12, 'Saanich')
+      await devicePosition.setValue({ ...HERE, name: 'Victoria' })
+      await cached(HERE)
+
+      render(<Probe settings={FOLLOW} />)
+
+      await waitFor(() => expect(shown()).toBe('5'))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(fetch).not.toHaveBeenCalled()
+      expect(place()).toBe('Victoria')
+    })
+
+    it('says "Current location" when the name can’t be had, and tries again next time', async () => {
+      device('granted')
+      answering(12, null)
+
+      const first = render(<Probe settings={FOLLOW} />)
+      await waitFor(() => expect(shown()).toBe('12'))
+      expect(place()).toBe('Current location')
+      first.unmount()
+
+      const fetch = answering(12, 'Victoria')
+      render(<Probe settings={FOLLOW} />)
+
+      await waitFor(() => expect(place()).toBe('Victoria'))
+      // The forecast was already cached for here; only the name was missing.
+      expect(requests(fetch, 'forecast')).toEqual([])
+    })
+
+    it('never asks for the position where that would show a prompt', async () => {
+      const getCurrentPosition = device('prompt')
+      const fetch = answering(12, 'Victoria')
+
+      render(<Probe settings={FOLLOW} />)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(getCurrentPosition).not.toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+      expect(shown()).toBe('none')
+    })
   })
 })

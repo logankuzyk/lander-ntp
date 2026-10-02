@@ -60,7 +60,7 @@ export type PlaceResult = {
 }
 
 /** Null on network errors, timeouts, bad statuses and data in a shape it doesn't know. */
-async function getJson<T extends v.GenericSchema>(
+export async function getJson<T extends v.GenericSchema>(
   url: string,
   params: Record<string, string>,
   schema: T,

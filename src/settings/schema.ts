@@ -36,6 +36,11 @@ export type WeatherSettings = {
   enabled: boolean
   /** Null until a place is picked; the widget stays hidden without one. */
   place: Place | null
+  /**
+   * Use wherever this device is instead of `place`, and keep up as it moves. The position
+   * itself is never stored here: see weather/deviceLocation.
+   */
+  followDevice: boolean
   unit: 'celsius' | 'fahrenheit'
   /** Sit on the same translucent panel as the popovers, rather than straight on the photo. */
   background: boolean
@@ -76,6 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
     // Off until asked for: it is the only thing that sends a place anywhere.
     enabled: false,
     place: null,
+    followDevice: false,
     unit: localeUsesFahrenheit() ? 'fahrenheit' : 'celsius',
     background: false,
     fields: [
