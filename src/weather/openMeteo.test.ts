@@ -63,6 +63,9 @@ describe('fetchWeather', () => {
     respond({ current: {} })
     expect(await fetchWeather(PLACE, 'celsius')).toBeNull()
 
+    respond({ ...FORECAST, daily: { ...FORECAST.daily, sunrise: ['7:13 AM'] } })
+    expect(await fetchWeather(PLACE, 'celsius')).toBeNull()
+
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     expect(await fetchWeather(PLACE, 'celsius')).toBeNull()
   })

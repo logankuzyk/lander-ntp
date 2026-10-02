@@ -8,7 +8,7 @@ import { makeManifest, makePhoto } from '@/test/fixtures'
 import { devicePosition } from './deviceLocation'
 import { cacheKey, type Weather } from './openMeteo'
 import { weatherCache } from './storage'
-import { MAX_AGE_MS, useWeather } from './useWeather'
+import { MAX_AGE_MS, MAX_STALE_MS, useWeather } from './useWeather'
 
 const PLACE = { name: 'Victoria', latitude: 48.43, longitude: -123.37 }
 
@@ -127,6 +127,21 @@ describe('useWeather', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     expect(shown()).toBe('5')
+  })
+
+  it('drops a reading too old to be the weather now when the refresh fails', async () => {
+    const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetch)
+    await weatherCache.setValue({
+      key: cacheKey(PLACE, ON.unit),
+      fetchedAt: Date.now() - MAX_STALE_MS - 1,
+      data: READING,
+    })
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    expect(shown()).toBe('none')
   })
 
   it('shows nothing, cached or fetched, when the manifest switches the weather off', async () => {
@@ -264,6 +279,20 @@ describe('useWeather', () => {
       await waitFor(() => expect(place()).toBe('Victoria'))
       // The forecast was already cached for here; only the name was missing.
       expect(requests(fetch, 'forecast')).toEqual([])
+    })
+
+    it('moves when settings pick the position again while the tab is open', async () => {
+      device('prompt')
+      answering(15, 'Vancouver')
+      await devicePosition.setValue({ ...HERE, name: 'Victoria' })
+      await cached(HERE)
+
+      render(<Probe settings={FOLLOW} />)
+      await waitFor(() => expect(shown()).toBe('5'))
+      await devicePosition.setValue({ ...AWAY, name: 'Vancouver' })
+
+      await waitFor(() => expect(shown()).toBe('15'))
+      expect(place()).toBe('Vancouver')
     })
 
     it('never asks for the position where that would show a prompt', async () => {

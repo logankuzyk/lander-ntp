@@ -256,18 +256,30 @@ function WeatherSection({ settings, onChange }: SectionProps) {
   const [changingPlace, setChangingPlace] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
 
+  // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
+  // a change is laid over the settings as they are when it is made, not as they were at the click.
+  const latest = useRef(settings)
+  latest.current = settings
+  const locating = useRef(false)
+
   const weather = (changes: Partial<WeatherSettings>) =>
-    onChange({ ...settings, weather: { ...current, ...changes } })
+    onChange({ ...latest.current, weather: { ...latest.current.weather, ...changes } })
 
   // The click that shows the browser's prompt. The position goes to local storage, where the
   // widget picks it up; the settings only record that the weather follows the device.
   const follow = async () => {
+    if (locating.current) return
+    locating.current = true
     setLocateFailed(false)
-    const position = await locate()
-    if (!position) return setLocateFailed(true)
-    await devicePosition.setValue({ ...position, name: await placeName(position) })
-    setChangingPlace(false)
-    weather({ followDevice: true })
+    try {
+      const position = await locate()
+      if (!position) return setLocateFailed(true)
+      await devicePosition.setValue({ ...position, name: await placeName(position) })
+      setChangingPlace(false)
+      weather({ followDevice: true })
+    } finally {
+      locating.current = false
+    }
   }
 
   const enable = async (enabled: boolean) => {

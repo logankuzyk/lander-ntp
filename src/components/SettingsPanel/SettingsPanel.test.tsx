@@ -495,6 +495,44 @@ describe('SettingsPanel', () => {
         })
       })
 
+      it('keeps a setting changed while the browser was asked, and asks only once', async () => {
+        let found: (position: unknown) => void = () => {}
+        const getCurrentPosition = vi.fn((done: typeof found) => {
+          found = done
+        })
+        vi.stubGlobal('navigator', { language: 'en-CA', geolocation: { getCurrentPosition } })
+        vi.stubGlobal(
+          'fetch',
+          vi
+            .fn()
+            .mockResolvedValue({ ok: true, json: () => Promise.resolve({ city: 'Victoria' }) }),
+        )
+        const onChange = vi.fn()
+        const panel = (weather: Partial<Settings['weather']>) => (
+          <SettingsPanel
+            settings={withWeather(weather)}
+            onChange={onChange}
+            photos={PHOTOS}
+            currentId="a"
+            onClose={vi.fn()}
+          />
+        )
+        const { rerender } = render(panel({ enabled: true }))
+        openSection('Weather')
+
+        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+        rerender(panel({ enabled: true, unit: 'fahrenheit' }))
+        found({ coords: { latitude: 48.4359, longitude: -123.35155 } })
+
+        await waitFor(() =>
+          expect(onChange).toHaveBeenCalledWith(
+            withWeather({ enabled: true, unit: 'fahrenheit', followDevice: true }),
+          ),
+        )
+        expect(getCurrentPosition).toHaveBeenCalledTimes(1)
+      })
+
       it('says so when the position is refused', async () => {
         locating(null)
         const { onChange } = renderWeather({ enabled: true })

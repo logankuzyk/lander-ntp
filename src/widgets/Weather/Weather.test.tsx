@@ -19,11 +19,11 @@ const READING: Reading = {
 
 const renderWeather = (
   shown: WeatherField[] = [],
-  props: { background?: boolean; hour12?: boolean } = {},
+  props: { background?: boolean; hour12?: boolean; reading?: Reading } = {},
 ) =>
   render(
     <Weather
-      weather={READING}
+      weather={props.reading ?? READING}
       place="Victoria"
       fields={[
         ...shown.map((id) => ({ id, shown: true })),
@@ -76,6 +76,16 @@ describe('Weather', () => {
 
     expect(screen.getByLabelText('Sunrise').textContent).toBe('7:13')
     expect(screen.getByLabelText('Sunset').textContent).toBe('6:51')
+  })
+
+  it('leaves out sunrise and sunset where the sun does neither today', () => {
+    const midnight = '2026-10-01T00:00'
+    const { container } = renderWeather(['sun', 'location'], {
+      reading: { ...READING, sunrise: midnight, sunset: midnight },
+    })
+
+    const lines = [...container.querySelectorAll('.weather__details li')]
+    expect(lines.map((line) => line.textContent)).toEqual(['Victoria'])
   })
 
   it('sits on the panel only when asked to', () => {

@@ -21,6 +21,9 @@ export type Weather = {
   sunset: string
 }
 
+/** "2026-10-01T07:13": the widget reads these as dates, so anything else is refused here. */
+const LocalTimeSchema = v.pipe(v.string(), v.isoDateTime())
+
 const ForecastSchema = v.object({
   current: v.object({
     temperature_2m: v.number(),
@@ -31,8 +34,8 @@ const ForecastSchema = v.object({
   daily: v.object({
     temperature_2m_max: v.tuple([v.number()]),
     temperature_2m_min: v.tuple([v.number()]),
-    sunrise: v.tuple([v.string()]),
-    sunset: v.tuple([v.string()]),
+    sunrise: v.tuple([LocalTimeSchema]),
+    sunset: v.tuple([LocalTimeSchema]),
   }),
 })
 

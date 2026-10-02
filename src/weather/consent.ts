@@ -16,3 +16,19 @@ export async function allowLocation(): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Whether that agreement stands on this device. Settings sync and the agreement doesn't, so a
+ * device can be told to show the weather without anyone having agreed there; it can also be
+ * taken back from the browser's add-on settings.
+ */
+export async function locationConsented(): Promise<boolean> {
+  if (import.meta.env.BROWSER !== 'firefox') return true
+  try {
+    return await browser.permissions.contains({ data_collection: ['locationInfo'] } as Parameters<
+      typeof browser.permissions.contains
+    >[0])
+  } catch {
+    return false
+  }
+}

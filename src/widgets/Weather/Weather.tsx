@@ -35,7 +35,11 @@ function SunTime({ label, at, hour12 }: { label: string; at: string; hour12: boo
 /** Top right: the weather now, over the optional lines that are switched on, in their order. */
 export function Weather({ weather, place, fields, background, hour12 }: WeatherProps) {
   const { condition, label } = describeCode(weather.code)
-  const shown = fields.filter((field) => field.shown).map((field) => field.id)
+  // Where the sun doesn't rise or set today, the forecast gives both as the same midnight.
+  const noSun = weather.sunrise === weather.sunset
+  const shown = fields
+    .filter((field) => field.shown && !(field.id === 'sun' && noSun))
+    .map((field) => field.id)
 
   const lines: Record<WeatherField, () => ComponentChildren> = {
     location: () => <li key="location">{place}</li>,

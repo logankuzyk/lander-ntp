@@ -92,10 +92,11 @@ describe('settingsItem', () => {
     }
   })
 
-  it('replaces settings from before the weather widget with the defaults', async () => {
-    await storage.setItem(settingsItem.key, { ...DEFAULT_SETTINGS, weather: undefined })
+  it('keeps settings from before the weather widget, with the weather defaults', async () => {
+    const { weather, ...before } = { ...DEFAULT_SETTINGS, font: 'geist', dim: false }
+    await storage.setItem(settingsItem.key, before)
 
-    expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
+    expect(await settingsItem.getValue()).toEqual({ ...before, weather })
   })
 
   it('replaces settings in a shape it does not know with the defaults', async () => {
