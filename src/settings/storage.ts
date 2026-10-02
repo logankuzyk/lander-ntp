@@ -3,36 +3,33 @@ import { storage } from 'wxt/utils/storage'
 
 import { FREQUENCIES } from '@/photos/rotation'
 
-import { DEFAULT_SETTINGS, WEATHER_FIELDS, type Settings } from './schema'
+import { DEFAULT_SETTINGS, type Settings, WEATHER_FIELDS } from './schema'
 
 /**
  * The shape the page reads. Fonts stay loose: fontStack falls back for one it doesn't know,
  * as happens when another device is on a newer version.
  */
 const SettingsSchema = v.object({
-  photos: v.object({
-    mode: v.picklist(['cycle', 'pinned']),
-    frequency: v.picklist(FREQUENCIES),
-    tags: v.array(v.string()),
-    pinnedId: v.nullable(v.string()),
-  }),
   clock: v.object({
     enabled: v.boolean(),
     hour12: v.boolean(),
     showDate: v.boolean(),
     showSeconds: v.boolean(),
   }),
+  dim: v.boolean(),
+  font: v.string(),
+  photos: v.object({
+    frequency: v.picklist(FREQUENCIES),
+    mode: v.picklist(['cycle', 'pinned']),
+    pinnedId: v.nullable(v.string()),
+    tags: v.array(v.string()),
+  }),
   // Settings stored by 0.2.x predate the weather widget: they keep everything else and get
   // its defaults.
   weather: v.optional(
     v.object({
-      enabled: v.boolean(),
-      place: v.nullable(
-        v.object({ name: v.string(), latitude: v.number(), longitude: v.number() }),
-      ),
-      followDevice: v.boolean(),
-      unit: v.picklist(['celsius', 'fahrenheit']),
       background: v.boolean(),
+      enabled: v.boolean(),
       fields: v.pipe(
         v.array(v.object({ id: v.picklist(WEATHER_FIELDS), shown: v.boolean() })),
         // Each field exactly once: the settings list has a row for every one.
@@ -42,11 +39,14 @@ const SettingsSchema = v.object({
             new Set(fields.map(({ id }) => id)).size === WEATHER_FIELDS.length,
         ),
       ),
+      followDevice: v.boolean(),
+      place: v.nullable(
+        v.object({ latitude: v.number(), longitude: v.number(), name: v.string() }),
+      ),
+      unit: v.picklist(['celsius', 'fahrenheit']),
     }),
     DEFAULT_SETTINGS.weather,
   ),
-  font: v.string(),
-  dim: v.boolean(),
 })
 
 /**
@@ -64,9 +64,9 @@ const stored = storage.defineItem<Settings>('sync:settings', { fallback: DEFAULT
 
 /** Synced by the browser, so settings follow you between devices. */
 export const settingsItem = {
-  key: stored.key,
   fallback: DEFAULT_SETTINGS,
   getValue: async (): Promise<Settings> => current(await stored.getValue()),
+  key: stored.key,
   setValue: (value: Settings): Promise<void> => stored.setValue(value),
   watch: (callback: (value: Settings | null) => void): (() => void) =>
     stored.watch((value) => callback(value === null ? null : current(value))),

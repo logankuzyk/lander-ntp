@@ -9,13 +9,13 @@ import type { Weather as Reading } from '@/weather/openMeteo'
 import { ConditionIcon } from './ConditionIcon'
 
 type WeatherProps = {
-  weather: Reading
-  /** The name of the place the reading is for. */
-  place: string
-  fields: WeatherSettings['fields']
   background: boolean
+  fields: WeatherSettings['fields']
   /** The clock's setting, so every time on the page reads the same way. */
   hour12: boolean
+  /** The name of the place the reading is for. */
+  place: string
+  weather: Reading
 }
 
 const degrees = (value: number) => `${Math.round(value)}°`
@@ -24,16 +24,16 @@ const degrees = (value: number) => `${Math.round(value)}°`
  * The forecast gives sunrise and sunset as wall-clock time at the place. Reading that as UTC
  * and formatting it as UTC keeps it there, whatever zone the browser is in.
  */
-function SunTime({ label, at, hour12 }: { label: string; at: string; hour12: boolean }) {
+function SunTime({ at, hour12, label }: { at: string; hour12: boolean; label: string }) {
   return (
-    <time dateTime={at} aria-label={label}>
+    <time aria-label={label} dateTime={at}>
       {formatTime(new Date(`${at}Z`), { hour12, timeZone: 'UTC' })}
     </time>
   )
 }
 
 /** Top right: the weather now, over the optional lines that are switched on, in their order. */
-export function Weather({ weather, place, fields, background, hour12 }: WeatherProps) {
+export function Weather({ background, fields, hour12, place, weather }: WeatherProps) {
   const { condition, label } = describeCode(weather.code)
   // Where the sun doesn't rise or set today, the forecast gives both as the same midnight.
   const noSun = weather.sunrise === weather.sunset
@@ -42,7 +42,6 @@ export function Weather({ weather, place, fields, background, hour12 }: WeatherP
     .map((field) => field.id)
 
   const lines: Record<WeatherField, () => ComponentChildren> = {
-    location: () => <li key="location">{place}</li>,
     condition: () => <li key="condition">{label}</li>,
     feelsLike: () => <li key="feelsLike">Feels like {degrees(weather.feelsLike)}</li>,
     highLow: () => (
@@ -51,18 +50,19 @@ export function Weather({ weather, place, fields, background, hour12 }: WeatherP
         {degrees(weather.low)}
       </li>
     ),
+    location: () => <li key="location">{place}</li>,
     sun: () => (
-      <li key="sun" class="weather__sun">
+      <li class="weather__sun" key="sun">
         <Sunrise aria-hidden="true" size={16} />
-        <SunTime label="Sunrise" at={weather.sunrise} hour12={hour12} />
+        <SunTime at={weather.sunrise} hour12={hour12} label="Sunrise" />
         <Sunset aria-hidden="true" size={16} />
-        <SunTime label="Sunset" at={weather.sunset} hour12={hour12} />
+        <SunTime at={weather.sunset} hour12={hour12} label="Sunset" />
       </li>
     ),
   }
 
   return (
-    <section class={background ? 'weather weather--panel' : 'weather'} aria-label="Weather">
+    <section aria-label="Weather" class={background ? 'weather weather--panel' : 'weather'}>
       <div class="weather__now" title={label}>
         <ConditionIcon condition={condition} isDay={weather.isDay} size={36} />
         <span class="weather__temperature">{degrees(weather.temperature)}</span>

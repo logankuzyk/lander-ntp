@@ -39,8 +39,8 @@ export function formatDateTaken(value: string | undefined, locale?: string): str
 /** Format a date as a weekday and day, e.g. "Friday, 11 September". */
 export function formatDate(date: Date, locale?: string): string {
   return new Intl.DateTimeFormat(locale, {
-    weekday: 'long',
-    month: 'long',
     day: 'numeric',
+    month: 'long',
+    weekday: 'long',
   }).format(date)
 }

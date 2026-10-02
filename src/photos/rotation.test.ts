@@ -5,14 +5,14 @@ import { seededRandom } from '@/test/fixtures'
 import {
   choosePhoto,
   FREQUENCIES,
+  type Frequency,
   msUntilAdvance,
   nextPhoto,
   photoForSettings,
   photoForVisit,
-  shouldAdvance,
-  type Frequency,
   type PhotoSettings,
   type PhotoState,
+  shouldAdvance,
 } from './rotation'
 
 const T0 = Date.parse('2026-09-11T10:00:00Z')
@@ -21,9 +21,9 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
 const state = (overrides: Partial<PhotoState> = {}): PhotoState => ({
+  bag: ['b', 'c'],
   currentId: 'a',
   shownAt: T0,
-  bag: ['b', 'c'],
   ...overrides,
 })
 
@@ -109,7 +109,7 @@ describe('nextPhoto', () => {
   })
 
   it('takes the head of the bag and records when it was shown', () => {
-    expect(nextPhoto(state(), ids, T0 + 5)).toEqual({ currentId: 'b', shownAt: T0 + 5, bag: ['c'] })
+    expect(nextPhoto(state(), ids, T0 + 5)).toEqual({ bag: ['c'], currentId: 'b', shownAt: T0 + 5 })
   })
 
   it('refills the bag as soon as it empties so the upcoming photo is known', () => {
@@ -126,18 +126,18 @@ describe('nextPhoto', () => {
   })
 
   it('refills when every queued id has left the manifest', () => {
-    const next = nextPhoto(state({ currentId: 'x', bag: ['y', 'z'] }), ids, T0, seededRandom(7))
+    const next = nextPhoto(state({ bag: ['y', 'z'], currentId: 'x' }), ids, T0, seededRandom(7))
     expect(ids).toContain(next.currentId)
   })
 
   it('works with a single photo', () => {
     const next = nextPhoto(null, ['only'], T0)
-    expect(next).toEqual({ currentId: 'only', shownAt: T0, bag: ['only'] })
+    expect(next).toEqual({ bag: ['only'], currentId: 'only', shownAt: T0 })
     expect(nextPhoto(next, ['only'], T0 + 1).currentId).toBe('only')
   })
 
   it('shows nothing when the manifest is empty', () => {
-    expect(nextPhoto(state(), [], T0)).toEqual({ currentId: null, shownAt: T0, bag: [] })
+    expect(nextPhoto(state(), [], T0)).toEqual({ bag: [], currentId: null, shownAt: T0 })
   })
 })
 
@@ -146,9 +146,9 @@ describe('choosePhoto', () => {
 
   it('shows the photo now and takes it out of the bag', () => {
     expect(choosePhoto(state({ bag: ['b', 'c', 'd'] }), 'c', ids, T0 + 5)).toEqual({
+      bag: ['b', 'd'],
       currentId: 'c',
       shownAt: T0 + 5,
-      bag: ['b', 'd'],
     })
   })
 
@@ -211,16 +211,16 @@ describe('photoForVisit', () => {
 describe('photoForSettings', () => {
   const ids = { all: ['a', 'b', 'c', 'd'], pool: ['c', 'd'] }
   const cycling = (frequency: Frequency = '1h'): PhotoSettings => ({
-    mode: 'cycle',
     frequency,
-    tags: ['water'],
+    mode: 'cycle',
     pinnedId: null,
+    tags: ['water'],
   })
   const pinned = (pinnedId: string | null): PhotoSettings => ({
-    mode: 'pinned',
     frequency: '1h',
-    tags: ['water'],
+    mode: 'pinned',
     pinnedId,
+    tags: ['water'],
   })
 
   it('shows the pinned photo, even outside the pool', () => {
@@ -242,7 +242,7 @@ describe('photoForSettings', () => {
   })
 
   it('follows the frequency on a visit, drawing from the pool', () => {
-    const current = state({ currentId: 'c', bag: ['a', 'd'] })
+    const current = state({ bag: ['a', 'd'], currentId: 'c' })
     expect(photoForSettings(cycling('1h'), current, ids, T0 + HOUR - 1, true)).toBe(current)
     expect(photoForSettings(cycling('1h'), current, ids, T0 + HOUR, true)).toMatchObject({
       currentId: 'd',

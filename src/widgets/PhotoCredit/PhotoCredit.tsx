@@ -14,7 +14,7 @@ export function PhotoCredit({ photo }: PhotoCreditProps) {
   const items = [
     photo.location && <span key="location">{photo.location}</span>,
     photo.printUrl && (
-      <a key="print" href={photo.printUrl}>
+      <a href={photo.printUrl} key="print">
         Buy a print
       </a>
     ),

@@ -4,9 +4,9 @@ export type WeatherEndpoints = {
   /** False when the manifest has switched the weather off: nothing is fetched or shown. */
   enabled: boolean
   forecastUrl: string
-  searchUrl: string
   /** Names the town at a device position; see weather/placeName. */
   placeNameUrl: string
+  searchUrl: string
 }
 
 /**
@@ -17,8 +17,8 @@ export type WeatherEndpoints = {
 export const DEFAULT_ENDPOINTS: WeatherEndpoints = {
   enabled: true,
   forecastUrl: 'https://api.open-meteo.com/v1/forecast',
-  searchUrl: 'https://geocoding-api.open-meteo.com/v1/search',
   placeNameUrl: 'https://api-bdc.io/data/reverse-geocode-client',
+  searchUrl: 'https://geocoding-api.open-meteo.com/v1/search',
 }
 
 /**
@@ -33,7 +33,7 @@ export async function getEndpoints(): Promise<WeatherEndpoints> {
   return {
     enabled: overrides?.enabled ?? DEFAULT_ENDPOINTS.enabled,
     forecastUrl: overrides?.forecastUrl ?? DEFAULT_ENDPOINTS.forecastUrl,
-    searchUrl: overrides?.searchUrl ?? DEFAULT_ENDPOINTS.searchUrl,
     placeNameUrl: overrides?.placeNameUrl ?? DEFAULT_ENDPOINTS.placeNameUrl,
+    searchUrl: overrides?.searchUrl ?? DEFAULT_ENDPOINTS.searchUrl,
   }
 }

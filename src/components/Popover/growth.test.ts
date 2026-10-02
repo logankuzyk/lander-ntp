@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { splitScroll, wheelPixels } from './growth'
 
-const wheel = (deltaY: number, deltaMode = 0) => ({ deltaY, deltaMode }) as WheelEvent
+const wheel = (deltaY: number, deltaMode = 0) => ({ deltaMode, deltaY }) as WheelEvent
 
 describe('wheelPixels', () => {
   it('passes pixels through', () => {

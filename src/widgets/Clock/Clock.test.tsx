@@ -35,7 +35,7 @@ describe('Clock', () => {
 
   it('can show the date', () => {
     const { container } = render(
-      <Clock hour12={false} showDate showSeconds={false} locale="en-GB" />,
+      <Clock hour12={false} locale="en-GB" showDate showSeconds={false} />,
     )
     expect(container.querySelector('.clock__date')?.textContent).toBe('Friday 11 September')
   })

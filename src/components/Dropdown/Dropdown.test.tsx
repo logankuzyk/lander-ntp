@@ -18,17 +18,17 @@ const renderSelect = (value: Fruit = 'pear') => {
   render(
     <>
       <span id="fruit">Fruit</span>
-      <Select labelId="fruit" value={value} options={FRUIT} onChange={onChange} />
+      <Select labelId="fruit" onChange={onChange} options={FRUIT} value={value} />
       <p>Elsewhere</p>
     </>,
   )
-  return { onChange, field: screen.getByRole('combobox', { name: 'Fruit' }) }
+  return { field: screen.getByRole('combobox', { name: 'Fruit' }), onChange }
 }
 
 const TAGS = [
-  { value: 'water', label: 'Water' },
-  { value: 'forest', label: 'Forest' },
-  { value: 'urban', label: 'Urban' },
+  { label: 'Water', value: 'water' },
+  { label: 'Forest', value: 'forest' },
+  { label: 'Urban', value: 'urban' },
 ]
 
 /** Keeps its own value, like the settings do. */
@@ -37,7 +37,7 @@ function Tags({ initial = [] as string[] }) {
   return (
     <>
       <span id="tags">Tags</span>
-      <MultiSelect labelId="tags" options={TAGS} value={value} onChange={setValue} allLabel="All" />
+      <MultiSelect allLabel="All" labelId="tags" onChange={setValue} options={TAGS} value={value} />
     </>
   )
 }
@@ -58,7 +58,7 @@ describe('Select', () => {
   })
 
   it('picks an option, closes and puts focus back on the field', () => {
-    const { onChange, field } = renderSelect()
+    const { field, onChange } = renderSelect()
 
     fireEvent.click(field)
     fireEvent.click(screen.getByRole('option', { name: 'Plum' }))

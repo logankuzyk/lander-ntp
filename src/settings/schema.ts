@@ -3,26 +3,26 @@ import type { PhotoSettings } from '@/photos/rotation'
 import type { FontId } from './fonts'
 
 export type Settings = {
-  /** Which photo is on screen, and how often it changes. */
-  photos: PhotoSettings
   clock: {
     enabled: boolean
     hour12: boolean
     showDate: boolean
     showSeconds: boolean
   }
-  weather: WeatherSettings
-  font: FontId
   /** Lay a slight wash over the photo, so light text holds up over bright ones. */
   dim: boolean
+  font: FontId
+  /** Which photo is on screen, and how often it changes. */
+  photos: PhotoSettings
+  weather: WeatherSettings
 }
 
 /** A place picked in settings. Only what the forecast request and the widget need. */
 export type Place = {
-  /** As shown in the widget, e.g. "Victoria". */
-  name: string
   latitude: number
   longitude: number
+  /** As shown in the widget, e.g. "Victoria". */
+  name: string
 }
 
 /** The optional lines under the temperature. */
@@ -33,19 +33,19 @@ export type WeatherField = (typeof WEATHER_FIELDS)[number]
 export type WeatherFieldSetting = { id: WeatherField; shown: boolean }
 
 export type WeatherSettings = {
+  /** Sit on the same translucent panel as the popovers, rather than straight on the photo. */
+  background: boolean
   enabled: boolean
-  /** Null until a place is picked; the widget stays hidden without one. */
-  place: Place | null
+  /** Every field once, in the order the widget draws them. */
+  fields: WeatherFieldSetting[]
   /**
    * Use wherever this device is instead of `place`, and keep up as it moves. The position
    * itself is never stored here: see weather/deviceLocation.
    */
   followDevice: boolean
+  /** Null until a place is picked; the widget stays hidden without one. */
+  place: Place | null
   unit: 'celsius' | 'fahrenheit'
-  /** Sit on the same translucent panel as the popovers, rather than straight on the photo. */
-  background: boolean
-  /** Every field once, in the order the widget draws them. */
-  fields: WeatherFieldSetting[]
 }
 
 /** Whether this browser's locale writes times as 12-hour. */
@@ -65,25 +65,24 @@ const localeUsesFahrenheit = (): boolean => {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  photos: {
-    mode: 'cycle',
-    frequency: 'every-visit',
-    tags: [],
-    pinnedId: null,
-  },
   clock: {
     enabled: true,
     hour12: localeUsesHour12(),
     showDate: false,
     showSeconds: false,
   },
+  dim: true,
+  font: 'system',
+  photos: {
+    frequency: 'every-visit',
+    mode: 'cycle',
+    pinnedId: null,
+    tags: [],
+  },
   weather: {
+    background: false,
     // Off until asked for: it is the only thing that sends a place anywhere.
     enabled: false,
-    place: null,
-    followDevice: false,
-    unit: localeUsesFahrenheit() ? 'fahrenheit' : 'celsius',
-    background: false,
     fields: [
       { id: 'location', shown: true },
       { id: 'sun', shown: true },
@@ -91,7 +90,8 @@ export const DEFAULT_SETTINGS: Settings = {
       { id: 'feelsLike', shown: false },
       { id: 'highLow', shown: false },
     ],
+    followDevice: false,
+    place: null,
+    unit: localeUsesFahrenheit() ? 'fahrenheit' : 'celsius',
   },
-  font: 'system',
-  dim: true,
 }

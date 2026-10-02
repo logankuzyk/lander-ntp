@@ -5,7 +5,7 @@ import { makePhoto } from '@/test/fixtures'
 import type { Tag } from './schema'
 import { availableTags, filterByTag, poolIds } from './tags'
 
-const tag = (slug: string): Tag => ({ slug, name: slug[0]?.toUpperCase() + slug.slice(1) })
+const tag = (slug: string): Tag => ({ name: slug[0]?.toUpperCase() + slug.slice(1), slug })
 const tagged = (id: string, ...slugs: string[]) => makePhoto(id, { tags: slugs.map(tag) })
 
 describe('availableTags', () => {

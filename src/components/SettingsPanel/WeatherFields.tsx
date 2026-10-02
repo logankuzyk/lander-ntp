@@ -4,10 +4,10 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 import type { WeatherField, WeatherFieldSetting } from '@/settings/schema'
 
 const LABELS: Record<WeatherField, string> = {
-  location: 'Location',
   condition: 'Conditions',
   feelsLike: 'Feels like',
   highLow: 'High and low',
+  location: 'Location',
   sun: 'Sunrise and sunset',
 }
 
@@ -80,7 +80,7 @@ function useSlide(list: { current: HTMLElement | null }, order: string) {
     else rows.current.delete(id)
   }
 
-  return { register, isSliding: (id: string) => sliding.current.has(id) }
+  return { isSliding: (id: string) => sliding.current.has(id), register }
 }
 
 type WeatherFieldsProps = {
@@ -100,7 +100,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
   } | null>(null)
   const shown = draft?.fields ?? fields
   const list = useRef<HTMLOListElement>(null)
-  const { register, isSliding } = useSlide(list, shown.map(({ id }) => id).join(' '))
+  const { isSliding, register } = useSlide(list, shown.map(({ id }) => id).join(' '))
 
   const dragOver = (event: DragEvent, index: number) => {
     if (!draft) return
@@ -132,7 +132,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
   })
 
   const onHandleKeyDown = (event: KeyboardEvent, index: number) => {
-    const to = { ArrowUp: index - 1, ArrowDown: index + 1 }[event.key]
+    const to = { ArrowDown: index + 1, ArrowUp: index - 1 }[event.key]
     const field = fields[index]
     if (to === undefined || !field) return
     event.preventDefault()
@@ -150,7 +150,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
 
   return (
     <>
-      <ol ref={list} class="fields" aria-labelledby="weather-show-heading">
+      <ol aria-labelledby="weather-show-heading" class="fields" ref={list}>
         {shown.map((field, index) => {
           const label = LABELS[field.id]
           const classes = ['fields__row']
@@ -158,36 +158,36 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
           if (draft?.dragging === field.id) classes.push('fields__row--dragging')
           return (
             <li
-              key={field.id}
-              ref={register(field.id)}
               class={classes.join(' ')}
               draggable
+              key={field.id}
+              onDragEnd={finish}
+              onDragOver={(event) => dragOver(event, index)}
               onDragStart={(event) => {
                 // Firefox only starts a drag that carries data.
                 event.dataTransfer?.setData('text/plain', label)
                 if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
                 setDraft({ dragging: field.id, fields: [...fields] })
               }}
-              onDragOver={(event) => dragOver(event, index)}
               onDrop={(event) => event.preventDefault()}
-              onDragEnd={finish}
+              ref={register(field.id)}
             >
               <button
-                type="button"
-                class="fields__handle"
                 aria-label={`Reorder ${label}`}
-                title="Drag, or use the arrow keys, to reorder"
+                class="fields__handle"
                 onKeyDown={(event) => onHandleKeyDown(event, index)}
+                title="Drag, or use the arrow keys, to reorder"
+                type="button"
               >
                 <GripVertical aria-hidden="true" size={14} />
               </button>
               <span class="fields__label">{label}</span>
               <button
-                type="button"
-                class="fields__eye"
                 aria-label={`Show ${label}`}
                 aria-pressed={field.shown}
+                class="fields__eye"
                 onClick={() => onChange(toggle(fields, field.id))}
+                type="button"
               >
                 {field.shown ? (
                   <Eye aria-hidden="true" size={16} />
@@ -200,7 +200,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
         })}
       </ol>
       {/* The list changing order says nothing by itself to a screen reader. */}
-      <p class="visually-hidden" aria-live="polite">
+      <p aria-live="polite" class="visually-hidden">
         {announcement}
       </p>
     </>

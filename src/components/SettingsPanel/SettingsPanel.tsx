@@ -8,26 +8,26 @@ import { usePopover } from '@/components/Popover/usePopover'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
-import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
+import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
 import type { Place, Settings, WeatherSettings } from '@/settings/schema'
 import { allowLocation } from '@/weather/consent'
 import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
+import { type PlaceResult, searchPlaces } from '@/weather/openMeteo'
 import { placeName } from '@/weather/placeName'
-import { searchPlaces, type PlaceResult } from '@/weather/openMeteo'
 
 import { Gallery } from './Gallery'
 import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
-  'every-visit': 'Every new tab',
-  '30s': 'Every 30 seconds',
+  '1h': 'Every hour',
   '1m': 'Every minute',
   '5m': 'Every 5 minutes',
-  '15m': 'Every 15 minutes',
-  '1h': 'Every hour',
   '6h': 'Every 6 hours',
   '12h': 'Every 12 hours',
+  '15m': 'Every 15 minutes',
+  '30s': 'Every 30 seconds',
   daily: 'Every day',
+  'every-visit': 'Every new tab',
 }
 
 /** The "Change photo" choice that pins the photo on screen. */
@@ -43,19 +43,19 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number][0]
 
 type ToggleProps = {
-  label: string
   checked: boolean
+  label: string
   onChange: (checked: boolean) => void
 }
 
-function Toggle({ label, checked, onChange }: ToggleProps) {
+function Toggle({ checked, label, onChange }: ToggleProps) {
   return (
     <label class="settings__row">
       <span>{label}</span>
       <input
-        type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
+        type="checkbox"
       />
     </label>
   )
@@ -63,29 +63,29 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
 
 type ChoiceProps<T extends string> = {
   label: string
-  value: T
-  options: readonly (readonly [T, string])[]
   onChange: (value: T) => void
+  options: readonly (readonly [T, string])[]
+  value: T
 }
 
-function Choice<T extends string>({ label, value, options, onChange }: ChoiceProps<T>) {
+function Choice<T extends string>({ label, onChange, options, value }: ChoiceProps<T>) {
   const labelId = useId()
   return (
     <div class="settings__row">
       <span id={labelId}>{label}</span>
-      <Select labelId={labelId} value={value} options={options} onChange={onChange} />
+      <Select labelId={labelId} onChange={onChange} options={options} value={value} />
     </div>
   )
 }
 
 type PhotosSectionProps = {
-  settings: Settings
+  currentId: string | null
   onChange: (settings: Settings) => void
   photos: readonly Photo[]
-  currentId: string | null
+  settings: Settings
 }
 
-function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionProps) {
+function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionProps) {
   const cycling = settings.photos
   const pinned = cycling.mode === 'pinned'
   const tags = useMemo(() => availableTags(photos), [photos])
@@ -101,41 +101,41 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
         <h3 id="cycling-heading">Cycling</h3>
         <Choice<Frequency | typeof NEVER>
           label="Change photo"
-          value={pinned ? NEVER : cycling.frequency}
+          onChange={(choice) =>
+            choice === NEVER
+              ? update({ mode: 'pinned', pinnedId: currentId })
+              : update({ frequency: choice, mode: 'cycle' })
+          }
           options={[
             ...FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const),
             [NEVER, 'Never'],
           ]}
-          onChange={(choice) =>
-            choice === NEVER
-              ? update({ mode: 'pinned', pinnedId: currentId })
-              : update({ mode: 'cycle', frequency: choice })
-          }
+          value={pinned ? NEVER : cycling.frequency}
         />
         {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
         {!pinned && tags.length > 0 && (
           <div class="settings__row settings__row--wrap">
             <span id={tagsLabel}>Tags</span>
             <MultiSelect
-              labelId={tagsLabel}
-              options={tags.map(({ slug, name }) => ({ value: slug, label: name }))}
-              value={cycling.tags}
-              onChange={(chosen) => update({ tags: chosen })}
               allLabel="All"
+              labelId={tagsLabel}
+              onChange={(chosen) => update({ tags: chosen })}
+              options={tags.map(({ name, slug }) => ({ label: name, value: slug }))}
+              value={cycling.tags}
             />
           </div>
         )}
         {pinned && (
           <p class="settings__note">
             Keeping this photo.{' '}
-            <button type="button" class="settings__link" onClick={() => update({ mode: 'cycle' })}>
+            <button class="settings__link" onClick={() => update({ mode: 'cycle' })} type="button">
               Resume cycling
             </button>
           </p>
         )}
         <Toggle
-          label="Dim the photo"
           checked={settings.dim}
+          label="Dim the photo"
           onChange={(dim) => onChange({ ...settings, dim })}
         />
       </section>
@@ -143,12 +143,12 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
       {photos.length === 0 && <p class="settings__note">Loading photos…</p>}
       {photos.length > 1 && (
         <Gallery
-          // Remounted when the cycled tags change, so the filter follows them.
-          key={cycling.tags.join(' ')}
-          photos={photos}
           currentId={currentId}
           initialTag={cycling.tags.length === 1 ? (cycling.tags[0] ?? null) : null}
+          // Remounted when the cycled tags change, so the filter follows them.
+          key={cycling.tags.join(' ')}
           onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
+          photos={photos}
         />
       )}
     </>
@@ -156,37 +156,37 @@ function PhotosSection({ settings, onChange, photos, currentId }: PhotosSectionP
 }
 
 type SectionProps = {
-  settings: Settings
   onChange: (settings: Settings) => void
+  settings: Settings
 }
 
-function ClockSection({ settings, onChange }: SectionProps) {
+function ClockSection({ onChange, settings }: SectionProps) {
   const clock = (changes: Partial<Settings['clock']>) =>
     onChange({ ...settings, clock: { ...settings.clock, ...changes } })
 
   return (
     <section>
       <Toggle
-        label="Show clock"
         checked={settings.clock.enabled}
+        label="Show clock"
         onChange={(enabled) => clock({ enabled })}
       />
       {/* Out of the way of both the eye and Tab while the clock is off. */}
       {settings.clock.enabled && (
         <>
           <Toggle
-            label="24-hour time"
             checked={!settings.clock.hour12}
+            label="24-hour time"
             onChange={(h24) => clock({ hour12: !h24 })}
           />
           <Toggle
-            label="Show date"
             checked={settings.clock.showDate}
+            label="Show date"
             onChange={(showDate) => clock({ showDate })}
           />
           <Toggle
-            label="Show seconds"
             checked={settings.clock.showSeconds}
+            label="Show seconds"
             onChange={(showSeconds) => clock({ showSeconds })}
           />
         </>
@@ -204,7 +204,7 @@ function PlaceSearch({ onSelect }: PlaceSearchProps) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   /** Null before the first search; 'failed' when the search itself didn't go through. */
-  const [results, setResults] = useState<PlaceResult[] | 'failed' | null>(null)
+  const [results, setResults] = useState<'failed' | PlaceResult[] | null>(null)
 
   const search = async (event: Event) => {
     event.preventDefault()
@@ -217,16 +217,16 @@ function PlaceSearch({ onSelect }: PlaceSearchProps) {
 
   return (
     <>
-      <form class="settings__search" role="search" onSubmit={(event) => void search(event)}>
+      <form class="settings__search" onSubmit={(event) => void search(event)} role="search">
         <input
-          type="search"
-          class="settings__input"
           aria-label="Search for a place"
-          placeholder="City or town"
-          value={query}
+          class="settings__input"
           onInput={(event) => setQuery(event.currentTarget.value)}
+          placeholder="City or town"
+          type="search"
+          value={query}
         />
-        <button type="submit" class="settings__button" disabled={searching || !query.trim()}>
+        <button class="settings__button" disabled={searching || !query.trim()} type="submit">
           Search
         </button>
       </form>
@@ -237,10 +237,10 @@ function PlaceSearch({ onSelect }: PlaceSearchProps) {
         )}
       </div>
       {results !== 'failed' && results && results.length > 0 && (
-        <ul class="settings__results" aria-label="Places">
-          {results.map(({ id, place, label }) => (
+        <ul aria-label="Places" class="settings__results">
+          {results.map(({ id, label, place }) => (
             <li key={id}>
-              <button type="button" class="settings__result" onClick={() => onSelect(place)}>
+              <button class="settings__result" onClick={() => onSelect(place)} type="button">
                 {label}
               </button>
             </li>
@@ -251,7 +251,7 @@ function PlaceSearch({ onSelect }: PlaceSearchProps) {
   )
 }
 
-function WeatherSection({ settings, onChange }: SectionProps) {
+function WeatherSection({ onChange, settings }: SectionProps) {
   const current = settings.weather
   const [changingPlace, setChangingPlace] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
@@ -291,8 +291,8 @@ function WeatherSection({ settings, onChange }: SectionProps) {
     <>
       <section>
         <Toggle
-          label="Show weather"
           checked={current.enabled}
+          label="Show weather"
           onChange={(enabled) => void enable(enabled)}
         />
         {current.enabled &&
@@ -301,7 +301,7 @@ function WeatherSection({ settings, onChange }: SectionProps) {
               <span>Place</span>
               <span>
                 {current.followDevice ? CURRENT_LOCATION : current.place?.name}{' '}
-                <button type="button" class="settings__link" onClick={() => setChangingPlace(true)}>
+                <button class="settings__link" onClick={() => setChangingPlace(true)} type="button">
                   Change
                 </button>
               </span>
@@ -311,11 +311,11 @@ function WeatherSection({ settings, onChange }: SectionProps) {
               <PlaceSearch
                 onSelect={(place) => {
                   setChangingPlace(false)
-                  weather({ place, followDevice: false })
+                  weather({ followDevice: false, place })
                 }}
               />
-              <p class="settings__note" aria-live="polite">
-                <button type="button" class="settings__link" onClick={() => void follow()}>
+              <p aria-live="polite" class="settings__note">
+                <button class="settings__link" onClick={() => void follow()} type="button">
                   Use my location
                 </button>
                 {locateFailed && ' Couldn’t get your location. Check that this page is allowed it.'}
@@ -326,16 +326,16 @@ function WeatherSection({ settings, onChange }: SectionProps) {
           <>
             <Choice<WeatherSettings['unit']>
               label="Units"
-              value={current.unit}
+              onChange={(unit) => weather({ unit })}
               options={[
                 ['celsius', 'Celsius'],
                 ['fahrenheit', 'Fahrenheit'],
               ]}
-              onChange={(unit) => weather({ unit })}
+              value={current.unit}
             />
             <Toggle
-              label="Background"
               checked={current.background}
+              label="Background"
               onChange={(background) => weather({ background })}
             />
           </>
@@ -357,14 +357,14 @@ function WeatherSection({ settings, onChange }: SectionProps) {
   )
 }
 
-function GeneralSection({ settings, onChange }: SectionProps) {
+function GeneralSection({ onChange, settings }: SectionProps) {
   return (
     <section>
       <Choice<FontId>
         label="Font"
-        value={settings.font}
-        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
         onChange={(font) => onChange({ ...settings, font })}
+        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
+        value={settings.font}
       />
     </section>
   )
@@ -392,24 +392,24 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 }
 
 type SettingsPanelProps = {
-  settings: Settings
+  currentId: string | null
   onChange: (settings: Settings) => void
+  onClose: () => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
-  currentId: string | null
-  onClose: () => void
+  settings: Settings
 }
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
-  settings,
-  onChange,
-  photos,
   currentId,
+  onChange,
   onClose,
+  photos,
+  settings,
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
-  const { container, close } = usePopover(onClose)
+  const { close, container } = usePopover(onClose)
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   const [section, setSection] = useState<SectionId>('photos')
@@ -426,11 +426,11 @@ export function SettingsPanel({
     const last = SECTIONS.length - 1
     const target = {
       ArrowDown: index + 1,
+      ArrowLeft: index - 1,
       ArrowRight: index + 1,
       ArrowUp: index - 1,
-      ArrowLeft: index - 1,
-      Home: 0,
       End: last,
+      Home: 0,
     }[event.key]
     if (target === undefined) return
     event.preventDefault()
@@ -442,37 +442,37 @@ export function SettingsPanel({
   }
 
   return (
-    <aside ref={container} class="popover settings" role="dialog" aria-label="Settings">
+    <aside aria-label="Settings" class="popover settings" ref={container} role="dialog">
       <header class="popover__header">
         <h2>Settings</h2>
         <button
+          aria-label="Close settings"
+          class="popover__close"
+          onClick={onClose}
           ref={close}
           type="button"
-          class="popover__close"
-          aria-label="Close settings"
-          onClick={onClose}
         >
           <CloseIcon />
         </button>
       </header>
 
       <div class="settings__layout">
-        <div class="settings__nav" role="tablist" aria-orientation="vertical">
+        <div aria-orientation="vertical" class="settings__nav" role="tablist">
           {SECTIONS.map(([id, label], index) => (
             <button
+              aria-controls="settings-section"
+              aria-selected={section === id}
+              class="settings__tab"
+              id={`settings-tab-${id}`}
               key={id}
+              onClick={() => show(id)}
+              onKeyDown={(event) => onTabKeyDown(event, index)}
               ref={(el) => {
                 tabs.current[index] = el
               }}
-              type="button"
               role="tab"
-              id={`settings-tab-${id}`}
-              aria-controls="settings-section"
-              aria-selected={section === id}
               tabIndex={section === id ? 0 : -1}
-              class="settings__tab"
-              onClick={() => show(id)}
-              onKeyDown={(event) => onTabKeyDown(event, index)}
+              type="button"
             >
               {label}
             </button>
@@ -480,23 +480,23 @@ export function SettingsPanel({
         </div>
 
         <div
-          ref={body}
-          id="settings-section"
-          class="settings__body"
-          role="tabpanel"
           aria-labelledby={`settings-tab-${section}`}
+          class="settings__body"
+          id="settings-section"
+          ref={body}
+          role="tabpanel"
         >
           {section === 'photos' && (
             <PhotosSection
-              settings={known}
+              currentId={currentId}
               onChange={onChange}
               photos={photos}
-              currentId={currentId}
+              settings={known}
             />
           )}
-          {section === 'clock' && <ClockSection settings={known} onChange={onChange} />}
-          {section === 'weather' && <WeatherSection settings={known} onChange={onChange} />}
-          {section === 'general' && <GeneralSection settings={known} onChange={onChange} />}
+          {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
+          {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
+          {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
         </div>
       </div>
     </aside>

@@ -1,28 +1,28 @@
 import type { Manifest, Photo } from '@/photos/schema'
 
 export const makePhoto = (id: string, overrides: Partial<Photo> = {}): Photo => ({
-  id,
   alt: `Photo ${id}`,
-  width: 6000,
-  height: 4000,
+  exif: {},
   focalX: null,
   focalY: null,
+  height: 4000,
+  id,
+  location: null,
+  pageUrl: `https://logankuzyk.com/photography/coast?photo=${id}`,
+  printUrl: null,
   sizes: [
     { url: `https://media.logankuzyk.com/photos/${id}/pic-300.webp`, width: 300 },
     { url: `https://media.logankuzyk.com/photos/${id}/pic-1920.webp`, width: 1920 },
   ],
-  exif: {},
-  location: null,
   tags: [],
-  pageUrl: `https://logankuzyk.com/photography/coast?photo=${id}`,
-  printUrl: null,
+  width: 6000,
   ...overrides,
 })
 
 export const makeManifest = (photos: Photo[]): Manifest => ({
-  version: 1,
   generatedAt: '2026-09-11T12:00:00.000Z',
   photos,
+  version: 1,
 })
 
 /** Deterministic Math.random replacement (LCG). */

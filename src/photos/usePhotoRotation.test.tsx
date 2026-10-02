@@ -8,36 +8,36 @@ import { manifestCache, photoState } from './storage'
 import { usePhotoRotation } from './usePhotoRotation'
 
 const IDS = ['a', 'b', 'c']
-const WATER = { slug: 'water', name: 'Water' }
+const WATER = { name: 'Water', slug: 'water' }
 
 const cycle = (frequency: Frequency, tags: string[] = []): PhotoSettings => ({
-  mode: 'cycle',
   frequency,
-  tags,
+  mode: 'cycle',
   pinnedId: null,
+  tags,
 })
 
 const pinned = (pinnedId: string | null): PhotoSettings => ({
-  mode: 'pinned',
   frequency: 'every-visit',
-  tags: [],
+  mode: 'pinned',
   pinnedId,
+  tags: [],
 })
 
 /** Cached manifest (so nothing is fetched) and a photo already showing. Only c is tagged. */
 const seed = async (currentId = 'a') => {
   await manifestCache.setValue({
+    data: makeManifest(IDS.map((id) => makePhoto(id, { tags: id === 'c' ? [WATER] : [] }))),
     etag: null,
     fetchedAt: Date.now(),
-    data: makeManifest(IDS.map((id) => makePhoto(id, { tags: id === 'c' ? [WATER] : [] }))),
   })
-  await photoState.setValue({ currentId, shownAt: Date.now(), bag: ['b'] })
+  await photoState.setValue({ bag: ['b'], currentId, shownAt: Date.now() })
 }
 
 /** What another tab writing to the shared state looks like from here. */
 const anotherTabShows = (currentId: string) =>
   act(async () => {
-    await photoState.setValue({ currentId, shownAt: Date.now(), bag: ['c'] })
+    await photoState.setValue({ bag: ['c'], currentId, shownAt: Date.now() })
   })
 
 const renderRotation = (initial: PhotoSettings | null) =>
@@ -122,7 +122,7 @@ describe('usePhotoRotation', () => {
 
   it('waits for the stored settings before deciding anything', async () => {
     await seed()
-    const { result, rerender } = renderRotation(null)
+    const { rerender, result } = renderRotation(null)
 
     // Settings haven't loaded yet: nothing decided, nothing written.
     await act(async () => {})
@@ -146,15 +146,15 @@ describe('usePhotoRotation', () => {
         }),
     )
     vi.stubGlobal('fetch', fetchMock)
-    const { result, rerender } = renderRotation(cycle('daily'))
+    const { rerender, result } = renderRotation(cycle('daily'))
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 
     // Any settings write hands the hook a new, equal object: here, mid-fetch.
     rerender(cycle('daily'))
     respond(
       new Response(JSON.stringify(makeManifest(IDS.map((id) => makePhoto(id)))), {
-        status: 200,
         headers: { 'Content-Type': 'application/json' },
+        status: 200,
       }),
     )
 
@@ -164,7 +164,7 @@ describe('usePhotoRotation', () => {
 
   it('does not move on when only the frequency changes', async () => {
     await seed()
-    const { result, rerender } = renderRotation(cycle('daily'))
+    const { rerender, result } = renderRotation(cycle('daily'))
     await waitFor(() => expect(result.current.photo?.id).toBe('a'))
 
     rerender(cycle('every-visit'))
@@ -175,7 +175,7 @@ describe('usePhotoRotation', () => {
 
   it('shows a pinned photo, in a new tab and when it is pinned later', async () => {
     await seed()
-    const { result, rerender } = renderRotation(pinned('c'))
+    const { rerender, result } = renderRotation(pinned('c'))
     await waitFor(() => expect(result.current.photo?.id).toBe('c'))
 
     rerender(pinned('b'))
@@ -195,7 +195,7 @@ describe('usePhotoRotation', () => {
 
   it('moves to a photo with the tag when cycling it', async () => {
     await seed()
-    const { result, rerender } = renderRotation(cycle('daily'))
+    const { rerender, result } = renderRotation(cycle('daily'))
     await waitFor(() => expect(result.current.photo?.id).toBe('a'))
 
     rerender(cycle('daily', ['water']))

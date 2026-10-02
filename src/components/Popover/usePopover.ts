@@ -44,5 +44,5 @@ export function usePopover(onClose: () => void) {
     }
   }, [onClose])
 
-  return { container, close }
+  return { close, container }
 }

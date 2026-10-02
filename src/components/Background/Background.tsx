@@ -8,20 +8,20 @@ import type { Photo } from '@/photos/schema'
 const FADE_MS = 1200
 
 type PhotoLayerProps = {
-  photo: Photo
   /**
    * True when this layer is covering an earlier photo. Such a layer stays transparent until
    * its own image is ready, so the photo it replaces is never swapped out for a placeholder.
    */
   covering: boolean
-  onLoad?: () => void
   /** Identifies this layer to the stack above; called once the layer is on screen. */
   layerKey: number
+  onLoad?: () => void
   onReveal: (key: number) => void
+  photo: Photo
 }
 
 /** One photo, stacked over whatever came before it. */
-function PhotoLayer({ photo, covering, onLoad, layerKey, onReveal }: PhotoLayerProps) {
+function PhotoLayer({ covering, layerKey, onLoad, onReveal, photo }: PhotoLayerProps) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const style = { objectPosition: objectPosition(photo) }
@@ -38,34 +38,34 @@ function PhotoLayer({ photo, covering, onLoad, layerKey, onReveal }: PhotoLayerP
   // Keyed so the swap replaces the element rather than patching the dead photo's srcset.
   const image = failed ? (
     <img
-      key="fallback"
-      class={imageClass}
-      src={browser.runtime.getURL('/fallback.webp')}
       alt=""
+      class={imageClass}
       decoding="async"
-      onLoad={() => setLoaded(true)}
+      key="fallback"
       // Nothing left to fall back to; reveal it so the page is not stuck blank.
       onError={() => setLoaded(true)}
+      onLoad={() => setLoaded(true)}
+      src={browser.runtime.getURL('/fallback.webp')}
     />
   ) : (
     <img
-      key="photo"
-      class={imageClass}
-      src={largestUrl(photo)}
-      srcset={buildSrcSet(photo.sizes)}
-      sizes={SIZES}
       alt={photo.alt ?? ''}
+      class={imageClass}
       decoding="async"
-      style={style}
-      onLoad={() => {
-        setLoaded(true)
-        onLoad?.()
-      }}
+      key="photo"
       onError={() => {
         // A cached manifest can outlive the images it points at.
         setFailed(true)
         setLoaded(false)
       }}
+      onLoad={() => {
+        setLoaded(true)
+        onLoad?.()
+      }}
+      sizes={SIZES}
+      src={largestUrl(photo)}
+      srcset={buildSrcSet(photo.sizes)}
+      style={style}
     />
   )
 
@@ -74,7 +74,7 @@ function PhotoLayer({ photo, covering, onLoad, layerKey, onReveal }: PhotoLayerP
       {/* The blurred thumbnail paints first, under the photo still loading over it. It comes
           from the same manifest entry, so a dead URL takes it down with the full image. */}
       {!covering && !failed && (
-        <img class="background__thumb" src={thumbnailUrl(photo)} alt="" style={style} />
+        <img alt="" class="background__thumb" src={thumbnailUrl(photo)} style={style} />
       )}
       {image}
     </div>
@@ -82,14 +82,13 @@ function PhotoLayer({ photo, covering, onLoad, layerKey, onReveal }: PhotoLayerP
 }
 
 type Layer = {
+  covering: boolean
   /** Photos can repeat, so layers carry their own key. */
   key: number
   photo: Photo
-  covering: boolean
 }
 
 type BackgroundProps = {
-  photo: Photo
   /** Lay a slight wash over the photo, so light text holds up over bright ones. */
   dim?: boolean
   /** Called once the full-resolution image has loaded. */
@@ -100,6 +99,7 @@ type BackgroundProps = {
    * otherwise look like nothing happened. Must be a stable reference.
    */
   onLoadingChange?: (loading: boolean) => void
+  photo: Photo
 }
 
 /**
@@ -109,8 +109,8 @@ type BackgroundProps = {
  *
  * Under prefers-reduced-motion the swap is instant.
  */
-export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundProps) {
-  const [layers, setLayers] = useState<Layer[]>(() => [{ key: 0, photo, covering: false }])
+export function Background({ dim, onLoad, onLoadingChange, photo }: BackgroundProps) {
+  const [layers, setLayers] = useState<Layer[]>(() => [{ covering: false, key: 0, photo }])
   const [revealedKey, setRevealedKey] = useState(0)
   const nextKey = useRef(0)
   const topKey = useRef(0)
@@ -121,7 +121,7 @@ export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundPr
       const top = current[current.length - 1]
       if (top?.photo.id === photo.id) return current
       nextKey.current += 1
-      return [...current, { key: nextKey.current, photo, covering: true }]
+      return [...current, { covering: true, key: nextKey.current, photo }]
     })
   }, [photo])
 
@@ -160,12 +160,12 @@ export function Background({ photo, dim, onLoad, onLoadingChange }: BackgroundPr
     <div class={dim ? 'background background--dim' : 'background'}>
       {layers.map((layer) => (
         <PhotoLayer
-          key={layer.key}
-          photo={layer.photo}
           covering={layer.covering}
-          onLoad={onLoad}
+          key={layer.key}
           layerKey={layer.key}
+          onLoad={onLoad}
           onReveal={settle}
+          photo={layer.photo}
         />
       ))}
     </div>

@@ -24,8 +24,8 @@ export async function placeName(position: Coordinates): Promise<string | null> {
     placeNameUrl,
     {
       latitude: String(position.latitude),
-      longitude: String(position.longitude),
       localityLanguage: navigator.language.split('-')[0] ?? 'en',
+      longitude: String(position.longitude),
     },
     PlaceNameSchema,
   )

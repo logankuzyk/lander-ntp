@@ -13,7 +13,7 @@ describe('Chip', () => {
 
   it('is a toggle with onClick', () => {
     const onClick = vi.fn()
-    render(<Chip label="Water" pressed onClick={onClick} />)
+    render(<Chip label="Water" onClick={onClick} pressed />)
     const chip = screen.getByRole('button', { name: 'Water' })
 
     fireEvent.click(chip)
@@ -24,7 +24,7 @@ describe('Chip', () => {
 
   it('has a × with onRemove', () => {
     const onRemove = vi.fn()
-    render(<Chip label="Water" size="s" onRemove={onRemove} />)
+    render(<Chip label="Water" onRemove={onRemove} size="s" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Water' }))
 
