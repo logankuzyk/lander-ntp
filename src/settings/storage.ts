@@ -3,7 +3,7 @@ import { storage } from 'wxt/utils/storage'
 
 import { FREQUENCIES } from '@/photos/rotation'
 
-import { DEFAULT_SETTINGS, type Settings } from './schema'
+import { DEFAULT_SETTINGS, WEATHER_FIELDS, type Settings } from './schema'
 
 /**
  * The shape the page reads. Fonts stay loose: fontStack falls back for one it doesn't know,
@@ -21,6 +21,21 @@ const SettingsSchema = v.object({
     hour12: v.boolean(),
     showDate: v.boolean(),
     showSeconds: v.boolean(),
+  }),
+  weather: v.object({
+    enabled: v.boolean(),
+    place: v.nullable(v.object({ name: v.string(), latitude: v.number(), longitude: v.number() })),
+    unit: v.picklist(['celsius', 'fahrenheit']),
+    background: v.boolean(),
+    fields: v.pipe(
+      v.array(v.object({ id: v.picklist(WEATHER_FIELDS), shown: v.boolean() })),
+      // Each field exactly once: the settings list has a row for every one.
+      v.check(
+        (fields) =>
+          fields.length === WEATHER_FIELDS.length &&
+          new Set(fields.map(({ id }) => id)).size === WEATHER_FIELDS.length,
+      ),
+    ),
   }),
   font: v.string(),
   dim: v.boolean(),

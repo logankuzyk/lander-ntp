@@ -9,9 +9,12 @@ import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotati
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
-import type { Settings } from '@/settings/schema'
+import type { Place, Settings, WeatherSettings } from '@/settings/schema'
+import { allowLocation } from '@/weather/consent'
+import { searchPlaces, type PlaceResult } from '@/weather/openMeteo'
 
 import { Gallery } from './Gallery'
+import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
   'every-visit': 'Every new tab',
@@ -31,6 +34,7 @@ const NEVER = 'never'
 const SECTIONS = [
   ['photos', 'Photos'],
   ['clock', 'Clock'],
+  ['weather', 'Weather'],
   ['general', 'General'],
 ] as const
 
@@ -189,6 +193,136 @@ function ClockSection({ settings, onChange }: SectionProps) {
   )
 }
 
+type PlaceSearchProps = {
+  onSelect: (place: Place) => void
+}
+
+/** Find a place by name. Searches on submit rather than per keystroke: one request a search. */
+function PlaceSearch({ onSelect }: PlaceSearchProps) {
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  /** Null before the first search; 'failed' when the search itself didn't go through. */
+  const [results, setResults] = useState<PlaceResult[] | 'failed' | null>(null)
+
+  const search = async (event: Event) => {
+    event.preventDefault()
+    const name = query.trim()
+    if (!name || searching) return
+    setSearching(true)
+    setResults((await searchPlaces(name)) ?? 'failed')
+    setSearching(false)
+  }
+
+  return (
+    <>
+      <form class="settings__search" role="search" onSubmit={(event) => void search(event)}>
+        <input
+          type="search"
+          class="settings__input"
+          aria-label="Search for a place"
+          placeholder="City or town"
+          value={query}
+          onInput={(event) => setQuery(event.currentTarget.value)}
+        />
+        <button type="submit" class="settings__button" disabled={searching || !query.trim()}>
+          Search
+        </button>
+      </form>
+      <div aria-live="polite">
+        {results === 'failed' && <p class="settings__note">Couldn’t search just now.</p>}
+        {results !== 'failed' && results?.length === 0 && (
+          <p class="settings__note">No places found.</p>
+        )}
+      </div>
+      {results !== 'failed' && results && results.length > 0 && (
+        <ul class="settings__results" aria-label="Places">
+          {results.map(({ id, place, label }) => (
+            <li key={id}>
+              <button type="button" class="settings__result" onClick={() => onSelect(place)}>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
+function WeatherSection({ settings, onChange }: SectionProps) {
+  const current = settings.weather
+  const [changingPlace, setChangingPlace] = useState(false)
+
+  const weather = (changes: Partial<WeatherSettings>) =>
+    onChange({ ...settings, weather: { ...current, ...changes } })
+
+  const enable = async (enabled: boolean) => {
+    if (enabled && !(await allowLocation())) return
+    weather({ enabled })
+  }
+
+  return (
+    <>
+      <section>
+        <Toggle
+          label="Show weather"
+          checked={current.enabled}
+          onChange={(enabled) => void enable(enabled)}
+        />
+        {current.enabled &&
+          (current.place && !changingPlace ? (
+            <div class="settings__row">
+              <span>Place</span>
+              <span>
+                {current.place.name}{' '}
+                <button type="button" class="settings__link" onClick={() => setChangingPlace(true)}>
+                  Change
+                </button>
+              </span>
+            </div>
+          ) : (
+            <PlaceSearch
+              onSelect={(place) => {
+                setChangingPlace(false)
+                weather({ place })
+              }}
+            />
+          ))}
+        {current.enabled && (
+          <>
+            <Choice<WeatherSettings['unit']>
+              label="Units"
+              value={current.unit}
+              options={[
+                ['celsius', 'Celsius'],
+                ['fahrenheit', 'Fahrenheit'],
+              ]}
+              onChange={(unit) => weather({ unit })}
+            />
+            <Toggle
+              label="Background"
+              checked={current.background}
+              onChange={(background) => weather({ background })}
+            />
+          </>
+        )}
+      </section>
+
+      {current.enabled && (
+        <section aria-labelledby="weather-show-heading">
+          <h3 id="weather-show-heading">Show</h3>
+          <WeatherFields fields={current.fields} onChange={(fields) => weather({ fields })} />
+        </section>
+      )}
+      {current.enabled && (
+        <p class="settings__note settings__credit">
+          <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+        </p>
+      )}
+    </>
+  )
+}
+
 function GeneralSection({ settings, onChange }: SectionProps) {
   return (
     <section>
@@ -327,6 +461,7 @@ export function SettingsPanel({
             />
           )}
           {section === 'clock' && <ClockSection settings={known} onChange={onChange} />}
+          {section === 'weather' && <WeatherSection settings={known} onChange={onChange} />}
           {section === 'general' && <GeneralSection settings={known} onChange={onChange} />}
         </div>
       </div>

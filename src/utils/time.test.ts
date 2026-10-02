@@ -14,6 +14,11 @@ describe('formatTime', () => {
     expect(formatTime(evening, { hour12: true, locale: 'en-CA' })).toBe('9:05')
   })
 
+  it('reads the time in another zone when given one', () => {
+    const utc = new Date('2026-10-01T07:13Z')
+    expect(formatTime(utc, { locale: 'en-CA', timeZone: 'UTC' })).toBe('07:13')
+  })
+
   it('zero-pads 24-hour times before 10', () => {
     expect(formatTime(morning, { locale: 'en-CA' })).toBe('09:05')
   })

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/preact'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
@@ -12,6 +12,7 @@ const settings: Settings = {
   ...DEFAULT_SETTINGS,
   photos: { mode: 'cycle', frequency: '1h', tags: [], pinnedId: null },
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
+  weather: { ...DEFAULT_SETTINGS.weather, unit: 'celsius' },
 }
 
 const PHOTOS = [
@@ -72,11 +73,11 @@ describe('SettingsPanel', () => {
   })
 
   describe('sections', () => {
-    it('lists photos, clock and general settings, starting on photos', () => {
+    it('lists photos, clock, weather and general settings, starting on photos', () => {
       renderPanel()
 
       const tabs = screen.getAllByRole('tab')
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'Clock', 'General'])
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'Clock', 'Weather', 'General'])
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
       expect(screen.getByRole('tabpanel', { name: 'Photos' })).toBeTruthy()
     })
@@ -366,6 +367,206 @@ describe('SettingsPanel', () => {
       fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
 
       expect(onChange).toHaveBeenCalledWith({ ...settings, font: 'instrument-serif' })
+    })
+  })
+
+  describe('weather', () => {
+    const PLACE = { name: 'Victoria', latitude: 48.44, longitude: -123.35 }
+
+    const withWeather = (changes: Partial<Settings['weather']>): Settings => ({
+      ...settings,
+      weather: { ...settings.weather, ...changes },
+    })
+
+    const renderWeather = (changes: Partial<Settings['weather']> = {}) => {
+      const rendered = renderPanel({ overrides: withWeather(changes) })
+      openSection('Weather')
+      return rendered
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('offers only the switch while the widget is off', () => {
+      const { onChange } = renderWeather()
+
+      expect(screen.queryByLabelText('Background')).toBeNull()
+      expect(screen.queryByRole('searchbox')).toBeNull()
+
+      fireEvent.click(screen.getByLabelText('Show weather'))
+      return waitFor(() => expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true })))
+    })
+
+    it('searches for a place and keeps the one picked', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              results: [
+                {
+                  id: 1,
+                  name: 'Victoria',
+                  latitude: 48.4359,
+                  longitude: -123.35155,
+                  admin1: 'British Columbia',
+                  country: 'Canada',
+                },
+              ],
+            }),
+        }),
+      )
+      const { onChange } = renderWeather({ enabled: true })
+
+      fireEvent.input(screen.getByRole('searchbox', { name: 'Search for a place' }), {
+        target: { value: 'Victoria' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Victoria, British Columbia, Canada' }),
+      )
+
+      expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true, place: PLACE }))
+    })
+
+    it('says when nothing matches and when the search fails', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }),
+      )
+      renderWeather({ enabled: true })
+      const search = () => {
+        fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'qqq' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+      }
+
+      search()
+      expect(await screen.findByText('No places found.')).toBeTruthy()
+
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+      search()
+      expect(await screen.findByText('Couldn’t search just now.')).toBeTruthy()
+    })
+
+    it('shows the chosen place, and the search again to change it', () => {
+      renderWeather({ enabled: true, place: PLACE })
+
+      expect(screen.getByText('Victoria')).toBeTruthy()
+      expect(screen.queryByRole('searchbox')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+      expect(screen.getByRole('searchbox')).toBeTruthy()
+    })
+
+    it('changes the unit and the background', () => {
+      const { onChange } = renderWeather({ enabled: true, place: PLACE })
+      const on = { enabled: true, place: PLACE }
+
+      fireEvent.click(screen.getByRole('combobox', { name: 'Units' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Fahrenheit' }))
+      expect(onChange).toHaveBeenCalledWith(withWeather({ ...on, unit: 'fahrenheit' }))
+
+      fireEvent.click(screen.getByLabelText('Background'))
+      expect(onChange).toHaveBeenCalledWith(withWeather({ ...on, background: true }))
+    })
+
+    describe('fields', () => {
+      const on = { enabled: true, place: PLACE }
+      const ids = (fields: Settings['weather']['fields']) => fields.map(({ id }) => id)
+      const rows = () =>
+        within(screen.getByRole('list', { name: 'Show' }))
+          .getAllByRole('listitem')
+          .map((row) => row.textContent)
+      const lastFields = (onChange: ReturnType<typeof vi.fn>) =>
+        (onChange.mock.lastCall?.[0] as Settings).weather.fields
+
+      it('lists every field in order, with an eye that is open for the ones shown', () => {
+        renderWeather(on)
+
+        expect(rows()).toEqual([
+          'Location',
+          'Sunrise and sunset',
+          'Conditions',
+          'Feels like',
+          'High and low',
+        ])
+        const pressed = (name: string) =>
+          screen.getByRole('button', { name }).getAttribute('aria-pressed')
+        expect(pressed('Show Location')).toBe('true')
+        expect(pressed('Show High and low')).toBe('false')
+        expect(
+          screen.getByRole('button', { name: 'Show High and low' }).closest('li')?.className,
+        ).toContain('fields__row--hidden')
+      })
+
+      it('shows and hides a field with its eye, keeping the order', () => {
+        const { onChange } = renderWeather(on)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show High and low' }))
+        expect(lastFields(onChange)).toEqual(
+          settings.weather.fields.map((field) =>
+            field.id === 'highLow' ? { ...field, shown: true } : field,
+          ),
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show Location' }))
+        expect(lastFields(onChange)[0]).toEqual({ id: 'location', shown: false })
+      })
+
+      it('reorders by dragging a row onto another, writing only on the drop', () => {
+        const { onChange } = renderWeather(on)
+        const row = (name: string) =>
+          screen.getByRole('button', { name: `Reorder ${name}` }).closest('li') as HTMLElement
+
+        fireEvent.dragStart(row('High and low'))
+        fireEvent.dragOver(row('Location'))
+        expect(rows()[0]).toBe('High and low')
+        expect(onChange).not.toHaveBeenCalled()
+
+        fireEvent.dragEnd(row('High and low'))
+        expect(ids(lastFields(onChange))).toEqual([
+          'highLow',
+          'location',
+          'sun',
+          'condition',
+          'feelsLike',
+        ])
+      })
+
+      it('writes nothing when a row is dropped where it started', () => {
+        const { onChange } = renderWeather(on)
+        const row = screen.getByRole('button', { name: 'Reorder Location' }).closest('li')
+
+        fireEvent.dragStart(row as HTMLElement)
+        fireEvent.dragEnd(row as HTMLElement)
+
+        expect(onChange).not.toHaveBeenCalled()
+      })
+
+      it('reorders with the arrow keys from the handle, stopping at the ends', () => {
+        const { onChange } = renderWeather(on)
+
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Location' }), {
+          key: 'ArrowDown',
+        })
+        expect(ids(lastFields(onChange)).slice(0, 2)).toEqual(['sun', 'location'])
+
+        onChange.mockClear()
+        fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Location' }), {
+          key: 'ArrowUp',
+        })
+        expect(onChange).not.toHaveBeenCalled()
+      })
+    })
+
+    it('credits the weather data', () => {
+      renderWeather({ enabled: true })
+
+      expect(
+        screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }).getAttribute('href'),
+      ).toBe('https://open-meteo.com/')
     })
   })
 })
