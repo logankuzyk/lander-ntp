@@ -7,9 +7,10 @@ import { DEFAULT_SETTINGS, WEATHER_FIELDS, type Settings } from './schema'
 
 /**
  * The shape the page reads. Fonts stay loose: fontStack falls back for one it doesn't know,
- * as happens when another device is on a newer version.
+ * as happens when another device is on a newer version. Loose at the top for the same reason:
+ * a block that device added is kept, so saving from here doesn't take it away.
  */
-const SettingsSchema = v.object({
+const SettingsSchema = v.looseObject({
   photos: v.object({
     mode: v.picklist(['cycle', 'pinned']),
     frequency: v.picklist(FREQUENCIES),

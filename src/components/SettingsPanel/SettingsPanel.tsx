@@ -255,6 +255,7 @@ function WeatherSection({ settings, onChange }: SectionProps) {
   const current = settings.weather
   const [changingPlace, setChangingPlace] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
+  const [, setRefused] = useState(0)
 
   // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
   // a change is laid over the settings as they are when it is made, not as they were at the click.
@@ -283,7 +284,8 @@ function WeatherSection({ settings, onChange }: SectionProps) {
   }
 
   const enable = async (enabled: boolean) => {
-    if (enabled && !(await allowLocation())) return
+    // Nothing changed, but the checkbox has ticked itself: render again to put it back.
+    if (enabled && !(await allowLocation())) return setRefused((count) => count + 1)
     weather({ enabled })
   }
 

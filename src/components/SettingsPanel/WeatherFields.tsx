@@ -113,8 +113,10 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
     if (from !== index) setDraft({ ...draft, fields: move(draft.fields, from, index) })
   }
 
-  const finish = () => {
-    if (draft && draft.fields.some(({ id }, index) => id !== fields[index]?.id)) {
+  const finish = (event: DragEvent) => {
+    // Let go outside the list, or stopped with Escape: the order stays as it was.
+    const cancelled = event.dataTransfer?.dropEffect === 'none'
+    if (!cancelled && draft && draft.fields.some(({ id }, index) => id !== fields[index]?.id)) {
       onChange(draft.fields)
     }
     setDraft(null)
@@ -150,7 +152,14 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
 
   return (
     <>
-      <ol ref={list} class="fields" aria-labelledby="weather-show-heading">
+      <ol
+        ref={list}
+        class="fields"
+        aria-labelledby="weather-show-heading"
+        // The gaps between rows take a drop too, so letting go there isn't a cancelled drag.
+        onDragOver={(event) => draft && event.preventDefault()}
+        onDrop={(event) => event.preventDefault()}
+      >
         {shown.map((field, index) => {
           const label = LABELS[field.id]
           const classes = ['fields__row']
