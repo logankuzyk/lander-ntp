@@ -42,16 +42,17 @@ export default defineConfig({
     name: 'Lander',
     description: 'A minimal new tab page featuring photography from logankuzyk.com.',
     homepage_url: 'https://logankuzyk.com',
-    // storage.local caches the photo manifest and rotation state. No host permissions: the
-    // manifest endpoint sends `Access-Control-Allow-Origin: *`.
+    // storage.local caches the photo manifest, rotation state and weather. No host
+    // permissions: the manifest endpoint and Open-Meteo send `Access-Control-Allow-Origin: *`.
     permissions: ['storage'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
           id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',
-          // Firefox requires this, and the extension collects nothing.
-          data_collection_permissions: { required: ['none'] },
+          // Firefox requires this. Nothing is collected unless the weather widget is switched
+          // on, which sends the chosen place to the forecast service and asks for this first.
+          data_collection_permissions: { required: ['none'], optional: ['locationInfo'] },
         },
         // data_collection_permissions landed in Firefox for Android 142.
         gecko_android: { strict_min_version: '142.0' },

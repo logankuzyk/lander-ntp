@@ -19,6 +19,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
+      weather: { enabled: false, place: null },
       font: 'system',
       dim: true,
     })
@@ -62,6 +63,40 @@ describe('settingsItem', () => {
     await settingsItem.setValue(settings)
 
     expect(await settingsItem.getValue()).toEqual(settings)
+  })
+
+  it('keeps weather settings with a place', async () => {
+    const settings: Settings = {
+      ...DEFAULT_SETTINGS,
+      weather: {
+        ...DEFAULT_SETTINGS.weather,
+        enabled: true,
+        place: { name: 'Victoria', latitude: 48.44, longitude: -123.35 },
+      },
+    }
+    await settingsItem.setValue(settings)
+
+    expect(await settingsItem.getValue()).toEqual(settings)
+  })
+
+  it('replaces weather fields that are not each listed once with the defaults', async () => {
+    const [first, ...rest] = DEFAULT_SETTINGS.weather.fields
+    for (const fields of [rest, [first, first, ...rest.slice(1)]]) {
+      await storage.setItem(settingsItem.key, {
+        ...DEFAULT_SETTINGS,
+        dim: false,
+        weather: { ...DEFAULT_SETTINGS.weather, fields },
+      })
+
+      expect(await settingsItem.getValue()).toEqual(DEFAULT_SETTINGS)
+    }
+  })
+
+  it('keeps settings from before the weather widget, with the weather defaults', async () => {
+    const { weather, ...before } = { ...DEFAULT_SETTINGS, font: 'geist', dim: false }
+    await storage.setItem(settingsItem.key, before)
+
+    expect(await settingsItem.getValue()).toEqual({ ...before, weather })
   })
 
   it('replaces settings in a shape it does not know with the defaults', async () => {

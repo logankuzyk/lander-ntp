@@ -8,9 +8,11 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
+import { useWeather } from '@/weather/useWeather'
 import { Clock } from '@/widgets/Clock/Clock'
 import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
+import { Weather } from '@/widgets/Weather/Weather'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'settings' | 'info' | null
@@ -24,6 +26,9 @@ export function App() {
   const { photos, photo, upcoming, next } = usePhotoRotation(
     settingsLoaded ? settings.photos : null,
   )
+
+  // Likewise held back, so nothing is fetched for a widget that turns out to be switched off.
+  const weather = useWeather(settingsLoaded ? settings.weather : null)
 
   const toggle = (which: Exclude<Popover, null>) =>
     setPopover((open) => (open === which ? null : which))
@@ -64,6 +69,14 @@ export function App() {
         until the settings are known.
       */}
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
+      {weather && (
+        <Weather
+          weather={weather.weather}
+          place={weather.place}
+          fields={settings.weather.fields}
+          hour12={settings.clock.hour12}
+        />
+      )}
       {photo && <PhotoCredit photo={photo} />}
       {photo && popover === 'info' && <PhotoInfo photo={photo} onClose={close} />}
       {popover === 'settings' && (

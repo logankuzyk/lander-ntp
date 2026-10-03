@@ -1,6 +1,6 @@
 # lander-ntp
 
-A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a clock, photo details, and a gallery in settings for picking a photo or a tag to cycle through.
+A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a clock, an optional weather widget, photo details, and a gallery in settings for picking a photo or a tag to cycle through.
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
@@ -40,6 +40,18 @@ Photos come from `https://logankuzyk.com/new-tab/photos.json` (photos with **Sho
 WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 ```
 
+The weather widget asks [Open-Meteo](https://open-meteo.com/) directly. If that ever has to change, the same manifest can carry an optional `weather` block, which installed versions pick up with their next manifest refresh:
+
+```json
+"weather": {
+  "enabled": true,
+  "forecastUrl": "https://example.com/v1/forecast",
+  "searchUrl": "https://example.com/v1/search"
+}
+```
+
+Each key is optional. A replacement address must be https, answer the same query parameters in Open-Meteo's response shape, and send `Access-Control-Allow-Origin: *`. `"enabled": false` hides the widget and stops its requests.
+
 ## Privacy
 
-Lander collects no personal data. See [PRIVACY.md](PRIVACY.md) for more information.
+Lander collects no personal data. The optional weather widget sends the place you pick to [Open-Meteo](https://open-meteo.com/), whose data (CC BY 4.0) it shows; icons are from [Lucide](https://lucide.dev) (ISC). See [PRIVACY.md](PRIVACY.md) for more information.

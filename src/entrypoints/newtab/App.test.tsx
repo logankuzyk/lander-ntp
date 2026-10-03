@@ -5,6 +5,8 @@ import { manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
+import { cacheKey } from '@/weather/openMeteo'
+import { weatherCache } from '@/weather/storage'
 
 import { App } from './App'
 
@@ -93,6 +95,44 @@ describe('App', () => {
 
     await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
     expect(container.querySelector('time')).toBeNull()
+  })
+
+  it('shows the weather for the chosen place, once switched on', async () => {
+    await seedPhotos()
+    const place = { name: 'Victoria', latitude: 48.44, longitude: -123.35 }
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place, unit: 'celsius' },
+    })
+    await weatherCache.setValue({
+      key: cacheKey(place, 'celsius'),
+      fetchedAt: Date.now(),
+      data: {
+        temperature: 12.3,
+        feelsLike: 11.9,
+        high: 16.1,
+        low: 9.3,
+        code: 3,
+        isDay: false,
+        sunrise: '2026-10-01T07:13',
+        sunset: '2026-10-01T18:51',
+      },
+    })
+    render(<App />)
+
+    const weather = await screen.findByRole('region', { name: 'Weather' })
+    expect(weather.textContent).toContain('12°')
+    // The high and low are the only line under it until others are asked for.
+    expect(weather.textContent).toContain('16°')
+    expect(weather.textContent).not.toContain('Victoria')
+  })
+
+  it('has no weather until it is switched on', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    await currentPhotoSrc()
+    expect(screen.queryByRole('region', { name: 'Weather' })).toBeNull()
   })
 
   it('opens the photo details panel', async () => {

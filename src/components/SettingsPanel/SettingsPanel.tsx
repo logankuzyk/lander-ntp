@@ -9,9 +9,14 @@ import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotati
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONTS, FONT_IDS, type FontId } from '@/settings/fonts'
-import type { Settings } from '@/settings/schema'
+import type { Settings, WeatherSettings } from '@/settings/schema'
+import { allowLocation } from '@/weather/consent'
+import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
+import { placeName } from '@/weather/placeName'
 
 import { Gallery } from './Gallery'
+import { PlaceSearch } from './PlaceSearch'
+import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
   'every-visit': 'Every new tab',
@@ -31,6 +36,7 @@ const NEVER = 'never'
 const SECTIONS = [
   ['photos', 'Photos'],
   ['clock', 'Clock'],
+  ['weather', 'Weather'],
   ['general', 'General'],
 ] as const
 
@@ -189,6 +195,103 @@ function ClockSection({ settings, onChange }: SectionProps) {
   )
 }
 
+function WeatherSection({ settings, onChange }: SectionProps) {
+  const current = settings.weather
+  const [changingPlace, setChangingPlace] = useState(false)
+  const [locateFailed, setLocateFailed] = useState(false)
+  const [, setRefused] = useState(0)
+
+  // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
+  // a change is laid over the settings as they are when it is made, not as they were at the click.
+  const latest = useRef(settings)
+  latest.current = settings
+  const locating = useRef(false)
+
+  const weather = (changes: Partial<WeatherSettings>) =>
+    onChange({ ...latest.current, weather: { ...latest.current.weather, ...changes } })
+
+  // The click that shows the browser's prompt. The position goes to local storage, where the
+  // widget picks it up; the settings only record that the weather follows the device.
+  const follow = async () => {
+    if (locating.current) return
+    locating.current = true
+    setLocateFailed(false)
+    try {
+      const position = await locate()
+      if (!position) return setLocateFailed(true)
+      await devicePosition.setValue({ ...position, name: await placeName(position) })
+      setChangingPlace(false)
+      weather({ followDevice: true })
+    } finally {
+      locating.current = false
+    }
+  }
+
+  const enable = async (enabled: boolean) => {
+    // Nothing changed, but the checkbox has ticked itself: render again to put it back.
+    if (enabled && !(await allowLocation())) return setRefused((count) => count + 1)
+    weather({ enabled })
+  }
+
+  return (
+    <>
+      <section>
+        <Toggle
+          label="Show weather"
+          checked={current.enabled}
+          onChange={(enabled) => void enable(enabled)}
+        />
+        {current.enabled &&
+          ((current.place || current.followDevice) && !changingPlace ? (
+            <div class="settings__row">
+              <span>Place</span>
+              <span>
+                {current.followDevice ? CURRENT_LOCATION : current.place?.name}{' '}
+                <button type="button" class="settings__link" onClick={() => setChangingPlace(true)}>
+                  Change
+                </button>
+              </span>
+            </div>
+          ) : (
+            <PlaceSearch
+              onSelect={(place) => {
+                setChangingPlace(false)
+                weather({ place, followDevice: false })
+              }}
+              onLocate={() => void follow()}
+              locateFailed={locateFailed}
+            />
+          ))}
+        {current.enabled && (
+          <>
+            <Choice<WeatherSettings['unit']>
+              label="Units"
+              value={current.unit}
+              options={[
+                ['celsius', 'Celsius'],
+                ['fahrenheit', 'Fahrenheit'],
+              ]}
+              onChange={(unit) => weather({ unit })}
+            />
+          </>
+        )}
+      </section>
+
+      {current.enabled && (
+        <section aria-labelledby="weather-show-heading">
+          <h3 id="weather-show-heading">Show</h3>
+          <WeatherFields fields={current.fields} onChange={(fields) => weather({ fields })} />
+        </section>
+      )}
+      {current.enabled && (
+        <p class="settings__note settings__credit">
+          <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+        </p>
+      )}
+    </>
+  )
+}
+
 function GeneralSection({ settings, onChange }: SectionProps) {
   return (
     <section>
@@ -327,6 +430,7 @@ export function SettingsPanel({
             />
           )}
           {section === 'clock' && <ClockSection settings={known} onChange={onChange} />}
+          {section === 'weather' && <WeatherSection settings={known} onChange={onChange} />}
           {section === 'general' && <GeneralSection settings={known} onChange={onChange} />}
         </div>
       </div>

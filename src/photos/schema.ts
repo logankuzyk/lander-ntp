@@ -7,6 +7,17 @@ const HttpUrlSchema = v.pipe(
   v.url(),
 )
 
+// A place is sent to these, so they must be encrypted.
+const HttpsUrlSchema = v.pipe(v.string(), v.regex(/^https:\/\//i, 'Expected an https URL'), v.url())
+
+/** Overrides for where the weather comes from; see weather/endpoints. All optional. */
+const WeatherSchema = v.object({
+  enabled: v.optional(v.boolean()),
+  forecastUrl: v.optional(HttpsUrlSchema),
+  searchUrl: v.optional(HttpsUrlSchema),
+  placeNameUrl: v.optional(HttpsUrlSchema),
+})
+
 const Percentage = v.pipe(v.number(), v.minValue(0), v.maxValue(100))
 
 const SizeSchema = v.object({
@@ -52,6 +63,9 @@ export const ManifestSchema = v.object({
   version: v.literal(1),
   generatedAt: v.string(),
   photos: v.array(PhotoSchema),
+  // Added to v1 after it shipped. A block that doesn't parse is dropped rather than taking the
+  // photos down with it.
+  weather: v.fallback(v.optional(WeatherSchema), undefined),
 })
 
 export type Manifest = v.InferOutput<typeof ManifestSchema>
