@@ -54,6 +54,8 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
       <span>{label}</span>
       <input
         type="checkbox"
+        role="switch"
+        class="switch"
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
