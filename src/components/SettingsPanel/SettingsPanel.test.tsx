@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/pre
 import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { CalloutInfo } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
@@ -815,6 +816,98 @@ describe('SettingsPanel', () => {
       expect(
         screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }).getAttribute('href'),
       ).toBe('https://open-meteo.com/')
+    })
+  })
+
+  describe('tour', () => {
+    const TOUR: CalloutInfo[] = [
+      { body: 'About the clock.', id: 'tour-clock', section: 'clock', title: 'Clock stop' },
+      { body: 'About the photos.', id: 'tour-photos', section: 'photos', title: 'Photos stop' },
+    ]
+
+    const renderTour = () => {
+      const onClose = vi.fn()
+      render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={onClose}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+        />,
+      )
+      return { onClose }
+    }
+
+    const selectedTab = () => screen.getByRole('tab', { selected: true }).textContent
+
+    it('opens on the section named by initialSection', () => {
+      render(
+        <SettingsPanel
+          currentId="a"
+          initialSection="weather"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+        />,
+      )
+
+      expect(selectedTab()).toBe('Weather')
+      expect(screen.queryByRole('note')).toBeNull()
+    })
+
+    it('starts on the first stop and its section', () => {
+      renderTour()
+
+      expect(selectedTab()).toBe('Clock')
+      const note = screen.getByRole('note')
+      expect(within(note).getByText('Clock stop')).toBeTruthy()
+      expect(within(note).getByText('About the clock.')).toBeTruthy()
+      expect(within(note).getByText('1 of 2')).toBeTruthy()
+    })
+
+    it('moves to the next stop and its section, and ends after the last', async () => {
+      renderTour()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+      // The note fades out first, and comes back as the next stop.
+      expect(screen.getByRole('note').classList.contains('callout--leaving')).toBe(true)
+      await waitFor(() => expect(selectedTab()).toBe('Photos'))
+      expect(within(screen.getByRole('note')).getByText('2 of 2')).toBeTruthy()
+      expect(screen.getByRole('note').classList.contains('callout--leaving')).toBe(false)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(selectedTab()).toBe('Photos')
+    })
+
+    it('follows a section opened by hand, and stays put on one it has no stop for', () => {
+      renderTour()
+
+      openSection('Photos')
+      expect(within(screen.getByRole('note')).getByText('Photos stop')).toBeTruthy()
+
+      openSection('General')
+      expect(within(screen.getByRole('note')).getByText('Photos stop')).toBeTruthy()
+    })
+
+    it('ends when dismissed, without closing the settings', async () => {
+      const { onClose } = renderTour()
+
+      // A press on the note is inside the panel, not a click outside it.
+      fireEvent.pointerDown(screen.getByRole('note'))
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(onClose).not.toHaveBeenCalled()
+
+      // And it doesn't come back with the next section.
+      openSection('Clock')
+      expect(screen.queryByRole('note')).toBeNull()
     })
   })
 })

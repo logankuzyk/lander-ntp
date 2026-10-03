@@ -1,10 +1,12 @@
 import { useId, useMemo, useRef, useState } from 'preact/hooks'
 
+import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { Select } from '@/components/Dropdown/Select'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
+import type { CalloutInfo } from '@/onboarding/callouts'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
@@ -40,7 +42,7 @@ const SECTIONS = [
   ['general', 'General'],
 ] as const
 
-type SectionId = (typeof SECTIONS)[number][0]
+export type SectionId = (typeof SECTIONS)[number][0]
 
 type ToggleProps = {
   checked: boolean
@@ -330,33 +332,47 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 
 type SettingsPanelProps = {
   currentId: string | null
+  /** The section to open on, when there is no tour to say. */
+  initialSection?: SectionId
   onChange: (settings: Settings) => void
   onClose: () => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
   settings: Settings
+  /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
+  tour?: readonly CalloutInfo[]
 }
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
   currentId,
+  initialSection = 'photos',
   onChange,
   onClose,
   photos,
   settings,
+  tour = [],
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
   const { close, container } = usePopover(onClose)
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
-  const [section, setSection] = useState<SectionId>('photos')
+  const [section, setSection] = useState<SectionId>(tour[0]?.section ?? initialSection)
+  // Where the tour has got to; null when there is none, or once it is over.
+  const [step, setStep] = useState<number | null>(tour.length > 0 ? 0 : null)
+  const stop = step === null ? undefined : tour[step]
   const resetGrowth = useGrowOnScroll(container, body)
 
-  // Each section starts at rest, from the top.
+  // Each section starts at rest, from the top. The tour follows along: opening a section it
+  // has a stop for moves it there.
   const show = (id: SectionId) => {
     setSection(id)
     resetGrowth()
+    const index = tour.findIndex((callout) => callout.section === id)
+    if (index !== -1) setStep((at) => (at === null ? null : index))
   }
+
+  const nextStop = step === null ? undefined : tour[step + 1]
 
   // Arrow keys move between tabs, as in any tab list; Tab moves on to the section.
   const onTabKeyDown = (event: KeyboardEvent, index: number) => {
@@ -380,6 +396,21 @@ export function SettingsPanel({
 
   return (
     <aside aria-label="Settings" class="popover settings" ref={container} role="dialog">
+      {/* Inside the panel, so a press on it isn't a click outside. */}
+      {stop && step !== null && (
+        <Callout
+          action={
+            nextStop
+              ? { label: 'Next', onClick: () => show(nextStop.section) }
+              : { label: 'Done', onClick: () => setStep(null) }
+          }
+          body={stop.body}
+          class="callout--tour"
+          onDismiss={() => setStep(null)}
+          progress={`${step + 1} of ${tour.length}`}
+          title={stop.title}
+        />
+      )}
       <header class="popover__header">
         <h2>Settings</h2>
         <button
