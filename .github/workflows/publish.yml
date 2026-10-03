@@ -26,9 +26,9 @@ jobs:
     # Job-wide so the credential check and the submission itself read the same values.
     env:
       CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
       FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
       FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
       FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
@@ -114,7 +114,7 @@ jobs:
 
           args=()
 
-          if configured Chrome CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; then
+          if configured Chrome CHROME_EXTENSION_ID CHROME_PUBLISHER_ID CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL CHROME_SERVICE_ACCOUNT_PRIVATE_KEY; then
             # The update check Chrome itself polls; the store API only reports drafts.
             live=$(
               curl -fsS "https://clients2.google.com/service/update2/crx?response=updatecheck&acceptformat=crx3&prodversion=140.0&x=id%3D${CHROME_EXTENSION_ID}%26uc" |
@@ -123,10 +123,12 @@ jobs:
             if outdated Chrome "$live"; then
               args+=(
                 --chrome-zip .output/*-chrome.zip
+                # v1.1, the default, stops working on 15 October 2026.
+                --chrome-api-version v2
                 --chrome-extension-id "$CHROME_EXTENSION_ID"
-                --chrome-client-id "$CHROME_CLIENT_ID"
-                --chrome-client-secret "$CHROME_CLIENT_SECRET"
-                --chrome-refresh-token "$CHROME_REFRESH_TOKEN"
+                --chrome-publisher-id "$CHROME_PUBLISHER_ID"
+                --chrome-service-account-client-email "$CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL"
+                --chrome-service-account-private-key "$CHROME_SERVICE_ACCOUNT_PRIVATE_KEY"
               )
             fi
           fi
