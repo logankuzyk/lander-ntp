@@ -102,6 +102,22 @@ describe('Controls', () => {
     expect(onToggleInfo).not.toHaveBeenCalled()
   })
 
+  it('ignores shortcuts pressed inside the welcome', () => {
+    const { onNext, onToggleInfo } = renderControls()
+    render(
+      <dialog open>
+        <button type="button">Skip</button>
+      </dialog>,
+    )
+    const button = screen.getByRole('button', { name: 'Skip' })
+
+    fireEvent.keyDown(button, { key: 'ArrowRight' })
+    fireEvent.keyDown(button, { key: 'i' })
+
+    expect(onNext).not.toHaveBeenCalled()
+    expect(onToggleInfo).not.toHaveBeenCalled()
+  })
+
   it('marks the next-photo button busy while the photo is loading', () => {
     // The cross-fade holds the old photo until the new one is ready, so without this the
     // press looks like it did nothing.

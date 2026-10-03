@@ -18,7 +18,7 @@ npm run dev:firefox  # Firefox
 npm run dev:edge     # Edge
 ```
 
-`npm run dev` opens a separate Chrome window with the extension loaded; open a new tab to see it. Changes reload as you save. That window keeps its own profile in `.wxt/chrome-profile`, so your settings carry over between runs. `npm run clean` deletes it (and the build output) to start again from a fresh install.
+`npm run dev` opens a separate Chrome window with the extension loaded; open a new tab to see it. Changes reload as you save. That window keeps its own profile in `.wxt/chrome-profile`, so your settings carry over between runs. `npm run clean` deletes it (and the build output) to start again from a fresh install. That is also how to see the welcome again: it is shown once, to a new install. To see it (or a feature callout) without starting over, run `chrome.storage.sync.remove('onboarding')` in the new tab's console and reload the extension from `chrome://extensions`, which counts as an update; set `{ onboarding: { dismissed: [], welcomed: false } }` instead for the welcome.
 
 To use a different browser binary or other [web-ext options](https://wxt.dev/guide/essentials/config/browser-startup.html), create a `web-ext.config.ts`. It's gitignored, and overrides the defaults in `wxt.config.ts`:
 

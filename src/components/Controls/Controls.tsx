@@ -4,9 +4,12 @@ const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))
 
-/** Keys pressed inside a popover belong to it: arrows move between its tabs and chips. */
+/**
+ * Keys pressed inside a popover belong to it: arrows move between its tabs and chips. Likewise
+ * the welcome, which is a modal: nothing behind it should answer.
+ */
 const inPopover = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('.popover') !== null
+  target instanceof Element && target.closest('.popover, dialog') !== null
 
 type ControlsProps = {
   /** True while the photo being faded in is still loading. */
