@@ -14,8 +14,8 @@ const HttpsUrlSchema = v.pipe(v.string(), v.regex(/^https:\/\//i, 'Expected an h
 const WeatherSchema = v.object({
   enabled: v.optional(v.boolean()),
   forecastUrl: v.optional(HttpsUrlSchema),
-  searchUrl: v.optional(HttpsUrlSchema),
   placeNameUrl: v.optional(HttpsUrlSchema),
+  searchUrl: v.optional(HttpsUrlSchema),
 })
 
 const Percentage = v.pipe(v.number(), v.minValue(0), v.maxValue(100))
@@ -26,43 +26,43 @@ const SizeSchema = v.object({
 })
 
 const TagSchema = v.object({
-  slug: v.pipe(v.string(), v.minLength(1)),
   name: v.pipe(v.string(), v.minLength(1)),
+  slug: v.pipe(v.string(), v.minLength(1)),
 })
 
 const PhotoSchema = v.object({
-  id: v.pipe(v.string(), v.minLength(1)),
   alt: v.nullable(v.string()),
-  width: v.pipe(v.number(), v.minValue(1)),
-  height: v.pipe(v.number(), v.minValue(1)),
+  exif: v.object({
+    aperture: v.optional(v.string()),
+    camera: v.optional(v.string()),
+    dateTaken: v.optional(v.string()),
+    focalLength: v.optional(v.string()),
+    iso: v.optional(v.string()),
+    shutter: v.optional(v.string()),
+  }),
   // Percentages: they go straight into `object-position`, so keep them in range.
   focalX: v.nullable(Percentage),
   focalY: v.nullable(Percentage),
+  height: v.pipe(v.number(), v.minValue(1)),
+  id: v.pipe(v.string(), v.minLength(1)),
+  location: v.nullable(v.string()),
+  pageUrl: HttpUrlSchema,
+  printUrl: v.nullable(HttpUrlSchema),
   sizes: v.pipe(
     v.array(SizeSchema),
     v.minLength(1),
     v.transform((sizes) => [...sizes].sort((a, b) => a.width - b.width)),
   ),
-  exif: v.object({
-    camera: v.optional(v.string()),
-    focalLength: v.optional(v.string()),
-    aperture: v.optional(v.string()),
-    shutter: v.optional(v.string()),
-    iso: v.optional(v.string()),
-    dateTaken: v.optional(v.string()),
-  }),
-  location: v.nullable(v.string()),
   // Added to v1 after it shipped, so manifests (and caches) from before it have none.
   tags: v.optional(v.array(TagSchema), []),
-  pageUrl: HttpUrlSchema,
-  printUrl: v.nullable(HttpUrlSchema),
+  width: v.pipe(v.number(), v.minValue(1)),
 })
 
 /** Manifest v1 served by logankuzyk.com at /new-tab/photos.json. */
 export const ManifestSchema = v.object({
-  version: v.literal(1),
   generatedAt: v.string(),
   photos: v.array(PhotoSchema),
+  version: v.literal(1),
   // Added to v1 after it shipped. A block that doesn't parse is dropped rather than taking the
   // photos down with it.
   weather: v.fallback(v.optional(WeatherSchema), undefined),

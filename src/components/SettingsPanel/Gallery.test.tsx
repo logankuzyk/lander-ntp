@@ -6,9 +6,9 @@ import { makePhoto } from '@/test/fixtures'
 
 import { Gallery } from './Gallery'
 
-const FOREST = { slug: 'forest', name: 'Forest' }
-const WATER = { slug: 'water', name: 'Water' }
-const BEACH = { slug: 'beach', name: 'Beach' }
+const FOREST = { name: 'Forest', slug: 'forest' }
+const WATER = { name: 'Water', slug: 'water' }
+const BEACH = { name: 'Beach', slug: 'beach' }
 
 const PHOTOS = [
   makePhoto('a', { alt: 'Waterfall', tags: [WATER, FOREST] }),
@@ -17,13 +17,13 @@ const PHOTOS = [
 ]
 
 const renderGallery = ({
-  photos = PHOTOS,
   currentId = 'b',
   initialTag = null,
-}: { photos?: Photo[]; currentId?: string | null; initialTag?: string | null } = {}) => {
+  photos = PHOTOS,
+}: { currentId?: string | null; initialTag?: string | null; photos?: Photo[] } = {}) => {
   const onSelect = vi.fn()
   render(
-    <Gallery photos={photos} currentId={currentId} initialTag={initialTag} onSelect={onSelect} />,
+    <Gallery currentId={currentId} initialTag={initialTag} onSelect={onSelect} photos={photos} />,
   )
   return { onSelect }
 }

@@ -10,39 +10,39 @@ import { cacheKey, type Weather } from './openMeteo'
 import { weatherCache } from './storage'
 import { MAX_AGE_MS, MAX_STALE_MS, useWeather } from './useWeather'
 
-const PLACE = { name: 'Victoria', latitude: 48.43, longitude: -123.37 }
+const PLACE = { latitude: 48.43, longitude: -123.37, name: 'Victoria' }
 
 const ON: WeatherSettings = { ...DEFAULT_SETTINGS.weather, enabled: true, place: PLACE }
 
 const READING: Weather = {
-  temperature: 5,
+  code: 0,
   feelsLike: 3,
   high: 8,
-  low: 1,
-  code: 0,
   isDay: true,
+  low: 1,
   sunrise: '2026-10-01T07:13',
   sunset: '2026-10-01T18:51',
+  temperature: 5,
 }
 
 /** A forecast response with the given temperature. */
 const forecast = (temperature: number) => ({
-  ok: true,
   json: () =>
     Promise.resolve({
       current: {
-        temperature_2m: temperature,
         apparent_temperature: temperature,
         is_day: 1,
+        temperature_2m: temperature,
         weather_code: 0,
       },
       daily: {
-        temperature_2m_max: [temperature],
-        temperature_2m_min: [temperature],
         sunrise: ['2026-10-01T07:13'],
         sunset: ['2026-10-01T18:51'],
+        temperature_2m_max: [temperature],
+        temperature_2m_min: [temperature],
       },
     }),
+  ok: true,
 })
 
 function Probe({ settings }: { settings: WeatherSettings | null }) {
@@ -80,8 +80,8 @@ describe('useWeather', () => {
 
     await waitFor(() => expect(shown()).toBe('12'))
     expect(await weatherCache.getValue()).toMatchObject({
-      key: cacheKey(PLACE, ON.unit),
       data: { temperature: 12 },
+      key: cacheKey(PLACE, ON.unit),
     })
   })
 
@@ -89,9 +89,9 @@ describe('useWeather', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     await weatherCache.setValue({
-      key: cacheKey(PLACE, ON.unit),
-      fetchedAt: Date.now(),
       data: READING,
+      fetchedAt: Date.now(),
+      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -103,9 +103,9 @@ describe('useWeather', () => {
   it('shows a stale cache, then the refreshed reading', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(12)))
     await weatherCache.setValue({
-      key: cacheKey(PLACE, ON.unit),
-      fetchedAt: Date.now() - MAX_AGE_MS - 1,
       data: READING,
+      fetchedAt: Date.now() - MAX_AGE_MS - 1,
+      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -118,9 +118,9 @@ describe('useWeather', () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
     await weatherCache.setValue({
-      key: cacheKey(PLACE, ON.unit),
-      fetchedAt: Date.now() - MAX_AGE_MS - 1,
       data: READING,
+      fetchedAt: Date.now() - MAX_AGE_MS - 1,
+      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -133,9 +133,9 @@ describe('useWeather', () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
     await weatherCache.setValue({
-      key: cacheKey(PLACE, ON.unit),
-      fetchedAt: Date.now() - MAX_STALE_MS - 1,
       data: READING,
+      fetchedAt: Date.now() - MAX_STALE_MS - 1,
+      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -164,14 +164,14 @@ describe('useWeather', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     await manifestCache.setValue({
+      data: { ...makeManifest([makePhoto('a')]), weather: { enabled: false } },
       etag: null,
       fetchedAt: Date.now(),
-      data: { ...makeManifest([makePhoto('a')]), weather: { enabled: false } },
     })
     await weatherCache.setValue({
-      key: cacheKey(PLACE, ON.unit),
-      fetchedAt: Date.now() - MAX_AGE_MS - 1,
       data: READING,
+      fetchedAt: Date.now() - MAX_AGE_MS - 1,
+      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -184,9 +184,9 @@ describe('useWeather', () => {
   it('ignores a cache for another place or unit', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(54)))
     await weatherCache.setValue({
-      key: cacheKey(PLACE, 'celsius'),
-      fetchedAt: Date.now(),
       data: READING,
+      fetchedAt: Date.now(),
+      key: cacheKey(PLACE, 'celsius'),
     })
 
     render(<Probe settings={{ ...ON, unit: 'fahrenheit' }} />)
@@ -195,7 +195,7 @@ describe('useWeather', () => {
   })
 
   describe('following the device', () => {
-    const FOLLOW: WeatherSettings = { ...ON, place: null, followDevice: true }
+    const FOLLOW: WeatherSettings = { ...ON, followDevice: true, place: null }
     const HERE = { latitude: 48.43, longitude: -123.37 }
     const AWAY = { latitude: 49.28, longitude: -123.12 }
 
@@ -203,8 +203,8 @@ describe('useWeather', () => {
     const device = (state: 'granted' | 'prompt', coords = HERE) => {
       const getCurrentPosition = vi.fn((done: (position: unknown) => void) => done({ coords }))
       vi.stubGlobal('navigator', {
-        language: 'en-CA',
         geolocation: { getCurrentPosition },
+        language: 'en-CA',
         permissions: { query: () => Promise.resolve({ state }) },
       })
       return getCurrentPosition
@@ -214,7 +214,7 @@ describe('useWeather', () => {
     const answering = (temperature: number, city: string | null) => {
       const fetch = vi.fn((url: string) =>
         url.includes('reverse-geocode')
-          ? Promise.resolve({ ok: city !== null, json: () => Promise.resolve({ city }) })
+          ? Promise.resolve({ json: () => Promise.resolve({ city }), ok: city !== null })
           : Promise.resolve(forecast(temperature)),
       )
       vi.stubGlobal('fetch', fetch)
@@ -232,9 +232,9 @@ describe('useWeather', () => {
 
     const cached = (position: typeof HERE) =>
       weatherCache.setValue({
-        key: cacheKey({ name: '', ...position }, ON.unit),
-        fetchedAt: Date.now(),
         data: READING,
+        fetchedAt: Date.now(),
+        key: cacheKey({ name: '', ...position }, ON.unit),
       })
 
     const place = () => screen.getByRole('status').getAttribute('data-place')

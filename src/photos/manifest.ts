@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { browser } from 'wxt/browser'
 
-import { ManifestSchema, type Manifest } from './schema'
+import { type Manifest, ManifestSchema } from './schema'
 import { manifestCache, type ManifestCache } from './storage'
 
 export const MANIFEST_URL =
@@ -19,24 +19,24 @@ export const FETCH_TIMEOUT_MS = 5000
 /** Shown when there is no usable cache and the network is unavailable. */
 export function fallbackManifest(): Manifest {
   return {
-    version: 1,
     generatedAt: new Date(0).toISOString(),
     photos: [
       {
-        id: 'fallback',
         alt: null,
-        width: 1920,
-        height: 1280,
+        exif: {},
         focalX: null,
         focalY: null,
-        sizes: [{ url: browser.runtime.getURL('/fallback.webp'), width: 1920 }],
-        exif: {},
+        height: 1280,
+        id: 'fallback',
         location: null,
-        tags: [],
         pageUrl: 'https://logankuzyk.com/photography',
         printUrl: null,
+        sizes: [{ url: browser.runtime.getURL('/fallback.webp'), width: 1920 }],
+        tags: [],
+        width: 1920,
       },
     ],
+    version: 1,
   }
 }
 
@@ -68,7 +68,7 @@ export async function revalidateManifest(
     const result = v.safeParse(ManifestSchema, await response.json())
     if (!result.success) return null
 
-    const next = { etag: response.headers.get('ETag'), fetchedAt: now, data: result.output }
+    const next = { data: result.output, etag: response.headers.get('ETag'), fetchedAt: now }
     await manifestCache.setValue(next)
     return next
   } catch {
@@ -80,9 +80,9 @@ export async function revalidateManifest(
 
 export type ManifestResult = {
   manifest: Manifest
-  source: 'cache' | 'network' | 'fallback'
   /** Settles once any background revalidation has finished. */
   revalidation: Promise<void>
+  source: 'cache' | 'fallback' | 'network'
 }
 
 const usable = (manifest: Manifest) => (manifest.photos.length > 0 ? manifest : fallbackManifest())
@@ -103,17 +103,17 @@ export async function getManifest(now = Date.now()): Promise<ManifestResult> {
     const stale = now - cached.fetchedAt >= MAX_AGE_MS
     return {
       manifest: usable(cached.data),
-      source: 'cache',
       revalidation: stale
         ? revalidateManifest(cached, now).then(() => undefined)
         : Promise.resolve(),
+      source: 'cache',
     }
   }
 
   const fresh = await revalidateManifest(null, now)
   return {
     manifest: usable(fresh?.data ?? fallbackManifest()),
-    source: fresh ? 'network' : 'fallback',
     revalidation: Promise.resolve(),
+    source: fresh ? 'network' : 'fallback',
   }
 }

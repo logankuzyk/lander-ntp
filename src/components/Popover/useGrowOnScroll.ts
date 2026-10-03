@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRef } from 'preact/hooks'
+import { type MutableRef, useCallback, useEffect, useRef } from 'preact/hooks'
 
 import { splitScroll, wheelPixels } from './growth'
 

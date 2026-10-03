@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { usePlacement } from '@/components/Dropdown/usePlacement'
 import type { Place } from '@/settings/schema'
 import { CURRENT_LOCATION } from '@/weather/deviceLocation'
-import { searchPlaces, type PlaceResult } from '@/weather/openMeteo'
+import { type PlaceResult, searchPlaces } from '@/weather/openMeteo'
 
 /** How long the typing has to pause before it is searched for: one request a pause. */
 const DEBOUNCE_MS = 300
@@ -11,10 +11,10 @@ const DEBOUNCE_MS = 300
 const MIN_LENGTH = 2
 
 type PlaceSearchProps = {
-  onSelect: (place: Place) => void
+  locateFailed: boolean
   /** Follow the device instead of a place searched for. */
   onLocate: () => void
-  locateFailed: boolean
+  onSelect: (place: Place) => void
 }
 
 /**
@@ -23,11 +23,11 @@ type PlaceSearchProps = {
  * text so far. The arrow keys move through them, putting each in the box, and Enter takes the
  * one there.
  */
-export function PlaceSearch({ onSelect, onLocate, locateFailed }: PlaceSearchProps) {
+export function PlaceSearch({ locateFailed, onLocate, onSelect }: PlaceSearchProps) {
   const listId = useId()
   const [query, setQuery] = useState('')
   /** Null with nothing to search for; 'failed' when the search itself didn't go through. */
-  const [results, setResults] = useState<PlaceResult[] | 'failed' | null>(null)
+  const [results, setResults] = useState<'failed' | PlaceResult[] | null>(null)
   const [open, setOpen] = useState(false)
   /** Which suggestion the arrow keys are on; null is the text as typed. */
   const [active, setActive] = useState<number | null>(null)
@@ -57,7 +57,7 @@ export function PlaceSearch({ onSelect, onLocate, locateFailed }: PlaceSearchPro
   const found = results !== 'failed' && results ? results : []
   const suggestions =
     found.length > 0
-      ? found.map(({ id, place, label }) => ({
+      ? found.map(({ id, label, place }) => ({
           id: String(id),
           label,
           pick: () => onSelect(place),
@@ -93,29 +93,29 @@ export function PlaceSearch({ onSelect, onLocate, locateFailed }: PlaceSearchPro
 
   return (
     <>
-      <div ref={anchor} class="settings__place">
+      <div class="settings__place" ref={anchor}>
         <div class="settings__search" role="search">
           <input
-            type="search"
-            role="combobox"
-            class="settings__input"
-            aria-label="Search for a place"
-            aria-autocomplete="list"
-            aria-expanded={open}
-            aria-controls={open ? listId : undefined}
             aria-activedescendant={open && chosen ? optionId(chosen.id) : undefined}
+            aria-autocomplete="list"
+            aria-controls={open ? listId : undefined}
+            aria-expanded={open}
+            aria-label="Search for a place"
             autocomplete="off"
-            placeholder="City or town"
-            value={chosen ? chosen.label : query}
-            onFocus={() => setOpen(true)}
-            onClick={() => setOpen(true)}
+            class="settings__input"
             onBlur={close}
-            onKeyDown={onKeyDown}
+            onClick={() => setOpen(true)}
+            onFocus={() => setOpen(true)}
             onInput={(event) => {
               setQuery(event.currentTarget.value)
               setActive(null)
               setOpen(true)
             }}
+            onKeyDown={onKeyDown}
+            placeholder="City or town"
+            role="combobox"
+            type="search"
+            value={chosen ? chosen.label : query}
           />
         </div>
         <div aria-live="polite">
@@ -132,29 +132,29 @@ export function PlaceSearch({ onSelect, onLocate, locateFailed }: PlaceSearchPro
       </div>
       {open && (
         <ul
-          ref={list}
-          id={listId}
-          class="dropdown__menu suggestions"
-          role="listbox"
           aria-label="Places"
+          class="dropdown__menu suggestions"
+          id={listId}
           // Focus stays in the box, so a press here doesn't close the list under the click.
           onMouseDown={(event) => event.preventDefault()}
           // Its own scrolling: the popover shouldn't grow under it.
           onWheel={(event) => event.stopPropagation()}
+          ref={list}
+          role="listbox"
         >
           {suggestions.map((suggestion, index) => (
             // The keys are the box's, where focus stays: see onKeyDown.
             // eslint-disable-next-line jsx-a11y/click-events-have-key-events
             <li
-              key={suggestion.id}
-              id={optionId(suggestion.id)}
-              class="dropdown__option suggestions__option"
-              role="option"
               aria-selected={index === active}
+              class="dropdown__option suggestions__option"
+              id={optionId(suggestion.id)}
+              key={suggestion.id}
               onClick={() => {
                 close()
                 suggestion.pick()
               }}
+              role="option"
             >
               {suggestion.label}
             </li>

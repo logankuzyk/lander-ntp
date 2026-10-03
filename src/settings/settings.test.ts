@@ -7,21 +7,21 @@ import { settingsItem } from './storage'
 
 /** Settings as 0.1.1 stored them, under this same key: a flat frequency and favourite sites. */
 const RELEASE_0_1_1 = {
-  frequency: 'daily',
   clock: { enabled: false, hour12: true, showDate: true, showSeconds: false },
-  font: 'geist',
   dim: false,
-  favourites: { enabled: true, style: 'list', size: 'm' },
+  favourites: { enabled: true, size: 'm', style: 'list' },
+  font: 'geist',
+  frequency: 'daily',
 }
 
 describe('DEFAULT_SETTINGS', () => {
   it('starts cycling all photos every tab, with the clock and system font', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
-      weather: { enabled: false, place: null },
-      font: 'system',
       dim: true,
+      font: 'system',
+      photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
+      weather: { enabled: false, place: null },
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()
@@ -71,7 +71,7 @@ describe('settingsItem', () => {
       weather: {
         ...DEFAULT_SETTINGS.weather,
         enabled: true,
-        place: { name: 'Victoria', latitude: 48.44, longitude: -123.35 },
+        place: { latitude: 48.44, longitude: -123.35, name: 'Victoria' },
       },
     }
     await settingsItem.setValue(settings)
@@ -93,7 +93,7 @@ describe('settingsItem', () => {
   })
 
   it('keeps settings from before the weather widget, with the weather defaults', async () => {
-    const { weather, ...before } = { ...DEFAULT_SETTINGS, font: 'geist', dim: false }
+    const { weather, ...before } = { ...DEFAULT_SETTINGS, dim: false, font: 'geist' }
     await storage.setItem(settingsItem.key, before)
 
     expect(await settingsItem.getValue()).toEqual({ ...before, weather })

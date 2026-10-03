@@ -6,10 +6,10 @@ import { locationConsented } from './consent'
 import {
   CURRENT_LOCATION,
   devicePosition,
+  type DevicePosition,
   locate,
   locationAllowed,
   near,
-  type DevicePosition,
 } from './deviceLocation'
 import { getEndpoints } from './endpoints'
 import { cacheKey, fetchWeather, type Weather } from './openMeteo'
@@ -118,7 +118,7 @@ function useDevicePosition(follow: boolean): DevicePosition | null {
  */
 export function useWeather(
   settings: WeatherSettings | null,
-): { weather: Weather; place: string } | null {
+): { place: string; weather: Weather } | null {
   const on = useConsent(settings?.enabled === true) && settings?.enabled === true
   const follow = on && settings.followDevice
   const position = useDevicePosition(follow)
@@ -128,7 +128,7 @@ export function useWeather(
     : fixed
   const unit = settings?.unit
   const key = place && unit ? cacheKey(place, unit) : null
-  const [shown, setShown] = useState<{ key: string; fetchedAt: number; data: Weather } | null>(null)
+  const [shown, setShown] = useState<{ data: Weather; fetchedAt: number; key: string } | null>(null)
 
   useEffect(() => {
     if (!place || !unit || !key) return
@@ -161,7 +161,7 @@ export function useWeather(
         if (age < MAX_AGE_MS) return again(MAX_AGE_MS - age)
 
         const fresh = await fetchWeather(place, unit)
-        const reading = fresh && { key, fetchedAt: Date.now(), data: fresh }
+        const reading = fresh && { data: fresh, fetchedAt: Date.now(), key }
         if (reading) await weatherCache.setValue(reading)
         if (!active) return
         setShown(
@@ -187,5 +187,5 @@ export function useWeather(
   }, [key])
 
   // A reading for the last place is not this place's weather.
-  return shown && place && shown.key === key ? { weather: shown.data, place: place.name } : null
+  return shown && place && shown.key === key ? { place: place.name, weather: shown.data } : null
 }

@@ -2,12 +2,12 @@ import type { Photo, Tag } from './schema'
 
 /** Every tag in use, the most common first. */
 export function availableTags(photos: readonly Photo[]): Tag[] {
-  const counts = new Map<string, { tag: Tag; count: number }>()
+  const counts = new Map<string, { count: number; tag: Tag }>()
   for (const photo of photos) {
     for (const tag of photo.tags) {
       const entry = counts.get(tag.slug)
       if (entry) entry.count++
-      else counts.set(tag.slug, { tag, count: 1 })
+      else counts.set(tag.slug, { count: 1, tag })
     }
   }
   return [...counts.values()]

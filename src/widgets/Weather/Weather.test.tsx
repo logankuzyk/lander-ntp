@@ -7,14 +7,14 @@ import type { Weather as Reading } from '@/weather/openMeteo'
 import { Weather } from './Weather'
 
 const READING: Reading = {
-  temperature: 12.3,
+  code: 61,
   feelsLike: 9.6,
   high: 16.1,
-  low: 9.3,
-  code: 61,
   isDay: true,
+  low: 9.3,
   sunrise: '2026-10-01T07:13',
   sunset: '2026-10-01T18:51',
+  temperature: 12.3,
 }
 
 const renderWeather = (
@@ -23,13 +23,13 @@ const renderWeather = (
 ) =>
   render(
     <Weather
-      weather={props.reading ?? READING}
-      place="Victoria"
       fields={[
         ...shown.map((id) => ({ id, shown: true })),
         ...WEATHER_FIELDS.filter((id) => !shown.includes(id)).map((id) => ({ id, shown: false })),
       ]}
       hour12={props.hour12 ?? false}
+      place="Victoria"
+      weather={props.reading ?? READING}
     />,
   )
 

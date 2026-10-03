@@ -13,14 +13,14 @@ import { WeatherFields } from './WeatherFields'
 
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
-  photos: { mode: 'cycle', frequency: '1h', tags: [], pinnedId: null },
   clock: { enabled: true, hour12: true, showDate: false, showSeconds: false },
+  photos: { frequency: '1h', mode: 'cycle', pinnedId: null, tags: [] },
   weather: { ...DEFAULT_SETTINGS.weather, unit: 'celsius' },
 }
 
 const PHOTOS = [
-  makePhoto('a', { alt: 'Waterfall', tags: [{ slug: 'water', name: 'Water' }] }),
-  makePhoto('b', { alt: 'Tide pools', tags: [{ slug: 'beach', name: 'Beach' }] }),
+  makePhoto('a', { alt: 'Waterfall', tags: [{ name: 'Water', slug: 'water' }] }),
+  makePhoto('b', { alt: 'Tide pools', tags: [{ name: 'Beach', slug: 'beach' }] }),
 ]
 
 const renderPanel = ({
@@ -31,11 +31,11 @@ const renderPanel = ({
   const onClose = vi.fn()
   render(
     <SettingsPanel
-      settings={{ ...settings, ...overrides }}
-      onChange={onChange}
-      photos={photos}
       currentId="a"
+      onChange={onChange}
       onClose={onClose}
+      photos={photos}
+      settings={{ ...settings, ...overrides }}
     />,
   )
   return { onChange, onClose }
@@ -209,7 +209,7 @@ describe('SettingsPanel', () => {
       choose('Change photo', 'Every day')
 
       expect(onChange).toHaveBeenCalledWith(
-        withPhotos({ mode: 'cycle', frequency: 'daily', pinnedId: 'b', tags: ['water'] }),
+        withPhotos({ frequency: 'daily', mode: 'cycle', pinnedId: 'b', tags: ['water'] }),
       )
     })
 
@@ -292,7 +292,7 @@ describe('SettingsPanel', () => {
       Object.defineProperty(body, 'scrollHeight', { value: 1000 })
       Object.defineProperty(body, 'scrollTop', { value: 0, writable: true })
 
-      const first = new WheelEvent('wheel', { deltaY: 450, cancelable: true })
+      const first = new WheelEvent('wheel', { cancelable: true, deltaY: 450 })
       body.dispatchEvent(first)
 
       expect(first.defaultPrevented).toBe(true)
@@ -300,14 +300,14 @@ describe('SettingsPanel', () => {
       expect(body.scrollTop).toBe(0)
 
       // 50px short of the cap: the rest of the wheel scrolls.
-      body.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, cancelable: true }))
+      body.dispatchEvent(new WheelEvent('wheel', { cancelable: true, deltaY: 100 }))
       expect(grown()).toBe(500)
       expect(body.scrollTop).toBe(50)
 
       // At the cap, and scrolling up, the browser scrolls as usual.
-      const atCap = new WheelEvent('wheel', { deltaY: 100, cancelable: true })
+      const atCap = new WheelEvent('wheel', { cancelable: true, deltaY: 100 })
       body.dispatchEvent(atCap)
-      const up = new WheelEvent('wheel', { deltaY: -100, cancelable: true })
+      const up = new WheelEvent('wheel', { cancelable: true, deltaY: -100 })
       body.dispatchEvent(up)
       expect(atCap.defaultPrevented).toBe(false)
       expect(up.defaultPrevented).toBe(false)
@@ -374,7 +374,7 @@ describe('SettingsPanel', () => {
   })
 
   describe('weather', () => {
-    const PLACE = { name: 'Victoria', latitude: 48.44, longitude: -123.35 }
+    const PLACE = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
     /** Two shown and three hidden, to move between. */
     const FIELDS: Settings['weather']['fields'] = [
       { id: 'location', shown: true },
@@ -413,20 +413,20 @@ describe('SettingsPanel', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue({
-          ok: true,
           json: () =>
             Promise.resolve({
               results: [
                 {
-                  id: 1,
-                  name: 'Victoria',
-                  latitude: 48.4359,
-                  longitude: -123.35155,
                   admin1: 'British Columbia',
                   country: 'Canada',
+                  id: 1,
+                  latitude: 48.4359,
+                  longitude: -123.35155,
+                  name: 'Victoria',
                 },
               ],
             }),
+          ok: true,
         }),
       )
       const { onChange } = renderWeather({ enabled: true })
@@ -439,7 +439,7 @@ describe('SettingsPanel', () => {
       )
 
       expect(onChange).toHaveBeenCalledWith(
-        withWeather({ enabled: true, place: PLACE, followDevice: false }),
+        withWeather({ enabled: true, followDevice: false, place: PLACE }),
       )
     })
 
@@ -448,17 +448,17 @@ describe('SettingsPanel', () => {
         vi.stubGlobal(
           'fetch',
           vi.fn().mockResolvedValue({
-            ok: true,
             json: () =>
               Promise.resolve({
                 results: names.map((name, id) => ({
+                  country: 'Canada',
                   id,
-                  name,
                   latitude: 48.4359,
                   longitude: -123.35155,
-                  country: 'Canada',
+                  name,
                 })),
               }),
+            ok: true,
           }),
         )
 
@@ -503,7 +503,7 @@ describe('SettingsPanel', () => {
         fireEvent.keyDown(box, { key: 'Enter' })
 
         expect(onChange).toHaveBeenCalledWith(
-          withWeather({ enabled: true, place: PLACE, followDevice: false }),
+          withWeather({ enabled: true, followDevice: false, place: PLACE }),
         )
       })
 
@@ -544,7 +544,7 @@ describe('SettingsPanel', () => {
     it('says when nothing matches and when the search fails', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }),
+        vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true }),
       )
       renderWeather({ enabled: true })
       const search = (value: string) =>
@@ -592,11 +592,11 @@ describe('SettingsPanel', () => {
 
       const locating = (coords: { latitude: number; longitude: number } | null) =>
         vi.stubGlobal('navigator', {
-          language: 'en-CA',
           geolocation: {
             getCurrentPosition: (done: (position: unknown) => void, fail: () => void) =>
               coords ? done({ coords }) : fail(),
           },
+          language: 'en-CA',
         })
 
       it('follows the device once the browser gives a position, keeping it off the settings', async () => {
@@ -605,7 +605,7 @@ describe('SettingsPanel', () => {
           'fetch',
           vi
             .fn()
-            .mockResolvedValue({ ok: true, json: () => Promise.resolve({ city: 'Victoria' }) }),
+            .mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
         )
         const { onChange } = renderWeather({ enabled: true })
 
@@ -626,21 +626,21 @@ describe('SettingsPanel', () => {
         const getCurrentPosition = vi.fn((done: typeof found) => {
           found = done
         })
-        vi.stubGlobal('navigator', { language: 'en-CA', geolocation: { getCurrentPosition } })
+        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition }, language: 'en-CA' })
         vi.stubGlobal(
           'fetch',
           vi
             .fn()
-            .mockResolvedValue({ ok: true, json: () => Promise.resolve({ city: 'Victoria' }) }),
+            .mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
         )
         const onChange = vi.fn()
         const panel = (weather: Partial<Settings['weather']>) => (
           <SettingsPanel
-            settings={withWeather(weather)}
-            onChange={onChange}
-            photos={PHOTOS}
             currentId="a"
+            onChange={onChange}
             onClose={vi.fn()}
+            photos={PHOTOS}
+            settings={withWeather(weather)}
           />
         )
         const { rerender } = render(panel({ enabled: true }))
@@ -653,7 +653,7 @@ describe('SettingsPanel', () => {
 
         await waitFor(() =>
           expect(onChange).toHaveBeenCalledWith(
-            withWeather({ enabled: true, unit: 'fahrenheit', followDevice: true }),
+            withWeather({ enabled: true, followDevice: true, unit: 'fahrenheit' }),
           ),
         )
         expect(getCurrentPosition).toHaveBeenCalledTimes(1)
@@ -670,7 +670,7 @@ describe('SettingsPanel', () => {
       })
 
       it('shows that it follows the device, and stops when a place is searched for', () => {
-        renderWeather({ enabled: true, place: PLACE, followDevice: true })
+        renderWeather({ enabled: true, followDevice: true, place: PLACE })
 
         expect(screen.getByText('Current location')).toBeTruthy()
         expect(screen.queryByText('Victoria')).toBeNull()
@@ -690,7 +690,7 @@ describe('SettingsPanel', () => {
     })
 
     describe('fields', () => {
-      const on = { enabled: true, place: PLACE, fields: FIELDS }
+      const on = { enabled: true, fields: FIELDS, place: PLACE }
       const ids = (fields: Settings['weather']['fields']) => fields.map(({ id }) => id)
       const rows = () =>
         within(screen.getByRole('list', { name: 'Show' }))

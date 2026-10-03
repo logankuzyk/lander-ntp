@@ -5,15 +5,15 @@
  * so the new tab works offline and needs no host permissions.
  */
 export const FONTS = {
-  system: {
-    label: 'System',
-    stack: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  },
   geist: { label: 'Geist', stack: "'Geist Sans', ui-sans-serif, system-ui, sans-serif" },
   'geist-mono': { label: 'Geist Mono', stack: "'Geist Mono', ui-monospace, monospace" },
   'instrument-serif': {
     label: 'Instrument Serif',
     stack: "'Instrument Serif', ui-serif, Georgia, serif",
+  },
+  system: {
+    label: 'System',
+    stack: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   },
 } as const
 

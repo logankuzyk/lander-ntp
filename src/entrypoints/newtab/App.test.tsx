@@ -26,9 +26,9 @@ const currentPhotoSrc = async () =>
 
 const seedPhotos = () =>
   manifestCache.setValue({
+    data: makeManifest([makePhoto('a'), makePhoto('b')]),
     etag: null,
     fetchedAt: Date.now(),
-    data: makeManifest([makePhoto('a'), makePhoto('b')]),
   })
 
 beforeEach(() => {
@@ -76,9 +76,9 @@ describe('App', () => {
 
   it('shows the credit whenever the photo carries a location', async () => {
     await manifestCache.setValue({
+      data: makeManifest([makePhoto('a', { location: 'Tofino, BC' })]),
       etag: null,
       fetchedAt: Date.now(),
-      data: makeManifest([makePhoto('a', { location: 'Tofino, BC' })]),
     })
     render(<App />)
 
@@ -99,24 +99,24 @@ describe('App', () => {
 
   it('shows the weather for the chosen place, once switched on', async () => {
     await seedPhotos()
-    const place = { name: 'Victoria', latitude: 48.44, longitude: -123.35 }
+    const place = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place, unit: 'celsius' },
     })
     await weatherCache.setValue({
-      key: cacheKey(place, 'celsius'),
-      fetchedAt: Date.now(),
       data: {
-        temperature: 12.3,
+        code: 3,
         feelsLike: 11.9,
         high: 16.1,
-        low: 9.3,
-        code: 3,
         isDay: false,
+        low: 9.3,
         sunrise: '2026-10-01T07:13',
         sunset: '2026-10-01T18:51',
+        temperature: 12.3,
       },
+      fetchedAt: Date.now(),
+      key: cacheKey(place, 'celsius'),
     })
     render(<App />)
 
@@ -137,9 +137,9 @@ describe('App', () => {
 
   it('opens the photo details panel', async () => {
     await manifestCache.setValue({
+      data: makeManifest([makePhoto('a', { exif: { camera: 'Canon, EOS R5' } })]),
       etag: null,
       fetchedAt: Date.now(),
-      data: makeManifest([makePhoto('a', { exif: { camera: 'Canon, EOS R5' } })]),
     })
     render(<App />)
 
@@ -153,7 +153,7 @@ describe('App', () => {
 
   it('pins a photo picked from the gallery in settings', async () => {
     await seedPhotos()
-    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       photos: { ...DEFAULT_SETTINGS.photos, frequency: '1h' },
@@ -168,10 +168,10 @@ describe('App', () => {
     await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/b/'))
     await waitFor(async () =>
       expect((await settingsItem.getValue()).photos).toEqual({
-        mode: 'pinned',
         frequency: '1h',
-        tags: [],
+        mode: 'pinned',
         pinnedId: 'b',
+        tags: [],
       }),
     )
     expect((await photoState.getValue())?.currentId).toBe('b')
@@ -179,7 +179,7 @@ describe('App', () => {
 
   it('pins the next photo when → is pressed while pinned', async () => {
     await seedPhotos()
-    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       photos: { ...DEFAULT_SETTINGS.photos, mode: 'pinned', pinnedId: 'a' },
@@ -248,7 +248,7 @@ describe('App', () => {
 
   it('opening a new tab keeps the photo when the frequency is not every-new-tab', async () => {
     await seedPhotos()
-    await photoState.setValue({ currentId: 'a', shownAt: Date.now(), bag: ['b'] })
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily' },

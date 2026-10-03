@@ -8,7 +8,7 @@ type ClockProps = Omit<Settings['clock'], 'enabled'> & {
   locale?: string
 }
 
-export function Clock({ hour12, showDate, showSeconds, locale }: ClockProps) {
+export function Clock({ hour12, locale, showDate, showSeconds }: ClockProps) {
   const [now, setNow] = useState(() => new Date())
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export function Clock({ hour12, showDate, showSeconds, locale }: ClockProps) {
   return (
     <div class="clock">
       <time class="clock__time" dateTime={now.toISOString()}>
-        {formatTime(now, { hour12, showSeconds, locale })}
+        {formatTime(now, { hour12, locale, showSeconds })}
       </time>
       {showDate && <span class="clock__date">{formatDate(now, locale)}</span>}
     </div>

@@ -8,22 +8,22 @@ import { makeManifest, makePhoto } from '@/test/fixtures'
 import { describeCode } from './conditions'
 import { cacheKey, fetchWeather, searchPlaces } from './openMeteo'
 
-const PLACE = { name: 'Victoria', latitude: 48.43, longitude: -123.37 }
+const PLACE = { latitude: 48.43, longitude: -123.37, name: 'Victoria' }
 
 const FORECAST = {
-  utc_offset_seconds: -25200,
-  timezone: 'America/Vancouver',
-  current: { temperature_2m: 12.3, apparent_temperature: 11.9, is_day: 0, weather_code: 3 },
+  current: { apparent_temperature: 11.9, is_day: 0, temperature_2m: 12.3, weather_code: 3 },
   daily: {
-    temperature_2m_max: [16.1],
-    temperature_2m_min: [9.3],
     sunrise: ['2026-10-01T07:13'],
     sunset: ['2026-10-01T18:51'],
+    temperature_2m_max: [16.1],
+    temperature_2m_min: [9.3],
   },
+  timezone: 'America/Vancouver',
+  utc_offset_seconds: -25200,
 }
 
 const respond = (body: unknown, ok = true) => {
-  const fetch = vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(body) })
+  const fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve(body), ok })
   vi.stubGlobal('fetch', fetch)
   return fetch
 }
@@ -39,14 +39,14 @@ describe('fetchWeather', () => {
     const fetch = respond(FORECAST)
 
     expect(await fetchWeather(PLACE, 'fahrenheit')).toEqual({
-      temperature: 12.3,
+      code: 3,
       feelsLike: 11.9,
       high: 16.1,
-      low: 9.3,
-      code: 3,
       isDay: false,
+      low: 9.3,
       sunrise: '2026-10-01T07:13',
       sunset: '2026-10-01T18:51',
+      temperature: 12.3,
     })
     const url = requested(fetch)
     expect(url.origin).toBe('https://api.open-meteo.com')
@@ -59,12 +59,12 @@ describe('fetchWeather', () => {
   it('keeps the query of an address the manifest has moved it to', async () => {
     const fetch = respond(FORECAST)
     await manifestCache.setValue({
-      etag: null,
-      fetchedAt: Date.now(),
       data: {
         ...makeManifest([makePhoto('a')]),
         weather: { forecastUrl: 'https://weather.example/forecast?source=lander' },
       },
+      etag: null,
+      fetchedAt: Date.now(),
     })
 
     await fetchWeather(PLACE, 'celsius')
@@ -95,27 +95,27 @@ describe('searchPlaces', () => {
     const fetch = respond({
       results: [
         {
-          id: 6174041,
-          name: 'Victoria',
-          latitude: 48.4359,
-          longitude: -123.35155,
           admin1: 'British Columbia',
           country: 'Canada',
+          id: 6174041,
+          latitude: 48.4359,
+          longitude: -123.35155,
+          name: 'Victoria',
         },
-        { id: 241131, name: 'Victoria', latitude: -4.62001, longitude: 55.45501 },
+        { id: 241131, latitude: -4.62001, longitude: 55.45501, name: 'Victoria' },
       ],
     })
 
     expect(await searchPlaces('Victoria')).toEqual([
       {
         id: 6174041,
-        place: { name: 'Victoria', latitude: 48.44, longitude: -123.35 },
         label: 'Victoria, British Columbia, Canada',
+        place: { latitude: 48.44, longitude: -123.35, name: 'Victoria' },
       },
       {
         id: 241131,
-        place: { name: 'Victoria', latitude: -4.62, longitude: 55.46 },
         label: 'Victoria',
+        place: { latitude: -4.62, longitude: 55.46, name: 'Victoria' },
       },
     ])
     expect(requested(fetch).searchParams.get('name')).toBe('Victoria')
@@ -137,9 +137,9 @@ describe('searchPlaces', () => {
 describe('endpoints from the manifest', () => {
   const withWeather = (weather: unknown) =>
     manifestCache.setValue({
+      data: v.parse(ManifestSchema, { ...makeManifest([makePhoto('a')]), weather }),
       etag: null,
       fetchedAt: Date.now(),
-      data: v.parse(ManifestSchema, { ...makeManifest([makePhoto('a')]), weather }),
     })
 
   it('asks wherever the manifest says, keeping the address it leaves alone', async () => {

@@ -2,13 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/preact
 import { describe, expect, it } from 'vitest'
 
 import { settingsItem } from './storage'
-import { useStorageItem, type StorageItemLike } from './useStorageItem'
+import { type StorageItemLike, useStorageItem } from './useStorageItem'
 
 function FontPicker() {
   const [settings, setSettings, loaded] = useStorageItem(settingsItem)
   return (
     <>
-      <button type="button" onClick={() => setSettings({ ...settings, font: 'geist' })}>
+      <button onClick={() => setSettings({ ...settings, font: 'geist' })} type="button">
         {settings.font}
       </button>
       <span data-testid="loaded">{String(loaded)}</span>

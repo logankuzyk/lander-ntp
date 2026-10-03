@@ -14,33 +14,33 @@ export const FREQUENCIES = [
 export type Frequency = (typeof FREQUENCIES)[number]
 
 /** What the rotation runs at: the cycling frequency, or `off` while a photo is pinned. */
-export type Pace = Frequency | 'off'
+export type Pace = 'off' | Frequency
 
 /** The photo settings (settings.photos). */
 export type PhotoSettings = {
-  /** Cycle through photos, or keep one on screen. */
-  mode: 'cycle' | 'pinned'
   /** How fast to cycle. Kept while a photo is pinned, for when cycling resumes. */
   frequency: Frequency
+  /** Cycle through photos, or keep one on screen. */
+  mode: 'cycle' | 'pinned'
+  /** The photo to keep while pinned. Null keeps whichever photo is showing. */
+  pinnedId: string | null
   /** Only cycle photos with one of these tag slugs; empty for all of them. Kept while a
    * photo is pinned, for when cycling resumes. */
   tags: string[]
-  /** The photo to keep while pinned. Null keeps whichever photo is showing. */
-  pinnedId: string | null
 }
 
 export const paceOf = (photos: PhotoSettings): Pace =>
   photos.mode === 'pinned' ? 'off' : photos.frequency
 
 export type PhotoState = {
-  currentId: string | null
-  /** Epoch ms when the current photo was first shown. */
-  shownAt: number
   /**
    * Shuffle bag of upcoming ids; `bag[0]` is next. Refilled as soon as it empties, so the
    * upcoming photo is always known (for preloading).
    */
   bag: string[]
+  currentId: string | null
+  /** Epoch ms when the current photo was first shown. */
+  shownAt: number
 }
 
 const SECOND = 1000
@@ -48,13 +48,13 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
 const INTERVALS: Partial<Record<Pace, number>> = {
-  '30s': 30 * SECOND,
+  '1h': HOUR,
   '1m': MINUTE,
   '5m': 5 * MINUTE,
-  '15m': 15 * MINUTE,
-  '1h': HOUR,
   '6h': 6 * HOUR,
   '12h': 12 * HOUR,
+  '15m': 15 * MINUTE,
+  '30s': 30 * SECOND,
 }
 
 /**
@@ -120,9 +120,9 @@ export function nextPhoto(
     pending.length > 0 ? pending : refill(ids, state?.currentId ?? null, random)
 
   return {
+    bag: rest.length > 0 ? rest : refill(ids, next, random),
     currentId: next,
     shownAt: now,
-    bag: rest.length > 0 ? rest : refill(ids, next, random),
   }
 }
 
@@ -161,7 +161,7 @@ export function choosePhoto(
   const available = new Set(ids)
   if (!available.has(id)) return state
   const bag = (state?.bag ?? []).filter((queued) => queued !== id && available.has(queued))
-  return { currentId: id, shownAt: now, bag: bag.length > 0 ? bag : refill(ids, id, random) }
+  return { bag: bag.length > 0 ? bag : refill(ids, id, random), currentId: id, shownAt: now }
 }
 
 export type PhotoIds = {

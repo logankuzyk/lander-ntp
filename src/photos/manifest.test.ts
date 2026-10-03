@@ -21,12 +21,12 @@ const fetchMock = vi.fn<typeof fetch>()
 
 const json = (body: unknown, etag = '"v2"') =>
   new Response(JSON.stringify(body), {
-    status: 200,
     headers: { 'Content-Type': 'application/json', ETag: etag },
+    status: 200,
   })
 
 const seed = (fetchedAt: number): Promise<void> =>
-  manifestCache.setValue({ etag: '"v1"', fetchedAt, data: manifest })
+  manifestCache.setValue({ data: manifest, etag: '"v1"', fetchedAt })
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
@@ -48,15 +48,15 @@ describe('getManifest', () => {
 
       const result = await getManifest(NOW)
 
-      expect(result).toMatchObject({ source: 'network', manifest })
+      expect(result).toMatchObject({ manifest, source: 'network' })
       expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
         headers: {},
         signal: expect.any(AbortSignal),
       })
       expect(await manifestCache.getValue()).toEqual({
+        data: manifest,
         etag: '"v2"',
         fetchedAt: NOW,
-        data: manifest,
       })
     })
 
@@ -95,13 +95,13 @@ describe('getManifest', () => {
     })
 
     it('reads photo tags, and gives photos from a manifest without them none', async () => {
-      const tagged = makePhoto('a', { tags: [{ slug: 'water', name: 'Water' }] })
+      const tagged = makePhoto('a', { tags: [{ name: 'Water', slug: 'water' }] })
       fetchMock.mockResolvedValueOnce(json(makeManifest([tagged, withoutTags(makePhoto('b'))])))
 
       const { manifest: result } = await getManifest(NOW)
 
       expect(result.photos.map((photo) => photo.tags)).toEqual([
-        [{ slug: 'water', name: 'Water' }],
+        [{ name: 'Water', slug: 'water' }],
         [],
       ])
     })
@@ -125,7 +125,7 @@ describe('getManifest', () => {
       const result = await getManifest(NOW)
       await result.revalidation
 
-      expect(result).toMatchObject({ source: 'cache', manifest })
+      expect(result).toMatchObject({ manifest, source: 'cache' })
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
@@ -134,7 +134,7 @@ describe('getManifest', () => {
       fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }))
 
       const result = await getManifest(NOW)
-      expect(result).toMatchObject({ source: 'cache', manifest })
+      expect(result).toMatchObject({ manifest, source: 'cache' })
       await result.revalidation
 
       expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
@@ -142,9 +142,9 @@ describe('getManifest', () => {
         signal: expect.any(AbortSignal),
       })
       expect(await manifestCache.getValue()).toEqual({
+        data: manifest,
         etag: '"v1"',
         fetchedAt: NOW,
-        data: manifest,
       })
     })
 
@@ -157,16 +157,16 @@ describe('getManifest', () => {
 
       expect(result.manifest).toEqual(manifest)
       expect(await manifestCache.getValue()).toEqual({
+        data: updated,
         etag: '"v3"',
         fetchedAt: NOW,
-        data: updated,
       })
     })
 
     it.each([
       ['a network error', () => Promise.reject(new TypeError('Failed to fetch'))],
       ['a server error', () => Promise.resolve(new Response('oops', { status: 500 }))],
-      ['invalid data', () => Promise.resolve(json({ version: 1, photos: 'nope' }))],
+      ['invalid data', () => Promise.resolve(json({ photos: 'nope', version: 1 }))],
     ])('keeps the stale cache after %s', async (_, respond) => {
       const fetchedAt = NOW - MAX_AGE_MS
       await seed(fetchedAt)
@@ -176,14 +176,14 @@ describe('getManifest', () => {
       await result.revalidation
 
       expect(result.manifest).toEqual(manifest)
-      expect(await manifestCache.getValue()).toEqual({ etag: '"v1"', fetchedAt, data: manifest })
+      expect(await manifestCache.getValue()).toEqual({ data: manifest, etag: '"v1"', fetchedAt })
     })
 
     it('gives photos in a cache from before tags none', async () => {
       await manifestCache.setValue({
+        data: makeManifest([withoutTags(makePhoto('a'))]),
         etag: '"v1"',
         fetchedAt: NOW,
-        data: makeManifest([withoutTags(makePhoto('a'))]),
       })
 
       const result = await getManifest(NOW)
@@ -194,9 +194,9 @@ describe('getManifest', () => {
 
     it('ignores a cache that no longer matches the schema', async () => {
       await manifestCache.setValue({
+        data: { version: 0 },
         etag: '"old"',
         fetchedAt: NOW,
-        data: { version: 0 },
       } as unknown as ManifestCache)
       fetchMock.mockResolvedValueOnce(json(manifest))
 

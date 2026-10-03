@@ -7,12 +7,12 @@ import { makePhoto } from '@/test/fixtures'
 import { PhotoInfo } from './PhotoInfo'
 
 const FULL_EXIF: Photo['exif'] = {
-  camera: 'Canon, EOS R5',
-  focalLength: '35.0mm',
   aperture: 'f/2.8',
-  shutter: '1/250s',
-  iso: 'ISO 400',
+  camera: 'Canon, EOS R5',
   dateTaken: '2025-06-30T12:26:01.000Z',
+  focalLength: '35.0mm',
+  iso: 'ISO 400',
+  shutter: '1/250s',
 }
 
 const rows = (container: ParentNode) =>
@@ -23,7 +23,7 @@ const rows = (container: ParentNode) =>
 
 const renderInfo = (photo: Photo) => {
   const onClose = vi.fn()
-  const view = render(<PhotoInfo photo={photo} onClose={onClose} locale="en-GB" />)
+  const view = render(<PhotoInfo locale="en-GB" onClose={onClose} photo={photo} />)
   return { ...view, onClose }
 }
 
@@ -105,7 +105,7 @@ describe('PhotoInfo', () => {
   it('stays open for a click inside, or on a button that toggles it', () => {
     const { onClose } = renderInfo(makePhoto('a'))
     render(
-      <button type="button" data-popover-toggle>
+      <button data-popover-toggle type="button">
         Toggle
       </button>,
     )

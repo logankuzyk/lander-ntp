@@ -8,17 +8,17 @@ import { getEndpoints } from './endpoints'
 export const FETCH_TIMEOUT_MS = 5000
 
 export type Weather = {
-  /** In the unit that was asked for. */
-  temperature: number
-  feelsLike: number
-  high: number
-  low: number
   /** WMO weather code; see `describeCode`. */
   code: number
+  feelsLike: number
+  high: number
   isDay: boolean
+  low: number
   /** Wall-clock time at the place, as an ISO string without an offset, e.g. "2026-10-01T07:13". */
   sunrise: string
   sunset: string
+  /** In the unit that was asked for. */
+  temperature: number
 }
 
 /** "2026-10-01T07:13": the widget reads these as dates, so anything else is refused here. */
@@ -26,16 +26,16 @@ const LocalTimeSchema = v.pipe(v.string(), v.isoDateTime())
 
 const ForecastSchema = v.object({
   current: v.object({
-    temperature_2m: v.number(),
     apparent_temperature: v.number(),
     is_day: v.number(),
+    temperature_2m: v.number(),
     weather_code: v.number(),
   }),
   daily: v.object({
-    temperature_2m_max: v.tuple([v.number()]),
-    temperature_2m_min: v.tuple([v.number()]),
     sunrise: v.tuple([LocalTimeSchema]),
     sunset: v.tuple([LocalTimeSchema]),
+    temperature_2m_max: v.tuple([v.number()]),
+    temperature_2m_min: v.tuple([v.number()]),
   }),
 })
 
@@ -43,12 +43,12 @@ const SearchSchema = v.object({
   results: v.optional(
     v.array(
       v.object({
-        id: v.number(),
-        name: v.string(),
-        latitude: v.number(),
-        longitude: v.number(),
         admin1: v.optional(v.string()),
         country: v.optional(v.string()),
+        id: v.number(),
+        latitude: v.number(),
+        longitude: v.number(),
+        name: v.string(),
       }),
     ),
     [],
@@ -57,9 +57,9 @@ const SearchSchema = v.object({
 
 export type PlaceResult = {
   id: number
-  place: Place
   /** Enough to tell one Victoria from another, e.g. "Victoria, British Columbia, Canada". */
   label: string
+  place: Place
 }
 
 /** Null on network errors, timeouts, bad statuses and data in a shape it doesn't know. */
@@ -94,18 +94,18 @@ export async function searchPlaces(name: string): Promise<PlaceResult[] | null> 
   if (!enabled) return null
   const found = await getJson(
     searchUrl,
-    { name, count: '5', language: navigator.language.split('-')[0] ?? 'en', format: 'json' },
+    { count: '5', format: 'json', language: navigator.language.split('-')[0] ?? 'en', name },
     SearchSchema,
   )
   if (!found) return null
   return found.results.map((result) => ({
     id: result.id,
+    label: [result.name, result.admin1, result.country].filter(Boolean).join(', '),
     place: {
-      name: result.name,
       latitude: round(result.latitude),
       longitude: round(result.longitude),
+      name: result.name,
     },
-    label: [result.name, result.admin1, result.country].filter(Boolean).join(', '),
   }))
 }
 
@@ -123,27 +123,27 @@ export async function fetchWeather(
   const forecast = await getJson(
     forecastUrl,
     {
-      latitude: String(place.latitude),
-      longitude: String(place.longitude),
       current: 'temperature_2m,apparent_temperature,is_day,weather_code',
       daily: 'temperature_2m_max,temperature_2m_min,sunrise,sunset',
+      forecast_days: '1',
+      latitude: String(place.latitude),
+      longitude: String(place.longitude),
       temperature_unit: unit,
       // Sunrise, sunset and "today" in the place's own time.
       timezone: 'auto',
-      forecast_days: '1',
     },
     ForecastSchema,
   )
   if (!forecast) return null
   const { current, daily } = forecast
   return {
-    temperature: current.temperature_2m,
+    code: current.weather_code,
     feelsLike: current.apparent_temperature,
     high: daily.temperature_2m_max[0],
-    low: daily.temperature_2m_min[0],
-    code: current.weather_code,
     isDay: current.is_day === 1,
+    low: daily.temperature_2m_min[0],
     sunrise: daily.sunrise[0],
     sunset: daily.sunset[0],
+    temperature: current.temperature_2m,
   }
 }

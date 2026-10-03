@@ -3,21 +3,21 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Controls } from './Controls'
 
-const renderControls = ({ withInfo = true, busy = false } = {}) => {
+const renderControls = ({ busy = false, withInfo = true } = {}) => {
   const onNext = vi.fn()
   const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
     <Controls
-      onNext={onNext}
       busy={busy}
+      infoOpen={false}
+      onNext={onNext}
+      onToggleInfo={withInfo ? onToggleInfo : undefined}
       onToggleSettings={onToggleSettings}
       settingsOpen={false}
-      onToggleInfo={withInfo ? onToggleInfo : undefined}
-      infoOpen={false}
     />,
   )
-  return { onNext, onToggleSettings, onToggleInfo }
+  return { onNext, onToggleInfo, onToggleSettings }
 }
 
 describe('Controls', () => {
@@ -76,9 +76,9 @@ describe('Controls', () => {
     render(<input aria-label="Search" />)
 
     fireEvent.keyDown(window, { key: 'ArrowRight', metaKey: true })
-    fireEvent.keyDown(window, { key: 'ArrowRight', altKey: true })
+    fireEvent.keyDown(window, { altKey: true, key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
-    fireEvent.keyDown(window, { key: 'i', ctrlKey: true })
+    fireEvent.keyDown(window, { ctrlKey: true, key: 'i' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'ArrowRight' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'i' })
 
@@ -89,7 +89,7 @@ describe('Controls', () => {
   it('ignores shortcuts pressed inside a popover', () => {
     const { onNext, onToggleInfo } = renderControls()
     render(
-      <aside class="popover" role="dialog" aria-label="Settings">
+      <aside aria-label="Settings" class="popover" role="dialog">
         <button type="button">Beach</button>
       </aside>,
     )

@@ -1,16 +1,16 @@
 /** What the sky is doing, reduced from the forecast's WMO weather codes to what has an icon. */
 export type Condition =
   | 'clear'
-  | 'partly-cloudy'
-  | 'overcast'
-  | 'fog'
   | 'drizzle'
+  | 'fog'
   | 'freezing-rain'
-  | 'rain'
-  | 'snow'
-  | 'snow-grains'
-  | 'showers'
   | 'heavy-showers'
+  | 'overcast'
+  | 'partly-cloudy'
+  | 'rain'
+  | 'showers'
+  | 'snow-grains'
+  | 'snow'
   | 'thunderstorm'
 
 /** WMO code (as Open-Meteo reports it) to condition and the words for it. */

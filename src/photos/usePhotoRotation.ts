@@ -4,13 +4,13 @@ import { getManifest } from './manifest'
 import {
   msUntilAdvance,
   nextPhoto,
+  type Pace,
   paceOf,
   photoForSettings,
-  shouldAdvance,
-  type Pace,
   type PhotoIds,
   type PhotoSettings,
   type PhotoState,
+  shouldAdvance,
 } from './rotation'
 import type { Manifest, Photo } from './schema'
 import { photoState } from './storage'
@@ -30,13 +30,13 @@ const sharesPhoto = (pace: Pace) => pace !== 'every-visit'
 const NO_PHOTOS: Photo[] = []
 
 export type PhotoRotation = {
-  /** Every photo in the manifest; empty until it has loaded. */
-  photos: Photo[]
-  photo: Photo | null
-  /** The photo that comes next, for preloading. Null while a photo is pinned. */
-  upcoming: Photo | null
   /** Move on to the next photo from the pool. Resolves with its id once it is shared. */
   next: () => Promise<string | null>
+  photo: Photo | null
+  /** Every photo in the manifest; empty until it has loaded. */
+  photos: Photo[]
+  /** The photo that comes next, for preloading. Null while a photo is pinned. */
+  upcoming: Photo | null
 }
 
 /**
@@ -170,10 +170,10 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
     const pool = new Set(manifest ? poolIds(manifest.photos, tagKey ? tagKey.split(' ') : []) : [])
     const upcoming = mode === 'pinned' ? null : find(state?.bag.find((id) => pool.has(id)))
     return {
-      photos: manifest?.photos ?? NO_PHOTOS,
-      photo,
-      upcoming: upcoming === photo ? null : upcoming,
       next,
+      photo,
+      photos: manifest?.photos ?? NO_PHOTOS,
+      upcoming: upcoming === photo ? null : upcoming,
     }
   }, [manifest, state, mode, tagKey, next])
 }

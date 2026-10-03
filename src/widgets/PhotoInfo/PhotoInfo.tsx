@@ -4,15 +4,15 @@ import type { Photo } from '@/photos/schema'
 import { formatDateTaken } from '@/utils/time'
 
 type PhotoInfoProps = {
-  photo: Photo
-  onClose: () => void
   /** Overrides the browser locale; for tests. */
   locale?: string
+  onClose: () => void
+  photo: Photo
 }
 
 /** Camera settings for the current photo. Opened with the ⓘ button or the `i` key. */
-export function PhotoInfo({ photo, onClose, locale }: PhotoInfoProps) {
-  const { container, close } = usePopover(onClose)
+export function PhotoInfo({ locale, onClose, photo }: PhotoInfoProps) {
+  const { close, container } = usePopover(onClose)
 
   const { exif } = photo
   const rows: [string, string][] = [
@@ -26,15 +26,15 @@ export function PhotoInfo({ photo, onClose, locale }: PhotoInfoProps) {
   ].filter((row): row is [string, string] => Boolean(row[1]))
 
   return (
-    <aside ref={container} class="popover photo-info" role="dialog" aria-label="Photo details">
+    <aside aria-label="Photo details" class="popover photo-info" ref={container} role="dialog">
       <header class="popover__header">
         <h2>Photo details</h2>
         <button
+          aria-label="Close photo details"
+          class="popover__close"
+          onClick={onClose}
           ref={close}
           type="button"
-          class="popover__close"
-          aria-label="Close photo details"
-          onClick={onClose}
         >
           <CloseIcon />
         </button>
@@ -43,7 +43,7 @@ export function PhotoInfo({ photo, onClose, locale }: PhotoInfoProps) {
       {rows.length > 0 ? (
         <dl class="photo-info__rows">
           {rows.map(([label, value]) => (
-            <div key={label} class="photo-info__row">
+            <div class="photo-info__row" key={label}>
               <dt>{label}</dt>
               <dd>{value}</dd>
             </div>

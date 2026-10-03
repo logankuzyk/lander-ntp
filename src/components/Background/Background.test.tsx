@@ -18,7 +18,7 @@ describe('Background', () => {
   it('shows the blurred thumbnail, then fades in the full image once it loads', () => {
     const onLoad = vi.fn()
     const photo = makePhoto('a', { alt: 'Sunset over the Olympics', focalX: 30, focalY: 70 })
-    const { container } = render(<Background photo={photo} onLoad={onLoad} />)
+    const { container } = render(<Background onLoad={onLoad} photo={photo} />)
 
     const thumbnail = container.querySelector('.background__thumb')
     const full = screen.getByRole('img', { name: 'Sunset over the Olympics' })
@@ -49,7 +49,7 @@ describe('Background', () => {
   it('falls back to the bundled photo when the image fails to load', () => {
     // A cached manifest can outlive the images it points at.
     const onLoad = vi.fn()
-    const { container } = render(<Background photo={makePhoto('a')} onLoad={onLoad} />)
+    const { container } = render(<Background onLoad={onLoad} photo={makePhoto('a')} />)
 
     const full = () => fulls(container)[0] as HTMLImageElement
     fireEvent.error(full())
@@ -68,12 +68,12 @@ describe('Background', () => {
   })
 
   it('washes the photo when asked, and leaves it alone otherwise', () => {
-    const { container, rerender } = render(<Background photo={makePhoto('a')} dim />)
+    const { container, rerender } = render(<Background dim photo={makePhoto('a')} />)
     const background = () => container.querySelector('.background') as HTMLElement
 
     expect(background().classList.contains('background--dim')).toBe(true)
 
-    rerender(<Background photo={makePhoto('a')} dim={false} />)
+    rerender(<Background dim={false} photo={makePhoto('a')} />)
 
     expect(background().classList.contains('background--dim')).toBe(false)
   })
@@ -138,11 +138,11 @@ describe('Background', () => {
       // The incoming photo is preloaded, so it often loads before the one it was stacked on.
       const onLoadingChange = vi.fn()
       const { container, rerender } = render(
-        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+        <Background onLoadingChange={onLoadingChange} photo={makePhoto('a')} />,
       )
       fireEvent.load(fulls(container)[0] as HTMLImageElement)
-      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
-      rerender(<Background photo={makePhoto('c')} onLoadingChange={onLoadingChange} />)
+      rerender(<Background onLoadingChange={onLoadingChange} photo={makePhoto('b')} />)
+      rerender(<Background onLoadingChange={onLoadingChange} photo={makePhoto('c')} />)
 
       fireEvent.load(fulls(container)[2] as HTMLImageElement)
       fireEvent.load(fulls(container)[1] as HTMLImageElement)
@@ -158,12 +158,12 @@ describe('Background', () => {
     it('reports the wait while the replacement photo loads', () => {
       const onLoadingChange = vi.fn()
       const { container, rerender } = render(
-        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+        <Background onLoadingChange={onLoadingChange} photo={makePhoto('a')} />,
       )
       fireEvent.load(fulls(container)[0] as HTMLImageElement)
       onLoadingChange.mockClear()
 
-      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
+      rerender(<Background onLoadingChange={onLoadingChange} photo={makePhoto('b')} />)
 
       expect(onLoadingChange).toHaveBeenLastCalledWith(true)
 
@@ -174,7 +174,7 @@ describe('Background', () => {
 
     it('never reports a wait for the first photo, which shows its thumbnail', () => {
       const onLoadingChange = vi.fn()
-      render(<Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />)
+      render(<Background onLoadingChange={onLoadingChange} photo={makePhoto('a')} />)
 
       expect(onLoadingChange).not.toHaveBeenCalledWith(true)
     })
@@ -182,10 +182,10 @@ describe('Background', () => {
     it('clears the wait when it unmounts mid-load', () => {
       const onLoadingChange = vi.fn()
       const { container, rerender, unmount } = render(
-        <Background photo={makePhoto('a')} onLoadingChange={onLoadingChange} />,
+        <Background onLoadingChange={onLoadingChange} photo={makePhoto('a')} />,
       )
       fireEvent.load(fulls(container)[0] as HTMLImageElement)
-      rerender(<Background photo={makePhoto('b')} onLoadingChange={onLoadingChange} />)
+      rerender(<Background onLoadingChange={onLoadingChange} photo={makePhoto('b')} />)
       expect(onLoadingChange).toHaveBeenLastCalledWith(true)
 
       unmount()

@@ -2,13 +2,13 @@ import { Dropdown } from './Dropdown'
 
 type SelectProps<T extends string> = {
   labelId: string
-  value: T
-  options: readonly (readonly [T, string])[]
   onChange: (value: T) => void
+  options: readonly (readonly [T, string])[]
+  value: T
 }
 
 /** Pick one option. The menu closes on a choice. */
-export function Select<T extends string>({ labelId, value, options, onChange }: SelectProps<T>) {
+export function Select<T extends string>({ labelId, onChange, options, value }: SelectProps<T>) {
   const current = options.find(([id]) => id === value)?.[1] ?? ''
 
   return (
@@ -16,29 +16,29 @@ export function Select<T extends string>({ labelId, value, options, onChange }: 
       {(close) =>
         options.map(([id, text]) => (
           <button
-            key={id}
-            type="button"
-            role="option"
-            class="dropdown__option"
             aria-selected={id === value}
-            tabIndex={-1}
+            class="dropdown__option"
+            key={id}
             onClick={() => {
               if (id !== value) onChange(id)
               close()
             }}
+            role="option"
+            tabIndex={-1}
+            type="button"
           >
             {text}
             {id === value && (
               <svg
                 aria-hidden="true"
-                viewBox="0 0 24 24"
-                width="14"
-                height="14"
                 fill="none"
+                height="14"
                 stroke="currentColor"
-                stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+                width="14"
               >
                 <path d="M5 12l5 5 9-10" />
               </svg>

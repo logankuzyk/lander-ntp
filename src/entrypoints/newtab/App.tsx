@@ -15,7 +15,7 @@ import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
 import { Weather } from '@/widgets/Weather/Weather'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
-type Popover = 'settings' | 'info' | null
+type Popover = 'info' | 'settings' | null
 
 export function App() {
   const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
@@ -23,7 +23,7 @@ export function App() {
   const [photoLoading, setPhotoLoading] = useState(false)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
-  const { photos, photo, upcoming, next } = usePhotoRotation(
+  const { next, photo, photos, upcoming } = usePhotoRotation(
     settingsLoaded ? settings.photos : null,
   )
 
@@ -54,12 +54,12 @@ export function App() {
     <main class="app">
       {photo && (
         <Background
-          photo={photo}
           dim={settings.dim}
           onLoad={() => {
             if (upcoming) preloadNext(upcoming)
           }}
           onLoadingChange={setPhotoLoading}
+          photo={photo}
         />
       )}
       {/*
@@ -71,30 +71,30 @@ export function App() {
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
       {weather && (
         <Weather
-          weather={weather.weather}
-          place={weather.place}
           fields={settings.weather.fields}
           hour12={settings.clock.hour12}
+          place={weather.place}
+          weather={weather.weather}
         />
       )}
       {photo && <PhotoCredit photo={photo} />}
-      {photo && popover === 'info' && <PhotoInfo photo={photo} onClose={close} />}
+      {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
       {popover === 'settings' && (
         <SettingsPanel
-          settings={settings}
-          onChange={setSettings}
-          photos={photos}
           currentId={photo?.id ?? null}
+          onChange={setSettings}
           onClose={close}
+          photos={photos}
+          settings={settings}
         />
       )}
       <Controls
-        onNext={showNext}
         busy={photoLoading}
+        infoOpen={popover === 'info'}
+        onNext={showNext}
+        onToggleInfo={photo ? () => toggle('info') : undefined}
         onToggleSettings={() => toggle('settings')}
         settingsOpen={popover === 'settings'}
-        onToggleInfo={photo ? () => toggle('info') : undefined}
-        infoOpen={popover === 'info'}
       />
     </main>
   )

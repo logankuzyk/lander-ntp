@@ -6,16 +6,16 @@ import { usePlacement } from './usePlacement'
 const OPTION = '[role="option"]'
 
 type DropdownProps = {
-  /** Id of the visible label, which names the field and its menu. */
-  labelId: string
-  /** What the closed field shows. */
-  value: ComponentChildren
-  /** `listbox` when the menu is only options; `dialog` when it has other controls as well. */
-  popup: 'listbox' | 'dialog'
-  /** For a field that holds chips rather than a line of text. */
-  chips?: boolean
   /** The menu's contents. `close` shuts it and puts focus back on the field. */
   children: (close: () => void) => ComponentChildren
+  /** For a field that holds chips rather than a line of text. */
+  chips?: boolean
+  /** Id of the visible label, which names the field and its menu. */
+  labelId: string
+  /** `listbox` when the menu is only options; `dialog` when it has other controls as well. */
+  popup: 'dialog' | 'listbox'
+  /** What the closed field shows. */
+  value: ComponentChildren
 }
 
 /**
@@ -24,7 +24,7 @@ type DropdownProps = {
  * it. Arrow keys move between options, and Escape, a click outside or tabbing away close it.
  * Select and MultiSelect fill it in.
  */
-export function Dropdown({ labelId, value, popup, chips = false, children }: DropdownProps) {
+export function Dropdown({ children, chips = false, labelId, popup, value }: DropdownProps) {
   const menuId = useId()
   const [open, setOpen] = useState(false)
   const field = useRef<HTMLButtonElement>(null)
@@ -97,8 +97,8 @@ export function Dropdown({ labelId, value, popup, chips = false, children }: Dro
     const to = {
       ArrowDown: index + 1,
       ArrowUp: index - 1,
-      Home: 0,
       End: list.length - 1,
+      Home: 0,
     }[event.key]
     if (to === undefined || list.length === 0) return
     event.preventDefault()
@@ -121,45 +121,45 @@ export function Dropdown({ labelId, value, popup, chips = false, children }: Dro
   return (
     <div class="dropdown">
       <button
-        ref={field}
-        type="button"
-        role="combobox"
-        class={chips ? 'dropdown__field dropdown__field--chips' : 'dropdown__field'}
-        aria-labelledby={labelId}
-        aria-haspopup={popup}
-        aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        aria-expanded={open}
+        aria-haspopup={popup}
+        aria-labelledby={labelId}
+        class={chips ? 'dropdown__field dropdown__field--chips' : 'dropdown__field'}
         onClick={() => setOpen((was) => !was)}
         onKeyDown={onFieldKeyDown}
+        ref={field}
+        role="combobox"
+        type="button"
       >
         <span class="dropdown__value">{value}</span>
         <svg
-          class="dropdown__chevron"
           aria-hidden="true"
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
+          class="dropdown__chevron"
           fill="none"
+          height="14"
           stroke="currentColor"
-          stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="14"
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
       {open && (
         <div
-          ref={menu}
-          id={menuId}
-          class={`dropdown__menu dropdown__menu--${popup}`}
-          role={popup}
           aria-labelledby={labelId}
-          onKeyDown={onMenuKeyDown}
+          class={`dropdown__menu dropdown__menu--${popup}`}
+          id={menuId}
           onFocusIn={onMenuFocusIn}
           onFocusOut={onMenuFocusOut}
+          onKeyDown={onMenuKeyDown}
           // Its own scrolling: the popover shouldn't grow under it.
           onWheel={(event) => event.stopPropagation()}
+          ref={menu}
+          role={popup}
         >
           {children(close)}
         </div>
