@@ -71,7 +71,6 @@ export function App() {
       {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
       {weather && (
         <Weather
-          background={settings.weather.background}
           fields={settings.weather.fields}
           hour12={settings.clock.hour12}
           place={weather.place}

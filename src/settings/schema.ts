@@ -33,8 +33,6 @@ export type WeatherField = (typeof WEATHER_FIELDS)[number]
 export type WeatherFieldSetting = { id: WeatherField; shown: boolean }
 
 export type WeatherSettings = {
-  /** Sit on the same translucent panel as the popovers, rather than straight on the photo. */
-  background: boolean
   enabled: boolean
   /** Every field once, in the order the widget draws them. */
   fields: WeatherFieldSetting[]
@@ -80,15 +78,14 @@ export const DEFAULT_SETTINGS: Settings = {
     tags: [],
   },
   weather: {
-    background: false,
     // Off until asked for: it is the only thing that sends a place anywhere.
     enabled: false,
     fields: [
-      { id: 'location', shown: true },
-      { id: 'sun', shown: true },
+      { id: 'highLow', shown: true },
+      { id: 'location', shown: false },
+      { id: 'sun', shown: false },
       { id: 'condition', shown: false },
       { id: 'feelsLike', shown: false },
-      { id: 'highLow', shown: false },
     ],
     followDevice: false,
     place: null,

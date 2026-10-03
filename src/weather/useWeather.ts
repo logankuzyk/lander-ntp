@@ -28,6 +28,9 @@ export const MAX_AGE_MS = 30 * 60 * 1000
  */
 export const MAX_STALE_MS = 3 * 60 * 60 * 1000
 
+/** How soon to ask again after a refresh that failed, which may only mean the network was away. */
+export const RETRY_MS = 60 * 1000
+
 /**
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
  * has to ask, so everywhere else this is true from the first render.
@@ -86,7 +89,7 @@ function useDevicePosition(follow: boolean): DevicePosition | null {
       void update()
     })()
 
-    // "Use my location" in settings writes a position of its own while this is already following.
+    // "Current location" in settings writes a position of its own while this is already following.
     const unwatch = devicePosition.watch((next) => {
       if (!next) return
       last = next
@@ -164,7 +167,7 @@ export function useWeather(
         setShown(
           (old) => reading ?? (old && Date.now() - old.fetchedAt < MAX_STALE_MS ? old : null),
         )
-        again(MAX_AGE_MS)
+        again(reading ? MAX_AGE_MS : RETRY_MS)
       } finally {
         checking = false
       }

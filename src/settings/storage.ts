@@ -7,9 +7,10 @@ import { DEFAULT_SETTINGS, type Settings, WEATHER_FIELDS } from './schema'
 
 /**
  * The shape the page reads. Fonts stay loose: fontStack falls back for one it doesn't know,
- * as happens when another device is on a newer version.
+ * as happens when another device is on a newer version. Loose at the top for the same reason:
+ * a block that device added is kept, so saving from here doesn't take it away.
  */
-const SettingsSchema = v.object({
+const SettingsSchema = v.looseObject({
   clock: v.object({
     enabled: v.boolean(),
     hour12: v.boolean(),
@@ -28,7 +29,6 @@ const SettingsSchema = v.object({
   // its defaults.
   weather: v.optional(
     v.object({
-      background: v.boolean(),
       enabled: v.boolean(),
       fields: v.pipe(
         v.array(v.object({ id: v.picklist(WEATHER_FIELDS), shown: v.boolean() })),

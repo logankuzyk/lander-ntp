@@ -375,6 +375,14 @@ describe('SettingsPanel', () => {
 
   describe('weather', () => {
     const PLACE = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
+    /** Two shown and three hidden, to move between. */
+    const FIELDS: Settings['weather']['fields'] = [
+      { id: 'location', shown: true },
+      { id: 'sun', shown: true },
+      { id: 'condition', shown: false },
+      { id: 'feelsLike', shown: false },
+      { id: 'highLow', shown: false },
+    ]
 
     const withWeather = (changes: Partial<Settings['weather']>): Settings => ({
       ...settings,
@@ -394,8 +402,8 @@ describe('SettingsPanel', () => {
     it('offers only the switch while the widget is off', () => {
       const { onChange } = renderWeather()
 
-      expect(screen.queryByLabelText('Background')).toBeNull()
-      expect(screen.queryByRole('searchbox')).toBeNull()
+      expect(screen.queryByRole('combobox', { name: 'Units' })).toBeNull()
+      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
 
       fireEvent.click(screen.getByLabelText('Show weather'))
       return waitFor(() => expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true })))
@@ -423,17 +431,114 @@ describe('SettingsPanel', () => {
       )
       const { onChange } = renderWeather({ enabled: true })
 
-      fireEvent.input(screen.getByRole('searchbox', { name: 'Search for a place' }), {
+      fireEvent.input(screen.getByRole('combobox', { name: 'Search for a place' }), {
         target: { value: 'Victoria' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Search' }))
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Victoria, British Columbia, Canada' }),
+        await screen.findByRole('option', { name: 'Victoria, British Columbia, Canada' }),
       )
 
       expect(onChange).toHaveBeenCalledWith(
         withWeather({ enabled: true, followDevice: false, place: PLACE }),
       )
+    })
+
+    describe('suggestions', () => {
+      const found = (...names: string[]) =>
+        vi.stubGlobal(
+          'fetch',
+          vi.fn().mockResolvedValue({
+            json: () =>
+              Promise.resolve({
+                results: names.map((name, id) => ({
+                  country: 'Canada',
+                  id,
+                  latitude: 48.4359,
+                  longitude: -123.35155,
+                  name,
+                })),
+              }),
+            ok: true,
+          }),
+        )
+
+      const searched = async () => {
+        found('Victoria', 'Victoriaville')
+        const rendered = renderWeather({ enabled: true })
+        const box = screen.getByRole<HTMLInputElement>('combobox', { name: 'Search for a place' })
+        fireEvent.focus(box)
+        fireEvent.input(box, { target: { value: 'Vic' } })
+        await screen.findByRole('option', { name: 'Victoria, Canada' })
+        return { ...rendered, box }
+      }
+
+      const active = () =>
+        screen
+          .queryAllByRole('option')
+          .find((option) => option.getAttribute('aria-selected') === 'true')?.textContent
+
+      it('puts each one in the box as the arrow keys reach it, and the typed text between', async () => {
+        const { box } = await searched()
+
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+        expect(box.value).toBe('Victoria, Canada')
+        expect(active()).toBe('Victoria, Canada')
+        expect(box.getAttribute('aria-activedescendant')).toBe(
+          screen.getByRole('option', { name: 'Victoria, Canada' }).id,
+        )
+
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+        expect(box.value).toBe('Vic')
+        expect(active()).toBeUndefined()
+
+        fireEvent.keyDown(box, { key: 'ArrowUp' })
+        expect(box.value).toBe('Victoriaville, Canada')
+      })
+
+      it('takes the one in the box with Enter', async () => {
+        const { box, onChange } = await searched()
+
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+        fireEvent.keyDown(box, { key: 'Enter' })
+
+        expect(onChange).toHaveBeenCalledWith(
+          withWeather({ enabled: true, followDevice: false, place: PLACE }),
+        )
+      })
+
+      it('searches once the typing pauses, for the text as it then is', async () => {
+        found('Victoria')
+        renderWeather({ enabled: true })
+        const box = screen.getByRole('combobox', { name: 'Search for a place' })
+
+        fireEvent.focus(box)
+        for (const value of ['V', 'Vi', 'Vic']) fireEvent.input(box, { target: { value } })
+        await screen.findByRole('option', { name: 'Victoria, Canada' })
+
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain('name=Vic')
+      })
+
+      it('offers the current location only until there are places to show', async () => {
+        const { box } = await searched()
+        expect(screen.queryByRole('option', { name: 'Current location' })).toBeNull()
+
+        fireEvent.input(box, { target: { value: '' } })
+        expect(screen.getByRole('option', { name: 'Current location' })).toBeTruthy()
+        expect(screen.queryByRole('option', { name: 'Victoria, Canada' })).toBeNull()
+      })
+
+      it('closes with Escape, leaving the typed text and the panel', async () => {
+        const { box, onClose } = await searched()
+
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+        fireEvent.keyDown(box, { key: 'Escape' })
+
+        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
+        expect(box.value).toBe('Vic')
+        expect(onClose).not.toHaveBeenCalled()
+      })
     })
 
     it('says when nothing matches and when the search fails', async () => {
@@ -442,16 +547,16 @@ describe('SettingsPanel', () => {
         vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true }),
       )
       renderWeather({ enabled: true })
-      const search = () => {
-        fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'qqq' } })
-        fireEvent.click(screen.getByRole('button', { name: 'Search' }))
-      }
+      const search = (value: string) =>
+        fireEvent.input(screen.getByRole('combobox', { name: 'Search for a place' }), {
+          target: { value },
+        })
 
-      search()
+      search('qqq')
       expect(await screen.findByText('No places found.')).toBeTruthy()
 
       vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-      search()
+      search('qqqq')
       expect(await screen.findByText('Couldn’t search just now.')).toBeTruthy()
     })
 
@@ -459,13 +564,32 @@ describe('SettingsPanel', () => {
       renderWeather({ enabled: true, place: PLACE })
 
       expect(screen.getByText('Victoria')).toBeTruthy()
-      expect(screen.queryByRole('searchbox')).toBeNull()
+      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
 
       fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-      expect(screen.getByRole('searchbox')).toBeTruthy()
+      expect(screen.getByRole('combobox', { name: 'Search for a place' })).toBeTruthy()
     })
 
     describe('using the device location', () => {
+      /** The suggestion under the search box, there once the box is focused. */
+      const currentLocation = () => {
+        fireEvent.focus(screen.getByRole('combobox', { name: 'Search for a place' }))
+        fireEvent.click(screen.getByRole('option', { name: 'Current location' }))
+      }
+
+      it('suggests it only while the search box is focused', () => {
+        renderWeather({ enabled: true })
+        const box = screen.getByRole('combobox', { name: 'Search for a place' })
+        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
+
+        fireEvent.focus(box)
+        expect(screen.getByRole('option', { name: 'Current location' })).toBeTruthy()
+        expect(box.getAttribute('aria-expanded')).toBe('true')
+
+        fireEvent.blur(box)
+        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
+      })
+
       const locating = (coords: { latitude: number; longitude: number } | null) =>
         vi.stubGlobal('navigator', {
           geolocation: {
@@ -485,7 +609,7 @@ describe('SettingsPanel', () => {
         )
         const { onChange } = renderWeather({ enabled: true })
 
-        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+        currentLocation()
 
         await waitFor(() =>
           expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true, followDevice: true })),
@@ -522,8 +646,8 @@ describe('SettingsPanel', () => {
         const { rerender } = render(panel({ enabled: true }))
         openSection('Weather')
 
-        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
-        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+        currentLocation()
+        currentLocation()
         rerender(panel({ enabled: true, unit: 'fahrenheit' }))
         found({ coords: { latitude: 48.4359, longitude: -123.35155 } })
 
@@ -539,7 +663,7 @@ describe('SettingsPanel', () => {
         locating(null)
         const { onChange } = renderWeather({ enabled: true })
 
-        fireEvent.click(screen.getByRole('button', { name: 'Use my location' }))
+        currentLocation()
 
         expect(await screen.findByText(/Couldn’t get your location/)).toBeTruthy()
         expect(onChange).not.toHaveBeenCalled()
@@ -552,24 +676,21 @@ describe('SettingsPanel', () => {
         expect(screen.queryByText('Victoria')).toBeNull()
 
         fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-        expect(screen.getByRole('searchbox')).toBeTruthy()
+        expect(screen.getByRole('combobox', { name: 'Search for a place' })).toBeTruthy()
       })
     })
 
-    it('changes the unit and the background', () => {
+    it('changes the unit', () => {
       const { onChange } = renderWeather({ enabled: true, place: PLACE })
       const on = { enabled: true, place: PLACE }
 
       fireEvent.click(screen.getByRole('combobox', { name: 'Units' }))
       fireEvent.click(screen.getByRole('option', { name: 'Fahrenheit' }))
       expect(onChange).toHaveBeenCalledWith(withWeather({ ...on, unit: 'fahrenheit' }))
-
-      fireEvent.click(screen.getByLabelText('Background'))
-      expect(onChange).toHaveBeenCalledWith(withWeather({ ...on, background: true }))
     })
 
     describe('fields', () => {
-      const on = { enabled: true, place: PLACE }
+      const on = { enabled: true, fields: FIELDS, place: PLACE }
       const ids = (fields: Settings['weather']['fields']) => fields.map(({ id }) => id)
       const rows = () =>
         within(screen.getByRole('list', { name: 'Show' }))
@@ -674,7 +795,7 @@ describe('SettingsPanel', () => {
 
     it('keeps the focus on a handle whose row the arrow keys moved', () => {
       function Fields() {
-        const [fields, setFields] = useState(DEFAULT_SETTINGS.weather.fields)
+        const [fields, setFields] = useState(FIELDS)
         return <WeatherFields fields={fields} onChange={setFields} />
       }
       render(<Fields />)

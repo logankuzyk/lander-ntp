@@ -21,7 +21,7 @@ describe('DEFAULT_SETTINGS', () => {
       dim: true,
       font: 'system',
       photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
-      weather: { background: false, enabled: false, place: null },
+      weather: { enabled: false, place: null },
     })
     expect(typeof DEFAULT_SETTINGS.clock.hour12).toBe('boolean')
     expect(FONTS[DEFAULT_SETTINGS.font]).toBeDefined()

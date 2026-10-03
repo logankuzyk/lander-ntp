@@ -122,7 +122,9 @@ describe('App', () => {
 
     const weather = await screen.findByRole('region', { name: 'Weather' })
     expect(weather.textContent).toContain('12°')
-    expect(within(weather).getByText('Victoria')).toBeTruthy()
+    // The high and low are the only line under it until others are asked for.
+    expect(weather.textContent).toContain('16°')
+    expect(weather.textContent).not.toContain('Victoria')
   })
 
   it('has no weather until it is switched on', async () => {

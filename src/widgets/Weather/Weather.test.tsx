@@ -19,11 +19,10 @@ const READING: Reading = {
 
 const renderWeather = (
   shown: WeatherField[] = [],
-  props: { background?: boolean; hour12?: boolean; reading?: Reading } = {},
+  props: { hour12?: boolean; reading?: Reading } = {},
 ) =>
   render(
     <Weather
-      background={props.background ?? false}
       fields={[
         ...shown.map((id) => ({ id, shown: true })),
         ...WEATHER_FIELDS.filter((id) => !shown.includes(id)).map((id) => ({ id, shown: false })),
@@ -86,12 +85,5 @@ describe('Weather', () => {
 
     const lines = [...container.querySelectorAll('.weather__details li')]
     expect(lines.map((line) => line.textContent)).toEqual(['Victoria'])
-  })
-
-  it('sits on the panel only when asked to', () => {
-    expect(renderWeather().container.querySelector('.weather--panel')).toBeNull()
-    expect(
-      renderWeather([], { background: true }).container.querySelector('.weather--panel'),
-    ).not.toBeNull()
   })
 })

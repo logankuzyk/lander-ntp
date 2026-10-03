@@ -4,8 +4,6 @@
  * Self-hosted through @fontsource (see entrypoints/newtab/main.tsx). No remote font requests,
  * so the new tab works offline and needs no host permissions.
  */
-// In the order the font picker lists them.
-
 export const FONTS = {
   geist: { label: 'Geist', stack: "'Geist Sans', ui-sans-serif, system-ui, sans-serif" },
   'geist-mono': { label: 'Geist Mono', stack: "'Geist Mono', ui-monospace, monospace" },

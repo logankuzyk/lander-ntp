@@ -9,13 +9,13 @@ import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotati
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
-import type { Place, Settings, WeatherSettings } from '@/settings/schema'
+import type { Settings, WeatherSettings } from '@/settings/schema'
 import { allowLocation } from '@/weather/consent'
 import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
-import { type PlaceResult, searchPlaces } from '@/weather/openMeteo'
 import { placeName } from '@/weather/placeName'
 
 import { Gallery } from './Gallery'
+import { PlaceSearch } from './PlaceSearch'
 import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
@@ -54,7 +54,9 @@ function Toggle({ checked, label, onChange }: ToggleProps) {
       <span>{label}</span>
       <input
         checked={checked}
+        class="switch"
         onChange={(event) => onChange(event.currentTarget.checked)}
+        role="switch"
         type="checkbox"
       />
     </label>
@@ -195,66 +197,11 @@ function ClockSection({ onChange, settings }: SectionProps) {
   )
 }
 
-type PlaceSearchProps = {
-  onSelect: (place: Place) => void
-}
-
-/** Find a place by name. Searches on submit rather than per keystroke: one request a search. */
-function PlaceSearch({ onSelect }: PlaceSearchProps) {
-  const [query, setQuery] = useState('')
-  const [searching, setSearching] = useState(false)
-  /** Null before the first search; 'failed' when the search itself didn't go through. */
-  const [results, setResults] = useState<'failed' | PlaceResult[] | null>(null)
-
-  const search = async (event: Event) => {
-    event.preventDefault()
-    const name = query.trim()
-    if (!name || searching) return
-    setSearching(true)
-    setResults((await searchPlaces(name)) ?? 'failed')
-    setSearching(false)
-  }
-
-  return (
-    <>
-      <form class="settings__search" onSubmit={(event) => void search(event)} role="search">
-        <input
-          aria-label="Search for a place"
-          class="settings__input"
-          onInput={(event) => setQuery(event.currentTarget.value)}
-          placeholder="City or town"
-          type="search"
-          value={query}
-        />
-        <button class="settings__button" disabled={searching || !query.trim()} type="submit">
-          Search
-        </button>
-      </form>
-      <div aria-live="polite">
-        {results === 'failed' && <p class="settings__note">Couldn’t search just now.</p>}
-        {results !== 'failed' && results?.length === 0 && (
-          <p class="settings__note">No places found.</p>
-        )}
-      </div>
-      {results !== 'failed' && results && results.length > 0 && (
-        <ul aria-label="Places" class="settings__results">
-          {results.map(({ id, label, place }) => (
-            <li key={id}>
-              <button class="settings__result" onClick={() => onSelect(place)} type="button">
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  )
-}
-
 function WeatherSection({ onChange, settings }: SectionProps) {
   const current = settings.weather
   const [changingPlace, setChangingPlace] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
+  const [, setRefused] = useState(0)
 
   // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
   // a change is laid over the settings as they are when it is made, not as they were at the click.
@@ -283,7 +230,8 @@ function WeatherSection({ onChange, settings }: SectionProps) {
   }
 
   const enable = async (enabled: boolean) => {
-    if (enabled && !(await allowLocation())) return
+    // Nothing changed, but the checkbox has ticked itself: render again to put it back.
+    if (enabled && !(await allowLocation())) return setRefused((count) => count + 1)
     weather({ enabled })
   }
 
@@ -307,20 +255,14 @@ function WeatherSection({ onChange, settings }: SectionProps) {
               </span>
             </div>
           ) : (
-            <>
-              <PlaceSearch
-                onSelect={(place) => {
-                  setChangingPlace(false)
-                  weather({ followDevice: false, place })
-                }}
-              />
-              <p aria-live="polite" class="settings__note">
-                <button class="settings__link" onClick={() => void follow()} type="button">
-                  Use my location
-                </button>
-                {locateFailed && ' Couldn’t get your location. Check that this page is allowed it.'}
-              </p>
-            </>
+            <PlaceSearch
+              locateFailed={locateFailed}
+              onLocate={() => void follow()}
+              onSelect={(place) => {
+                setChangingPlace(false)
+                weather({ followDevice: false, place })
+              }}
+            />
           ))}
         {current.enabled && (
           <>
@@ -332,11 +274,6 @@ function WeatherSection({ onChange, settings }: SectionProps) {
                 ['fahrenheit', 'Fahrenheit'],
               ]}
               value={current.unit}
-            />
-            <Toggle
-              checked={current.background}
-              label="Background"
-              onChange={(background) => weather({ background })}
             />
           </>
         )}

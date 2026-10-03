@@ -1,11 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
-/** Between the field and the menu, and the menu and the window's edge. */
-const GAP = 4
-const EDGE = 8
-/** Enough room below for a few options, which is where a menu is looked for first. */
-const ROOM_BELOW = 200
+import { usePlacement } from './usePlacement'
 
 const OPTION = '[role="option"]'
 
@@ -43,34 +39,7 @@ export function Dropdown({ children, chips = false, labelId, popup, value }: Dro
 
   const options = () => [...(menu.current?.querySelectorAll<HTMLElement>(OPTION) ?? [])]
 
-  // Placement: right edges together, below the field when it fits there or there's a fair bit
-  // of room to scroll in, otherwise wherever there's more.
-  useLayoutEffect(() => {
-    if (!open) return
-    const place = () => {
-      const anchor = field.current
-      const el = menu.current
-      if (!anchor || !el) return
-      const frame = (el.offsetParent ?? document.documentElement).getBoundingClientRect()
-      const at = anchor.getBoundingClientRect()
-      const below = window.innerHeight - at.bottom - GAP - EDGE
-      const above = at.top - GAP - EDGE
-      const up = el.scrollHeight > below && below < ROOM_BELOW && above > below
-      el.style.right = `${frame.right - at.right}px`
-      el.style.top = up ? '' : `${at.bottom - frame.top + GAP}px`
-      el.style.bottom = up ? `${frame.bottom - at.top + GAP}px` : ''
-      el.style.maxHeight = `${Math.max(up ? above : below, 0)}px`
-      el.style.minWidth = `${at.width}px`
-    }
-    place()
-    window.addEventListener('resize', place)
-    // Capture: the section that scrolls is an ancestor, not the window.
-    document.addEventListener('scroll', place, true)
-    return () => {
-      window.removeEventListener('resize', place)
-      document.removeEventListener('scroll', place, true)
-    }
-  }, [open])
+  usePlacement(open, field, menu, 'end')
 
   // Into the menu on open: the chosen option, else the first one, else whatever can take it.
   useEffect(() => {

@@ -47,8 +47,6 @@ const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
-// Shortest first.
-
 const INTERVALS: Partial<Record<Pace, number>> = {
   '1h': HOUR,
   '1m': MINUTE,

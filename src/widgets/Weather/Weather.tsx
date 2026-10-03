@@ -9,7 +9,6 @@ import type { Weather as Reading } from '@/weather/openMeteo'
 import { ConditionIcon } from './ConditionIcon'
 
 type WeatherProps = {
-  background: boolean
   fields: WeatherSettings['fields']
   /** The clock's setting, so every time on the page reads the same way. */
   hour12: boolean
@@ -33,7 +32,7 @@ function SunTime({ at, hour12, label }: { at: string; hour12: boolean; label: st
 }
 
 /** Top right: the weather now, over the optional lines that are switched on, in their order. */
-export function Weather({ background, fields, hour12, place, weather }: WeatherProps) {
+export function Weather({ fields, hour12, place, weather }: WeatherProps) {
   const { condition, label } = describeCode(weather.code)
   // Where the sun doesn't rise or set today, the forecast gives both as the same midnight.
   const noSun = weather.sunrise === weather.sunset
@@ -62,7 +61,7 @@ export function Weather({ background, fields, hour12, place, weather }: WeatherP
   }
 
   return (
-    <section aria-label="Weather" class={background ? 'weather weather--panel' : 'weather'}>
+    <section aria-label="Weather" class="weather">
       <div class="weather__now" title={label}>
         <ConditionIcon condition={condition} isDay={weather.isDay} size={36} />
         <span class="weather__temperature">{degrees(weather.temperature)}</span>
