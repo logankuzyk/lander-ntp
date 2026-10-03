@@ -26,9 +26,9 @@ jobs:
     # Job-wide so the credential check and the submission itself read the same values.
     env:
       CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+      CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
+      CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
       FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
       FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
       FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
@@ -63,58 +63,108 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" .output/*.zip --clobber
 
-      # Submitting is opt-in: until the store secrets exist this workflow is just a builder.
-      # A half-filled set is treated as a mistake rather than a reason to skip, so a typo in
-      # one secret name can't quietly turn a real release into a no-op.
-      - name: Check for store credentials
-        id: credentials
-        run: |
-          set -euo pipefail
-
-          required=(
-            CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN
-            FIREFOX_EXTENSION_ID FIREFOX_JWT_ISSUER FIREFOX_JWT_SECRET
-            EDGE_PRODUCT_ID EDGE_CLIENT_ID EDGE_API_KEY
-          )
-          missing=()
-          for name in "${required[@]}"; do
-            [ -n "${!name:-}" ] || missing+=("$name")
-          done
-
-          if [ "${#missing[@]}" -eq 0 ]; then
-            echo 'configured=true' >> "$GITHUB_OUTPUT"
-          elif [ "${#missing[@]}" -eq "${#required[@]}" ]; then
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::No store credentials configured, so nothing was submitted. Download the zips from this run and upload them to the stores by hand.'
-          else
-            echo "::error::Store credentials are only partially configured. Missing: ${missing[*]}"
-            exit 1
-          fi
-
+      # Each store is opt-in: one with no secrets is skipped, so until any exist this
+      # workflow is just a builder. A half-filled set is treated as a mistake rather than a
+      # reason to skip, so a typo in one secret name can't quietly drop a store from a release.
+      #
+      # A store is also skipped when it already has this version or a newer one live, which
+      # makes a re-run safe after one store failed. The live version comes from the public
+      # listing, so a version still waiting on review doesn't count. Edge has no such lookup
+      # without a second ID, so it's submitted whenever it's configured.
       - name: Submit to the stores
-        if: steps.credentials.outputs.configured == 'true'
         env:
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           set -euo pipefail
-          if [ "$DRY_RUN" = "true" ]; then
-            dry_run=--dry-run
-          else
-            dry_run=""
+
+          version=$(node -p "require('./package.json').version")
+
+          # configured <store> <secret names…>
+          configured() {
+            local store=$1 missing=() name
+            shift
+            for name in "$@"; do
+              [ -n "${!name:-}" ] || missing+=("$name")
+            done
+            [ "${#missing[@]}" -gt 0 ] || return 0
+            if [ "${#missing[@]}" -lt "$#" ]; then
+              echo "::error::$store credentials are only partially configured. Missing: ${missing[*]}"
+              exit 1
+            fi
+            echo "::notice::No $store credentials configured, so it was skipped."
+            return 1
+          }
+
+          # outdated <store> <live version>
+          outdated() {
+            local store=$1 live=$2
+            if [ -z "$live" ]; then
+              echo "::error::Couldn't read the live $store version."
+              exit 1
+            fi
+            # A dry run only checks authentication, so it goes ahead whatever is live.
+            [ "$DRY_RUN" != "true" ] || return 0
+            if [ "$version" != "$live" ] &&
+              [ "$(printf '%s\n' "$version" "$live" | sort -V | tail -n 1)" = "$version" ]; then
+              return 0
+            fi
+            echo "::notice::$store already has $live live, so $version was not submitted."
+            return 1
+          }
+
+          # Only the zips are passed as flags; wxt reads the credentials from the environment.
+          # As a flag the Chrome private key, which starts with dashes, is parsed as options.
+          args=()
+          stores=()
+
+          if configured Chrome CHROME_EXTENSION_ID CHROME_PUBLISHER_ID CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL CHROME_SERVICE_ACCOUNT_PRIVATE_KEY; then
+            # The update check Chrome itself polls; the store API only reports drafts.
+            live=$(
+              curl -fsS "https://clients2.google.com/service/update2/crx?response=updatecheck&acceptformat=crx3&prodversion=140.0&x=id%3D${CHROME_EXTENSION_ID}%26uc" |
+                sed -n 's/.*<updatecheck[^>]* version="\([^"]*\)".*/\1/p'
+            )
+            if outdated Chrome "$live"; then
+              args+=(
+                --chrome-zip .output/*-chrome.zip
+                # v1.1, the default, stops working on 15 October 2026.
+                --chrome-api-version v2
+              )
+              stores+=(Chrome)
+            fi
           fi
 
-          npx wxt submit ${dry_run} \
-            --chrome-zip .output/*-chrome.zip \
-            --chrome-extension-id "$CHROME_EXTENSION_ID" \
-            --chrome-client-id "$CHROME_CLIENT_ID" \
-            --chrome-client-secret "$CHROME_CLIENT_SECRET" \
-            --chrome-refresh-token "$CHROME_REFRESH_TOKEN" \
-            --firefox-zip .output/*-firefox.zip \
-            --firefox-sources-zip .output/*-sources.zip \
-            --firefox-extension-id "$FIREFOX_EXTENSION_ID" \
-            --firefox-jwt-issuer "$FIREFOX_JWT_ISSUER" \
-            --firefox-jwt-secret "$FIREFOX_JWT_SECRET" \
-            --edge-zip .output/*-edge.zip \
-            --edge-product-id "$EDGE_PRODUCT_ID" \
-            --edge-client-id "$EDGE_CLIENT_ID" \
-            --edge-api-key "$EDGE_API_KEY"
+          if configured Firefox FIREFOX_EXTENSION_ID FIREFOX_JWT_ISSUER FIREFOX_JWT_SECRET; then
+            live=$(
+              curl -fsS "https://addons.mozilla.org/api/v5/addons/addon/${FIREFOX_EXTENSION_ID}/" |
+                jq -r '.current_version.version // empty'
+            )
+            if outdated Firefox "$live"; then
+              args+=(
+                --firefox-zip .output/*-firefox.zip
+                --firefox-sources-zip .output/*-sources.zip
+              )
+              stores+=(Firefox)
+            fi
+          fi
+
+          if configured Edge EDGE_PRODUCT_ID EDGE_CLIENT_ID EDGE_API_KEY; then
+            args+=(--edge-zip .output/*-edge.zip)
+            stores+=(Edge)
+          fi
+
+          if [ "${#args[@]}" -eq 0 ]; then
+            echo '::notice::Nothing was submitted. The zips are attached to this run.'
+            exit 0
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+
+          npx wxt submit "${args[@]}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::Dry run: authentication worked for ${stores[*]}. Nothing was uploaded."
+          else
+            echo "::notice::Submitted $version to ${stores[*]}."
+          fi
