@@ -112,7 +112,10 @@ jobs:
             return 1
           }
 
+          # Only the zips are passed as flags; wxt reads the credentials from the environment.
+          # As a flag the Chrome private key, which starts with dashes, is parsed as options.
           args=()
+          stores=()
 
           if configured Chrome CHROME_EXTENSION_ID CHROME_PUBLISHER_ID CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL CHROME_SERVICE_ACCOUNT_PRIVATE_KEY; then
             # The update check Chrome itself polls; the store API only reports drafts.
@@ -125,11 +128,8 @@ jobs:
                 --chrome-zip .output/*-chrome.zip
                 # v1.1, the default, stops working on 15 October 2026.
                 --chrome-api-version v2
-                --chrome-extension-id "$CHROME_EXTENSION_ID"
-                --chrome-publisher-id "$CHROME_PUBLISHER_ID"
-                --chrome-service-account-client-email "$CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL"
-                --chrome-service-account-private-key "$CHROME_SERVICE_ACCOUNT_PRIVATE_KEY"
               )
+              stores+=(Chrome)
             fi
           fi
 
@@ -142,20 +142,14 @@ jobs:
               args+=(
                 --firefox-zip .output/*-firefox.zip
                 --firefox-sources-zip .output/*-sources.zip
-                --firefox-extension-id "$FIREFOX_EXTENSION_ID"
-                --firefox-jwt-issuer "$FIREFOX_JWT_ISSUER"
-                --firefox-jwt-secret "$FIREFOX_JWT_SECRET"
               )
+              stores+=(Firefox)
             fi
           fi
 
           if configured Edge EDGE_PRODUCT_ID EDGE_CLIENT_ID EDGE_API_KEY; then
-            args+=(
-              --edge-zip .output/*-edge.zip
-              --edge-product-id "$EDGE_PRODUCT_ID"
-              --edge-client-id "$EDGE_CLIENT_ID"
-              --edge-api-key "$EDGE_API_KEY"
-            )
+            args+=(--edge-zip .output/*-edge.zip)
+            stores+=(Edge)
           fi
 
           if [ "${#args[@]}" -eq 0 ]; then
@@ -168,3 +162,9 @@ jobs:
           fi
 
           npx wxt submit "${args[@]}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::Dry run: authentication worked for ${stores[*]}. Nothing was uploaded."
+          else
+            echo "::notice::Submitted $version to ${stores[*]}."
+          fi
