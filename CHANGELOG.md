@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/logankuzyk/lander-ntp/compare/v0.2.2...v0.2.3) (2026-10-03)
+
+
+### Features
+
+* Add weather widget and settings ([#39](https://github.com/logankuzyk/lander-ntp/issues/39)) ([796ae00](https://github.com/logankuzyk/lander-ntp/commit/796ae00896a0e161e9ad1736e59580e828b13038))
+* Use sliding switches and a fixed-height settings panel ([#40](https://github.com/logankuzyk/lander-ntp/issues/40)) ([87d00eb](https://github.com/logankuzyk/lander-ntp/commit/87d00eb041727b3a6717be8bde19314d7cd4c740))
+
 ## [0.2.2](https://github.com/logankuzyk/lander-ntp/compare/v0.2.1...v0.2.2) (2026-09-22)
 
 
