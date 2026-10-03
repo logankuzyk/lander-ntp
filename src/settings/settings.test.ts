@@ -19,7 +19,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       photos: { mode: 'cycle', frequency: 'every-visit', tags: [], pinnedId: null },
       clock: { enabled: true, showDate: false, showSeconds: false },
-      weather: { enabled: false, place: null, background: false },
+      weather: { enabled: false, place: null },
       font: 'system',
       dim: true,
     })

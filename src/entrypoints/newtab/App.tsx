@@ -74,7 +74,6 @@ export function App() {
           weather={weather.weather}
           place={weather.place}
           fields={settings.weather.fields}
-          background={settings.weather.background}
           hour12={settings.clock.hour12}
         />
       )}

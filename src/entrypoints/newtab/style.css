@@ -198,10 +198,9 @@ body {
   white-space: nowrap;
 }
 
-/* The translucent panel the popovers sit on, and the weather when asked to. */
+/* The translucent panel the popovers sit on. */
 
-.popover,
-.weather--panel {
+.popover {
   border-radius: 0.75rem;
   background: rgb(0 0 0 / 55%);
   backdrop-filter: blur(12px);
@@ -222,11 +221,6 @@ body {
   text-align: right;
 }
 
-/* The panel's edge takes over the line the text was on, so the text moves in by the padding. */
-.weather--panel {
-  padding: 0.75rem 1rem;
-}
-
 .weather__now {
   display: flex;
   align-items: center;
@@ -241,10 +235,6 @@ body {
 .weather svg {
   flex: none;
   filter: drop-shadow(var(--text-shadow));
-}
-
-.weather--panel svg {
-  filter: none;
 }
 
 .weather__details {
@@ -503,6 +493,11 @@ body {
   outline-offset: 2px;
 }
 
+/* The notes under the box keep the rows' gap from it, and take no room until there is one. */
+.settings__place .settings__note {
+  margin-top: var(--popover-gap);
+}
+
 .settings__search {
   display: flex;
   gap: var(--popover-gap);
@@ -520,54 +515,14 @@ body {
   font: inherit;
 }
 
+/* The ring inside the box rather than around it, so the suggestions under it are its width. */
+.settings .settings__input:focus-visible {
+  outline-offset: -2px;
+}
+
 .settings__input::placeholder {
   color: inherit;
   opacity: 0.5;
-}
-
-.settings__button {
-  height: var(--popover-control);
-  padding: 0 0.75rem;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 0.375rem;
-  background: rgb(255 255 255 / 10%);
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.settings__button:hover:not(:disabled) {
-  background: rgb(255 255 255 / 15%);
-}
-
-.settings__button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.settings__results {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.settings__result {
-  width: 100%;
-  min-height: var(--popover-control);
-  padding: 0 0.5rem;
-  border: 0;
-  border-radius: 0.25rem;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings__result:hover {
-  background: rgb(255 255 255 / 10%);
 }
 
 /* Its own block, as far below the section as sections are from each other. */
@@ -867,6 +822,29 @@ button.chip:hover {
   outline: none;
   background: rgb(255 255 255 / 10%);
   opacity: 1;
+}
+
+/* Suggestions under the place search (SettingsPanel/PlaceSearch): a menu as wide as the box. */
+
+.suggestions {
+  max-width: none;
+  margin: 0;
+  /* Rows from edge to edge, their text under the text in the box. */
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.suggestions__option {
+  display: block;
+  overflow: hidden;
+  border-radius: 0;
+  line-height: var(--popover-control);
+  text-overflow: ellipsis;
+}
+
+/* Where the arrow keys are; focus itself stays in the box. */
+.popover .suggestions__option[aria-selected='true'] {
+  background: rgb(255 255 255 / 10%);
 }
 
 /* Gallery (in settings) */

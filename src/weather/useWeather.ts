@@ -89,7 +89,7 @@ function useDevicePosition(follow: boolean): DevicePosition | null {
       void update()
     })()
 
-    // "Use my location" in settings writes a position of its own while this is already following.
+    // "Current location" in settings writes a position of its own while this is already following.
     const unwatch = devicePosition.watch((next) => {
       if (!next) return
       last = next

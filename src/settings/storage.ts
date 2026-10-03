@@ -33,7 +33,6 @@ const SettingsSchema = v.looseObject({
       ),
       followDevice: v.boolean(),
       unit: v.picklist(['celsius', 'fahrenheit']),
-      background: v.boolean(),
       fields: v.pipe(
         v.array(v.object({ id: v.picklist(WEATHER_FIELDS), shown: v.boolean() })),
         // Each field exactly once: the settings list has a row for every one.

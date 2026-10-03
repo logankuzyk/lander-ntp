@@ -13,7 +13,6 @@ type WeatherProps = {
   /** The name of the place the reading is for. */
   place: string
   fields: WeatherSettings['fields']
-  background: boolean
   /** The clock's setting, so every time on the page reads the same way. */
   hour12: boolean
 }
@@ -33,7 +32,7 @@ function SunTime({ label, at, hour12 }: { label: string; at: string; hour12: boo
 }
 
 /** Top right: the weather now, over the optional lines that are switched on, in their order. */
-export function Weather({ weather, place, fields, background, hour12 }: WeatherProps) {
+export function Weather({ weather, place, fields, hour12 }: WeatherProps) {
   const { condition, label } = describeCode(weather.code)
   // Where the sun doesn't rise or set today, the forecast gives both as the same midnight.
   const noSun = weather.sunrise === weather.sunset
@@ -62,7 +61,7 @@ export function Weather({ weather, place, fields, background, hour12 }: WeatherP
   }
 
   return (
-    <section class={background ? 'weather weather--panel' : 'weather'} aria-label="Weather">
+    <section class="weather" aria-label="Weather">
       <div class="weather__now" title={label}>
         <ConditionIcon condition={condition} isDay={weather.isDay} size={36} />
         <span class="weather__temperature">{degrees(weather.temperature)}</span>

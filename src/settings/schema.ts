@@ -42,8 +42,6 @@ export type WeatherSettings = {
    */
   followDevice: boolean
   unit: 'celsius' | 'fahrenheit'
-  /** Sit on the same translucent panel as the popovers, rather than straight on the photo. */
-  background: boolean
   /** Every field once, in the order the widget draws them. */
   fields: WeatherFieldSetting[]
 }
@@ -83,13 +81,12 @@ export const DEFAULT_SETTINGS: Settings = {
     place: null,
     followDevice: false,
     unit: localeUsesFahrenheit() ? 'fahrenheit' : 'celsius',
-    background: false,
     fields: [
-      { id: 'location', shown: true },
-      { id: 'sun', shown: true },
+      { id: 'highLow', shown: true },
+      { id: 'location', shown: false },
+      { id: 'sun', shown: false },
       { id: 'condition', shown: false },
       { id: 'feelsLike', shown: false },
-      { id: 'highLow', shown: false },
     ],
   },
   font: 'system',
