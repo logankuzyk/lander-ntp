@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.3](https://github.com/logankuzyk/lander-ntp/compare/v0.2.2...v0.2.3) (2026-10-04)
+
+
+### Features
+
+* Add weather widget and settings ([#39](https://github.com/logankuzyk/lander-ntp/issues/39)) ([796ae00](https://github.com/logankuzyk/lander-ntp/commit/796ae00896a0e161e9ad1736e59580e828b13038))
+* Use sliding switches and a fixed-height settings panel ([#40](https://github.com/logankuzyk/lander-ntp/issues/40)) ([87d00eb](https://github.com/logankuzyk/lander-ntp/commit/87d00eb041727b3a6717be8bde19314d7cd4c740))
+* Welcome new installs and announce new features to updated ones ([#45](https://github.com/logankuzyk/lander-ntp/issues/45)) ([1f4df24](https://github.com/logankuzyk/lander-ntp/commit/1f4df24c6eea117ab7e84e22674a990fb8b72205))
+
+
+### Bug Fixes
+
+* Restore the Firefox homepage override ([#46](https://github.com/logankuzyk/lander-ntp/issues/46)) ([2beb328](https://github.com/logankuzyk/lander-ntp/commit/2beb328c79689cf2b93953a54e0e20d27c142455))
+
 ## [0.2.2](https://github.com/logankuzyk/lander-ntp/compare/v0.2.1...v0.2.2) (2026-09-22)
 
 
