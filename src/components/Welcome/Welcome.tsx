@@ -40,8 +40,8 @@ export function Welcome({ onSkip, onTour }: WelcomeProps) {
         <Wordmark />
       </h1>
       <p>
-        Your new tab now opens on a photograph from logankuzyk.com. Take a minute to set how often
-        it changes, and what sits on top of it.
+        It's great to have you here! Take a minute to set how often the photo changes, and what sits
+        on top of it.
       </p>
       <div class="welcome__actions">
         <button class="welcome__skip" onClick={() => leave(onSkip)} type="button">

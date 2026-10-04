@@ -25,13 +25,13 @@ export const TOUR: readonly CalloutInfo[] = [
     title: 'Photos',
   },
   {
-    body: 'Switch to 24-hour time, or add the date and seconds.',
+    body: 'Switch to 24-hour time, or choose to show the date and seconds.',
     id: 'tour-clock',
     section: 'clock',
     title: 'Clock',
   },
   {
-    body: 'Switch it on and pick a place to see the forecast in the top corner.',
+    body: 'Switch it on and pick a place to see its current conditions in the top corner.',
     id: 'tour-weather',
     section: 'weather',
     title: 'Weather',
