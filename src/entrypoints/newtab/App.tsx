@@ -1,8 +1,13 @@
 import { useCallback, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
+import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
-import { SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
+import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
+import { Welcome } from '@/components/Welcome/Welcome'
+import { TOUR } from '@/onboarding/callouts'
+import { onboardingItem } from '@/onboarding/storage'
+import { useNews } from '@/onboarding/useNews'
 import { preloadNext } from '@/photos/image'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
@@ -17,9 +22,16 @@ import { Weather } from '@/widgets/Weather/Weather'
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
 
+/** How the settings were opened: on which section, and whether with the welcome tour. */
+type SettingsEntry = { section: SectionId; tour: boolean }
+
+const FROM_GEAR: SettingsEntry = { section: 'photos', tour: false }
+
 export function App() {
   const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
+  const [onboarding, setOnboarding] = useStorageItem(onboardingItem)
   const [popover, setPopover] = useState<Popover>(null)
+  const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
   const [photoLoading, setPhotoLoading] = useState(false)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
@@ -33,6 +45,16 @@ export function App() {
   const toggle = (which: Exclude<Popover, null>) =>
     setPopover((open) => (open === which ? null : which))
   const close = useCallback(() => setPopover(null), [])
+  const openSettings = (how: SettingsEntry) => {
+    setEntry(how)
+    setPopover('settings')
+  }
+
+  // Out of the way while a popover has the corner, and until the welcome has been answered.
+  const news = useNews(popover === null ? onboarding : null, settingsLoaded ? settings : null)
+  const dismiss = (id: string) => {
+    if (onboarding) setOnboarding({ ...onboarding, dismissed: [...onboarding.dismissed, id] })
+  }
 
   // While a photo is pinned, → pins the next one instead, so the next tab keeps it too.
   const showNext = () => {
@@ -82,10 +104,36 @@ export function App() {
       {popover === 'settings' && (
         <SettingsPanel
           currentId={photo?.id ?? null}
+          initialSection={entry.section}
           onChange={setSettings}
           onClose={close}
           photos={photos}
           settings={settings}
+          tour={entry.tour ? TOUR : undefined}
+        />
+      )}
+      {news && (
+        <Callout
+          action={{
+            label: 'Set up',
+            onClick: () => {
+              dismiss(news.id)
+              openSettings({ section: news.section, tour: false })
+            },
+          }}
+          body={news.body}
+          class={`callout--${news.section}`}
+          onDismiss={() => dismiss(news.id)}
+          title={news.title}
+        />
+      )}
+      {onboarding && !onboarding.welcomed && (
+        <Welcome
+          onSkip={() => setOnboarding({ ...onboarding, welcomed: true })}
+          onTour={() => {
+            setOnboarding({ ...onboarding, welcomed: true })
+            openSettings({ section: 'photos', tour: true })
+          }}
         />
       )}
       <Controls
@@ -93,7 +141,10 @@ export function App() {
         infoOpen={popover === 'info'}
         onNext={showNext}
         onToggleInfo={photo ? () => toggle('info') : undefined}
-        onToggleSettings={() => toggle('settings')}
+        onToggleSettings={() => {
+          setEntry(FROM_GEAR)
+          toggle('settings')
+        }}
         settingsOpen={popover === 'settings'}
       />
     </main>

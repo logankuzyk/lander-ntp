@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { WxtVitest } from 'wxt/testing/vitest-plugin'
 
 export default defineConfig({
@@ -11,6 +11,8 @@ export default defineConfig({
       provider: 'v8',
     },
     environment: 'happy-dom',
+    // Agent worktrees are whole copies of the repo, tests included.
+    exclude: [...configDefaults.exclude, '.claude/**'],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
   },
