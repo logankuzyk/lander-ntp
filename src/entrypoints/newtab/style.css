@@ -1063,12 +1063,13 @@ button.chip:hover {
 /* Welcome: a new install's first tab, in the middle of the page. */
 
 .welcome {
-  width: min(24rem, calc(100% - 2.5rem));
-  padding: 2rem;
+  width: min(30rem, calc(100% - 2.5rem));
+  padding: 3rem 2.5rem;
   border: 0;
   color: inherit;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  /* The same text as the popovers. */
+  font-size: 0.85rem;
+  line-height: 1.25rem;
   text-align: center;
 }
 
@@ -1079,11 +1080,11 @@ button.chip:hover {
 
 .welcome h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 2.75rem;
 }
 
 .welcome p {
-  margin: 1rem 0 1.5rem;
+  margin: 1.5rem 0 2rem;
   opacity: 0.85;
 }
 
@@ -1091,7 +1092,7 @@ button.chip:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .welcome__skip {
