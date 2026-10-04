@@ -41,6 +41,9 @@ export default defineConfig({
         // data_collection_permissions landed in Firefox for Android 142.
         gecko_android: { strict_min_version: '142.0' },
       },
+      // Lists the page under Settings > Home > "Homepage and new windows". Firefox keeps that
+      // separate from new tabs, which chrome_url_overrides covers.
+      chrome_settings_overrides: { homepage: 'newtab.html' },
     }),
   }),
   // WXT defaults Firefox to MV2; ship MV3 everywhere.
