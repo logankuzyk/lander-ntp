@@ -39,10 +39,7 @@ export function Welcome({ onSkip, onTour }: WelcomeProps) {
         <span class="visually-hidden">Welcome to </span>
         <Wordmark />
       </h1>
-      <p>
-        It's great to have you here! Take a minute to set how often the photo changes, and what sits
-        on top of it.
-      </p>
+      <p>Take a minute to set how often the photo changes, and configure what sits on top of it.</p>
       <div class="welcome__actions">
         <button class="welcome__skip" onClick={() => leave(onSkip)} type="button">
           Skip
