@@ -1,5 +1,5 @@
 import { NEWS } from './callouts'
-import { onboardingItem } from './storage'
+import { onboardingItem, pendingItem } from './storage'
 
 /**
  * Called by the background script with the reason the browser gives `runtime.onInstalled`,
@@ -13,9 +13,10 @@ import { onboardingItem } from './storage'
 export async function recordInstall(reason: string): Promise<void> {
   if (reason !== 'install' && reason !== 'update') return
   if (await onboardingItem.getValue()) return
-  await onboardingItem.setValue(
-    reason === 'install'
-      ? { dismissed: NEWS.map(({ id }) => id), welcomed: false }
-      : { dismissed: [], welcomed: true },
-  )
+  // Not synced until the welcome is answered: see pendingItem.
+  if (reason === 'install') {
+    await pendingItem.setValue({ dismissed: NEWS.map(({ id }) => id), welcomed: false })
+  } else {
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+  }
 }

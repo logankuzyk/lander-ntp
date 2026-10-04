@@ -373,6 +373,9 @@ export function SettingsPanel({
   }
 
   const nextStop = step === null ? undefined : tour[step + 1]
+  // "Next" acts after its note has faded: not if a section was opened by hand meanwhile.
+  const latestSection = useRef(section)
+  latestSection.current = section
 
   // Arrow keys move between tabs, as in any tab list; Tab moves on to the section.
   const onTabKeyDown = (event: KeyboardEvent, index: number) => {
@@ -401,7 +404,12 @@ export function SettingsPanel({
         <Callout
           action={
             nextStop
-              ? { label: 'Next', onClick: () => show(nextStop.section) }
+              ? {
+                  label: 'Next',
+                  onClick: () => {
+                    if (latestSection.current === section) show(nextStop.section)
+                  },
+                }
               : { label: 'Done', onClick: () => setStep(null) }
           }
           body={stop.body}
