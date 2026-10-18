@@ -2,7 +2,8 @@ import type { StorybookConfig } from '@storybook/preact-vite'
 
 const config: StorybookConfig = {
   framework: '@storybook/preact-vite',
-  staticDirs: ['../public'],
+  // `public/` is the extension's own (fallback.webp); the story photos are only for stories.
+  staticDirs: ['../public', './public'],
   stories: ['../src/**/*.stories.tsx'],
   async viteFinal(config) {
     const { mergeConfig } = await import('vite')

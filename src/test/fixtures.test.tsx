@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/preact'
+import fs from 'node:fs'
+import path from 'node:path'
 import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 
@@ -6,6 +8,9 @@ import { WEATHER_FIELDS } from '@/settings/schema'
 import { Weather } from '@/widgets/Weather/Weather'
 
 import { makeWeather, STORY_PHOTOS } from './fixtures'
+
+/** Where Storybook serves the story photos from; see `staticDirs` in .storybook/main.ts. */
+const STORY_PUBLIC = path.resolve(__dirname, '../../.storybook/public')
 
 describe('makeWeather', () => {
   it('is a reading the Weather draws in full, sunrise and sunset included', () => {
@@ -56,11 +61,23 @@ describe('STORY_PHOTOS', () => {
     expect(remote).toEqual([])
   })
 
-  it('draws every photo from the fallback that Storybook serves', () => {
+  it('draws every photo from a small file in .storybook/public that Storybook serves', () => {
     const urls = STORY_PHOTOS.flatMap((photo) => photo.sizes.map((size) => size.url))
 
     expect(urls.length).toBeGreaterThan(0)
-    expect(new Set(urls)).toEqual(new Set(['/fallback.webp']))
+    for (const url of urls) {
+      expect(url).toMatch(/^\/story-photos\/[a-z-]+\.webp$/)
+      const file = path.join(STORY_PUBLIC, url)
+      expect(fs.existsSync(file), `${url} is missing from .storybook/public`).toBe(true)
+      // The smallest rendition the site offers: these are committed to the repo.
+      expect(fs.statSync(file).size).toBeLessThan(50 * 1024)
+    }
+  })
+
+  it('shows a different photo for each, so the stories have something to tell apart', () => {
+    const files = STORY_PHOTOS.map((photo) => photo.sizes[0]?.url)
+
+    expect(new Set(files).size).toBe(STORY_PHOTOS.length)
   })
 
   it('gives each photo its own id, a location and tags, as the credit and gallery show them', () => {
