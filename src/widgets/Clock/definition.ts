@@ -22,9 +22,10 @@ function ClockView({ options, page }: WidgetViewProps<ClockOptions>) {
 
 export const clockDefinition: WidgetDefinition<ClockOptions> = {
   name: 'Clock',
-  // In the order and words of the settings panel. Defaults come from today's settings, so the
-  // two cannot drift apart.
+  // The order and wording are copied from the settings panel. Defaults come from today's
+  // settings, so those cannot drift.
   options: [
+    // Label and value are opposite: checked means hour12 is false. A form must invert it, as SettingsPanel does with !hour12.
     { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
     {
       control: 'switch',
