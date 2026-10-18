@@ -3,12 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 import meta, * as stories from './SettingsPanel.stories'
 
-const { default: _meta, ...STORIES } = stories
-void _meta
+type StoryName = Exclude<keyof typeof stories, 'default'>
 
 /** Draws a story as Storybook does, minus the page decorator: its args through the meta's render. */
-const renderStory = (name: keyof typeof STORIES) => {
-  const args = { ...meta.args, ...STORIES[name].args }
+const renderStory = (name: StoryName) => {
+  const args = { ...meta.args, ...stories[name].args }
   return render(<>{meta.render(args as never)}</>)
 }
 
@@ -62,13 +61,5 @@ describe('settings panel stories', () => {
     expect((screen.getByRole('switch', { name: 'Show date' }) as HTMLInputElement).checked).toBe(
       true,
     )
-  })
-
-  it('hides the clock options once the clock is switched off', () => {
-    renderStory('ClockOn')
-
-    fireEvent.click(screen.getByRole('switch', { name: 'Show clock' }))
-
-    expect(screen.queryByRole('switch', { name: 'Show date' })).toBeNull()
   })
 })

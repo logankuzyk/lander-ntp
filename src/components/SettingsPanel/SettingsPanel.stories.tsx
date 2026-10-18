@@ -3,21 +3,34 @@ import { useEffect, useState } from 'preact/hooks'
 import { fn } from 'storybook/test'
 
 import { TOUR } from '@/onboarding/callouts'
-import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
+import type { Settings } from '@/settings/schema'
 import { makePlace, STORY_PHOTOS } from '@/test/fixtures'
 
 import { withPage } from '../../../.storybook/withPage'
 import { SettingsPanel } from './SettingsPanel'
 
 /**
- * Settings that do not depend on the browser's locale, so a story looks the same everywhere.
- * Photos are cycling, the clock is on and the weather is off.
+ * Every setting written out, so neither the browser's locale nor a later change to the defaults
+ * moves a story. Photos are cycling, the clock is on and the weather is off.
  */
 const SETTINGS: Settings = {
-  ...DEFAULT_SETTINGS,
   clock: { enabled: true, hour12: false, showDate: false, showSeconds: false },
+  dim: true,
+  font: 'system',
   photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
-  weather: { ...DEFAULT_SETTINGS.weather, unit: 'celsius' },
+  weather: {
+    enabled: false,
+    fields: [
+      { id: 'highLow', shown: true },
+      { id: 'location', shown: false },
+      { id: 'sun', shown: false },
+      { id: 'condition', shown: false },
+      { id: 'feelsLike', shown: false },
+    ],
+    followDevice: false,
+    place: null,
+    unit: 'celsius',
+  },
 }
 
 const weather = (changes: Partial<Settings['weather']>): Settings => ({
