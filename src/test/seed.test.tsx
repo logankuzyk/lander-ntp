@@ -2,10 +2,9 @@ import { render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '@/entrypoints/newtab/App'
-import { DEFAULT_SETTINGS } from '@/settings/schema'
 
-import { makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
-import { seedPage } from './seed'
+import { STORY_PHOTOS } from './fixtures'
+import { PAGE_SEEDS, seedPage } from './seed'
 
 const fetchSpy = vi.fn()
 
@@ -20,6 +19,13 @@ const shownPhoto = async () =>
     })
   ).getAttribute('src')
 
+/** Every page starts on the first story photo, not a random one. */
+const expectFirstStoryPhoto = async () => {
+  const [first] = STORY_PHOTOS
+  expect(await shownPhoto()).toBe(new URL(first?.sizes[0]?.url ?? '', location.href).href)
+  expect(screen.getByText(first?.location ?? '')).toBeTruthy()
+}
+
 beforeEach(() => {
   fetchSpy.mockReset()
   vi.stubGlobal('fetch', fetchSpy)
@@ -30,53 +36,49 @@ afterEach(() => {
   document.documentElement.removeAttribute('style')
 })
 
-describe('seedPage', () => {
-  it('gives a new install the welcome, and nothing is fetched', async () => {
-    await seedPage({ pending: { dismissed: ['weather'], welcomed: false } })
+describe('the page stories', () => {
+  it('give a new install the welcome over the photo', async () => {
+    await seedPage(PAGE_SEEDS.newInstall)
     render(<App />)
 
     expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
-    expect(await shownPhoto()).toContain('/story-photos/')
+    await expectFirstStoryPhoto()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('gives a settled install the clock and the photo, and nothing else', async () => {
-    await seedPage({ onboarding: { dismissed: ['weather'], welcomed: true } })
+  it('give a settled install the clock and the photo, and nothing else', async () => {
+    await seedPage(PAGE_SEEDS.settledInstall)
     const { container } = render(<App />)
 
     await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
-    expect(await shownPhoto()).toContain('/story-photos/')
-    expect(await screen.findByText(STORY_PHOTOS[0]?.location ?? '')).toBeTruthy()
+    await expectFirstStoryPhoto()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('note')).toBeNull()
     expect(screen.queryByRole('region', { name: 'Weather' })).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('gives Weather on the reading it is seeded with', async () => {
-    const place = makePlace()
-    await seedPage({
-      onboarding: { dismissed: ['weather'], welcomed: true },
-      settings: {
-        ...DEFAULT_SETTINGS,
-        weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place, unit: 'celsius' },
-      },
-      weather: makeWeather({ temperature: 13.4 }),
-    })
+  it('give Weather on the reading it is seeded with', async () => {
+    await seedPage(PAGE_SEEDS.weatherOn)
     render(<App />)
 
     const weather = await screen.findByRole('region', { name: 'Weather' })
     expect(weather.textContent).toContain('13°')
+    await expectFirstStoryPhoto()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('note')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('gives an updated install the weather news', async () => {
-    await seedPage({ onboarding: { dismissed: [], welcomed: true } })
+  it('give an updated install the weather news', async () => {
+    await seedPage(PAGE_SEEDS.weatherNews)
     render(<App />)
 
     const note = await screen.findByRole('note')
     expect(note.textContent).toContain('New: weather')
+    await expectFirstStoryPhoto()
     expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Weather' })).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
