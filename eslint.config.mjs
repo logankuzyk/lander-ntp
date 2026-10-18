@@ -8,7 +8,14 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['.claude/', '.output/', '.wxt/', 'coverage/', 'web-ext-artifacts/']),
+  globalIgnores([
+    '.claude/',
+    '.output/',
+    '.wxt/',
+    'coverage/',
+    'storybook-static/',
+    'web-ext-artifacts/',
+  ]),
   js.configs.recommended,
   tseslint.configs.recommended,
   jsxA11y.flatConfigs.recommended,

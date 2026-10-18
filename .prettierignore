@@ -1,6 +1,7 @@
 .output/
 .wxt/
 coverage/
+storybook-static/
 web-ext-artifacts/
 package-lock.json
 CHANGELOG.md

@@ -8,6 +8,8 @@
     "jsxImportSource": "preact",
     "types": ["vitest/globals"]
   },
-  // Replaces WXT's list, so it repeats it.
-  "exclude": ["**/node_modules", ".output"]
+  // These replace WXT's lists, so they repeat them. `**/*` skips dot-folders, so `.storybook`
+  // is named.
+  "include": ["**/*", ".wxt/wxt.d.ts", ".storybook/**/*"],
+  "exclude": ["**/node_modules", ".output", "storybook-static"]
 }
