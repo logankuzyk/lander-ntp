@@ -11,6 +11,9 @@ stats.html
 # Tests
 coverage/
 
+# Storybook build output
+storybook-static/
+
 # Env
 .env.local
 .env.*.local

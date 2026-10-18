@@ -51,6 +51,18 @@ jobs:
       - run: npm ci
       - run: npm run test:coverage
 
+  storybook:
+    name: Build Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run storybook:build
+
   build:
     name: Build (${{ matrix.browser }})
     runs-on: ubuntu-latest
