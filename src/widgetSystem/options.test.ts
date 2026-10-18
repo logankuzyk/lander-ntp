@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { WidgetDefinition } from './definition'
+import type { OptionDescription, WidgetDefinition } from './definition'
 import { defaultOptions, readOptions } from './options'
 
 /** A Widget with one option of every control, made up for these tests. */
@@ -157,6 +157,16 @@ describe('readOptions', () => {
     })
   })
 
+  it('keeps keys it does not know inside a place and a list entry too', () => {
+    const nested = {
+      ...stored,
+      place: { ...VICTORIA, extra: 1 },
+      rows: [{ extra: 1, id: 'a', shown: true }, ...stored.rows.filter(({ id }) => id !== 'a')],
+    }
+
+    expect(readOptions(definition, nested)).toEqual(nested)
+  })
+
   it('never reads a shared option from what is stored', () => {
     expect(readOptions(definition, { ...stored, hour12: true })).toEqual(stored)
     expect(readOptions(definition, { ...stored, hour12: 'maybe' })).toEqual(stored)
@@ -170,9 +180,61 @@ describe('readOptions', () => {
     expect(given).toEqual(before)
   })
 
-  it('does not share its lists with what is stored', () => {
-    const result = readOptions(definition, stored)
+  it('does not share anything with what is stored, unknown values included', () => {
+    const given = { ...stored, added: { by: 'a newer device' } }
+    const result = readOptions(definition, given)
 
-    expect(result.rows).not.toBe(stored.rows)
+    expect(result.rows).not.toBe(given.rows)
+    expect(result.place).not.toBe(given.place)
+    expect(result.added).toEqual(given.added)
+    expect(result.added).not.toBe(given.added)
+  })
+
+  it('reads the defaults back as they are', () => {
+    expect(readOptions(definition, defaultOptions(definition))).toEqual(defaultOptions(definition))
+  })
+})
+
+describe('a place with a default', () => {
+  const withPlace: WidgetDefinition<Record<string, unknown>> = {
+    ...definition,
+    options: [
+      {
+        control: 'place',
+        default: { followDevice: false, place: VICTORIA },
+        id: 'place',
+        label: 'Place',
+      },
+    ],
+  }
+
+  it('starts from that place', () => {
+    expect(defaultOptions(withPlace)).toEqual({ followDevice: false, place: VICTORIA })
+    expect(readOptions(withPlace, {})).toEqual({ followDevice: false, place: VICTORIA })
+  })
+
+  it('gives a copy each time, so changing one leaves the definition and the next alone', () => {
+    const first = defaultOptions(withPlace)
+    ;(first.place as { name: string }).name = 'Elsewhere'
+    const read = readOptions(withPlace, {})
+    ;(read.place as { name: string }).name = 'Elsewhere'
+
+    expect(defaultOptions(withPlace).place).toEqual(VICTORIA)
+    expect(readOptions(withPlace, {}).place).toEqual(VICTORIA)
+  })
+})
+
+describe('a page-wide value option', () => {
+  it('cannot carry a default', () => {
+    const option: OptionDescription = {
+      control: 'switch',
+      default: true,
+      id: 'hour12',
+      label: '24-hour time',
+      // @ts-expect-error A shared option takes its value from the page, so it has no default.
+      shared: 'hour12',
+    }
+
+    expect(option.id).toBe('hour12')
   })
 })

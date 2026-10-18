@@ -11,7 +11,7 @@ export type PageValues = {
 }
 
 /** The name of a page-wide value. */
-export type SharedValue = keyof PageValues
+export type PageValueName = keyof PageValues
 
 type OptionBase = {
   id: string
@@ -23,6 +23,7 @@ type OptionBase = {
 export type SwitchOption = OptionBase & {
   control: 'switch'
   default: boolean
+  shared?: never
 }
 
 /** One of the listed values. */
@@ -46,6 +47,7 @@ export type PlaceValue = {
 export type PlaceOption = OptionBase & {
   control: 'place'
   default: PlaceValue
+  id: 'place'
 }
 
 /** One entry of an ordered list: shown, or hidden. */
@@ -64,14 +66,15 @@ export type OrderedListOption = OptionBase & {
  * other control and a change there changes it for every Widget. It has no default, and is
  * never stored in the Widget's options.
  */
-export type SharedOption = OptionBase & {
+export type PageValueOption = OptionBase & {
   control: 'switch'
-  shared: SharedValue
+  default?: never
+  shared: PageValueName
 }
 
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
-  ChoiceOption | OrderedListOption | PlaceOption | SharedOption | SwitchOption
+  ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
 
 export type WidgetViewProps<O> = {
   options: O

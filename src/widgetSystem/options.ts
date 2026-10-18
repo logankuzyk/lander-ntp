@@ -29,7 +29,7 @@ function fieldsOf(option: OptionDescription): Field[] {
       const ids = option.items.map((item) => item.id)
       return [
         {
-          default: option.default.map((entry) => ({ ...entry })),
+          default: option.default,
           key: option.id,
           schema: v.pipe(
             v.array(v.looseObject({ id: v.picklist(ids), shown: v.boolean() })),
@@ -45,7 +45,7 @@ function fieldsOf(option: OptionDescription): Field[] {
     case 'place':
       return [
         {
-          default: option.default.place && { ...option.default.place },
+          default: option.default.place,
           key: 'place',
           schema: PlaceSchema,
         },
