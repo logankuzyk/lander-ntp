@@ -16,8 +16,10 @@ import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
 import { useWeather } from '@/weather/useWeather'
-import { Clock } from '@/widgets/Clock/Clock'
 import { Weather } from '@/widgets/Weather/Weather'
+import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
+import { widgetDefinition } from '@/widgetSystem/registry'
+import { WidgetHost } from '@/widgetSystem/WidgetHost'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
@@ -90,7 +92,20 @@ export function App() {
         depends on them waits for them. The photo already does: usePhotoRotation is held back
         until the settings are known.
       */}
-      {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
+      {settingsLoaded &&
+        widgetsFromSettings(settings).map(({ options, type }) => {
+          const definition = widgetDefinition(type)
+          return (
+            definition && (
+              <WidgetHost
+                definition={definition}
+                key={type}
+                options={options}
+                page={pageValues(settings)}
+              />
+            )
+          )
+        })}
       {weather && (
         <Weather
           fields={settings.weather.fields}
