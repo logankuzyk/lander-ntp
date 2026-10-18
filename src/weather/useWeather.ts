@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import type { WeatherSettings } from '@/settings/schema'
+import { type Source, useSource } from '@/widgetSystem/source'
 
 import { locationConsented } from './consent'
 import {
@@ -30,6 +31,24 @@ export const MAX_STALE_MS = 3 * 60 * 60 * 1000
 
 /** How soon to ask again after a refresh that failed, which may only mean the network was away. */
 export const RETRY_MS = 60 * 1000
+
+/**
+ * Where the weather comes from. `weatherCache` holds a single reading, so it answers only for the
+ * key it was fetched for; the manifest can switch the weather off.
+ */
+export const weatherSource: Source<Weather> = {
+  cache: {
+    get: async (key) => {
+      const cached = await weatherCache.getValue()
+      return cached?.key === key ? { data: cached.data, fetchedAt: cached.fetchedAt } : null
+    },
+    set: (key, { data, fetchedAt }) => weatherCache.setValue({ data, fetchedAt, key }),
+  },
+  enabled: async () => (await getEndpoints()).enabled,
+  maxAgeMs: MAX_AGE_MS,
+  maxStaleMs: MAX_STALE_MS,
+  retryMs: RETRY_MS,
+}
 
 /**
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
@@ -128,64 +147,11 @@ export function useWeather(
     : fixed
   const unit = settings?.unit
   const key = place && unit ? cacheKey(place, unit) : null
-  const [shown, setShown] = useState<{ data: Weather; fetchedAt: number; key: string } | null>(null)
+  const weather = useSource(
+    weatherSource,
+    place && unit && key ? { fetch: () => fetchWeather(place, unit), key } : null,
+  )
 
-  useEffect(() => {
-    if (!place || !unit || !key) return
-    let active = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-
-    let checking = false
-
-    /** Check again after a wait; the manifest and the cache are both read anew each time. */
-    const again = (wait: number) => {
-      timer = setTimeout(() => void check(), wait)
-    }
-
-    const check = async () => {
-      // Every open tab runs this. One nobody is looking at waits until it is looked at, and the
-      // cache is read first, so a reading another tab has just fetched is not fetched again.
-      if (checking || document.hidden) return
-      checking = true
-      clearTimeout(timer)
-      try {
-        const [{ enabled }, cached] = await Promise.all([getEndpoints(), weatherCache.getValue()])
-        if (!active) return
-        // Switched off from the manifest: not even the cached reading, which would never refresh.
-        if (!enabled) {
-          setShown(null)
-          return again(MAX_AGE_MS)
-        }
-        const age = cached?.key === key ? Date.now() - cached.fetchedAt : Infinity
-        if (cached && age < MAX_STALE_MS) setShown(cached)
-        if (age < MAX_AGE_MS) return again(MAX_AGE_MS - age)
-
-        const fresh = await fetchWeather(place, unit)
-        const reading = fresh && { data: fresh, fetchedAt: Date.now(), key }
-        if (reading) await weatherCache.setValue(reading)
-        if (!active) return
-        setShown(
-          (old) => reading ?? (old && Date.now() - old.fetchedAt < MAX_STALE_MS ? old : null),
-        )
-        again(reading ? MAX_AGE_MS : RETRY_MS)
-      } finally {
-        checking = false
-      }
-    }
-
-    const onVisibilityChange = () => void check()
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    void check()
-
-    return () => {
-      active = false
-      clearTimeout(timer)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-    }
-    // `place` is a new object whenever settings change; `key` says whether it really moved.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-
-  // A reading for the last place is not this place's weather.
-  return shown && place && shown.key === key ? { place: place.name, weather: shown.data } : null
+  // A reading for the last place is not this place's weather; `useSource` already holds to that.
+  return weather && place ? { place: place.name, weather } : null
 }
