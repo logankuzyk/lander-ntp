@@ -53,39 +53,75 @@ export const makePlace = (overrides: Partial<Place> = {}): Place => ({
   ...overrides,
 })
 
-/** The photo the extension ships with, which Storybook serves from `public/` as the page does. */
-const LOCAL_PHOTO = '/fallback.webp'
-
 /**
- * Photos for stories. Every size is the bundled fallback and the links stay on the page, so no
- * story loads anything from logankuzyk.com or media.logankuzyk.com.
+ * Photos for stories: three of Logan Kuzyk's own, from logankuzyk.com, each the smallest
+ * rendition its manifest offers (300px wide) and committed in `.storybook/public/story-photos/`,
+ * which Storybook serves. Location, camera settings, tags and alt text are the manifest's, so
+ * the photo credit and details panel read as they do for a real photo. The manifest has no
+ * licence field: they are the site owner's work, used here with his say-so. The links stay on
+ * the page and no size is remote, so no story loads anything from logankuzyk.com or
+ * media.logankuzyk.com.
  */
 export const STORY_PHOTOS: Photo[] = [
+  // Sombrio Beach: https://logankuzyk.com/photography/beach?photo=69a656b8d61aea8798094721
   makePhoto('story-coast', {
-    alt: 'Waves breaking on a rocky shore',
-    exif: { aperture: 'f/8', camera: 'Fujifilm X-T5', focalLength: '23mm', iso: '125' },
-    location: 'Botanical Beach, BC',
+    alt: 'A person stands on the dark, rocky shore of Sombrio Beach facing a large rock formation in the ocean.',
+    exif: {
+      aperture: 'f/5',
+      camera: 'Canon, EOS REBEL T4i',
+      dateTaken: '2024-05-19T17:35:30.000Z',
+      focalLength: '123.0mm',
+      iso: 'ISO 250',
+      shutter: '1/4000s',
+    },
+    height: 2828,
+    location: 'Sombrio Beach, Vancouver Island, British Columbia',
     pageUrl: '#story-coast',
-    printUrl: '#story-coast-print',
-    sizes: [{ url: LOCAL_PHOTO, width: 1920 }],
-    tags: [{ name: 'Coast', slug: 'coast' }],
-  }),
-  makePhoto('story-forest', {
-    alt: 'Fog between tall cedars',
-    exif: { camera: 'Fujifilm X-T5', shutter: '1/60' },
-    location: 'Cathedral Grove, BC',
-    pageUrl: '#story-forest',
-    sizes: [{ url: LOCAL_PHOTO, width: 1920 }],
+    sizes: [{ url: '/story-photos/beach.webp', width: 300 }],
     tags: [
-      { name: 'Forest', slug: 'forest' },
-      { name: 'Fog', slug: 'fog' },
+      { name: 'Water', slug: 'water' },
+      { name: 'People', slug: 'people' },
+      { name: 'Beach', slug: 'beach' },
     ],
+    width: 4242,
   }),
+  // Vancouver Island: https://logankuzyk.com/photography/nature?photo=69a65698d61aea87980946d9
+  makePhoto('story-forest', {
+    alt: 'A single small purple flower blooms on a thin stem amidst green fern-like leaves in a dark forest setting.',
+    exif: {
+      aperture: 'f/4',
+      camera: 'Canon, EOS REBEL T4i',
+      dateTaken: '2025-06-01T13:31:36.000Z',
+      focalLength: '50.0mm',
+      iso: 'ISO 100',
+      shutter: '1/80s',
+    },
+    height: 2828,
+    location: 'Vancouver Island, British Columbia',
+    pageUrl: '#story-forest',
+    sizes: [{ url: '/story-photos/forest.webp', width: 300 }],
+    tags: [
+      { name: 'Plants', slug: 'plants' },
+      { name: 'Forest', slug: 'forest' },
+    ],
+    width: 4242,
+  }),
+  // Landslide Lake: https://logankuzyk.com/photography/nature?photo=6a109b3d912438fa4f84a6e9
   makePhoto('story-mountain', {
-    alt: 'Snow on a ridge at sunrise',
-    location: 'Mount Washington, BC',
+    alt: 'Landslide Lake',
+    exif: {
+      aperture: 'f/7.1',
+      camera: 'SONY, ILCE-6000',
+      dateTaken: '2026-05-17T09:50:24.000Z',
+      focalLength: '16.0mm',
+      iso: 'ISO 100',
+      shutter: '1/320s',
+    },
+    height: 2828,
+    location: 'Strathcona Provincial Park',
     pageUrl: '#story-mountain',
-    sizes: [{ url: LOCAL_PHOTO, width: 1920 }],
+    sizes: [{ url: '/story-photos/mountain.webp', width: 300 }],
     tags: [{ name: 'Mountains', slug: 'mountains' }],
+    width: 4242,
   }),
 ]
