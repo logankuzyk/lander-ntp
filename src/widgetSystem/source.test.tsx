@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/preact'
+import { render as renderOutsideAct } from 'preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type Reading, type ReadingCache, type Source, useSource } from './source'
+import { type Query, type Reading, type ReadingCache, type Source, useSource } from './source'
 
 const MAX_AGE_MS = 30 * 60 * 1000
 const MAX_STALE_MS = 3 * 60 * 60 * 1000
@@ -32,9 +33,7 @@ function makeSource(overrides: Partial<Source<number>> = {}) {
   return { ...memory, source }
 }
 
-type Query = { fetch: () => Promise<number | null>; key: string } | null
-
-function Probe({ query, source }: { query: Query; source: Source<number> }) {
+function Probe({ query, source }: { query: Query<number> | null; source: Source<number> }) {
   const reading = useSource(source, query)
   return <output>{reading === null ? 'none' : String(reading)}</output>
 }
@@ -239,6 +238,143 @@ describe('useSource', () => {
     await pass()
 
     expect(shown()).toBe('54')
+  })
+
+  it('does not fetch the new key for, or cache it under, the old key when the key changes mid-check', async () => {
+    const { cache, readings, source } = makeSource()
+    // The first read of the cache is held until released.
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let held = false
+    source.cache = {
+      ...cache,
+      get: async (key) => {
+        if (!held) {
+          held = true
+          await gate
+        }
+        return cache.get(key)
+      },
+    }
+    const fetchA = fetching(1)
+    const fetchB = fetching(2)
+    const container = document.createElement('div')
+    document.body.append(container)
+
+    try {
+      renderOutsideAct(<Probe query={{ fetch: fetchA, key: 'a' }} source={source} />, container)
+      await pass(200)
+      // Outside `act`, the old effect is cleaned up only after a paint; its check is still reading.
+      renderOutsideAct(<Probe query={{ fetch: fetchB, key: 'b' }} source={source} />, container)
+      release()
+      await pass()
+
+      expect(readings.has('a')).toBe(false)
+      expect(fetchA).not.toHaveBeenCalled()
+      await pass(200)
+      expect(readings.get('b')?.data).toBe(2)
+    } finally {
+      renderOutsideAct(null, container)
+      container.remove()
+    }
+  })
+
+  it('drops a reading too old to show while its refresh is still pending', async () => {
+    const { cache, source } = makeSource()
+    const fetch = vi.fn(() => new Promise<number>(() => undefined))
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_STALE_MS - 1 })
+
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+
+    expect(fetch).toHaveBeenCalled()
+    expect(shown()).toBe('none')
+  })
+
+  it('stops everything when unmounted: no timer left, no listener, nothing fetched later', async () => {
+    const { cache, source } = makeSource()
+    const fetch = fetching(12)
+    const remove = vi.spyOn(document, 'removeEventListener')
+    await cache.set('a', { data: 5, fetchedAt: Date.now() })
+
+    const view = render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+
+    view.unmount()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(remove).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+
+    await pass(MAX_AGE_MS)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await pass()
+    expect(fetch).not.toHaveBeenCalled()
+    remove.mockRestore()
+  })
+
+  it('does nothing more when unmounted while the cache is being read', async () => {
+    const { cache, source } = makeSource()
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    source.cache = { ...cache, get: async (key) => (await gate, cache.get(key)) }
+    const fetch = fetching(12)
+
+    const view = render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+    view.unmount()
+    release()
+    await pass(MAX_AGE_MS)
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not start a second fetch while one is in flight', async () => {
+    const { source } = makeSource()
+    const fetch = vi.fn(() => new Promise<number>(() => undefined))
+
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+    document.dispatchEvent(new Event('visibilitychange'))
+    await pass()
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks a switched-off source again after exactly the maximum age', async () => {
+    const enabled = vi.fn(() => Promise.resolve(false))
+    // A maximum age that is not a multiple of the retry wait, so the two cannot be mistaken.
+    const { source } = makeSource({ enabled, maxAgeMs: 100_000, retryMs: 60_000 })
+
+    render(<Probe query={{ fetch: fetching(12), key: 'a' }} source={source} />)
+    await pass()
+    expect(enabled).toHaveBeenCalledTimes(1)
+
+    await pass(99_999)
+    expect(enabled).toHaveBeenCalledTimes(1)
+
+    await pass(1)
+    expect(enabled).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets a check made when the tab comes back replace the wait that was pending', async () => {
+    const { cache, source } = makeSource()
+    const fetch = fetching(null)
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - (MAX_AGE_MS - 100_000) })
+
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+    // Fresh, so the next check is due in 100 seconds.
+    await pass(90_000)
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_AGE_MS - 1 })
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await pass()
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    // The earlier wait would have ended 10 seconds in; the failed fetch's retry is 60 seconds out.
+    await pass(20_000)
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('never shows the reading for one key as the reading for another', async () => {

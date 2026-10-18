@@ -44,6 +44,9 @@ export type Query<R> = { fetch: () => Promise<R | null>; key: string }
  * straight away and refreshed once older than `maxAgeMs`, and again each time that passes
  * while the tab stays open and in view. A failed refresh keeps the old reading until it is
  * older than `maxStaleMs`, and is tried again after `retryMs`.
+ *
+ * `source` must be a stable object, such as one defined at module level: the loader starts over
+ * whenever it, or the query's key, changes.
  */
 export function useSource<R>(source: Source<R>, query: Query<R> | null): R | null {
   const key = query?.key ?? null
@@ -85,7 +88,10 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
         if (cached && age < source.maxStaleMs) setShown({ ...cached, key })
         if (age < source.maxAgeMs) return again(source.maxAgeMs - age)
 
-        const data = await latest.current?.fetch()
+        // The key may have changed while the cache was read; this check is then not the one to fetch.
+        const current = latest.current
+        if (current?.key !== key) return
+        const data = await current.fetch()
         const reading = data == null ? null : { data, fetchedAt: Date.now() }
         if (reading) await source.cache.set(key, reading)
         if (!active) return
