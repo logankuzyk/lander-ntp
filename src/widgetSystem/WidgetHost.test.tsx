@@ -5,6 +5,7 @@ import { clockDefinition } from '@/widgets/Clock/definition'
 
 import type { WidgetDefinition } from './definition'
 import type { Need } from './needs'
+import type { Query, Reading, Source } from './source'
 import { WidgetHost } from './WidgetHost'
 
 const time = (container: ParentNode) => container.querySelector('.clock__time')?.textContent
@@ -187,5 +188,162 @@ describe('WidgetHost with needs', () => {
     )
     expect(container.children).toHaveLength(1)
     expect(container.firstElementChild?.classList.contains('example')).toBe(true)
+  })
+})
+
+describe('WidgetHost with a source', () => {
+  type Options = { name: string }
+
+  /** A source that keeps nothing, so every check fetches. */
+  const source: Source<number> = {
+    cache: {
+      get: () => Promise.resolve(null),
+      set: () => Promise.resolve(),
+    },
+    maxAgeMs: 60_000,
+    maxStaleMs: 600_000,
+    retryMs: 10_000,
+  }
+
+  /** A Widget made up here that draws what it is given: the reading and the context. */
+  const example = (
+    query: (options: Options) => Query<number> | null,
+    needs?: readonly Need<Options>[],
+    seen: string[] = [],
+    from: Source<number> = source,
+  ): WidgetDefinition<Options, number, string> => ({
+    name: 'Example',
+    needs,
+    options: [
+      {
+        choices: [{ label: 'A', value: 'a' }],
+        control: 'choice',
+        default: 'a',
+        id: 'name',
+        label: 'Name',
+      },
+    ],
+    source: {
+      source: from,
+      useQuery: (options) => {
+        seen.push(options.name)
+        return { context: `context ${options.name}`, query: query(options) }
+      },
+    },
+    type: 'example',
+    View: ({ context, reading }) => (
+      <p class="example">
+        {reading} {context}
+      </p>
+    ),
+  })
+  const page = { hour12: false }
+
+  /** Lets the source's cache check and fetch finish. */
+  const settleSource = () =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+  it('draws the View with the reading and what the source carried once it has one', async () => {
+    const fetch = vi.fn(() => Promise.resolve(7))
+    const definition = example(() => ({ fetch, key: 'k' }))
+    const { container } = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    expect(container.children).toHaveLength(0)
+
+    await settleSource()
+
+    expect(container.querySelector('.example')?.textContent).toBe('7 context a')
+    expect(container.children).toHaveLength(1)
+  })
+
+  it('draws nothing while there is no query to load', async () => {
+    const { container } = render(
+      <WidgetHost definition={example(() => null)} options={{}} page={page} />,
+    )
+    await settleSource()
+    expect(container.children).toHaveLength(0)
+  })
+
+  it('draws nothing when the source has no reading, because the fetch failed', async () => {
+    const fetch = vi.fn(() => Promise.resolve(null))
+    const { container } = render(
+      <WidgetHost definition={example(() => ({ fetch, key: 'k' }))} options={{}} page={page} />,
+    )
+    await settleSource()
+    expect(fetch).toHaveBeenCalled()
+    expect(container.children).toHaveLength(0)
+  })
+
+  it('builds the query from the options as the definition reads them', async () => {
+    const seen: string[] = []
+    render(
+      <WidgetHost
+        definition={example(() => null, undefined, seen)}
+        options={{ name: 'not a choice' }}
+        page={page}
+      />,
+    )
+    await settleSource()
+    expect(seen).toEqual(['a'])
+  })
+
+  it('does not run the source until every need is met', async () => {
+    let answer!: (met: boolean) => void
+    const fetch = vi.fn(() => Promise.resolve(7))
+    const seen: string[] = []
+    const definition = example(
+      () => ({ fetch, key: 'k' }),
+      [
+        { id: 'a', met: () => true },
+        { id: 'b', met: () => new Promise<boolean>((resolve) => (answer = resolve)) },
+      ],
+      seen,
+    )
+    const { container } = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    await settleSource()
+    expect(seen).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
+
+    await settle(() => answer(true))
+    await settleSource()
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('.example')?.textContent).toBe('7 context a')
+  })
+
+  it('never runs the source while a need is unmet', async () => {
+    const fetch = vi.fn(() => Promise.resolve(7))
+    const seen: string[] = []
+    const { container } = render(
+      <WidgetHost
+        definition={example(() => ({ fetch, key: 'k' }), [{ id: 'a', met: () => false }], seen)}
+        options={{}}
+        page={page}
+      />,
+    )
+    await settleSource()
+    expect(seen).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
+    expect(container.children).toHaveLength(0)
+  })
+
+  it('shows a reading the source has cached without fetching', async () => {
+    const cached: Reading<number> = { data: 3, fetchedAt: Date.now() }
+    const fetch = vi.fn(() => Promise.resolve(7))
+    const cachedSource: Source<number> = {
+      ...source,
+      cache: { get: () => Promise.resolve(cached), set: () => Promise.resolve() },
+    }
+    const { container } = render(
+      <WidgetHost
+        definition={example(() => ({ fetch, key: 'k' }), undefined, [], cachedSource)}
+        options={{}}
+        page={page}
+      />,
+    )
+    await settleSource()
+    expect(container.querySelector('.example')?.textContent).toBe('3 context a')
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

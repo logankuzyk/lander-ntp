@@ -4,7 +4,7 @@ import { manifestCache } from '@/photos/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import { weatherCache } from './storage'
-import { weatherSource } from './useWeather'
+import { weatherSource } from './weatherSource'
 
 const READING = {
   code: 0,

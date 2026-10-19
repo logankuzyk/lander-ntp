@@ -3,6 +3,7 @@ import type { ComponentType } from 'preact'
 import type { Place } from '@/settings/schema'
 
 import type { Need } from './needs'
+import type { Query, Source } from './source'
 
 /**
  * The page-wide values a Widget may read: settings shared by the whole page, not kept in any
@@ -78,13 +79,41 @@ export type PageValueOption = OptionBase & {
 export type OptionDescription =
   ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
 
-export type WidgetViewProps<O> = {
+/**
+ * What a View is given. A Widget with a source also gets the `reading` the source loaded and
+ * the `context` its `useQuery` carried along; for one without, both are undefined.
+ */
+export type WidgetViewProps<O, R = undefined, C = undefined> = {
+  context: C
   options: O
   page: PageValues
+  reading: R
 }
 
-/** What a Widget declares. */
-export type WidgetDefinition<O> = {
+/** What `useQuery` gives: what to load, and anything else the View needs from working that out. */
+export type SourceQuery<R, C> = {
+  /** Handed to the View with the reading. */
+  context: C
+  /** Null while there is nothing to load yet. */
+  query: Query<R> | null
+}
+
+/** Where a Widget's data comes from, and what to ask of it for these options. */
+export type WidgetSource<O, R, C> = {
+  source: Source<R>
+  /**
+   * Works out what to load from the options. A hook, so it can follow things that change on
+   * their own, such as the device's position. It runs only once every need is met, so it may
+   * start work (ask the device, fetch a name) that the needs are there to hold back.
+   */
+  useQuery: (options: O) => SourceQuery<R, C>
+}
+
+/**
+ * What a Widget declares. `R` is what its source loads and `C` what the source carries to the
+ * View; a Widget with no source leaves both alone.
+ */
+export type WidgetDefinition<O, R = undefined, C = undefined> = {
   /** What people read: "Weather". Free to change. */
   name: string
   /**
@@ -93,7 +122,20 @@ export type WidgetDefinition<O> = {
    */
   needs?: readonly Need<O>[]
   options: readonly OptionDescription[]
+  /**
+   * Where its data comes from. Run once every need is met; the View is drawn only with a
+   * reading. Defined once, not rebuilt on each render.
+   */
+  source?: WidgetSource<O, R, C>
   /** The id that is stored. Never renamed or reused. */
   type: string
-  View: ComponentType<WidgetViewProps<O>>
+  View: ComponentType<WidgetViewProps<O, R, C>>
 }
+
+/**
+ * A definition with options `O`, whatever it loads. `WidgetDefinition` is invariant in what it
+ * loads (a View takes it, a source gives it), so only an `any` stands for all of them; this is
+ * the one place that says so, for what only reads the options.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DefinitionOf<O> = WidgetDefinition<O, any, any>

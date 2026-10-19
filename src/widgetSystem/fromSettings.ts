@@ -1,5 +1,6 @@
 import type { Settings } from '@/settings/schema'
 import { clockDefinition } from '@/widgets/Clock/definition'
+import { weatherDefinition } from '@/widgets/Weather/definition'
 
 import type { PageValues } from './definition'
 
@@ -20,6 +21,11 @@ export function widgetsFromSettings(settings: Settings): PlacedWidget[] {
       options: { showDate: settings.clock.showDate, showSeconds: settings.clock.showSeconds },
       type: clockDefinition.type,
     })
+  }
+  // Listed whenever it is on, placed or not: with no place picked it draws nothing.
+  if (settings.weather.enabled) {
+    const { fields, followDevice, place, unit } = settings.weather
+    widgets.push({ options: { fields, followDevice, place, unit }, type: weatherDefinition.type })
   }
   return widgets
 }

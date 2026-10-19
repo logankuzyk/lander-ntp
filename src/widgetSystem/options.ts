@@ -1,6 +1,6 @@
 import * as v from 'valibot'
 
-import type { OptionDescription, WidgetDefinition } from './definition'
+import type { DefinitionOf, OptionDescription } from './definition'
 
 const PlaceSchema = v.nullable(
   v.looseObject({ latitude: v.number(), longitude: v.number(), name: v.string() }),
@@ -66,7 +66,7 @@ const defaultsOf = (fields: readonly Field[]): Record<string, unknown> =>
  * A Widget's options as a new Widget starts: every option at its default, under the key it is
  * stored under. Shared options are the page's, not the Widget's, so they are not here.
  */
-export function defaultOptions<O>(definition: WidgetDefinition<O>): O {
+export function defaultOptions<O>(definition: DefinitionOf<O>): O {
   return defaultsOf(definition.options.flatMap(fieldsOf)) as O
 }
 
@@ -81,7 +81,7 @@ export function defaultOptions<O>(definition: WidgetDefinition<O>): O {
  *
  * What is stored is not an object at all: the defaults.
  */
-export function readOptions<O>(definition: WidgetDefinition<O>, stored: unknown): O {
+export function readOptions<O>(definition: DefinitionOf<O>, stored: unknown): O {
   const fields = definition.options.flatMap(fieldsOf)
   const given = isRecord(stored) ? stored : {}
 
