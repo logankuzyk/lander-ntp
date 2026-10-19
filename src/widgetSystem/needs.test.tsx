@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
-import { type Need, useUnmetNeed } from './needs'
+import { CHECKING, checkNeeds, type Need, useUnmetNeed } from './needs'
 
 type Options = { place: string | null }
 
@@ -41,7 +41,7 @@ function setup(needs: readonly Need<Options>[] | undefined, initial: Options) {
   const seen: string[] = []
   function Probe({ options }: { options: Options }) {
     const result = useUnmetNeed(needs, options)
-    const text = result === 'checking' ? 'checking' : result === null ? 'none' : result.id
+    const text = result === CHECKING ? CHECKING : result === null ? 'none' : result.id
     seen.push(text)
     return <output>{text}</output>
   }
@@ -95,12 +95,12 @@ describe('useUnmetNeed', () => {
   it('gives "checking" until a late answer arrives, then none when it is met', async () => {
     const a = lateNeed('a')
     const { seen, shown } = setup([a.need], { place: null })
-    expect(shown()).toBe('checking')
+    expect(shown()).toBe(CHECKING)
 
     await answer(() => a.answers[0]!.resolve(true))
 
     expect(shown()).toBe('none')
-    expect(seen).toEqual(['checking', 'none'])
+    expect(seen).toEqual([CHECKING, 'none'])
   })
 
   it('gives the need once a late answer says it is unmet', async () => {
@@ -138,7 +138,7 @@ describe('useUnmetNeed', () => {
   it('gives "checking" for a late need that comes after answers given at once', () => {
     const b = lateNeed('b')
     const { seen } = setup([need('a', () => true), b.need], { place: null })
-    expect(seen).toEqual(['checking'])
+    expect(seen).toEqual([CHECKING])
   })
 
   it('counts a need that throws as unmet', () => {
@@ -174,7 +174,7 @@ describe('useUnmetNeed', () => {
     expect(met).toHaveBeenCalledTimes(2)
     expect(shown()).toBe('none')
     // Each answer given at once is in the render that asked, so there was never a "checking".
-    expect(seen).not.toContain('checking')
+    expect(seen).not.toContain(CHECKING)
   })
 
   it('checks a late need again when the options change, showing "checking" until it answers', async () => {
@@ -184,7 +184,7 @@ describe('useUnmetNeed', () => {
     expect(shown()).toBe('a')
 
     update({ place: 'Victoria' })
-    expect(shown()).toBe('checking')
+    expect(shown()).toBe(CHECKING)
 
     await answer(() => a.answers[1]!.resolve(true))
     expect(shown()).toBe('none')
@@ -198,7 +198,7 @@ describe('useUnmetNeed', () => {
     // The answer for the old options arrives after the options changed: it says "met", but
     // for the old options.
     await answer(() => a.answers[0]!.resolve(true))
-    expect(shown()).toBe('checking')
+    expect(shown()).toBe(CHECKING)
 
     await answer(() => a.answers[1]!.resolve(false))
     expect(shown()).toBe('a')
@@ -225,9 +225,150 @@ describe('useUnmetNeed', () => {
     // The old check stops there: it does not go on to ask b about options no longer current.
     await answer(() => a.answers[0]!.resolve(true))
     expect(second).not.toHaveBeenCalled()
-    expect(shown()).toBe('checking')
+    expect(shown()).toBe(CHECKING)
 
     await answer(() => a.answers[1]!.resolve(true))
     expect(shown()).toBe('none')
+  })
+
+  it('counts an answer that is not true as unmet, whatever it is', () => {
+    for (const answer of [undefined, null, 'yes', 1, {}]) {
+      const { shown } = setup([need('a', () => answer as unknown as boolean)], { place: null })
+      expect(shown()).toBe('a')
+    }
+  })
+
+  it('takes a thenable that is not a Promise as a late answer', async () => {
+    const thenable = { then: (resolve: (met: boolean) => void) => resolve(true) }
+    const { shown } = setup([need('a', () => thenable as unknown as Promise<boolean>)], {
+      place: null,
+    })
+    expect(shown()).toBe(CHECKING)
+
+    await answer(() => {})
+
+    expect(shown()).toBe('none')
+  })
+
+  it('counts a thenable that throws as unmet', async () => {
+    const thenable = {
+      then: () => {
+        throw new Error('no')
+      },
+    }
+    const { shown } = setup([need('a', () => thenable as unknown as Promise<boolean>)], {
+      place: null,
+    })
+
+    await answer(() => {})
+
+    expect(shown()).toBe('a')
+  })
+
+  it('counts a late answer that is not true as unmet', async () => {
+    const a = lateNeed('a')
+    const { shown } = setup([a.need], { place: null })
+
+    await answer(() => a.answers[0]!.resolve('yes' as unknown as boolean))
+
+    expect(shown()).toBe('a')
+  })
+
+  describe('a cancelled check', () => {
+    it('never gives an answer, so it cannot report that every need is met', async () => {
+      const a = lateNeed('a')
+      const later = checkNeeds([a.need], { place: null })
+      let settled = false
+      void later.later!.then(() => (settled = true))
+
+      later.cancel()
+      a.answers[0]!.resolve(true)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(settled).toBe(false)
+    })
+
+    it('asks no more needs', async () => {
+      const a = lateNeed('a')
+      const second = vi.fn(() => true)
+      const check = checkNeeds([a.need, need('b', second)], { place: null })
+
+      check.cancel()
+      a.answers[0]!.resolve(true)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(second).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('when the options are compared', () => {
+    type Loose = { [key: string]: unknown }
+
+    /** Draws with `first`, then with `second`; how many times were the needs asked? */
+    function asked(first: Loose, second: Loose) {
+      const met = vi.fn(() => true)
+      const needs = [{ id: 'a', met }]
+      function Probe({ options }: { options: Loose }) {
+        useUnmetNeed(needs, options)
+        return null
+      }
+      const view = render(<Probe options={first} />)
+      view.rerender(<Probe options={second} />)
+      return met.mock.calls.length
+    }
+
+    it('checks again when something nested in the options changes', () => {
+      expect(asked({ place: { name: 'Victoria' } }, { place: { name: 'Oslo' } })).toBe(2)
+    })
+
+    it('checks again when an element of an array in the options changes', () => {
+      expect(asked({ fields: ['a', 'b'] }, { fields: ['a', 'c'] })).toBe(2)
+      expect(asked({ fields: ['a'] }, { fields: ['a', 'b'] })).toBe(2)
+    })
+
+    it('does not check again for equal data in new objects and arrays', () => {
+      expect(asked({ fields: ['a', { on: true }] }, { fields: ['a', { on: true }] })).toBe(1)
+    })
+
+    it('does not check again when the same keys come in another order', () => {
+      expect(asked({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(1)
+    })
+
+    it('tells an empty array from an empty object', () => {
+      expect(asked({ x: [] }, { x: {} })).toBe(2)
+      expect(asked({ x: {} }, { x: [] })).toBe(2)
+    })
+  })
+
+  describe('with needs that are not stable', () => {
+    // The contract is that `needs` is one array, such as the one on a definition. A new array
+    // on each render is a new check on each render: the needs are asked again every time.
+    it('asks answered-at-once needs again on every render', () => {
+      const met = vi.fn(() => true)
+      function Probe(_props: { tick: number }) {
+        useUnmetNeed([{ id: 'a', met }], { tick: 0 })
+        return null
+      }
+      const view = render(<Probe tick={0} />)
+      view.rerender(<Probe tick={1} />)
+      view.rerender(<Probe tick={2} />)
+      expect(met).toHaveBeenCalledTimes(3)
+    })
+
+    it('never leaves "checking" for a late need: each answer renders again, which starts over', async () => {
+      const a = lateNeed('a')
+      function Probe() {
+        const result = useUnmetNeed([a.need], { place: null })
+        return <output>{result === CHECKING ? CHECKING : 'settled'}</output>
+      }
+      const view = render(<Probe />)
+      expect(a.answers).toHaveLength(1)
+
+      await answer(() => a.answers[0]!.resolve(true))
+
+      // The answer was for the first array; the render it caused asked again with a new one.
+      expect(a.answers).toHaveLength(2)
+      expect(view.container.textContent).toBe(CHECKING)
+    })
   })
 })

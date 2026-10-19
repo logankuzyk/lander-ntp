@@ -10,8 +10,12 @@ export type Need<O> = {
   id: string
   /**
    * Whether the need is met for these options. Answer at once (`true` or `false`) when you can:
-   * a Widget whose needs all do is drawn in its first render. A need that throws, or whose
-   * answer fails, is counted as unmet.
+   * a Widget whose needs all do is drawn in its first render. A need that throws, whose
+   * answer fails, or whose answer is anything but `true` is counted as unmet.
+   *
+   * It is called while the Widget is drawn (inside `useMemo`), and again for each change of
+   * options, so it must do nothing but ask: no side effects, and nothing slow before returning
+   * the promise.
    */
   met: (options: O) => boolean | Promise<boolean>
 }
@@ -26,19 +30,34 @@ const NO_NEEDS: readonly never[] = []
 
 /** One check of the needs for one set of options. */
 type Check<O> = {
-  /** Ends the check: it asks no more needs, and its answer will not be used. */
+  /**
+   * Ends the check: it asks no more needs and never gives an answer, not even "every need is
+   * met", which would show the Widget with a need unmet.
+   */
   cancel: () => void
-  /** The answer when it comes, if it did not come at once. */
+  /** The answer when it comes, if it did not come at once. Never, once cancelled. */
   later: Promise<Need<O> | null> | undefined
   /** The answer, if every need asked so far was answered at once. Undefined: still waiting. */
   now: Need<O> | null | undefined
 }
 
+/** Whether a value is a promise, or something that acts as one. */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === 'function'
+  )
+}
+
 /**
  * Asks the needs in order, stopping at the first unmet one. Answers given at once are used at
- * once; from the first late answer on, the rest follows when it arrives.
+ * once; from the first late answer on, the rest follows when it arrives. An answer that is not
+ * `true` (or a promise of it) leaves the need unmet.
+ *
+ * Exported for its tests; the hook below is how Widgets use it.
  */
-function check<O>(needs: readonly Need<O>[], options: O): Check<O> {
+export function checkNeeds<O>(needs: readonly Need<O>[], options: O): Check<O> {
   let cancelled = false
   const cancel = () => {
     cancelled = true
@@ -47,17 +66,17 @@ function check<O>(needs: readonly Need<O>[], options: O): Check<O> {
   /** Asks `needs[from]` onwards while the answers keep coming at once. */
   const ask = (
     from: number,
-  ): { index: number; pending: Promise<boolean> } | { now: Need<O> | null } => {
+  ): { index: number; pending: Promise<unknown> } | { now: Need<O> | null } => {
     for (let i = from; i < needs.length; i++) {
       const need = needs[i]!
-      let answer: boolean | Promise<boolean>
+      let answer: unknown
       try {
         answer = need.met(options)
       } catch {
         return { now: need }
       }
-      if (typeof answer !== 'boolean') return { index: i, pending: answer }
-      if (!answer) return { now: need }
+      if (isThenable(answer)) return { index: i, pending: Promise.resolve(answer) }
+      if (answer !== true) return { now: need }
     }
     return { now: null }
   }
@@ -65,14 +84,14 @@ function check<O>(needs: readonly Need<O>[], options: O): Check<O> {
   const first = ask(0)
   if ('now' in first) return { cancel, later: undefined, now: first.now }
 
-  const finish = async (index: number, pending: Promise<boolean>): Promise<Need<O> | null> => {
+  const finish = async (index: number, pending: Promise<unknown>): Promise<Need<O> | null> => {
     for (;;) {
       const met = await pending.then(
-        (answer) => answer,
+        (answer) => answer === true,
         () => false,
       )
-      // The options have changed since: do not ask the rest about them.
-      if (cancelled) return null
+      // The options have changed since: do not ask the rest about them, and do not answer.
+      if (cancelled) return new Promise<never>(() => {})
       if (!met) return needs[index]!
       const next = ask(index + 1)
       if ('now' in next) return next.now
@@ -117,11 +136,15 @@ function useSameData<T>(value: T): T {
  * options that have since changed is ignored.
  *
  * `needs` must be a stable array, such as one on a definition: a new array starts a new check.
+ * The needs' `met` is called during render (inside `useMemo`), so it must only ask.
  */
 export function useUnmetNeed<O>(needs: readonly Need<O>[] | undefined, options: O): UnmetNeed<O> {
   const stableNeeds = needs ?? NO_NEEDS
   const stableOptions = useSameData(options)
-  const current = useMemo(() => check(stableNeeds, stableOptions), [stableNeeds, stableOptions])
+  const current = useMemo(
+    () => checkNeeds(stableNeeds, stableOptions),
+    [stableNeeds, stableOptions],
+  )
   const [settled, setSettled] = useState<{ check: Check<O>; unmet: Need<O> | null } | null>(null)
 
   useEffect(() => {
