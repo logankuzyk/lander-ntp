@@ -1,9 +1,10 @@
-import { render } from '@testing-library/preact'
+import { act, render } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { clockDefinition } from '@/widgets/Clock/definition'
 
 import type { WidgetDefinition } from './definition'
+import type { Need } from './needs'
 import { WidgetHost } from './WidgetHost'
 
 const time = (container: ParentNode) => container.querySelector('.clock__time')?.textContent
@@ -75,5 +76,116 @@ describe('WidgetHost', () => {
       { flag: true, other: true },
       { flag: true, other: false },
     ])
+  })
+})
+
+/** Runs `give`, then lets every promise it set going finish, inside `act`. */
+const settle = (give: () => void) =>
+  act(async () => {
+    give()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+describe('WidgetHost with needs', () => {
+  type Options = { on: boolean }
+
+  /** A Widget made up here: it draws its name, and needs whatever the test gives it. */
+  const example = (needs?: readonly Need<Options>[]): WidgetDefinition<Options> => ({
+    name: 'Example',
+    needs,
+    options: [{ control: 'switch', default: false, id: 'on', label: 'On' }],
+    type: 'example',
+    View: ({ options }) => <p class="example">{options.on ? 'on' : 'off'}</p>,
+  })
+  const page = { hour12: false }
+
+  it('draws the View in its first render when every need is met at once', () => {
+    const { container } = render(
+      <WidgetHost
+        definition={example([{ id: 'a', met: () => true }])}
+        options={{ on: true }}
+        page={page}
+      />,
+    )
+    expect(container.querySelector('.example')?.textContent).toBe('on')
+  })
+
+  it('draws nothing while a need is unmet', () => {
+    const { container } = render(
+      <WidgetHost
+        definition={example([
+          { id: 'a', met: () => true },
+          { id: 'b', met: () => false },
+        ])}
+        options={{ on: true }}
+        page={page}
+      />,
+    )
+    expect(container.children).toHaveLength(0)
+  })
+
+  it('draws nothing while checking, then the View once every need is met', async () => {
+    let answer!: (met: boolean) => void
+    const definition = example([
+      { id: 'a', met: () => new Promise<boolean>((resolve) => (answer = resolve)) },
+    ])
+    const { container } = render(
+      <WidgetHost definition={definition} options={{ on: true }} page={page} />,
+    )
+    expect(container.children).toHaveLength(0)
+
+    await settle(() => answer(true))
+
+    expect(container.querySelector('.example')?.textContent).toBe('on')
+  })
+
+  it('draws nothing when a late answer says a need is unmet', async () => {
+    let answer!: (met: boolean) => void
+    const definition = example([
+      { id: 'a', met: () => new Promise<boolean>((resolve) => (answer = resolve)) },
+    ])
+    const { container } = render(
+      <WidgetHost definition={definition} options={{ on: true }} page={page} />,
+    )
+
+    await settle(() => answer(false))
+
+    expect(container.children).toHaveLength(0)
+  })
+
+  it('asks the needs with the options as the definition reads them', () => {
+    const met = vi.fn(() => true)
+    render(<WidgetHost definition={example([{ id: 'a', met }])} options={{}} page={page} />)
+    expect(met).toHaveBeenCalledWith({ on: false })
+  })
+
+  it('checks again when the stored options change, and draws once they meet the need', () => {
+    const definition = example([{ id: 'on', met: (options) => options.on }])
+    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    expect(view.container.children).toHaveLength(0)
+
+    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+
+    expect(view.container.querySelector('.example')?.textContent).toBe('on')
+  })
+
+  it('does not check again when it is drawn again with the same options', () => {
+    const met = vi.fn(() => true)
+    const definition = example([{ id: 'a', met }])
+    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    view.rerender(<WidgetHost definition={definition} options={{}} page={{ hour12: true }} />)
+    expect(met).toHaveBeenCalledTimes(1)
+  })
+
+  it('adds no element of its own once its needs are met', () => {
+    const { container } = render(
+      <WidgetHost
+        definition={example([{ id: 'a', met: () => true }])}
+        options={{ on: true }}
+        page={page}
+      />,
+    )
+    expect(container.children).toHaveLength(1)
+    expect(container.firstElementChild?.classList.contains('example')).toBe(true)
   })
 })

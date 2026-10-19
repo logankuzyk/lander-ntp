@@ -2,6 +2,8 @@ import type { ComponentType } from 'preact'
 
 import type { Place } from '@/settings/schema'
 
+import type { Need } from './needs'
+
 /**
  * The page-wide values a Widget may read: settings shared by the whole page, not kept in any
  * Widget's options. The font is not among them; it stays in CSS.
@@ -85,6 +87,11 @@ export type WidgetViewProps<O> = {
 export type WidgetDefinition<O> = {
   /** What people read: "Weather". Free to change. */
   name: string
+  /**
+   * What must be true before the Widget shows, checked in order against its options. Until they
+   * all are, it draws nothing. Defined once, not rebuilt on each render.
+   */
+  needs?: readonly Need<O>[]
   options: readonly OptionDescription[]
   /** The id that is stored. Never renamed or reused. */
   type: string

@@ -1,0 +1,233 @@
+import { act, render } from '@testing-library/preact'
+import { describe, expect, it, vi } from 'vitest'
+
+import { type Need, useUnmetNeed } from './needs'
+
+type Options = { place: string | null }
+
+/** A promise settled by hand, to answer a need late. */
+function later<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, reject, resolve }
+}
+
+/** Gives an answer, then lets every promise it set going finish, inside `act`. */
+const answer = (give: () => void) =>
+  act(async () => {
+    give()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+const need = (id: string, met: Need<Options>['met']): Need<Options> => ({ id, met })
+
+/** Needs answered by hand: each check of the need makes a new answer to settle. */
+function lateNeed(id: string) {
+  const answers: ReturnType<typeof later<boolean>>[] = []
+  const met = (): Promise<boolean> => {
+    const answer = later<boolean>()
+    answers.push(answer)
+    return answer.promise
+  }
+  return { answers, need: need(id, met) }
+}
+
+/** Draws what `useUnmetNeed` gave, and keeps every value it gave, one per render. */
+function setup(needs: readonly Need<Options>[] | undefined, initial: Options) {
+  const seen: string[] = []
+  function Probe({ options }: { options: Options }) {
+    const result = useUnmetNeed(needs, options)
+    const text = result === 'checking' ? 'checking' : result === null ? 'none' : result.id
+    seen.push(text)
+    return <output>{text}</output>
+  }
+  const view = render(<Probe options={initial} />)
+  return {
+    seen,
+    shown: () => view.container.textContent,
+    update: (options: Options) => view.rerender(<Probe options={options} />),
+  }
+}
+
+describe('useUnmetNeed', () => {
+  it('gives none for a Widget with no needs, in the first render', () => {
+    const { seen, shown } = setup(undefined, { place: null })
+    expect(seen).toEqual(['none'])
+    expect(shown()).toBe('none')
+  })
+
+  it('settles answers given at once in the render that asked: never "checking"', () => {
+    const { seen } = setup([need('a', () => true), need('b', () => true)], { place: 'Victoria' })
+    expect(seen).toEqual(['none'])
+  })
+
+  it('gives the first unmet need, in the first render, when the answers come at once', () => {
+    const { seen } = setup(
+      [need('a', () => true), need('b', () => false), need('c', () => false)],
+      {
+        place: null,
+      },
+    )
+    expect(seen).toEqual(['b'])
+  })
+
+  it('asks the needs in order and stops at the first unmet one', () => {
+    const asked: string[] = []
+    const ask = (id: string, answer: boolean) =>
+      need(id, () => {
+        asked.push(id)
+        return answer
+      })
+    setup([ask('a', true), ask('b', false), ask('c', true)], { place: null })
+    expect(asked).toEqual(['a', 'b'])
+  })
+
+  it('passes the options to each need', () => {
+    const met = vi.fn(() => true)
+    setup([need('a', met)], { place: 'Victoria' })
+    expect(met).toHaveBeenCalledWith({ place: 'Victoria' })
+  })
+
+  it('gives "checking" until a late answer arrives, then none when it is met', async () => {
+    const a = lateNeed('a')
+    const { seen, shown } = setup([a.need], { place: null })
+    expect(shown()).toBe('checking')
+
+    await answer(() => a.answers[0]!.resolve(true))
+
+    expect(shown()).toBe('none')
+    expect(seen).toEqual(['checking', 'none'])
+  })
+
+  it('gives the need once a late answer says it is unmet', async () => {
+    const a = lateNeed('a')
+    const { shown } = setup([a.need], { place: null })
+
+    await answer(() => a.answers[0]!.resolve(false))
+
+    expect(shown()).toBe('a')
+  })
+
+  it('asks a need after a late one only once the late one is met', async () => {
+    const a = lateNeed('a')
+    const second = vi.fn(() => true)
+    const { shown } = setup([a.need, need('b', second)], { place: null })
+    expect(second).not.toHaveBeenCalled()
+
+    await answer(() => a.answers[0]!.resolve(true))
+
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(shown()).toBe('none')
+  })
+
+  it('does not ask the needs after a late one that turns out unmet', async () => {
+    const a = lateNeed('a')
+    const second = vi.fn(() => true)
+    const { shown } = setup([a.need, need('b', second)], { place: null })
+
+    await answer(() => a.answers[0]!.resolve(false))
+
+    expect(second).not.toHaveBeenCalled()
+    expect(shown()).toBe('a')
+  })
+
+  it('gives "checking" for a late need that comes after answers given at once', () => {
+    const b = lateNeed('b')
+    const { seen } = setup([need('a', () => true), b.need], { place: null })
+    expect(seen).toEqual(['checking'])
+  })
+
+  it('counts a need that throws as unmet', () => {
+    const { shown } = setup(
+      [
+        need('a', () => {
+          throw new Error('no')
+        }),
+      ],
+      { place: null },
+    )
+    expect(shown()).toBe('a')
+  })
+
+  it('counts a need whose late answer fails as unmet', async () => {
+    const a = lateNeed('a')
+    const { shown } = setup([a.need], { place: null })
+
+    await answer(() => a.answers[0]!.reject(new Error('no')))
+
+    expect(shown()).toBe('a')
+  })
+
+  it('checks again when the options change, and not when they are the same', () => {
+    const met = vi.fn((options: Options) => options.place !== null)
+    const { seen, shown, update } = setup([need('place', met)], { place: null })
+    expect(shown()).toBe('place')
+
+    update({ place: null })
+    expect(met).toHaveBeenCalledTimes(1)
+
+    update({ place: 'Victoria' })
+    expect(met).toHaveBeenCalledTimes(2)
+    expect(shown()).toBe('none')
+    // Each answer given at once is in the render that asked, so there was never a "checking".
+    expect(seen).not.toContain('checking')
+  })
+
+  it('checks a late need again when the options change, showing "checking" until it answers', async () => {
+    const a = lateNeed('a')
+    const { shown, update } = setup([a.need], { place: null })
+    await answer(() => a.answers[0]!.resolve(false))
+    expect(shown()).toBe('a')
+
+    update({ place: 'Victoria' })
+    expect(shown()).toBe('checking')
+
+    await answer(() => a.answers[1]!.resolve(true))
+    expect(shown()).toBe('none')
+  })
+
+  it('ignores a late answer for options that have since changed', async () => {
+    const a = lateNeed('a')
+    const { shown, update } = setup([a.need], { place: null })
+
+    update({ place: 'Victoria' })
+    // The answer for the old options arrives after the options changed: it says "met", but
+    // for the old options.
+    await answer(() => a.answers[0]!.resolve(true))
+    expect(shown()).toBe('checking')
+
+    await answer(() => a.answers[1]!.resolve(false))
+    expect(shown()).toBe('a')
+  })
+
+  it('does not let a late answer for old options overwrite the answer for the new ones', async () => {
+    const a = lateNeed('a')
+    const { shown, update } = setup([a.need], { place: null })
+
+    update({ place: 'Victoria' })
+    await answer(() => a.answers[1]!.resolve(true))
+    expect(shown()).toBe('none')
+
+    await answer(() => a.answers[0]!.resolve(false))
+    expect(shown()).toBe('none')
+  })
+
+  it('ignores a late need that was still being asked for options that have since changed', async () => {
+    const a = lateNeed('a')
+    const second = vi.fn((options: Options) => options.place === 'Victoria')
+    const { shown, update } = setup([a.need, need('b', second)], { place: null })
+
+    update({ place: 'Victoria' })
+    // The old check stops there: it does not go on to ask b about options no longer current.
+    await answer(() => a.answers[0]!.resolve(true))
+    expect(second).not.toHaveBeenCalled()
+    expect(shown()).toBe('checking')
+
+    await answer(() => a.answers[1]!.resolve(true))
+    expect(shown()).toBe('none')
+  })
+})

@@ -1,4 +1,5 @@
 import type { PageValues, WidgetDefinition } from './definition'
+import { useUnmetNeed } from './needs'
 import { readOptions } from './options'
 
 type WidgetHostProps<O> = {
@@ -10,11 +11,15 @@ type WidgetHostProps<O> = {
 
 /**
  * Draws a Widget: its View, with its options read from what is stored and the page's values.
+ * Nothing is drawn while its needs are being checked or one is unmet.
  *
  * It adds no element of its own. `.app` is a grid that centres its children, so a wrapper
  * would be a row of its own and move the Widget.
  */
 export function WidgetHost<O>({ definition, options, page }: WidgetHostProps<O>) {
   const { View } = definition
-  return <View options={readOptions(definition, options)} page={page} />
+  const read = readOptions(definition, options)
+  const unmet = useUnmetNeed(definition.needs, read)
+  if (unmet !== null) return null
+  return <View options={read} page={page} />
 }
