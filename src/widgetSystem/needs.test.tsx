@@ -331,12 +331,22 @@ describe('useUnmetNeed', () => {
     })
 
     it('does not check again when the same keys come in another order', () => {
-      expect(asked({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(1)
+      // Built from entries: the lint rule that sorts object keys would put a literal back in order.
+      const reordered = Object.fromEntries([
+        ['b', 2],
+        ['a', 1],
+      ])
+      expect(Object.keys(reordered)).toEqual(['b', 'a'])
+      expect(asked({ a: 1, b: 2 }, reordered)).toBe(1)
     })
 
     it('tells an empty array from an empty object', () => {
       expect(asked({ x: [] }, { x: {} })).toBe(2)
       expect(asked({ x: {} }, { x: [] })).toBe(2)
+    })
+
+    it('tells a key set to undefined from a key that is missing', () => {
+      expect(asked({ a: undefined }, { b: undefined })).toBe(2)
     })
   })
 

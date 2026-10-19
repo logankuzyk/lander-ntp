@@ -137,6 +137,9 @@ function useSameData<T>(value: T): T {
  *
  * `needs` must be a stable array, such as one on a definition: a new array starts a new check.
  * The needs' `met` is called during render (inside `useMemo`), so it must only ask.
+ *
+ * Each Check is followed by one effect; a second effect on the same Check would never see an
+ * answer.
  */
 export function useUnmetNeed<O>(needs: readonly Need<O>[] | undefined, options: O): UnmetNeed<O> {
   const stableNeeds = needs ?? NO_NEEDS
