@@ -1,5 +1,7 @@
+import { useRef } from 'preact/hooks'
+
 import type { PageValues, WidgetDefinition, WidgetSource, WidgetViewProps } from './definition'
-import { useUnmetNeed } from './needs'
+import { CHECKING, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { useSource } from './source'
 
@@ -31,7 +33,8 @@ function SourcedView<O, R, C>({ options, page, source, View }: SourcedViewProps<
 
 /**
  * Draws a Widget: its View, with its options read from what is stored and the page's values.
- * Nothing is drawn while its needs are being checked or one is unmet. A Widget with a source
+ * Nothing is drawn while its needs are first checked or one is unmet; once drawn, a Widget
+ * stays drawn while they are checked again for new options. A Widget with a source
  * has it run once every need is met, and is drawn only with a reading.
  *
  * It adds no element of its own. `.app` is a grid that centres its children, so a wrapper
@@ -41,7 +44,12 @@ export function WidgetHost<O, R, C>({ definition, options, page }: WidgetHostPro
   const { source, View } = definition
   const read = readOptions(definition, options)
   const unmet = useUnmetNeed(definition.needs, read)
-  if (unmet !== null) return null
+  // A Widget already drawn stays drawn while its needs are checked again for new options, so an
+  // edit does not make it vanish and start over. Only an unmet need, or a first check, hides it.
+  const drawn = useRef(false)
+  const draw = unmet === null || (unmet === CHECKING && drawn.current)
+  drawn.current = draw
+  if (!draw) return null
   if (source) return <SourcedView options={read} page={page} source={source} View={View} />
   // No source, so no reading or context: they are the `undefined` that `R` and `C` default to.
   const props = { options: read, page } as WidgetViewProps<O, R, C>

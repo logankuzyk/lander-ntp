@@ -111,7 +111,7 @@ export type WidgetSource<O, R, C> = {
 
 /**
  * What a Widget declares. `R` is what its source loads and `C` what the source carries to the
- * View; a Widget with no source leaves both alone.
+ * View. Both are only for definitions with a `source`; a Widget without one leaves them alone.
  */
 export type WidgetDefinition<O, R = undefined, C = undefined> = {
   /** What people read: "Weather". Free to change. */

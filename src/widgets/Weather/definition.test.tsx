@@ -369,7 +369,8 @@ describe('the Weather', () => {
   })
 
   it('ignores a cache for another place or unit', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(54)))
+    const fetch = vi.fn().mockResolvedValue(forecast(54))
+    vi.stubGlobal('fetch', fetch)
     await weatherCache.setValue({
       data: READING,
       fetchedAt: Date.now(),
@@ -379,6 +380,36 @@ describe('the Weather', () => {
     render(<Probe settings={{ ...ON, unit: 'fahrenheit' }} />)
 
     await waitFor(() => expect(shown()).toBe('54'))
+    // The request is in the unit the settings ask for, not just a different cache key.
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const url = new URL(fetch.mock.calls[0]![0] as string)
+    expect(url.searchParams.get('temperature_unit')).toBe('fahrenheit')
+    expect(url.searchParams.get('latitude')).toBe(String(PLACE.latitude))
+  })
+
+  it('does not ask the device, or for a name, when a picked place is shown', async () => {
+    const getCurrentPosition = vi.fn((done: (position: unknown) => void) =>
+      done({ coords: { latitude: 49.28, longitude: -123.12 } }),
+    )
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition },
+      language: 'en-CA',
+      permissions: { query: () => Promise.resolve({ state: 'granted' }) },
+    })
+    const fetch = vi.fn((url: string) =>
+      url.includes('reverse-geocode')
+        ? Promise.resolve({ json: () => Promise.resolve({ city: 'Vancouver' }), ok: true })
+        : Promise.resolve(forecast(12)),
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(shown()).toBe('12'))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(getCurrentPosition).not.toHaveBeenCalled()
+    expect(fetch.mock.calls.filter(([url]) => url.includes('reverse-geocode'))).toEqual([])
+    expect(await devicePosition.getValue()).toBeNull()
   })
 
   describe('following the device', () => {
@@ -585,5 +616,68 @@ describe('the Weather on Firefox', () => {
 
     expect(getCurrentPosition).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  describe('when its options are edited', () => {
+    const REORDERED: WeatherSettings['fields'] = [
+      { id: 'location', shown: true },
+      { id: 'feelsLike', shown: false },
+      { id: 'condition', shown: false },
+      { id: 'sun', shown: false },
+      { id: 'highLow', shown: false },
+    ]
+    const HERE = { latitude: 48.43, longitude: -123.37 }
+
+    /** Lets a few ticks pass, checking the Weather is drawn after each. */
+    const stayDrawn = async (temperature: string) => {
+      for (let tick = 0; tick < 10; tick++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        expect(shown()).toBe(temperature)
+      }
+    }
+
+    it('keeps the Weather drawn throughout when the lines are reordered', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(12)))
+      agreement(true)
+      const view = render(<Probe settings={ON} />)
+      await waitFor(() => expect(shown()).toBe('12'))
+
+      view.rerender(<Probe settings={{ ...ON, fields: REORDERED }} />)
+
+      expect(shown()).toBe('12')
+      await stayDrawn('12')
+    })
+
+    it('asks the device no extra time when the lines are reordered while following it', async () => {
+      const getCurrentPosition = vi.fn((done: (position: unknown) => void) =>
+        done({ coords: HERE }),
+      )
+      vi.stubGlobal('navigator', {
+        geolocation: { getCurrentPosition },
+        language: 'en-CA',
+        permissions: { query: () => Promise.resolve({ state: 'granted' }) },
+      })
+      const fetch = vi.fn((url: string) =>
+        url.includes('reverse-geocode')
+          ? Promise.resolve({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true })
+          : Promise.resolve(forecast(12)),
+      )
+      vi.stubGlobal('fetch', fetch)
+      agreement(true)
+      const follow: WeatherSettings = { ...ON, followDevice: true, place: null }
+      const view = render(<Probe settings={follow} />)
+      await waitFor(() => expect(shown()).toBe('12'))
+      const asked = getCurrentPosition.mock.calls.length
+      const requested = fetch.mock.calls.length
+
+      view.rerender(<Probe settings={{ ...follow, fields: REORDERED }} />)
+
+      expect(shown()).toBe('12')
+      await stayDrawn('12')
+      expect(getCurrentPosition).toHaveBeenCalledTimes(asked)
+      expect(fetch).toHaveBeenCalledTimes(requested)
+    })
   })
 })

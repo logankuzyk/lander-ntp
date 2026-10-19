@@ -178,6 +178,45 @@ describe('WidgetHost with needs', () => {
     expect(met).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a drawn Widget drawn while its needs are checked again for new options, and hides it if one is then unmet', async () => {
+    const answers: ((met: boolean) => void)[] = []
+    const definition = example([
+      { id: 'a', met: () => new Promise<boolean>((resolve) => answers.push(resolve)) },
+    ])
+    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    await settle(() => answers[0]!(true))
+    expect(view.container.querySelector('.example')?.textContent).toBe('off')
+
+    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    expect(view.container.querySelector('.example')?.textContent).toBe('on')
+
+    await settle(() => answers[1]!(false))
+    expect(view.container.children).toHaveLength(0)
+  })
+
+  it('hides a Widget whose need became unmet, also while its needs are checked again', async () => {
+    const answers: ((met: boolean) => void)[] = []
+    const definition = example([
+      {
+        id: 'a',
+        met: (options) =>
+          options.on ? new Promise<boolean>((resolve) => answers.push(resolve)) : false,
+      },
+    ])
+    const view = render(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    await settle(() => answers[0]!(true))
+    expect(view.container.children).toHaveLength(1)
+
+    view.rerender(<WidgetHost definition={definition} options={{ on: false }} page={page} />)
+    expect(view.container.children).toHaveLength(0)
+
+    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    expect(view.container.children).toHaveLength(0)
+
+    await settle(() => answers[1]!(true))
+    expect(view.container.children).toHaveLength(1)
+  })
+
   it('adds no element of its own once its needs are met', () => {
     const { container } = render(
       <WidgetHost
