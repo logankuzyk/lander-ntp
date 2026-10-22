@@ -32,6 +32,15 @@ export default defineWebExtConfig({
 })
 ```
 
+To look at one part of the page on its own, run Storybook:
+
+```bash
+npm run storybook        # http://localhost:6006
+npm run storybook:build  # static build, into storybook-static/
+```
+
+Stories sit beside their component as `*.stories.tsx`. They run without the extension: storage is WXT's in-memory fake, cleared before each story, and photos are three small ones from logankuzyk.com committed in `.storybook/public/story-photos/`, so nothing is fetched. The **Font** menu in the toolbar switches the display font.
+
 `npm run build:chrome` and `npm run zip:chrome` (and the `firefox`/`edge` versions) build for one browser, into `.output/`. To try a build in your everyday Chrome, open `chrome://extensions`, turn on **Developer mode**, then **Load unpacked** and pick `.output/chrome-mv3`.
 
 Photos come from `https://logankuzyk.com/new-tab/photos.json` (photos with **Show in new tab** ticked in the website admin). To use a local copy of the website instead, create `.env.local`:

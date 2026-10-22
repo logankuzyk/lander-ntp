@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [WxtVitest()],
   test: {
     coverage: {
-      exclude: ['src/entrypoints/**/main.tsx', '**/*.test.{ts,tsx}'],
+      exclude: ['src/entrypoints/**/main.tsx', '**/*.test.{ts,tsx}', '**/*.stories.tsx'],
       include: ['src/**/*.{ts,tsx}'],
       provider: 'v8',
     },

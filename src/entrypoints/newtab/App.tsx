@@ -3,6 +3,8 @@ import { useCallback, useLayoutEffect, useState } from 'preact/hooks'
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
+import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
+import { PhotoInfo } from '@/components/PhotoInfo/PhotoInfo'
 import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
 import { Welcome } from '@/components/Welcome/Welcome'
 import { TOUR } from '@/onboarding/callouts'
@@ -13,11 +15,9 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
-import { useWeather } from '@/weather/useWeather'
-import { Clock } from '@/widgets/Clock/Clock'
-import { PhotoCredit } from '@/widgets/PhotoCredit/PhotoCredit'
-import { PhotoInfo } from '@/widgets/PhotoInfo/PhotoInfo'
-import { Weather } from '@/widgets/Weather/Weather'
+import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
+import { widgetDefinition } from '@/widgetSystem/registry'
+import { WidgetHost } from '@/widgetSystem/WidgetHost'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
@@ -38,9 +38,6 @@ export function App() {
   const { next, photo, photos, upcoming } = usePhotoRotation(
     settingsLoaded ? settings.photos : null,
   )
-
-  // Likewise held back, so nothing is fetched for a widget that turns out to be switched off.
-  const weather = useWeather(settingsLoaded ? settings.weather : null)
 
   const toggle = (which: Exclude<Popover, null>) =>
     setPopover((open) => (open === which ? null : which))
@@ -90,15 +87,20 @@ export function App() {
         depends on them waits for them. The photo already does: usePhotoRotation is held back
         until the settings are known.
       */}
-      {settingsLoaded && settings.clock.enabled && <Clock {...settings.clock} />}
-      {weather && (
-        <Weather
-          fields={settings.weather.fields}
-          hour12={settings.clock.hour12}
-          place={weather.place}
-          weather={weather.weather}
-        />
-      )}
+      {settingsLoaded &&
+        widgetsFromSettings(settings).map(({ options, type }) => {
+          const definition = widgetDefinition(type)
+          return (
+            definition && (
+              <WidgetHost
+                definition={definition}
+                key={type}
+                options={options}
+                page={pageValues(settings)}
+              />
+            )
+          )
+        })}
       {photo && <PhotoCredit photo={photo} />}
       {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
       {popover === 'settings' && (
