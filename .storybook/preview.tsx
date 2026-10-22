@@ -29,6 +29,7 @@ const preview: Preview = {
     },
   },
   initialGlobals: { font: 'system' },
-  parameters: { layout: 'fullscreen' },
+  // Publish only: Chromatic takes no snapshots, so no visual tests run.
+  parameters: { chromatic: { disableSnapshot: true }, layout: 'fullscreen' },
 }
 export default preview
