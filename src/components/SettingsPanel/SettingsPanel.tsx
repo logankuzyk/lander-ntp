@@ -2,7 +2,6 @@ import { useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
-import { Select } from '@/components/Dropdown/Select'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
@@ -13,11 +12,11 @@ import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
 import type { Settings, WeatherSettings } from '@/settings/schema'
 import { allowLocation } from '@/weather/consent'
-import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
-import { placeName } from '@/weather/placeName'
+import { Choice } from '@/widgetSystem/controls/Choice'
+import { PlaceControl } from '@/widgetSystem/controls/PlaceControl'
+import { Switch } from '@/widgetSystem/controls/Switch'
 
 import { Gallery } from './Gallery'
-import { PlaceSearch } from './PlaceSearch'
 import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
@@ -44,44 +43,6 @@ const SECTIONS = [
 
 export type SectionId = (typeof SECTIONS)[number][0]
 
-type ToggleProps = {
-  checked: boolean
-  label: string
-  onChange: (checked: boolean) => void
-}
-
-function Toggle({ checked, label, onChange }: ToggleProps) {
-  return (
-    <label class="settings__row">
-      <span>{label}</span>
-      <input
-        checked={checked}
-        class="switch"
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        role="switch"
-        type="checkbox"
-      />
-    </label>
-  )
-}
-
-type ChoiceProps<T extends string> = {
-  label: string
-  onChange: (value: T) => void
-  options: readonly (readonly [T, string])[]
-  value: T
-}
-
-function Choice<T extends string>({ label, onChange, options, value }: ChoiceProps<T>) {
-  const labelId = useId()
-  return (
-    <div class="settings__row">
-      <span id={labelId}>{label}</span>
-      <Select labelId={labelId} onChange={onChange} options={options} value={value} />
-    </div>
-  )
-}
-
 type PhotosSectionProps = {
   currentId: string | null
   onChange: (settings: Settings) => void
@@ -104,16 +65,16 @@ function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionP
       <section aria-labelledby="cycling-heading">
         <h3 id="cycling-heading">Cycling</h3>
         <Choice<Frequency | typeof NEVER>
+          choices={[
+            ...FREQUENCIES.map((id) => ({ label: FREQUENCY_LABELS[id], value: id })),
+            { label: 'Never', value: NEVER },
+          ]}
           label="Change photo"
           onChange={(choice) =>
             choice === NEVER
               ? update({ mode: 'pinned', pinnedId: currentId })
               : update({ frequency: choice, mode: 'cycle' })
           }
-          options={[
-            ...FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const),
-            [NEVER, 'Never'],
-          ]}
           value={pinned ? NEVER : cycling.frequency}
         />
         {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
@@ -137,7 +98,7 @@ function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionP
             </button>
           </p>
         )}
-        <Toggle
+        <Switch
           checked={settings.dim}
           label="Dim the photo"
           onChange={(dim) => onChange({ ...settings, dim })}
@@ -170,7 +131,7 @@ function ClockSection({ onChange, settings }: SectionProps) {
 
   return (
     <section>
-      <Toggle
+      <Switch
         checked={settings.clock.enabled}
         label="Show clock"
         onChange={(enabled) => clock({ enabled })}
@@ -178,17 +139,17 @@ function ClockSection({ onChange, settings }: SectionProps) {
       {/* Out of the way of both the eye and Tab while the clock is off. */}
       {settings.clock.enabled && (
         <>
-          <Toggle
+          <Switch
             checked={!settings.clock.hour12}
             label="24-hour time"
             onChange={(h24) => clock({ hour12: !h24 })}
           />
-          <Toggle
+          <Switch
             checked={settings.clock.showDate}
             label="Show date"
             onChange={(showDate) => clock({ showDate })}
           />
-          <Toggle
+          <Switch
             checked={settings.clock.showSeconds}
             label="Show seconds"
             onChange={(showSeconds) => clock({ showSeconds })}
@@ -201,35 +162,16 @@ function ClockSection({ onChange, settings }: SectionProps) {
 
 function WeatherSection({ onChange, settings }: SectionProps) {
   const current = settings.weather
-  const [changingPlace, setChangingPlace] = useState(false)
-  const [locateFailed, setLocateFailed] = useState(false)
   const [, setRefused] = useState(0)
 
-  // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
-  // a change is laid over the settings as they are when it is made, not as they were at the click.
+  // The place control's following and `enable` wait on the browser's prompts, and the settings
+  // can change meanwhile: a change is laid over the settings as they are when it is made, not as
+  // they were at the click.
   const latest = useRef(settings)
   latest.current = settings
-  const locating = useRef(false)
 
   const weather = (changes: Partial<WeatherSettings>) =>
     onChange({ ...latest.current, weather: { ...latest.current.weather, ...changes } })
-
-  // The click that shows the browser's prompt. The position goes to local storage, where the
-  // widget picks it up; the settings only record that the weather follows the device.
-  const follow = async () => {
-    if (locating.current) return
-    locating.current = true
-    setLocateFailed(false)
-    try {
-      const position = await locate()
-      if (!position) return setLocateFailed(true)
-      await devicePosition.setValue({ ...position, name: await placeName(position) })
-      setChangingPlace(false)
-      weather({ followDevice: true })
-    } finally {
-      locating.current = false
-    }
-  }
 
   const enable = async (enabled: boolean) => {
     // Nothing changed, but the checkbox has ticked itself: render again to put it back.
@@ -240,41 +182,27 @@ function WeatherSection({ onChange, settings }: SectionProps) {
   return (
     <>
       <section>
-        <Toggle
+        <Switch
           checked={current.enabled}
           label="Show weather"
           onChange={(enabled) => void enable(enabled)}
         />
-        {current.enabled &&
-          ((current.place || current.followDevice) && !changingPlace ? (
-            <div class="settings__row">
-              <span>Place</span>
-              <span>
-                {current.followDevice ? CURRENT_LOCATION : current.place?.name}{' '}
-                <button class="settings__link" onClick={() => setChangingPlace(true)} type="button">
-                  Change
-                </button>
-              </span>
-            </div>
-          ) : (
-            <PlaceSearch
-              locateFailed={locateFailed}
-              onLocate={() => void follow()}
-              onSelect={(place) => {
-                setChangingPlace(false)
-                weather({ followDevice: false, place })
-              }}
-            />
-          ))}
+        {current.enabled && (
+          <PlaceControl
+            label="Place"
+            onChange={weather}
+            value={{ followDevice: current.followDevice, place: current.place }}
+          />
+        )}
         {current.enabled && (
           <>
             <Choice<WeatherSettings['unit']>
+              choices={[
+                { label: 'Celsius', value: 'celsius' },
+                { label: 'Fahrenheit', value: 'fahrenheit' },
+              ]}
               label="Units"
               onChange={(unit) => weather({ unit })}
-              options={[
-                ['celsius', 'Celsius'],
-                ['fahrenheit', 'Fahrenheit'],
-              ]}
               value={current.unit}
             />
           </>
@@ -300,9 +228,9 @@ function GeneralSection({ onChange, settings }: SectionProps) {
   return (
     <section>
       <Choice<FontId>
+        choices={FONT_IDS.map((id) => ({ label: FONTS[id].label, value: id }))}
         label="Font"
         onChange={(font) => onChange({ ...settings, font })}
-        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
         value={settings.font}
       />
     </section>
