@@ -7,8 +7,7 @@ import { DEFAULT_SETTINGS, type Settings, type WeatherSettings } from '@/setting
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
-import { weatherCache } from '@/weather/storage'
-import { MAX_AGE_MS, MAX_STALE_MS } from '@/weather/weatherSource'
+import { MAX_AGE_MS, MAX_STALE_MS, weatherSource } from '@/weather/weatherSource'
 import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
 import { widgetDefinition } from '@/widgetSystem/registry'
@@ -189,10 +188,9 @@ describe('the Weather definition', () => {
 
 describe('the Weather on the page', () => {
   it('draws the Weather with no wrapper of its own, in the place it always was', async () => {
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
     })
 
     const { container } = render(<Probe settings={ON} />)
@@ -205,10 +203,9 @@ describe('the Weather on the page', () => {
   })
 
   it('reads the sun times in the page’s 12/24-hour time', async () => {
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
     })
     const options = {
       fields: [{ id: 'sun', shown: true }, ...ONLY_LOCATION.filter(({ id }) => id !== 'sun')],
@@ -266,19 +263,17 @@ describe('the Weather', () => {
     render(<Probe settings={ON} />)
 
     await waitFor(() => expect(shown()).toBe('12'))
-    expect(await weatherCache.getValue()).toMatchObject({
+    expect(await weatherSource.cache.get(cacheKey(PLACE, ON.unit))).toMatchObject({
       data: { temperature: 12 },
-      key: cacheKey(PLACE, ON.unit),
     })
   })
 
   it('serves a fresh cache without asking again', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -289,10 +284,9 @@ describe('the Weather', () => {
 
   it('shows a stale cache, then the refreshed reading', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(12)))
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -304,10 +298,9 @@ describe('the Weather', () => {
   it('keeps a stale reading when the refresh fails', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -319,10 +312,9 @@ describe('the Weather', () => {
   it('drops a reading too old to be the weather now when the refresh fails', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_STALE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -355,10 +347,9 @@ describe('the Weather', () => {
       etag: null,
       fetchedAt: Date.now(),
     })
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -371,10 +362,9 @@ describe('the Weather', () => {
   it('ignores a cache for another place or unit', async () => {
     const fetch = vi.fn().mockResolvedValue(forecast(54))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, 'celsius'), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, 'celsius'),
     })
 
     render(<Probe settings={{ ...ON, unit: 'fahrenheit' }} />)
@@ -385,6 +375,59 @@ describe('the Weather', () => {
     const url = new URL(fetch.mock.calls[0]![0] as string)
     expect(url.searchParams.get('temperature_unit')).toBe('fahrenheit')
     expect(url.searchParams.get('latitude')).toBe(String(PLACE.latitude))
+  })
+
+  describe('with two Weathers on the page', () => {
+    const options = (place: typeof PLACE) => ({
+      fields: ONLY_LOCATION,
+      followDevice: false,
+      place,
+      unit: ON.unit,
+    })
+    const page = { hour12: false }
+    const OTHER = { latitude: 49.28, longitude: -123.12, name: 'Vancouver' }
+
+    it('makes one request for two Weathers of one place, and both show it', async () => {
+      const fetch = vi.fn().mockResolvedValue(forecast(12))
+      vi.stubGlobal('fetch', fetch)
+
+      render(
+        <>
+          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
+          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
+        </>,
+      )
+
+      await waitFor(() => expect(document.querySelectorAll('.weather')).toHaveLength(2))
+      expect(
+        [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+      ).toEqual(['12°', '12°'])
+      expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps a reading for each of two places, not one replacing the other', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => Promise.resolve(forecast(url.includes('latitude=49.28') ? 15 : 12))),
+      )
+
+      render(
+        <>
+          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
+          <WidgetHost definition={weatherDefinition} options={options(OTHER)} page={page} />
+        </>,
+      )
+
+      await waitFor(() =>
+        expect(
+          [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+        ).toEqual(['12°', '15°']),
+      )
+      expect(await weatherSource.cache.keys()).toEqual([
+        cacheKey(PLACE, ON.unit),
+        cacheKey(OTHER, ON.unit),
+      ])
+    })
   })
 
   it('does not ask the device, or for a name, when a picked place is shown', async () => {
@@ -449,10 +492,9 @@ describe('the Weather', () => {
         }))
 
     const cached = (position: typeof HERE) =>
-      weatherCache.setValue({
+      weatherSource.cache.set(cacheKey({ name: '', ...position }, ON.unit), {
         data: READING,
         fetchedAt: Date.now(),
-        key: cacheKey({ name: '', ...position }, ON.unit),
       })
 
     /** The place the Weather says it is for: the location line is the only one shown. */

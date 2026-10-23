@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { cacheKey } from '@/weather/openMeteo'
-import { weatherCache } from '@/weather/storage'
+import { weatherSource } from '@/weather/weatherSource'
 
 import { App } from './App'
 
@@ -105,7 +105,7 @@ describe('App', () => {
       ...DEFAULT_SETTINGS,
       weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place, unit: 'celsius' },
     })
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(place, 'celsius'), {
       data: {
         code: 3,
         feelsLike: 11.9,
@@ -117,7 +117,6 @@ describe('App', () => {
         temperature: 12.3,
       },
       fetchedAt: Date.now(),
-      key: cacheKey(place, 'celsius'),
     })
     render(<App />)
 
