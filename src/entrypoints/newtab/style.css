@@ -1187,6 +1187,17 @@ button.chip:hover {
   right: 1.25rem;
 }
 
+/* A note with nothing to answer, such as a change that could not be saved: above the bottom
+   bar, on the photo credit's side, since the popovers have the other. */
+.callout--notice {
+  bottom: 4rem;
+  left: 1.25rem;
+}
+
+.callout--notice .callout__header {
+  align-items: flex-start;
+}
+
 /* A stop on the tour: to the left of the settings panel, level with its foot. */
 .callout--tour {
   position: absolute;

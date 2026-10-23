@@ -1,8 +1,9 @@
-import { useCallback, useLayoutEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
+import { Notice } from '@/components/Notice/Notice'
 import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/components/PhotoInfo/PhotoInfo'
 import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
@@ -27,9 +28,18 @@ type SettingsEntry = { section: SectionId; tour: boolean }
 
 const FROM_GEAR: SettingsEntry = { section: 'photos', tour: false }
 
+/** How long "Couldn't save that" stays, unless it is dismissed or a save goes through first. */
+const SAVE_FAILED_MS = 8_000
+
 export function App() {
-  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
-  const [onboarding, setOnboarding] = useStorageItem(onboardingItem)
+  // A new object for each failure, so a second one starts the 8 seconds over.
+  const [saveFailure, setSaveFailure] = useState<object | null>(null)
+  const saveOutcome = {
+    onRejected: () => setSaveFailure({}),
+    onSaved: () => setSaveFailure(null),
+  }
+  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem, saveOutcome)
+  const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
   const [photoLoading, setPhotoLoading] = useState(false)
@@ -63,6 +73,12 @@ export function App() {
       }
     })()
   }
+
+  useEffect(() => {
+    if (!saveFailure) return
+    const timer = setTimeout(() => setSaveFailure(null), SAVE_FAILED_MS)
+    return () => clearTimeout(timer)
+  }, [saveFailure])
 
   // Before paint, so the clock is never drawn in one font and then redrawn in another.
   useLayoutEffect(() => {
@@ -136,6 +152,12 @@ export function App() {
             setOnboarding({ ...onboarding, welcomed: true })
             openSettings({ section: 'photos', tour: true })
           }}
+        />
+      )}
+      {saveFailure && (
+        <Notice
+          message="Couldn't save that. Try again in a minute."
+          onDismiss={() => setSaveFailure(null)}
         />
       )}
       <Controls

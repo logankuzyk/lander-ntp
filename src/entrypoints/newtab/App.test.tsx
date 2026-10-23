@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { onboardingItem } from '@/onboarding/storage'
@@ -386,5 +386,101 @@ describe('App', () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.queryByRole('note')).toBeNull()
     })
+  })
+})
+
+describe('App, when a change cannot be saved', () => {
+  const SAVE_FAILED = "Couldn't save that. Try again in a minute."
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** Opens the settings and flicks Dim the photo, which starts on. */
+  const flickDim = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+    fireEvent.click(await screen.findByLabelText('Dim the photo'))
+  }
+
+  it('says so and puts the switch back when the browser rejects the save', async () => {
+    await seedPhotos()
+    vi.spyOn(settingsItem, 'setValue').mockRejectedValue(new Error('QUOTA_BYTES_PER_ITEM'))
+    render(<App />)
+
+    await flickDim()
+
+    expect((await screen.findByRole('status')).textContent).toContain(SAVE_FAILED)
+    await waitFor(() =>
+      expect((screen.getByLabelText('Dim the photo') as HTMLInputElement).checked).toBe(true),
+    )
+    expect((await settingsItem.getValue()).dim).toBe(true)
+  })
+
+  it('has no line while saves go through', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    await flickDim()
+
+    await waitFor(async () => expect((await settingsItem.getValue()).dim).toBe(false))
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('goes when it is dismissed', async () => {
+    await seedPhotos()
+    vi.spyOn(settingsItem, 'setValue').mockRejectedValue(new Error('quota'))
+    render(<App />)
+    await flickDim()
+    await screen.findByRole('status')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('goes after 8 seconds', async () => {
+    await seedPhotos()
+    vi.spyOn(settingsItem, 'setValue').mockRejectedValue(new Error('quota'))
+    // Before the failure, so the timer the page sets is the faked one. Time still moves on its own.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      render(<App />)
+      await flickDim()
+      await screen.findByRole('status')
+
+      await act(async () => {
+        vi.advanceTimersByTime(7_500)
+      })
+      expect(screen.queryByRole('status')).not.toBeNull()
+      await act(async () => {
+        vi.advanceTimersByTime(1_000)
+      })
+      expect(screen.queryByRole('status')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('goes with the next save that succeeds', async () => {
+    await seedPhotos()
+    const setValue = vi.spyOn(settingsItem, 'setValue').mockRejectedValueOnce(new Error('quota'))
+    render(<App />)
+    await flickDim()
+    await screen.findByRole('status')
+
+    fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+    expect(setValue).toHaveBeenCalledTimes(2)
+  })
+
+  it('says so when the onboarding record cannot be saved either', async () => {
+    await onboardingItem.setValue({ dismissed: [], welcomed: false })
+    vi.spyOn(onboardingItem, 'setValue').mockRejectedValue(new Error('quota'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
+
+    expect((await screen.findByRole('status')).textContent).toContain(SAVE_FAILED)
   })
 })
