@@ -173,4 +173,25 @@ describe('OrderedListControl', () => {
     expect(document.activeElement).toBe(handle)
     expect(screen.getAllByRole('listitem')[2]?.contains(handle)).toBe(true)
   })
+
+  it('keeps the arrow keys from scrolling the page, at the ends as well as between', () => {
+    draw()
+
+    const down = fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder North' }), {
+      key: 'ArrowDown',
+    })
+    const upAtTop = fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder North' }), {
+      key: 'ArrowUp',
+    })
+    const downAtEnd = fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder West' }), {
+      key: 'ArrowDown',
+    })
+    const other = fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder North' }), {
+      key: 'a',
+    })
+
+    // fireEvent says whether the event went unprevented.
+    expect([down, upAtTop, downAtEnd]).toEqual([false, false, false])
+    expect(other).toBe(true)
+  })
 })

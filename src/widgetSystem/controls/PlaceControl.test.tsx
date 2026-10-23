@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { devicePosition } from '@/weather/deviceLocation'
@@ -257,6 +258,49 @@ describe('PlaceControl', () => {
       currentLocation()
 
       await waitFor(() => expect(screen.queryByText(/Couldn’t get your location/)).toBeNull())
+    })
+  })
+
+  describe('kept by a parent that takes each change', () => {
+    function Parent({ label = 'Place', start }: { label?: string; start: PlaceValue }) {
+      const [value, setValue] = useState(start)
+      return <PlaceControl label={label} onChange={setValue} value={value} />
+    }
+    const row = () => document.querySelector('.settings__row')
+
+    it('goes back to the row, naming the device, once the current location is chosen', async () => {
+      locating({ latitude: 48.4359, longitude: -123.35155 })
+      answering({ city: 'Victoria' })
+      render(<Parent start={{ followDevice: false, place: VICTORIA }} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+
+      currentLocation()
+
+      await waitFor(() => expect(row()?.textContent).toBe('PlaceCurrent location Change'))
+      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
+    })
+
+    it('goes back to the row, naming the place, once another is picked', async () => {
+      answering({
+        results: [
+          { country: 'Canada', id: 1, latitude: 48.4359, longitude: -123.35155, name: 'Sidney' },
+        ],
+      })
+      render(<Parent start={{ followDevice: false, place: VICTORIA }} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Change' }))
+
+      fireEvent.input(search(), { target: { value: 'Sidney' } })
+      fireEvent.click(await screen.findByRole('option', { name: 'Sidney, Canada' }))
+
+      expect(row()?.textContent).toBe('PlaceSidney Change')
+      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
+    })
+
+    it('calls the row whatever the label it is given', () => {
+      render(<Parent label="Where" start={{ followDevice: false, place: VICTORIA }} />)
+
+      expect(row()?.firstElementChild?.textContent).toBe('Where')
+      expect(screen.queryByText('Place')).toBeNull()
     })
   })
 })
