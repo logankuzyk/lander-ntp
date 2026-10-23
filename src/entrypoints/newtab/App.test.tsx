@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { onboardingItem } from '@/onboarding/storage'
@@ -386,5 +386,165 @@ describe('App', () => {
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.queryByRole('note')).toBeNull()
     })
+  })
+})
+
+describe('App, when a change cannot be saved', () => {
+  const SAVE_FAILED = "Couldn't save that. Try again in a minute."
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  /** What the page's live region says: empty when there is no notice. */
+  const said = () => screen.getByRole('status').textContent
+
+  /** Opens the settings and flicks Dim the photo, which starts on. */
+  const flickDim = async () => {
+    if (!screen.queryByRole('dialog', { name: 'Settings' })) {
+      fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+    }
+    fireEvent.click(await screen.findByLabelText('Dim the photo'))
+  }
+
+  const rejectSettings = () =>
+    vi.spyOn(settingsItem, 'setValue').mockRejectedValue(new Error('QUOTA_BYTES_PER_ITEM'))
+
+  it('says so and puts the switch back when the browser rejects the save', async () => {
+    await seedPhotos()
+    rejectSettings()
+    render(<App />)
+
+    await flickDim()
+
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+    await waitFor(() =>
+      expect((screen.getByLabelText('Dim the photo') as HTMLInputElement).checked).toBe(true),
+    )
+    expect((await settingsItem.getValue()).dim).toBe(true)
+  })
+
+  it('has its live region from the start, empty, so the line is announced when it comes', async () => {
+    await seedPhotos()
+    rejectSettings()
+    render(<App />)
+    const region = screen.getByRole('status')
+    expect(region.textContent).toBe('')
+
+    await flickDim()
+
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+    expect(screen.getByRole('status')).toBe(region)
+  })
+
+  it('has no line while saves go through', async () => {
+    await seedPhotos()
+    render(<App />)
+
+    await flickDim()
+
+    await waitFor(async () => expect((await settingsItem.getValue()).dim).toBe(false))
+    expect(said()).toBe('')
+  })
+
+  it('goes when it is dismissed', async () => {
+    await seedPhotos()
+    rejectSettings()
+    render(<App />)
+    await flickDim()
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(said()).toBe('')
+  })
+
+  it('goes after 8 seconds', async () => {
+    await seedPhotos()
+    rejectSettings()
+    // Before the failure, so the timer the page sets is the faked one. Time still moves on its own.
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(<App />)
+    await flickDim()
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+
+    await act(async () => {
+      vi.advanceTimersByTime(7_500)
+    })
+    expect(said()).toContain(SAVE_FAILED)
+    await act(async () => {
+      vi.advanceTimersByTime(1_000)
+    })
+    expect(said()).toBe('')
+  })
+
+  it('starts the 8 seconds again with a second failure', async () => {
+    await seedPhotos()
+    const setValue = rejectSettings()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(<App />)
+    await flickDim()
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000)
+    })
+
+    await flickDim()
+    await waitFor(() => expect(setValue).toHaveBeenCalledTimes(2))
+    // Let the second rejection reach the page.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000)
+    })
+    // Ten seconds after the first failure, five after the second.
+    expect(said()).toContain(SAVE_FAILED)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000)
+    })
+    expect(said()).toBe('')
+  })
+
+  it('clears its 8 seconds when the page goes', async () => {
+    await seedPhotos()
+    rejectSettings()
+    const started = vi.spyOn(globalThis, 'setTimeout')
+    const cleared = vi.spyOn(globalThis, 'clearTimeout')
+    const { unmount } = render(<App />)
+    await flickDim()
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+    // Effects run after paint, so the timer follows the line by a moment.
+    await waitFor(() => expect(started.mock.calls.some(([, delay]) => delay === 8_000)).toBe(true))
+    const timer =
+      started.mock.results[started.mock.calls.findIndex(([, delay]) => delay === 8_000)]?.value
+
+    unmount()
+
+    expect(cleared).toHaveBeenCalledWith(timer)
+  })
+
+  it('goes with the next save that succeeds', async () => {
+    await seedPhotos()
+    const setValue = vi.spyOn(settingsItem, 'setValue').mockRejectedValueOnce(new Error('quota'))
+    render(<App />)
+    await flickDim()
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+
+    fireEvent.click(screen.getByLabelText('Dim the photo'))
+
+    await waitFor(() => expect(said()).toBe(''))
+    expect(setValue).toHaveBeenCalledTimes(2)
+  })
+
+  it('says so when the onboarding record cannot be saved either', async () => {
+    await onboardingItem.setValue({ dismissed: [], welcomed: false })
+    vi.spyOn(onboardingItem, 'setValue').mockRejectedValue(new Error('quota'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
+
+    await waitFor(() => expect(said()).toContain(SAVE_FAILED))
   })
 })

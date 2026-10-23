@@ -1187,6 +1187,35 @@ button.chip:hover {
   right: 1.25rem;
 }
 
+/* A note with nothing to answer, such as a change that could not be saved: above the bottom
+   bar, level with the photo credit. The wrapper is the live region and is always there, empty
+   when there is no note, so it has no box of its own. */
+.notice {
+  position: fixed;
+  bottom: 4rem;
+  left: 1.5rem;
+  z-index: 1;
+}
+
+.callout--notice {
+  position: static;
+}
+
+/* Below this width the settings panel (40rem and the margins beside it) reaches the photo
+   credit's side, and a photo's details (20rem) do from about 38rem. The note moves to the top
+   of the page for as long as one is open, so it never lands on the panel the person is using:
+   below the clock and the weather, above the panel. */
+@media (max-width: 60rem) {
+  .popover ~ .notice {
+    top: 6rem;
+    bottom: auto;
+  }
+}
+
+.callout--notice .callout__header {
+  align-items: flex-start;
+}
+
 /* A stop on the tour: to the left of the settings panel, level with its foot. */
 .callout--tour {
   position: absolute;
