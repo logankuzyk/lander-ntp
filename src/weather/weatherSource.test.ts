@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { storage } from 'wxt/utils/storage'
 
 import { manifestCache } from '@/photos/storage'
@@ -98,6 +98,18 @@ describe('weatherSource', () => {
     await weatherSource.cache.prune([])
 
     expect(await weatherSource.cache.keys()).toEqual([])
+  })
+
+  it('keeps saving after one save fails', async () => {
+    vi.spyOn(weatherReadings, 'setValue').mockRejectedValueOnce(new Error('storage is full'))
+
+    await expect(
+      weatherSource.cache.set('here', { data: READING, fetchedAt: 1000 }),
+    ).rejects.toThrow('storage is full')
+    await weatherSource.cache.set('there', { data: READING, fetchedAt: 2000 })
+
+    expect(await weatherSource.cache.keys()).toEqual(['there'])
+    vi.restoreAllMocks()
   })
 
   it('tells a watcher of one key when that key’s reading changes, and of no other', async () => {

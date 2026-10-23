@@ -554,6 +554,33 @@ describe('useSource across the sources on a page', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('does not fetch again for the echo of its own write', async () => {
+    const memory = memoryCache()
+    const echoes: (() => void)[] = []
+    // Storage tells watchers after the write has finished, not during it.
+    const cache: ReadingCache<number> = {
+      ...memory.cache,
+      set: async (key, reading) => {
+        await memory.cache.set(key, reading)
+        setTimeout(() => echoes.forEach((echo) => echo()), 0)
+      },
+      watch: (_key, onChange) => {
+        const echo = () => onChange({ data: 12, fetchedAt: Date.now() })
+        echoes.push(echo)
+        return () => echoes.splice(echoes.indexOf(echo), 1)
+      },
+    }
+    const { source } = makeSource({ cache })
+    const fetch = fetching(12)
+
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+    await pass()
+    await pass(1)
+
+    expect(shown()).toBe('12')
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('does not react to another key’s reading changing', async () => {
     const { cache, fromAnotherTab } = watchableCache()
     const { source } = makeSource({ cache })

@@ -101,8 +101,6 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
     let timer: ReturnType<typeof setTimeout> | undefined
 
     let checking = false
-    // The newest reading this use has shown or written, so its own writes are not read back.
-    let seen: number | null = null
 
     /** Check again after a wait; the source and the cache are both read anew each time. */
     const again = (wait: number) => {
@@ -127,10 +125,7 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
           return again(source.maxAgeMs)
         }
         const age = cached ? Date.now() - cached.fetchedAt : Infinity
-        if (cached && age < source.maxStaleMs) {
-          seen = cached.fetchedAt
-          setShown({ ...cached, key })
-        }
+        if (cached && age < source.maxStaleMs) setShown({ ...cached, key })
         if (age < source.maxAgeMs) return again(source.maxAgeMs - age)
 
         // The key may have changed while the cache was read; this check is then not the one to fetch.
@@ -138,7 +133,6 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
         if (current?.key !== key) return
         const reading = await fetchOnce(source.cache, key, current.fetch)
         if (!active) return
-        if (reading) seen = reading.fetchedAt
         setShown((old) =>
           reading
             ? { ...reading, key }
@@ -154,9 +148,10 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
 
     const onVisibilityChange = () => void check()
     document.addEventListener('visibilitychange', onVisibilityChange)
-    // A reading forgotten is not one to fetch again at once: the next check, when due, does that.
+    // A check reads the cache first, so a reading just written, even by this use, is not fetched
+    // again. A reading forgotten is not one to fetch at once: the next check, when due, does that.
     const unwatch = source.cache.watch?.(key, (written) => {
-      if (written && written.fetchedAt !== seen) void check()
+      if (written) void check()
     })
     void check()
 
