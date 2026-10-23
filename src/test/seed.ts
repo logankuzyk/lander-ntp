@@ -6,7 +6,7 @@ import type { Settings } from '@/settings/schema'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
-import { weatherCache } from '@/weather/storage'
+import { weatherSource } from '@/weather/weatherSource'
 
 import { makeManifest, makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
 
@@ -55,11 +55,7 @@ export async function seedPage({
   if (weather) {
     const { place, unit } = settings.weather
     if (!place) throw new Error('seedPage: a weather reading needs settings.weather.place')
-    await weatherCache.setValue({
-      data: weather,
-      fetchedAt: Date.now(),
-      key: cacheKey(place, unit),
-    })
+    await weatherSource.cache.set(cacheKey(place, unit), { data: weather, fetchedAt: Date.now() })
   }
   if (onboarding) await onboardingItem.setValue(onboarding)
   if (pending) await pendingItem.setValue(pending)
