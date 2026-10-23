@@ -32,11 +32,16 @@ const FROM_GEAR: SettingsEntry = { section: 'photos', tour: false }
 const SAVE_FAILED_MS = 8_000
 
 export function App() {
-  // A new object for each failure, so a second one starts the 8 seconds over.
-  const [saveFailure, setSaveFailure] = useState<object | null>(null)
+  // Whether to say so, and how many have failed: each failure starts the 8 seconds over.
+  const [saveFailed, setSaveFailed] = useState(false)
+  const [saveFailures, setSaveFailures] = useState(0)
+  // From either item: the next save that goes through, whichever it is, clears the line.
   const saveOutcome = {
-    onRejected: () => setSaveFailure({}),
-    onSaved: () => setSaveFailure(null),
+    onRejected: () => {
+      setSaveFailed(true)
+      setSaveFailures((count) => count + 1)
+    },
+    onSaved: () => setSaveFailed(false),
   }
   const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem, saveOutcome)
   const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
@@ -75,10 +80,10 @@ export function App() {
   }
 
   useEffect(() => {
-    if (!saveFailure) return
-    const timer = setTimeout(() => setSaveFailure(null), SAVE_FAILED_MS)
+    if (saveFailures === 0) return
+    const timer = setTimeout(() => setSaveFailed(false), SAVE_FAILED_MS)
     return () => clearTimeout(timer)
-  }, [saveFailure])
+  }, [saveFailures])
 
   // Before paint, so the clock is never drawn in one font and then redrawn in another.
   useLayoutEffect(() => {
@@ -154,12 +159,10 @@ export function App() {
           }}
         />
       )}
-      {saveFailure && (
-        <Notice
-          message="Couldn't save that. Try again in a minute."
-          onDismiss={() => setSaveFailure(null)}
-        />
-      )}
+      <Notice
+        message={saveFailed ? "Couldn't save that. Try again in a minute." : null}
+        onDismiss={() => setSaveFailed(false)}
+      />
       <Controls
         busy={photoLoading}
         infoOpen={popover === 'info'}

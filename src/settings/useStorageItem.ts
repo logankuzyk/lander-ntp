@@ -12,21 +12,23 @@ export type StorageItemLike<T> = {
 
 /** What to do about a save, besides showing the new value at once. */
 export type StorageItemOptions = {
-  /** Storage refused the change and the stored value has been put back (or a newer change is on its way). */
+  /** Storage refused the change. The stored value is being put back, unless a newer change is on its way. */
   onRejected?: () => void
   /** The change was written. A change replaced by a newer one while it waited is not reported. */
   onSaved?: () => void
 }
 
-// One queue per item, shared by everything that writes it, so its saves cannot overlap.
-const queues = new WeakMap<object, WriteQueue<never>>()
-const queueFor = <T>(item: StorageItemLike<T>): WriteQueue<T> => {
-  let queue = queues.get(item) as WriteQueue<T> | undefined
-  if (!queue) {
-    queue = createWriteQueue((value: T) => item.setValue(value))
-    queues.set(item, queue as WriteQueue<never>)
+/** What every hook on one item shares: its saves, and a count of the changes made to it. */
+type Saves<T> = { latest: number; queue: WriteQueue<T> }
+
+const saves = new WeakMap<object, Saves<never>>()
+const savesFor = <T>(item: StorageItemLike<T>): Saves<T> => {
+  let entry = saves.get(item) as Saves<T> | undefined
+  if (!entry) {
+    entry = { latest: 0, queue: createWriteQueue((value: T) => item.setValue(value)) }
+    saves.set(item, entry as Saves<never>)
   }
-  return queue
+  return entry
 }
 
 /**
@@ -38,7 +40,7 @@ const queueFor = <T>(item: StorageItemLike<T>): WriteQueue<T> => {
  *
  * `update` shows the new value at once, then saves it, one write at a time with only the latest
  * change waiting behind one in flight. If the browser refuses the write, the value it still
- * holds is put back and `onRejected` is called.
+ * holds is put back and `onRejected` is called (first, before that value has been read).
  */
 export function useStorageItem<T>(
   item: StorageItemLike<T>,
@@ -69,28 +71,28 @@ export function useStorageItem<T>(
   // Read when a save ends, not when it starts, so the latest callbacks answer it.
   const handlers = useRef(options)
   handlers.current = options
-  // Counts updates, so a rejection can tell whether a newer change has since taken over.
-  const latest = useRef(0)
-
   const update = useCallback(
     (next: T) => {
-      const mine = ++latest.current
+      const entry = savesFor(item)
+      // Counts changes to the item from every hook, so a rejection can tell whether a newer one
+      // has since taken over.
+      const mine = ++entry.latest
       setValue(next)
-      void queueFor(item)
-        .save(next)
-        .then(async (result) => {
-          if (result === 'saved') handlers.current.onSaved?.()
-          if (result !== 'rejected') return
-          // Put back what the browser still holds, unless a newer change has taken over: that one
-          // is on its way to storage, and puts itself back if it fails too.
-          try {
-            const stored = await item.getValue()
-            if (latest.current === mine) setValue(stored)
-          } catch {
-            // Nothing to put back from: leave what is shown.
-          }
-          handlers.current.onRejected?.()
-        })
+      void entry.queue.save(next).then(async (result) => {
+        if (result === 'saved') handlers.current.onSaved?.()
+        if (result !== 'rejected') return
+        // Before reading anything back, so a newer change that is saved meanwhile is heard of
+        // after this rejection, not before it.
+        handlers.current.onRejected?.()
+        // Put back what the browser still holds, unless a newer change has taken over: that one
+        // is on its way to storage, and puts itself back if it fails too.
+        try {
+          const stored = await item.getValue()
+          if (entry.latest === mine) setValue(stored)
+        } catch {
+          // Nothing to put back from: leave what is shown.
+        }
+      })
     },
     [item],
   )

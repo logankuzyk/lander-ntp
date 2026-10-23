@@ -96,16 +96,18 @@ describe('createWriteQueue', () => {
     expect(await queue.save(1)).toBe('rejected')
   })
 
-  it('says whether a save is waiting or in flight', async () => {
-    const { settlers, write } = manualWrites()
+  it('writes a waiting value once: nothing is written again after the queue has caught up', async () => {
+    const { settlers, write, written } = manualWrites()
     const queue = createWriteQueue(write)
-    expect(queue.busy()).toBe(false)
 
     const first = queue.save(1)
-    expect(queue.busy()).toBe(true)
-
+    const second = queue.save(2)
     settlers[0]?.resolve()
     await first
-    expect(queue.busy()).toBe(false)
+    settlers[1]?.resolve()
+    await second
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(written).toEqual([1, 2])
   })
 })

@@ -7,8 +7,6 @@
 export type SaveResult = 'rejected' | 'saved' | 'superseded'
 
 export type WriteQueue<T> = {
-  /** Whether a write is in flight or a value is waiting for one. */
-  busy: () => boolean
   /** Saves `value` after any write in flight. Never rejects: the result says what happened. */
   save: (value: T) => Promise<SaveResult>
 }
@@ -41,8 +39,7 @@ export function createWriteQueue<T>(write: (value: T) => Promise<void>): WriteQu
 
   const finish = (settle: (result: SaveResult) => void, result: SaveResult) => {
     running = false
-    // The next write starts before the caller hears of this one, so a caller that looks at the
-    // queue then sees that more is coming.
+    // The next write starts before the caller hears of this one.
     const next = waiting
     waiting = null
     if (next) run(next)
@@ -50,7 +47,6 @@ export function createWriteQueue<T>(write: (value: T) => Promise<void>): WriteQu
   }
 
   return {
-    busy: () => running || waiting !== null,
     save: (value) =>
       new Promise<SaveResult>((settle) => {
         if (!running) return run({ settle, value })
