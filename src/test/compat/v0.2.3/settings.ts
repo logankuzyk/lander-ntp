@@ -12,8 +12,8 @@
  * Only the import lines and the order of declarations differ; the check itself
  * (`SettingsSchema`, `current`, `stored`, `settingsItem`) is copied as it was, apart from
  * formatting and sorting that the repo's prettier and eslint rules apply to every file. The
- * `compat.test.ts` cases replay what was observed of v0.2.3 (LR-15), so a copy that drifts
- * fails there.
+ * `compat.test.ts` cases show it behaves like the v0.2.3 observed in LR-15 in four ways; they do
+ * not pin every line, so keeping it verbatim relies on nobody editing it.
  *
  * If the live reader changes, that is a reason to add a test, not to edit this file.
  */

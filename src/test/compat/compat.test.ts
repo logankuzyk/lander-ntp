@@ -106,6 +106,16 @@ type PhaseTwoWrite = {
    * not name must still be what SEED has.
    */
   changes?: Partial<Pick<Settings, 'dim' | 'font' | 'photos'>>
+  /**
+   * The write starts from no synced onboarding record, so it has no `dismissed` ids to keep.
+   */
+  fromNoRecord?: boolean
+  /**
+   * A write only the settings panel's Clock and Weather tabs make. W17 deletes those tabs, and
+   * deletes these rows with them: from then on nothing may change `clock.*` other than
+   * `hour12`, or `weather.*` at all.
+   */
+  legacyPanel?: boolean
   name: string
   /** The write, made through the real storage items, as the page makes it. */
   write: () => Promise<void>
@@ -114,7 +124,14 @@ type PhaseTwoWrite = {
 /**
  * Every write the extension can make to `sync:settings` and `sync:onboarding`, replayed through
  * the real items and read back through the frozen v0.2.3 reader. This is the standing guard
- * against resetting a device that is still on v0.2.3 (LR-15).
+ * against resetting a device that is still on v0.2.3 (LR-15). Two things are checked for each
+ * row: that v0.2.3 still reads what was written, and that the write changed only what phase 2
+ * is allowed to change (see below), which the reader alone would not catch.
+ *
+ * What v0.2.3 does with what it reads: the settings are a loose object, so it keeps a top-level
+ * key it does not know (`v`, `layout`) and writes it back on its own saves. It falls back to the
+ * defaults only when a known block is missing or wrong. A key added inside `clock`, `photos` or
+ * `place` is stripped, silently, the next time v0.2.3 saves.
  *
  * What phase 2 may write to `sync:settings` is only the top-level `v: 1`, `clock.hour12`, and
  * what v0.2.3 already writes (photos, dim, font, as the panel does now). It never removes a
@@ -122,6 +139,10 @@ type PhaseTwoWrite = {
  * Clock writes only `sync:layout`; it never writes `clock.enabled`. `sync:onboarding` only gains
  * ids in `dismissed`. `sync:layout` is not here: v0.2.3 never reads it (its own row arrives
  * with the PR that adds it).
+ *
+ * `recordInstall('install')` writes only `local:onboarding`, which is not synced, so it is
+ * correctly not a row. The "answer the welcome" row starts from a synced record, where a real
+ * new install starts from `local:onboarding`; the shape is the same.
  *
  * A PR that adds a write adds a row here, in the same change.
  */
@@ -167,10 +188,12 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     write: changeSettings((s) => ({ ...s, clock: { ...s.clock, hour12: !s.clock.hour12 } })),
   },
   {
+    legacyPanel: true, // W17 deletes this row
     name: 'switch the clock off (settings panel until the Clock moves to the page)',
     write: changeSettings((s) => ({ ...s, clock: { ...s.clock, enabled: false } })),
   },
   {
+    legacyPanel: true, // W17 deletes this row
     name: 'show the date and seconds on the clock (settings panel)',
     write: changeSettings((s) => ({
       ...s,
@@ -178,6 +201,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    legacyPanel: true, // W17 deletes this row
     name: 'switch the weather on at a place (settings panel)',
     write: changeSettings((s) => ({
       ...s,
@@ -185,6 +209,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    legacyPanel: true, // W17 deletes this row
     name: 'follow the device, and choose the unit and lines (settings panel)',
     write: changeSettings((s) => ({
       ...s,
@@ -208,6 +233,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    fromNoRecord: true,
     name: 'record an update from a version that kept no record',
     write: async () => {
       await fakeBrowser.storage.sync.remove('onboarding')
@@ -216,15 +242,54 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
   },
 ]
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * The paths at which `after` differs from `before`, one block deep: `dim`, `photos.mode`,
+ * `clock.hour12`. A key that is added or removed counts, at the top level or inside a block.
+ */
+const changedPaths = (before: unknown, after: unknown): string[] => {
+  const was = isObject(before) ? before : {}
+  const now = isObject(after) ? after : {}
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  return [...new Set([...Object.keys(was), ...Object.keys(now)])].flatMap((key) => {
+    const [a, b] = [was[key], now[key]]
+    if (isObject(a) && isObject(b)) {
+      return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+        .filter((inner) => !same(a[inner], b[inner]))
+        .map((inner) => `${key}.${inner}`)
+    }
+    return same(a, b) ? [] : [key]
+  })
+}
+
+/** Everything phase 2 may change in `sync:settings`; see PHASE_2_WRITES. */
+const ALLOWED_PATHS = /^dim$|^font$|^photos\.|^clock\.hour12$|^v$/
+const LEGACY_PANEL_PATHS = /^clock\.|^weather\./
+
 describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
   beforeEach(async () => {
     await settingsItem.setValue(SEED)
     await onboardingItem.setValue(SEED_ONBOARDING)
   })
 
-  it.each(PHASE_2_WRITES)('$name', async ({ changes, write }) => {
+  it.each(PHASE_2_WRITES)('$name', async ({ changes, fromNoRecord, legacyPanel, write }) => {
     await write()
     const stored = await fakeBrowser.storage.sync.get(null)
+
+    // Only what phase 2 is allowed to change has changed, and `v` is 1 where there is one.
+    const disallowed = changedPaths(SEED, stored.settings).filter(
+      (path) => !ALLOWED_PATHS.test(path) && !(legacyPanel && LEGACY_PANEL_PATHS.test(path)),
+    )
+    expect(disallowed).toEqual([])
+    if (isObject(stored.settings) && 'v' in stored.settings) expect(stored.settings.v).toBe(1)
+    // `dismissed` only gains ids.
+    if (!fromNoRecord) {
+      expect((stored.onboarding as Onboarding).dismissed).toEqual(
+        expect.arrayContaining(SEED_ONBOARDING.dismissed),
+      )
+    }
 
     const { fellBack, onboarding, settings } = await asV023(stored)
 
