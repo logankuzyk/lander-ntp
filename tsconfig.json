@@ -11,5 +11,5 @@
   // These replace WXT's lists, so they repeat them. `**/*` skips dot-folders, so `.storybook`
   // is named.
   "include": ["**/*", ".wxt/wxt.d.ts", ".storybook/**/*"],
-  "exclude": ["**/node_modules", ".output", "storybook-static"]
+  "exclude": ["**/node_modules", ".output", "server/**", "storybook-static"]
 }
