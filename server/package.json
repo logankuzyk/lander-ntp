@@ -10,7 +10,7 @@
     "build": "tsc --project tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.json"
+    "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project tsconfig.test.json"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@types/node": "^26.6.5",
+    "@types/node": "^24.19.2",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-perfectionist": "^5.12.1",

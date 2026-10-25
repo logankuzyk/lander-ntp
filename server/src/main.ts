@@ -1,13 +1,21 @@
 import { serve } from '@hono/node-server'
+import { type Server as HttpServer } from 'node:http'
+import { type DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
 
 import { createApp } from './app.js'
-import { loadConfig } from './config.js'
+import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
 
-export function startServer() {
-  const config = loadConfig()
-  const db = openDatabase(config.databasePath)
+export type StartServerOptions = {
+  config?: ServerConfig
+  db?: DatabaseSync
+  shutdownTimeoutMs?: number
+}
+
+export function startServer(options: StartServerOptions = {}) {
+  const config = options.config ?? loadConfig()
+  const db = options.db ?? openDatabase(config.databasePath)
   const app = createApp({
     clock: { now: () => new Date() },
     config,
@@ -26,13 +34,29 @@ export function startServer() {
       },
     },
   })
-  const server = serve({ fetch: app.fetch, port: config.port })
+  const server = serve({ fetch: app.fetch, port: config.port }) as HttpServer
 
-  process.once('SIGTERM', () => {
+  let shuttingDown = false
+  const shutdown = () => {
+    if (shuttingDown) return
+    shuttingDown = true
+
+    const shutdownTimer = setTimeout(
+      () => server.closeAllConnections(),
+      options.shutdownTimeoutMs ?? 10_000,
+    )
+    shutdownTimer.unref()
     server.close(() => {
-      db.close()
+      clearTimeout(shutdownTimer)
+      process.removeListener('SIGTERM', shutdown)
+      process.removeListener('SIGINT', shutdown)
+      if (db.isOpen) db.close()
     })
-  })
+    server.closeIdleConnections()
+  }
+
+  process.once('SIGTERM', shutdown)
+  process.once('SIGINT', shutdown)
 
   return server
 }
