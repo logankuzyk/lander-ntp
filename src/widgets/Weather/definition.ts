@@ -116,6 +116,13 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
     // Label and value are opposite: checked means hour12 is false, so a form inverts it.
     { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
+  // The smallest holds every line the options can turn on, and a Weather starts there for
+  // everyone (owner answer 1 on LR-19, over LR-16's 2 by 1). W9 fixes the largest by measuring.
+  sizes: {
+    largest: { h: 3, w: 4 },
+    smallest: { h: 2, w: 2 },
+    starting: () => ({ h: 2, w: 2 }),
+  },
   source: { source: weatherSource, useQuery: useWeatherQuery },
   type: 'weather',
   View: WeatherView,

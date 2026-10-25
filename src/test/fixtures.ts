@@ -1,6 +1,14 @@
 import type { Manifest, Photo } from '@/photos/schema'
 import type { Place } from '@/settings/schema'
 import type { Weather } from '@/weather/openMeteo'
+import type { WidgetSizes } from '@/widgetSystem/definition'
+
+/** The sizes of a Widget made up in a test, where its size is not what is being tested. */
+export const EXAMPLE_SIZES: WidgetSizes<unknown> = {
+  largest: { h: 4, w: 4 },
+  smallest: { h: 1, w: 1 },
+  starting: () => ({ h: 2, w: 2 }),
+}
 
 export const makePhoto = (id: string, overrides: Partial<Photo> = {}): Photo => ({
   alt: `Photo ${id}`,

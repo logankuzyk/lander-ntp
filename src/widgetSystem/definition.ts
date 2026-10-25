@@ -84,6 +84,22 @@ export type PageValueOption = OptionBase & {
 export type OptionDescription =
   ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
 
+/** A size on the Grid, in whole cells. */
+export type Cells = { h: number; w: number }
+
+/**
+ * The sizes a Widget may have, in cells. Any whole number of cells between `smallest` and
+ * `largest` is allowed, and the Widget's content fills whatever box it is given.
+ */
+export type WidgetSizes<O> = {
+  /** The most it may be resized to. */
+  largest: Cells
+  /** The least it may be resized to. It holds everything the options can turn on at once. */
+  smallest: Cells
+  /** Where it starts when added, which may depend on the options. Between smallest and largest. */
+  starting: (options: O) => Cells
+}
+
 /**
  * What a View is given. A Widget with a source also gets the `reading` the source loaded and
  * the `context` its `useQuery` carried along; for one without, both are undefined.
@@ -135,6 +151,8 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
    */
   needs?: readonly Need<O>[]
   options: readonly OptionDescription[]
+  /** How big it may be on the Grid, and how big it starts. */
+  sizes: WidgetSizes<O>
   /**
    * Where its data comes from. Run once every need is met; the View is drawn only with a
    * reading. Defined once, not rebuilt on each render.

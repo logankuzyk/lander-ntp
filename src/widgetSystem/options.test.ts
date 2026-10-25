@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { EXAMPLE_SIZES } from '@/test/fixtures'
+
 import type { OptionDescription, WidgetDefinition } from './definition'
 import { defaultOptions, readOptions, writeOptions } from './options'
 
@@ -41,6 +43,7 @@ const definition: WidgetDefinition<Record<string, unknown>> = {
     },
     { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
   ],
+  sizes: EXAMPLE_SIZES,
   type: 'example',
   View: () => null,
 }
