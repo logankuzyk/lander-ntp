@@ -12,7 +12,7 @@ export default defineConfig({
     },
     environment: 'happy-dom',
     // Agent worktrees are whole copies of the repo, tests included.
-    exclude: [...configDefaults.exclude, '.claude/**'],
+    exclude: [...configDefaults.exclude, '.claude/**', 'server/**'],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
   },

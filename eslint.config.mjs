@@ -11,6 +11,7 @@ export default defineConfig([
   globalIgnores([
     '.claude/',
     '.output/',
+    'server/',
     '.wxt/',
     'coverage/',
     'storybook-static/',
