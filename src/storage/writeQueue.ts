@@ -2,9 +2,11 @@
  * What became of one `save`:
  * - `saved`: its value was written.
  * - `rejected`: its value was handed to storage and storage refused it.
+ * - `refused`: it was rejected for a reason the queue was told is a refusal, not a failure: the
+ *   place will not take a value from this code at all (see guard.ts).
  * - `superseded`: a newer value took its place while it waited, so it was never written.
  */
-export type SaveResult = 'rejected' | 'saved' | 'superseded'
+export type SaveResult = 'refused' | 'rejected' | 'saved' | 'superseded'
 
 export type WriteQueue<T> = {
   /** Saves `value` after any write in flight. Never rejects: the result says what happened. */
@@ -17,9 +19,12 @@ type Waiting<T> = { settle: (result: SaveResult) => void; value: T }
  * Runs saves to one place one at a time. While a write is in flight only the latest value waits
  * behind it, so twenty quick changes are two writes, the second carrying the last value. A write
  * that is refused fails only its own save: the one waiting behind it still goes, and so does
- * the next.
+ * the next. `isRefusal` says which errors a write may fail with that are refusals.
  */
-export function createWriteQueue<T>(write: (value: T) => Promise<void>): WriteQueue<T> {
+export function createWriteQueue<T>(
+  write: (value: T) => Promise<void>,
+  isRefusal: (error: unknown) => boolean = () => false,
+): WriteQueue<T> {
   let running = false
   let waiting: Waiting<T> | null = null
 
@@ -33,7 +38,7 @@ export function createWriteQueue<T>(write: (value: T) => Promise<void>): WriteQu
     }
     void written.then(
       () => finish(settle, 'saved'),
-      () => finish(settle, 'rejected'),
+      (error: unknown) => finish(settle, isRefusal(error) ? 'refused' : 'rejected'),
     )
   }
 

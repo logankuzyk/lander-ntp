@@ -522,6 +522,23 @@ body {
   opacity: 0.75;
 }
 
+/* Settings from a newer version: the line sits under the header, a block clear of the tabs. */
+.popover .settings__readonly {
+  margin-bottom: var(--popover-block);
+}
+
+/* Groups the open section's controls so they can be turned off together. It draws nothing. */
+.settings__fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings__fieldset:disabled {
+  opacity: 0.55;
+}
+
 .settings__link {
   padding: 0;
   border: 0;

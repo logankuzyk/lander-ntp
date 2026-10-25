@@ -911,3 +911,61 @@ describe('SettingsPanel', () => {
     })
   })
 })
+
+describe('SettingsPanel, when the settings are from a newer version', () => {
+  const LINE = 'Update Lander to change this.'
+
+  const renderReadOnly = (readOnly: boolean) => {
+    const onChange = vi.fn()
+    render(
+      <SettingsPanel
+        currentId="a"
+        onChange={onChange}
+        onClose={() => {}}
+        photos={PHOTOS}
+        readOnly={readOnly}
+        settings={settings}
+      />,
+    )
+    return { onChange }
+  }
+
+  /**
+   * Every control in the open section, which the browser turns off with the fieldset around them
+   * (the test DOM does not, so this looks for the fieldset).
+   */
+  const controlsInDisabledFieldset = () => {
+    const section = screen.getByRole('tabpanel')
+    const fieldset = section.querySelector('fieldset[disabled]')
+    const controls = [...section.querySelectorAll('button, input, select')]
+    return { all: controls, inside: controls.filter((control) => fieldset?.contains(control)) }
+  }
+
+  it('says to update, at the top, and puts every control in the section in a disabled fieldset', () => {
+    renderReadOnly(true)
+
+    expect(screen.getByText(LINE)).toBeTruthy()
+    const { all, inside } = controlsInDisabledFieldset()
+    expect(all.length).toBeGreaterThan(0)
+    expect(inside).toEqual(all)
+  })
+
+  it('does so in every section, and keeps the tabs enabled to look around', () => {
+    renderReadOnly(true)
+
+    for (const name of ['Clock', 'Weather', 'General']) {
+      openSection(name)
+      const { all, inside } = controlsInDisabledFieldset()
+      expect(all.length).toBeGreaterThan(0)
+      expect(inside).toEqual(all)
+    }
+    expect(screen.getByRole('tab', { name: 'General' }).closest('fieldset')).toBeNull()
+  })
+
+  it('is as it was, with no line, when the settings can be changed', () => {
+    renderReadOnly(false)
+
+    expect(screen.queryByText(LINE)).toBeNull()
+    expect(screen.getByRole('tabpanel').querySelector('fieldset[disabled]')).toBeNull()
+  })
+})

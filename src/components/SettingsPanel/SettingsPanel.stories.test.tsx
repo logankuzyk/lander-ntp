@@ -24,6 +24,7 @@ describe('settings panel stories', () => {
     ['WeatherChoosingAPlace', 'Weather'],
     ['General', 'General'],
     ['WithTheTour', 'Photos'],
+    ['FromNewerVersion', 'Photos'],
   ] as const)('%s opens on %s', (name, tab) => {
     renderStory(name)
 
@@ -49,6 +50,13 @@ describe('settings panel stories', () => {
     renderStory('WithTheTour')
 
     expect(screen.getByText('1 of 4')).toBeTruthy()
+  })
+
+  it('says to update, and turns the section off, in FromNewerVersion', () => {
+    renderStory('FromNewerVersion')
+
+    expect(screen.getByText('Update Lander to change this.')).toBeTruthy()
+    expect(screen.getByRole('tabpanel').querySelector('fieldset[disabled]')).not.toBeNull()
   })
 
   it('keeps the settings in state, so a switch responds', () => {

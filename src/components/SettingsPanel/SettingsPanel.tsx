@@ -31,6 +31,9 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   'every-visit': 'Every new tab',
 }
 
+/** What the panel says while the settings are from a newer version. */
+const UPDATE_TO_CHANGE = 'Update Lander to change this.'
+
 /** The "Change photo" choice that pins the photo on screen. */
 const NEVER = 'never'
 
@@ -266,6 +269,11 @@ type SettingsPanelProps = {
   onClose: () => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
+  /**
+   * The settings were written by a newer version of the page, which would lose something if
+   * this one saved over them: they can be looked at and not changed.
+   */
+  readOnly?: boolean
   settings: Settings
   /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
   tour?: readonly CalloutInfo[]
@@ -278,6 +286,7 @@ export function SettingsPanel({
   onChange,
   onClose,
   photos,
+  readOnly = false,
   settings,
   tour = [],
 }: SettingsPanelProps) {
@@ -360,6 +369,8 @@ export function SettingsPanel({
         </button>
       </header>
 
+      {readOnly && <p class="settings__note settings__readonly">{UPDATE_TO_CHANGE}</p>}
+
       <div class="settings__layout">
         <div aria-orientation="vertical" class="settings__nav" role="tablist">
           {SECTIONS.map(([id, label], index) => (
@@ -390,17 +401,20 @@ export function SettingsPanel({
           ref={body}
           role="tabpanel"
         >
-          {section === 'photos' && (
-            <PhotosSection
-              currentId={currentId}
-              onChange={onChange}
-              photos={photos}
-              settings={known}
-            />
-          )}
-          {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
-          {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
-          {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
+          {/* Switches every control in the section off at once; the tabs stay, to look around. */}
+          <fieldset class="settings__fieldset" disabled={readOnly}>
+            {section === 'photos' && (
+              <PhotosSection
+                currentId={currentId}
+                onChange={onChange}
+                photos={photos}
+                settings={known}
+              />
+            )}
+            {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
+            {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
+            {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
+          </fieldset>
         </div>
       </div>
     </aside>
