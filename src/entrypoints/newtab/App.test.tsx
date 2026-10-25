@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { onboardingItem } from '@/onboarding/storage'
 import { manifestCache, photoState } from '@/photos/storage'
@@ -274,7 +275,9 @@ describe('App', () => {
         'Geist Sans',
       ),
     )
-    expect((await settingsItem.getValue()).font).toBe('geist')
+    // The save looks at what is stored before it writes (see storage/guard), so it lands a beat
+    // after the font is applied.
+    await waitFor(async () => expect((await settingsItem.getValue()).font).toBe('geist'))
   })
 
   it('closes the settings panel with Escape', async () => {
@@ -545,5 +548,99 @@ describe('App, when a change cannot be saved', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
 
     await waitFor(() => expect(said()).toContain(SAVE_FAILED))
+  })
+})
+
+describe('App, when the settings are from a newer version', () => {
+  const UPDATE_TO_CHANGE = 'Update Lander to change this.'
+
+  /** What a newer version wrote: settings this one reads, with a block of its own beside them. */
+  const NEWER = {
+    ...DEFAULT_SETTINGS,
+    bookmarks: { open: 'tab' },
+    dim: false,
+    font: 'geist',
+    photos: { ...DEFAULT_SETTINGS.photos, mode: 'pinned', pinnedId: 'a' },
+    v: 2,
+  }
+
+  const storedSettings = async () => (await fakeBrowser.storage.sync.get('settings')).settings
+
+  afterEach(() => vi.restoreAllMocks())
+
+  const openSettings = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+    return screen.findByRole('dialog', { name: 'Settings' })
+  }
+
+  it('draws the page from them, and says in the settings to update', async () => {
+    await seedPhotos()
+    await fakeBrowser.storage.sync.set({ settings: NEWER })
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+    const settings = await openSettings()
+
+    expect(within(settings).getByText(UPDATE_TO_CHANGE)).toBeTruthy()
+    expect(settings.querySelector('fieldset[disabled]')).not.toBeNull()
+    expect(document.documentElement.style.getPropertyValue('--font-display')).toContain(
+      'Geist Sans',
+    )
+  })
+
+  it('never writes to storage: not from a settings change, a font change or the next photo', async () => {
+    await seedPhotos()
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    await fakeBrowser.storage.sync.set({ settings: NEWER })
+    const setValue = vi.spyOn(settingsItem, 'setValue')
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    render(<App />)
+    await currentPhotoSrc()
+    const settings = await openSettings()
+
+    // The controls are off in a browser; a change that got through anyway must still not save.
+    fireEvent.click(within(settings).getByLabelText('Dim the photo'))
+    fireEvent.click(within(settings).getByRole('tab', { name: 'General' }))
+    fireEvent.click(await within(settings).findByRole('combobox', { name: 'Font' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+
+    await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/b/'))
+    await act(async () => {})
+    expect(setValue).not.toHaveBeenCalled()
+    expect(set).not.toHaveBeenCalled()
+    expect(await storedSettings()).toEqual(NEWER)
+    // And it is no failure to save.
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+
+  it('goes read-only when a newer version syncs in while the page is open', async () => {
+    await seedPhotos()
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS })
+    render(<App />)
+    const settings = await openSettings()
+    expect(within(settings).queryByText(UPDATE_TO_CHANGE)).toBeNull()
+
+    await act(async () => {
+      await fakeBrowser.storage.sync.set({ settings: NEWER })
+    })
+
+    expect(await within(settings).findByText(UPDATE_TO_CHANGE)).toBeTruthy()
+  })
+
+  it('is as before for settings of the version it knows, and saves them with `v: 1`', async () => {
+    await seedPhotos()
+    const v023 = Object.fromEntries(Object.entries(DEFAULT_SETTINGS).filter(([key]) => key !== 'v'))
+    await fakeBrowser.storage.sync.set({ settings: v023 })
+    render(<App />)
+    const settings = await openSettings()
+    expect(within(settings).queryByText(UPDATE_TO_CHANGE)).toBeNull()
+    // Nothing is written by loading.
+    expect(await storedSettings()).toEqual(v023)
+
+    fireEvent.click(await within(settings).findByLabelText('Dim the photo'))
+
+    await waitFor(async () => expect(await storedSettings()).toEqual({ ...v023, dim: false, v: 1 }))
   })
 })

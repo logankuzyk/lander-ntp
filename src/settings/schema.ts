@@ -14,6 +14,11 @@ export type Settings = {
   font: FontId
   /** Which photo is on screen, and how often it changes. */
   photos: PhotoSettings
+  /**
+   * The version of this shape. A device never saves over settings with a higher `v` than it
+   * knows (see storage/guard). Settings stored without one, as 0.2.x wrote them, are version 1.
+   */
+  v: 1
   weather: WeatherSettings
 }
 
@@ -77,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
     pinnedId: null,
     tags: [],
   },
+  v: 1,
   weather: {
     // Off until asked for: it is the only thing that sends a place anywhere.
     enabled: false,

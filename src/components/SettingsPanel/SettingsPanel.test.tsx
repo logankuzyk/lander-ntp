@@ -911,3 +911,93 @@ describe('SettingsPanel', () => {
     })
   })
 })
+
+describe('SettingsPanel, when the settings are from a newer version', () => {
+  const LINE = 'Update Lander to change this.'
+
+  const renderReadOnly = (readOnly: boolean, shown: Settings = settings) => {
+    const onChange = vi.fn()
+    render(
+      <SettingsPanel
+        currentId="a"
+        onChange={onChange}
+        onClose={() => {}}
+        photos={PHOTOS}
+        readOnly={readOnly}
+        settings={shown}
+      />,
+    )
+    return { onChange }
+  }
+
+  /**
+   * Every control in the open section, which the browser turns off with the fieldset around them
+   * (the test DOM does not, so this looks for the fieldset).
+   */
+  const controlsInDisabledFieldset = () => {
+    const section = screen.getByRole('tabpanel')
+    const fieldset = section.querySelector('fieldset[disabled]')
+    const controls = [...section.querySelectorAll('button, input, select')]
+    return { all: controls, inside: controls.filter((control) => fieldset?.contains(control)) }
+  }
+
+  it('says to update, at the top, and puts every control in the section in a disabled fieldset', () => {
+    renderReadOnly(true)
+
+    expect(screen.getByText(LINE)).toBeTruthy()
+    const { all, inside } = controlsInDisabledFieldset()
+    expect(all.length).toBeGreaterThan(0)
+    expect(inside).toEqual(all)
+  })
+
+  it('keeps the weather lines, which are draggable rows and not form controls, under the fieldset', () => {
+    // A disabled fieldset does not stop a draggable row. `.settings__fieldset:disabled
+    // .fields__row` in style.css does (pointer-events: none), which a unit test cannot see: this
+    // checks the markup that rule relies on.
+    renderReadOnly(true, {
+      ...settings,
+      weather: { ...settings.weather, enabled: true, place: null },
+    })
+    openSection('Weather')
+
+    const rows = screen.getByRole('tabpanel').querySelectorAll('fieldset[disabled] .fields__row')
+    expect(rows.length).toBe(settings.weather.fields.length)
+    for (const row of rows) expect(row.getAttribute('draggable')).toBe('true')
+  })
+
+  it('describes the disabled fieldset with the line, so a screen reader hears why', () => {
+    renderReadOnly(true)
+
+    const fieldset = screen.getByRole('tabpanel').querySelector('fieldset[disabled]')
+    const describedBy = fieldset?.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy ?? '')?.textContent).toBe(LINE)
+  })
+
+  it('has no description on the fieldset when the settings can be changed', () => {
+    renderReadOnly(false)
+
+    expect(
+      screen.getByRole('tabpanel').querySelector('fieldset')?.hasAttribute('aria-describedby'),
+    ).toBe(false)
+  })
+
+  it('does so in every section, and keeps the tabs enabled to look around', () => {
+    renderReadOnly(true)
+
+    for (const name of ['Clock', 'Weather', 'General']) {
+      openSection(name)
+      const { all, inside } = controlsInDisabledFieldset()
+      expect(all.length).toBeGreaterThan(0)
+      expect(inside).toEqual(all)
+    }
+    expect(screen.getByRole('tab', { name: 'General' }).closest('fieldset')).toBeNull()
+  })
+
+  it('is as it was, with no line, when the settings can be changed', () => {
+    renderReadOnly(false)
+
+    expect(screen.queryByText(LINE)).toBeNull()
+    expect(screen.getByRole('tabpanel').querySelector('fieldset[disabled]')).toBeNull()
+  })
+})

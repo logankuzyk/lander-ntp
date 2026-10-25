@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { NewerVersionError } from './guard'
 import { createWriteQueue } from './writeQueue'
 
 /** A write the test settles by hand, so it can look at the queue while the write is in flight. */
@@ -86,6 +87,25 @@ describe('createWriteQueue', () => {
 
     expect(written).toEqual([1, 2])
     expect(await next).toBe('saved')
+  })
+
+  it('says a save was refused, not rejected, when the write fails for a reason it is told is a refusal', async () => {
+    const { settlers, write, written } = manualWrites()
+    const queue = createWriteQueue(write, (error) => error instanceof NewerVersionError)
+
+    const refused = queue.save(1)
+    settlers[0]?.reject(new NewerVersionError('sync:settings'))
+    expect(await refused).toBe('refused')
+
+    const rejected = queue.save(2)
+    settlers[1]?.reject(new Error('quota'))
+    expect(await rejected).toBe('rejected')
+
+    // A refusal fails only its own save.
+    const next = queue.save(3)
+    settlers[2]?.resolve()
+    expect(await next).toBe('saved')
+    expect(written).toEqual([1, 2, 3])
   })
 
   it('treats a write that throws before returning a promise as a rejection', async () => {

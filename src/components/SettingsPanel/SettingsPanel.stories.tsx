@@ -18,6 +18,7 @@ const SETTINGS: Settings = {
   dim: true,
   font: 'system',
   photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
+  v: 1,
   weather: {
     enabled: false,
     fields: [
@@ -110,6 +111,20 @@ export const WeatherChoosingAPlace: Story = {
 }
 
 export const General: Story = { args: { initialSection: 'general' } }
+
+/**
+ * Settings that a newer version of Lander wrote: the panel shows them and says to update, with
+ * every control in the section off, and nothing is saved.
+ */
+export const FromNewerVersion: Story = {
+  args: {
+    readOnly: true,
+    settings: {
+      ...SETTINGS,
+      photos: { ...SETTINGS.photos, mode: 'pinned', pinnedId: STORY_PHOTOS[0]?.id ?? null },
+    },
+  },
+}
 
 /** As a new install opens it: a note beside the panel for each section in turn. */
 export const WithTheTour: Story = { args: { tour: TOUR } }

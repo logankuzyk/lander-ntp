@@ -5,6 +5,7 @@ import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
+import { createWriteQueue } from '@/storage/writeQueue'
 
 import { asV023, saveLikeV023 } from './compat'
 
@@ -117,6 +118,11 @@ type PhaseTwoWrite = {
    */
   legacyPanel?: boolean
   name: string
+  /**
+   * The write must leave `v: 1` at the top of the settings, which stored settings from v0.2.3
+   * (the row starts from those) do not have.
+   */
+  stampsVersion?: boolean
   /** The write, made through the real storage items, as the page makes it. */
   write: () => Promise<void>
 }
@@ -222,6 +228,39 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    changes: { font: 'instrument-serif' },
+    name: 'the first save after an update from v0.2.3 adds the top-level `v: 1` (W3)',
+    stampsVersion: true,
+    write: async () => {
+      // Settings as v0.2.3 left them: the current shape, and no `v`.
+      const settings = (await fakeBrowser.storage.sync.get('settings')).settings as Settings
+      await fakeBrowser.storage.sync.set({
+        settings: Object.fromEntries(Object.entries(settings).filter(([key]) => key !== 'v')),
+      })
+      await changeSettings((s) => ({ ...s, font: 'instrument-serif' }))()
+    },
+  },
+  {
+    changes: { photos: { ...SEED.photos, pinnedId: 'p19' } },
+    name: 'a burst of saves through the write queue (W2: it writes nothing new; the last value wins)',
+    write: async () => {
+      const writes: (string | null)[] = []
+      const queue = createWriteQueue(async (value: Settings) => {
+        writes.push(value.photos.pinnedId)
+        await settingsItem.setValue(value)
+      })
+      const base = await settingsItem.getValue()
+      // Twenty pins in a row, the way the page makes them, each a different photo: the first goes
+      // straight out, and of the nineteen behind it only the last is written.
+      await Promise.all(
+        Array.from({ length: 20 }, (_, i) =>
+          queue.save({ ...base, photos: { ...base.photos, pinnedId: `p${i}` } }),
+        ),
+      )
+      expect(writes).toEqual(['p0', 'p19'])
+    },
+  },
+  {
     name: 'answer the welcome',
     write: changeOnboarding((record) => ({ ...record, welcomed: true })),
   },
@@ -274,35 +313,39 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
     await onboardingItem.setValue(SEED_ONBOARDING)
   })
 
-  it.each(PHASE_2_WRITES)('$name', async ({ changes, fromNoRecord, legacyPanel, write }) => {
-    await write()
-    const stored = await fakeBrowser.storage.sync.get(null)
+  it.each(PHASE_2_WRITES)(
+    '$name',
+    async ({ changes, fromNoRecord, legacyPanel, stampsVersion, write }) => {
+      await write()
+      const stored = await fakeBrowser.storage.sync.get(null)
 
-    // Only what phase 2 is allowed to change has changed, and `v` is 1 where there is one.
-    const disallowed = changedPaths(SEED, stored.settings).filter(
-      (path) => !ALLOWED_PATHS.test(path) && !(legacyPanel && LEGACY_PANEL_PATHS.test(path)),
-    )
-    expect(disallowed).toEqual([])
-    if (isObject(stored.settings) && 'v' in stored.settings) expect(stored.settings.v).toBe(1)
-    // `dismissed` only gains ids.
-    if (!fromNoRecord) {
-      expect((stored.onboarding as Onboarding).dismissed).toEqual(
-        expect.arrayContaining(SEED_ONBOARDING.dismissed),
+      // Only what phase 2 is allowed to change has changed, and `v` is 1 where there is one.
+      const disallowed = changedPaths(SEED, stored.settings).filter(
+        (path) => !ALLOWED_PATHS.test(path) && !(legacyPanel && LEGACY_PANEL_PATHS.test(path)),
       )
-    }
+      expect(disallowed).toEqual([])
+      if (isObject(stored.settings) && 'v' in stored.settings) expect(stored.settings.v).toBe(1)
+      if (stampsVersion) expect(stored.settings).toHaveProperty('v', 1)
+      // `dismissed` only gains ids.
+      if (!fromNoRecord) {
+        expect((stored.onboarding as Onboarding).dismissed).toEqual(
+          expect.arrayContaining(SEED_ONBOARDING.dismissed),
+        )
+      }
 
-    const { fellBack, onboarding, settings } = await asV023(stored)
+      const { fellBack, onboarding, settings } = await asV023(stored)
 
-    expect(fellBack).toBe(false)
-    // Photos, font and dim survive: the new ones where the write changed them, else the seed's.
-    expect(settings).toMatchObject({
-      dim: SEED.dim,
-      font: SEED.font,
-      photos: SEED.photos,
-      ...changes,
-    })
-    // And v0.2.3 draws everything that was written, with nothing dropped or added.
-    expect(settings).toEqual(stored.settings)
-    expect(onboarding).toEqual(stored.onboarding)
-  })
+      expect(fellBack).toBe(false)
+      // Photos, font and dim survive: the new ones where the write changed them, else the seed's.
+      expect(settings).toMatchObject({
+        dim: SEED.dim,
+        font: SEED.font,
+        photos: SEED.photos,
+        ...changes,
+      })
+      // And v0.2.3 draws everything that was written, with nothing dropped or added.
+      expect(settings).toEqual(stored.settings)
+      expect(onboarding).toEqual(stored.onboarding)
+    },
+  )
 })

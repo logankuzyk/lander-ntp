@@ -43,7 +43,11 @@ export function App() {
     },
     onSaved: () => setSaveFailed(false),
   }
-  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem, saveOutcome)
+  // Read-only when a newer version of the page wrote the settings: nothing here saves over them.
+  const [settings, setSettings, settingsLoaded, settingsReadOnly] = useStorageItem(
+    settingsItem,
+    saveOutcome,
+  )
   const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
@@ -72,6 +76,8 @@ export function App() {
   const showNext = () => {
     void (async () => {
       const id = await next()
+      // The photo moves on; the settings, which would say which, are not this version's to write.
+      if (settingsReadOnly) return
       const latest = await settingsItem.getValue()
       if (id && latest.photos.mode === 'pinned' && latest.photos.pinnedId !== id) {
         setSettings({ ...latest, photos: { ...latest.photos, pinnedId: id } })
@@ -131,6 +137,7 @@ export function App() {
           onChange={setSettings}
           onClose={close}
           photos={photos}
+          readOnly={settingsReadOnly}
           settings={settings}
           tour={entry.tour ? TOUR : undefined}
         />

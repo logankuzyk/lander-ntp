@@ -1,7 +1,7 @@
 import * as v from 'valibot'
-import { storage } from 'wxt/utils/storage'
 
 import { FREQUENCIES } from '@/photos/rotation'
+import { defineGuardedItem } from '@/storage/guard'
 
 import { DEFAULT_SETTINGS, type Settings, WEATHER_FIELDS } from './schema'
 
@@ -52,22 +52,33 @@ const SettingsSchema = v.looseObject({
 /**
  * Settings in any other shape get the defaults: those stored by 0.1.1, which kept a flat
  * `frequency` and favourite sites, and any a newer version has changed. Nothing is migrated;
- * a block added since is filled in with its defaults.
+ * a block added since is filled in with its defaults. Settings with no `v`, as 0.2.x stored
+ * them, are version 1; a `v` that is there is kept, so a newer version's stays on what is drawn
+ * (and is never written over: see the guard below).
  */
 const current = (value: unknown): Settings => {
   const result = v.safeParse(SettingsSchema, value)
-  return result.success ? (result.output as Settings) : DEFAULT_SETTINGS
+  return result.success ? ({ v: 1, ...result.output } as Settings) : DEFAULT_SETTINGS
 }
 
-// No version or migrations: nothing is stored alongside the settings themselves.
-const stored = storage.defineItem<Settings>('sync:settings', { fallback: DEFAULT_SETTINGS })
+// No WXT version or migrations: the version is `v`, in the value, where every device sees it.
+// A save never goes over settings that a newer version wrote.
+const guarded = defineGuardedItem<Settings>({
+  check: current,
+  fallback: DEFAULT_SETTINGS,
+  key: 'sync:settings',
+  version: DEFAULT_SETTINGS.v,
+})
 
 /** Synced by the browser, so settings follow you between devices. */
 export const settingsItem = {
   fallback: DEFAULT_SETTINGS,
-  getValue: async (): Promise<Settings> => current(await stored.getValue()),
-  key: stored.key,
-  setValue: (value: Settings): Promise<void> => stored.setValue(value),
-  watch: (callback: (value: Settings | null) => void): (() => void) =>
-    stored.watch((value) => callback(value === null ? null : current(value))),
+  getValue: async (): Promise<Settings> => (await guarded.read()).value,
+  key: guarded.key,
+  /** The settings, and whether a newer version wrote them, which makes them read-only. */
+  read: guarded.read,
+  /** Throws a `NewerVersionError`, writing nothing, when the stored settings are newer. */
+  setValue: (value: Settings): Promise<void> => guarded.write(value),
+  watch: (callback: (value: Settings | null, newer?: boolean) => void): (() => void) =>
+    guarded.watch((read) => (read ? callback(read.value, read.newer) : callback(null))),
 }
