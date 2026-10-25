@@ -6,7 +6,15 @@ import { defaultOptions } from '@/widgetSystem/options'
 
 import { checkLayout, storedLayout } from './check'
 import { collides, drawnRects, isOnGrid } from './geometry'
-import { addWidget, moveWidget, type Refusal, removeWidget, resizeWidget, setOptions } from './ops'
+import {
+  addWidget,
+  moveWidget,
+  type Refusal,
+  removeWidget,
+  resizeWidget,
+  setOptions,
+  settle,
+} from './ops'
 import type { Layout, PlacedWidget } from './types'
 
 const CLOCK_OPTIONS = { showDate: false, showSeconds: false }
@@ -528,5 +536,259 @@ describe('setOptions', () => {
     expect(refusal(setOptions({ layout, readOnly: true }, 'a', { showDate: true }))).toBe(
       'read only',
     )
+  })
+})
+
+/** Where every Widget is drawn, by id. */
+const drawnById = (layout: Layout) =>
+  Object.fromEntries(drawnRects(layout).map(({ rect, widget }) => [widget.placed.id, rect]))
+
+/** Where every Widget that can be placed is stored, by id. */
+const storedById = (layout: Layout) =>
+  Object.fromEntries(
+    layout.widgets.flatMap((widget) =>
+      widget.kind === 'malformed'
+        ? []
+        : [
+            [
+              widget.placed.id,
+              {
+                col: widget.placed.col,
+                h: widget.placed.h,
+                row: widget.placed.row,
+                w: widget.placed.w,
+              },
+            ],
+          ],
+    ),
+  )
+
+describe('settle', () => {
+  // "a" and "b" are stored on the same cells. "a" is first in reading order, so it keeps them
+  // and "b" is drawn at column 5, row 2.
+  const overlapping = () => layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+
+  it('writes the place each Widget is drawn at into the Layout', () => {
+    const settled = settle(overlapping())
+
+    expect(storedById(settled)).toEqual({
+      a: { col: 5, h: 2, row: 4, w: 4 },
+      b: { col: 5, h: 2, row: 2, w: 4 },
+    })
+  })
+
+  it('draws every Widget exactly where it was drawn before', () => {
+    const before = overlapping()
+
+    expect(drawnById(settle(before))).toEqual(drawnById(before))
+  })
+
+  it('does not change the Layout it was given', () => {
+    const before = overlapping()
+    const snapshot = JSON.stringify(stored(before))
+    settle(before)
+    expect(JSON.stringify(stored(before))).toBe(snapshot)
+  })
+
+  it('is the same Layout, not a copy, when every Widget is drawn where it is stored', () => {
+    const fine = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+    const settled = settle(overlapping())
+
+    expect(settle(fine)).toBe(fine)
+    expect(settle(settled)).toBe(settled)
+  })
+
+  it('leaves a Widget with no place alone, and one that is not well-formed, and keeps the rest', () => {
+    const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
+    const before = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: defaultOptions(weatherDefinition) },
+      widgets: [
+        clock('all', 1, 1, { h: 8, w: 12 }),
+        weather('lost', 3, 3),
+        malformed,
+        { ...clock('off', 20, 20), note: 'kept' },
+      ],
+    })
+
+    // The whole Grid is taken by "all", so "lost" and "off" have no place: nothing to settle.
+    expect(settle(before)).toBe(before)
+  })
+
+  it('keeps what a settled Widget has that this version does not know', () => {
+    const before = layoutOf(clock('a', 5, 4), { ...clock('b', 5, 4), note: 'kept' })
+
+    expect(placedOf(settle(before), 'b')).toEqual({ ...clock('b', 5, 2), note: 'kept' })
+  })
+
+  it('keeps the rest of the Layout as it was', () => {
+    const before = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: defaultOptions(weatherDefinition) },
+      widgets: [clock('a', 5, 4), clock('b', 5, 4)],
+    })
+
+    const after = stored(settle(before))
+
+    expect(after.extra).toBe(1)
+    expect(after.waiting).toEqual({ weather: defaultOptions(weatherDefinition) })
+  })
+
+  it('settles a Widget of a type this version does not know', () => {
+    const future = { col: 5, h: 2, id: 'f', options: { z: 1 }, row: 4, type: 'bookmarks', w: 4 }
+    const before = layoutOf(future, clock('g', 5, 4))
+
+    // "f" keeps the cells; "g" is drawn elsewhere and stored there.
+    expect(storedById(settle(before)).f).toEqual({ col: 5, h: 2, row: 4, w: 4 })
+    expect(storedById(settle(before)).g).not.toEqual({ col: 5, h: 2, row: 4, w: 4 })
+  })
+
+  it('leaves drawn results alone for any mix of Widgets, and a second pass changes nothing', () => {
+    // A seeded generator: the same Layouts on every run.
+    let seed = 7
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return 1 + (seed % n)
+    }
+    let corrected = 0
+    for (let round = 0; round < 200; round++) {
+      const widgets = Array.from({ length: next(10) }, (_, i) =>
+        i % 3 === 0
+          ? weather(`w${i}`, next(14) - 1, next(10) - 1, { h: next(3), w: next(3) })
+          : clock(`c${i}`, next(14) - 1, next(10) - 1, { h: next(4), w: next(8) }),
+      )
+      const before = layoutOf(...widgets)
+      const settled = settle(before)
+
+      expect(drawnById(settled), JSON.stringify(widgets)).toEqual(drawnById(before))
+      expect(settle(settled)).toBe(settled)
+      if (settled !== before) corrected++
+    }
+    // The mix is rough enough that many rounds have a Widget to correct.
+    expect(corrected).toBeGreaterThan(50)
+  })
+})
+
+describe('a Widget drawn away from its stored place is stored where it is drawn', () => {
+  // The probe: "a" and "b" are both stored at column 5, row 4. "b" is drawn at column 5, row 2.
+  const probe = () => layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+  const B_DRAWN = { col: 5, h: 2, row: 2, w: 4 }
+
+  it('when a Widget is added, so removing "a" later does not make "b" jump', () => {
+    const added = accepted(addWidget(editable(probe()), 'weather'))
+    expect(storedById(added).b).toEqual(B_DRAWN)
+
+    const removed = accepted(removeWidget(editable(added), 'a'))
+    expect(drawnById(removed).b).toEqual(B_DRAWN)
+  })
+
+  it('when "a" is removed straight away', () => {
+    const removed = accepted(removeWidget(editable(probe()), 'a'))
+
+    expect(storedById(removed).b).toEqual(B_DRAWN)
+    expect(drawnById(removed).b).toEqual(B_DRAWN)
+  })
+
+  it('when "a" is moved away', () => {
+    const moved = accepted(moveWidget(editable(probe()), 'a', { col: 1, row: 7 }))
+
+    expect(storedById(moved).b).toEqual(B_DRAWN)
+    expect(drawnById(moved).b).toEqual(B_DRAWN)
+    expect(storedById(moved).a).toEqual({ col: 1, h: 2, row: 7, w: 4 })
+  })
+
+  it('when "a" is resized', () => {
+    const resized = accepted(resizeWidget(editable(probe()), 'a', { h: 2, w: 3 }))
+
+    expect(storedById(resized).b).toEqual(B_DRAWN)
+    expect(drawnById(resized).b).toEqual(B_DRAWN)
+  })
+
+  it('when "b" itself is moved or resized', () => {
+    const moved = accepted(moveWidget(editable(probe()), 'b', { col: 1, row: 1 }))
+    expect(storedById(moved).b).toEqual({ col: 1, h: 2, row: 1, w: 4 })
+
+    const resized = accepted(resizeWidget(editable(probe()), 'b', { h: 2, w: 5 }))
+    expect(storedById(resized).b).toEqual({ col: 5, h: 2, row: 2, w: 5 })
+  })
+
+  it('and every Widget is drawn where it was drawn before the change', () => {
+    const before = probe()
+    const added = accepted(addWidget(editable(before), 'weather'))
+
+    expect(drawnById(added)).toMatchObject({ a: drawnById(before).a, b: drawnById(before).b })
+  })
+})
+
+describe('a change that changes nothing', () => {
+  const layout = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+
+  it('gives back the same Layout when a Widget is moved to where it is', () => {
+    const result = moveWidget(editable(layout), 'a', { col: 5, row: 4 })
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('gives back the same Layout when a Widget is resized to the size it is', () => {
+    const result = resizeWidget(editable(layout), 'a', { h: 2, w: 4 })
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('does so even when other Widgets are drawn away from their stored places', () => {
+    const odd = layoutOf(clock('a', 5, 4), clock('b', 5, 4), weather('c', 11, 1))
+
+    const result = moveWidget(editable(odd), 'c', { col: 11, row: 1 })
+
+    expect(result.ok && result.layout).toBe(odd)
+  })
+
+  it('is still a change for a Widget drawn away from its stored place', () => {
+    const odd = layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+
+    // "b" is stored at 5, 4 but drawn at 5, 2: resizing it to its own size writes where it is.
+    const result = resizeWidget(editable(odd), 'b', { h: 2, w: 4 })
+
+    expect(result.ok && result.layout).not.toBe(odd)
+    expect(result.ok && storedById(result.layout).b).toEqual({ col: 5, h: 2, row: 2, w: 4 })
+  })
+
+  it('is a new Layout for a move to a different place', () => {
+    const result = moveWidget(editable(layout), 'a', { col: 5, row: 5 })
+
+    expect(result.ok && result.layout).not.toBe(layout)
+  })
+})
+
+describe('waiting options and a type named like something every object has', () => {
+  const waitingWeather = defaultOptions(weatherDefinition)
+  // A registry that knows a Widget under a name that is also a key of Object.prototype.
+  const named = (name: string) => (type: string) => (type === name ? clockDefinition : undefined)
+
+  it.each(['constructor', 'toString', 'hasOwnProperty'])(
+    'does not find options for "%s" that nobody kept',
+    (name) => {
+      const before = checkLayout({ v: 1, waiting: {}, widgets: [] })
+
+      const next = accepted(addWidget(editable(before), name, named(name)))
+
+      expect(next.waiting).toEqual({})
+      expect(next.widgets[0]).toMatchObject({ placed: { options: CLOCK_OPTIONS } })
+    },
+  )
+
+  it('still uses what was kept under such a type, and leaves the other types waiting', () => {
+    const before = checkLayout({
+      v: 1,
+      waiting: { toString: { showDate: true, showSeconds: false }, weather: waitingWeather },
+      widgets: [],
+    })
+
+    const next = accepted(addWidget(editable(before), 'toString', named('toString')))
+
+    expect(next.widgets[0]).toMatchObject({ placed: { options: { showDate: true } } })
+    expect(next.waiting).toEqual({ weather: waitingWeather })
   })
 })
