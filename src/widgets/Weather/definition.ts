@@ -81,10 +81,11 @@ const LABELS: Record<WeatherField, string> = {
 }
 
 export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceName> = {
+  credit: { href: 'https://open-meteo.com/', text: 'Weather data by Open-Meteo.com' },
   name: 'Weather',
   needs: [locationConsent, place],
-  // The order and wording are copied from the settings panel. Defaults come from today's
-  // settings, so those cannot drift.
+  // The order and wording are copied from the settings panel (the page-wide switch last).
+  // Defaults come from today's settings, so those cannot drift.
   options: [
     {
       control: 'place',
@@ -112,8 +113,8 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
       items: WEATHER_FIELDS.map((id) => ({ id, label: LABELS[id] })),
       label: 'Show',
     },
-    // Label and value are opposite: checked means hour12 is false. A form must invert it, as SettingsPanel does with !hour12.
-    { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
+    // Label and value are opposite: checked means hour12 is false, so a form inverts it.
+    { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
   source: { source: weatherSource, useQuery: useWeatherQuery },
   type: 'weather',

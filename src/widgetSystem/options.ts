@@ -71,6 +71,26 @@ export function defaultOptions<O>(definition: DefinitionOf<O>): O {
 }
 
 /**
+ * The keys of what is stored that this version knows nothing of, copied: the options a shared
+ * option's name or a field's key does not account for.
+ */
+function unknownKeys(
+  descriptions: readonly OptionDescription[],
+  fields: readonly Field[],
+  given: Record<string, unknown>,
+): Record<string, unknown> {
+  const known = new Set([
+    ...fields.map((field) => field.key),
+    ...descriptions.filter((option) => 'shared' in option).map((option) => option.id),
+  ])
+  return Object.fromEntries(
+    Object.entries(given)
+      .filter(([key]) => !known.has(key))
+      .map(([key, value]) => [key, structuredClone(value)]),
+  )
+}
+
+/**
  * The options a Widget shows, from whatever is stored for it. Pure: nothing is written back.
  *
  * - A key that is missing gets its default, so an option added later needs no migration.
@@ -85,15 +105,7 @@ export function readOptions<O>(definition: DefinitionOf<O>, stored: unknown): O 
   const fields = definition.options.flatMap(fieldsOf)
   const given = isRecord(stored) ? stored : {}
 
-  const known = new Set([
-    ...fields.map((field) => field.key),
-    ...definition.options.filter((option) => 'shared' in option).map((option) => option.id),
-  ])
-  const unknown = Object.fromEntries(
-    Object.entries(given)
-      .filter(([key]) => !known.has(key))
-      .map(([key, value]) => [key, structuredClone(value)]),
-  )
+  const unknown = unknownKeys(definition.options, fields, given)
 
   const read: Record<string, unknown> = {}
   for (const field of fields) {
@@ -106,4 +118,34 @@ export function readOptions<O>(definition: DefinitionOf<O>, stored: unknown): O 
     read[field.key] = result.output
   }
   return { ...unknown, ...read } as O
+}
+
+/**
+ * What to store for a Widget when the user changes some of its options: the whole object, so
+ * each change is one save. Unlike reading, which draws a Widget with a bad key from its defaults
+ * and leaves what is stored alone, this is the user changing this Widget's options on this
+ * device, which is when stored options may be put right (LR-15):
+ *
+ * - Keys it does not know are kept as they are, so a newer version's survive being saved here.
+ * - A key that passes its check is kept as stored.
+ * - A key that is missing, or fails its check, is replaced by its default; no other key is.
+ * - A shared option is the page's: whatever is stored under its name is dropped.
+ * - Then the change is laid over all that, a place by both its keys at once.
+ *
+ * Pure: nothing is written, and the result shares nothing with what is stored.
+ */
+export function writeOptions<O>(
+  definition: DefinitionOf<O>,
+  stored: unknown,
+  change: Partial<O>,
+): Record<string, unknown> {
+  const fields = definition.options.flatMap(fieldsOf)
+  const given = isRecord(stored) ? stored : {}
+
+  const kept: Record<string, unknown> = {}
+  for (const field of fields) {
+    const result = field.key in given ? v.safeParse(field.schema, given[field.key]) : null
+    kept[field.key] = result?.success ? result.output : structuredClone(field.default)
+  }
+  return { ...unknownKeys(definition.options, fields, given), ...kept, ...structuredClone(change) }
 }

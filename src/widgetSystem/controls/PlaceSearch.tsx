@@ -11,6 +11,8 @@ const DEBOUNCE_MS = 300
 const MIN_LENGTH = 2
 
 type PlaceSearchProps = {
+  /** The box cannot be typed in, and suggests nothing. */
+  disabled?: boolean
   locateFailed: boolean
   /** Follow the device instead of a place searched for. */
   onLocate: () => void
@@ -23,7 +25,12 @@ type PlaceSearchProps = {
  * text so far. The arrow keys move through them, putting each in the box, and Enter takes the
  * one there.
  */
-export function PlaceSearch({ locateFailed, onLocate, onSelect }: PlaceSearchProps) {
+export function PlaceSearch({
+  disabled = false,
+  locateFailed,
+  onLocate,
+  onSelect,
+}: PlaceSearchProps) {
   const listId = useId()
   const [query, setQuery] = useState('')
   /** Null with nothing to search for; 'failed' when the search itself didn't go through. */
@@ -103,6 +110,7 @@ export function PlaceSearch({ locateFailed, onLocate, onSelect }: PlaceSearchPro
             aria-label="Search for a place"
             autocomplete="off"
             class="settings__input"
+            disabled={disabled}
             onBlur={close}
             onClick={() => setOpen(true)}
             onFocus={() => setOpen(true)}

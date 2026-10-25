@@ -72,6 +72,11 @@ export type OrderedListOption = OptionBase & {
 export type PageValueOption = OptionBase & {
   control: 'switch'
   default?: never
+  /**
+   * The switch says the opposite of the value: "24-hour time" is on when `hour12` is off. The
+   * form that draws it inverts the value on the way in and the change on the way out.
+   */
+  invert?: boolean
   shared: PageValueName
 }
 
@@ -109,11 +114,19 @@ export type WidgetSource<O, R, C> = {
   useQuery: (options: O) => SourceQuery<R, C>
 }
 
+/** A line of thanks that links to where the Widget's data comes from. */
+export type Credit = {
+  href: string
+  text: string
+}
+
 /**
  * What a Widget declares. `R` is what its source loads and `C` what the source carries to the
  * View. Both are only for definitions with a `source`; a Widget without one leaves them alone.
  */
 export type WidgetDefinition<O, R = undefined, C = undefined> = {
+  /** A line at the foot of its options, such as who its data is from. */
+  credit?: Credit
   /** What people read: "Weather". Free to change. */
   name: string
   /**

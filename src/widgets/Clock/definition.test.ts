@@ -52,11 +52,21 @@ describe('the Clock definition', () => {
     })
   })
 
-  it('words its options as the settings panel does, in its order', () => {
+  it("words its options as the settings panel does, with the page-wide switch last as the Weather's is", () => {
     expect(clockDefinition.options.map(({ id, label }) => [id, label])).toEqual([
-      ['hour12', '24-hour time'],
       ['showDate', 'Show date'],
       ['showSeconds', 'Show seconds'],
+      ['hour12', '24-hour time'],
     ])
+  })
+
+  it('marks "24-hour time" as the opposite of the hour12 it shows, so a form inverts it', () => {
+    expect(clockDefinition.options.find((option) => option.id === 'hour12')).toMatchObject({
+      invert: true,
+    })
+  })
+
+  it('has no credit to give', () => {
+    expect(clockDefinition.credit).toBeUndefined()
   })
 })

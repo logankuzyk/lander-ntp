@@ -22,11 +22,9 @@ function ClockView({ options, page }: WidgetViewProps<ClockOptions>) {
 
 export const clockDefinition: WidgetDefinition<ClockOptions> = {
   name: 'Clock',
-  // The order and wording are copied from the settings panel. Defaults come from today's
-  // settings, so those cannot drift.
+  // The wording is copied from the settings panel; the page-wide switch comes last, as the
+  // Weather's does. Defaults come from today's settings, so those cannot drift.
   options: [
-    // Label and value are opposite: checked means hour12 is false. A form must invert it, as SettingsPanel does with !hour12.
-    { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
     {
       control: 'switch',
       default: DEFAULT_SETTINGS.clock.showDate,
@@ -39,6 +37,8 @@ export const clockDefinition: WidgetDefinition<ClockOptions> = {
       id: 'showSeconds',
       label: 'Show seconds',
     },
+    // Label and value are opposite: checked means hour12 is false, so a form inverts it.
+    { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
   type: 'clock',
   View: ClockView,

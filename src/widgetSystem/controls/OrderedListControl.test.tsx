@@ -36,6 +36,9 @@ const draw = (value: readonly ListEntry[] = LIST) => {
   return onChange
 }
 
+/** Whether a row can be dragged: the property in a browser, the attribute where there is none. */
+const draggable = (row: HTMLElement) => row.draggable ?? row.getAttribute('draggable') === 'true'
+
 const rows = () =>
   within(screen.getByRole('list', { name: 'Points' }))
     .getAllByRole('listitem')
@@ -193,5 +196,47 @@ describe('OrderedListControl', () => {
     // fireEvent says whether the event went unprevented.
     expect([down, upAtTop, downAtEnd]).toEqual([false, false, false])
     expect(other).toBe(true)
+  })
+
+  it('is turned off by disabled: nothing moves, shows or hides, and the rows cannot be dragged', () => {
+    const onChange = vi.fn()
+    render(
+      <>
+        <h3 id="points-heading">Points</h3>
+        <OrderedListControl
+          disabled
+          items={ITEMS}
+          labelledBy="points-heading"
+          onChange={onChange}
+          value={LIST}
+        />
+      </>,
+    )
+
+    for (const name of ['Reorder North', 'Show North', 'Show East']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      fireEvent.click(button)
+    }
+    // A drag goes nowhere, so there is nothing to drop.
+    for (const row of screen.getAllByRole('listitem')) {
+      expect(draggable(row)).toBe(false)
+    }
+    const [north, south] = screen.getAllByRole('listitem')
+    fireEvent.dragStart(north as HTMLElement)
+    fireEvent.dragOver(south as HTMLElement)
+    fireEvent.dragEnd(north as HTMLElement)
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(rows()).toEqual(['North', 'South', 'East', 'West'])
+  })
+
+  it('can be used unless it is told otherwise', () => {
+    draw()
+
+    for (const row of screen.getAllByRole('listitem')) expect(draggable(row)).toBe(true)
+    expect((screen.getByRole('button', { name: 'Show North' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    )
   })
 })
