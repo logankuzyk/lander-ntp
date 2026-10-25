@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { fn } from 'storybook/test'
 
+import { deriveLayout } from '@/layout/derive'
 import type { Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
@@ -10,7 +11,7 @@ import { weatherDefinition } from '@/widgets/Weather/definition'
 
 import { withPage } from '../../.storybook/withPage'
 import { withPanel } from '../../.storybook/withPanel'
-import { pageValues, widgetsFromSettings } from './fromSettings'
+import { pageValues } from './fromSettings'
 import { OptionsForm } from './OptionsForm'
 
 /**
@@ -78,7 +79,9 @@ function Stored({
 }: Omit<Props, 'options' | 'page'>) {
   const [settings, setSettings, loaded] = useStorageItem(settingsItem)
   if (!loaded) return null
-  const widget = widgetsFromSettings(settings).find(({ type }) => type === definition.type)
+  const widget = deriveLayout(settings).widgets.find(
+    (placed) => placed.kind === 'known' && placed.placed.type === definition.type,
+  )
   return (
     <OptionsForm
       {...props}
@@ -91,7 +94,7 @@ function Stored({
         onPageValueChange(name, value)
         setSettings({ ...settings, clock: { ...settings.clock, [name]: value } })
       }}
-      options={widget?.options}
+      options={widget?.kind === 'known' ? widget.placed.options : undefined}
       page={pageValues(settings)}
     />
   )

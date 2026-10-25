@@ -391,6 +391,136 @@ describe('App', () => {
   })
 })
 
+describe('App, on the Grid', () => {
+  const PLACE = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
+
+  /** Each box on the page as [type, column, row]: where CSS grid is told to put it. */
+  const boxes = (container: ParentNode) =>
+    [...container.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [
+      box.dataset.widget,
+      box.style.gridColumn,
+      box.style.gridRow,
+    ])
+
+  const settingsWith = (settings: {
+    clock?: Partial<typeof DEFAULT_SETTINGS.clock>
+    weather?: Partial<typeof DEFAULT_SETTINGS.weather>
+  }) => ({
+    ...DEFAULT_SETTINGS,
+    clock: { ...DEFAULT_SETTINGS.clock, ...settings.clock },
+    weather: { ...DEFAULT_SETTINGS.weather, ...settings.weather },
+  })
+
+  /** Waits until the page has drawn the Grid, which it does once settings and Layout are known. */
+  const drawn = async (container: ParentNode) => {
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+  }
+
+  it('draws one Clock box at column 5, row 4, 4 by 2, on a new install', async () => {
+    await seedPhotos()
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([['clock', '5 / span 4', '4 / span 2']])
+  })
+
+  it('draws no Grid before the stored settings and Layout are known', async () => {
+    await seedPhotos()
+    // A Weather stored in the settings: drawn from the defaults first, it would not be there.
+    await settingsItem.setValue(settingsWith({ weather: { enabled: true, place: PLACE } }))
+    const { container } = render(<App />)
+
+    expect(container.querySelector('.grid')).toBeNull()
+    expect(container.querySelector('.widget-box')).toBeNull()
+
+    await drawn(container)
+    expect(boxes(container).map(([type]) => type)).toEqual(['weather', 'clock'])
+  })
+
+  it('draws the Weather of an updated user at column 11, row 1, and the Clock where it was', async () => {
+    await seedPhotos()
+    await settingsItem.setValue(
+      settingsWith({ weather: { enabled: true, place: PLACE, unit: 'celsius' } }),
+    )
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '5 / span 4', '4 / span 2'],
+    ])
+  })
+
+  it('draws the Clock with seconds 6 wide, from column 4', async () => {
+    await seedPhotos()
+    await settingsItem.setValue(settingsWith({ clock: { showSeconds: true } }))
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([['clock', '4 / span 6', '4 / span 2']])
+  })
+
+  it('draws an empty Grid when the Clock and the Weather are both off', async () => {
+    await seedPhotos()
+    await settingsItem.setValue(settingsWith({ clock: { enabled: false } }))
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([])
+  })
+
+  it('draws the stored Layout, not the settings, once there is one', async () => {
+    await seedPhotos()
+    await fakeBrowser.storage.sync.set({
+      layout: {
+        v: 1,
+        widgets: [{ col: 1, h: 2, id: 'aaaaaaaa', options: {}, row: 7, type: 'clock', w: 4 }],
+      },
+    })
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([['clock', '1 / span 4', '7 / span 2']])
+  })
+
+  it('draws a stored Widget that sits on another in the free place nearest the middle', async () => {
+    await seedPhotos()
+    const clock = (id: string) => ({
+      col: 5,
+      h: 2,
+      id,
+      options: {},
+      row: 4,
+      type: 'clock',
+      w: 4,
+    })
+    await fakeBrowser.storage.sync.set({
+      layout: { v: 1, widgets: [clock('aaaaaaaa'), clock('bbbbbbbb')] },
+    })
+    const { container } = render(<App />)
+
+    await drawn(container)
+    expect(boxes(container)).toEqual([
+      ['clock', '5 / span 4', '2 / span 2'],
+      ['clock', '5 / span 4', '4 / span 2'],
+    ])
+  })
+
+  it('writes nothing to sync storage: not on load, and not on a resize', async () => {
+    await seedPhotos()
+    await settingsItem.setValue(settingsWith({ weather: { enabled: true, place: PLACE } }))
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const { container } = render(<App />)
+
+    await drawn(container)
+    globalThis.dispatchEvent(new Event('resize'))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(set).not.toHaveBeenCalled()
+    expect(await fakeBrowser.storage.sync.get('layout')).toEqual({})
+  })
+})
+
 describe('App, when a change cannot be saved', () => {
   const SAVE_FAILED = "Couldn't save that. Try again in a minute."
 

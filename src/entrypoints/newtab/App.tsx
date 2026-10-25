@@ -3,11 +3,13 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
+import { Grid } from '@/components/Grid/Grid'
 import { Notice } from '@/components/Notice/Notice'
 import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/components/PhotoInfo/PhotoInfo'
 import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
 import { Welcome } from '@/components/Welcome/Welcome'
+import { useLayout } from '@/layout/useLayout'
 import { TOUR } from '@/onboarding/callouts'
 import { onboardingItem } from '@/onboarding/storage'
 import { useNews } from '@/onboarding/useNews'
@@ -16,9 +18,7 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
-import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
-import { widgetDefinition } from '@/widgetSystem/registry'
-import { WidgetHost } from '@/widgetSystem/WidgetHost'
+import { pageValues } from '@/widgetSystem/fromSettings'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
@@ -48,6 +48,9 @@ export function App() {
     settingsItem,
     saveOutcome,
   )
+  // The Layout is the stored one, or worked out from the settings while there is none. Only
+  // right once the stored settings have loaded, as the hook starts from the defaults.
+  const { layout, loaded: layoutLoaded } = useLayout(settings, saveOutcome)
   const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
@@ -109,25 +112,13 @@ export function App() {
         />
       )}
       {/*
-        Stored settings land a beat after the first paint. Drawing the defaults and then
-        correcting them is a visible jolt — a clock that jumps fonts, say — so anything that
-        depends on them waits for them. The photo already does: usePhotoRotation is held back
-        until the settings are known.
+        Stored settings and the stored Layout land a beat after the first paint. Drawing the
+        defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
+        and the Layout worked out from the defaults would put the wrong Widgets in the wrong
+        places, so anything that depends on them waits for both. The photo already does:
+        usePhotoRotation is held back until the settings are known.
       */}
-      {settingsLoaded &&
-        widgetsFromSettings(settings).map(({ options, type }) => {
-          const definition = widgetDefinition(type)
-          return (
-            definition && (
-              <WidgetHost
-                definition={definition}
-                key={type}
-                options={options}
-                page={pageValues(settings)}
-              />
-            )
-          )
-        })}
+      {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
       {photo && <PhotoCredit photo={photo} />}
       {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
       {popover === 'settings' && (

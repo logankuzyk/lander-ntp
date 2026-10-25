@@ -7,17 +7,27 @@ import { clockDefinition } from '@/widgets/Clock/definition'
 import type { WidgetDefinition } from './definition'
 import type { Need } from './needs'
 import type { Query, Reading, Source } from './source'
-import { WidgetHost } from './WidgetHost'
+import { WidgetBox } from './WidgetBox'
+
+const RECT = { col: 5, h: 2, row: 4, w: 4 }
 
 const time = (container: ParentNode) => container.querySelector('.clock__time')?.textContent
 
-describe('WidgetHost', () => {
+/** The box a Widget sits in: the one element WidgetBox adds, which holds what the Widget draws. */
+const box = (container: ParentNode) => {
+  const found = container.querySelector('.widget-box')
+  if (!found) throw new Error('no box was drawn')
+  return found
+}
+
+describe('WidgetBox', () => {
   it("draws the Widget's View with its options and the page's values", () => {
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={clockDefinition}
         options={{ showDate: true, showSeconds: true }}
         page={{ hour12: true }}
+        rect={RECT}
       />,
     )
     expect(time(container)).toMatch(/^\d{1,2}:\d{2}:\d{2}$/)
@@ -30,11 +40,16 @@ describe('WidgetHost', () => {
     vi.setSystemTime(new Date(2026, 8, 11, 21, 5, 9))
     try {
       const twelve = render(
-        <WidgetHost definition={clockDefinition} options={{}} page={{ hour12: true }} />,
+        <WidgetBox definition={clockDefinition} options={{}} page={{ hour12: true }} rect={RECT} />,
       )
       expect(time(twelve.container)).toBe('9:05')
       const twentyFour = render(
-        <WidgetHost definition={clockDefinition} options={{}} page={{ hour12: false }} />,
+        <WidgetBox
+          definition={clockDefinition}
+          options={{}}
+          page={{ hour12: false }}
+          rect={RECT}
+        />,
       )
       expect(time(twentyFour.container)).toBe('21:05')
     } finally {
@@ -42,12 +57,50 @@ describe('WidgetHost', () => {
     }
   })
 
-  it('adds no element of its own: the first thing in the container is the Widget', () => {
+  it('adds one element, the box, and the Widget is its only child', () => {
     const { container } = render(
-      <WidgetHost definition={clockDefinition} options={{}} page={{ hour12: false }} />,
+      <WidgetBox definition={clockDefinition} options={{}} page={{ hour12: false }} rect={RECT} />,
     )
     expect(container.children).toHaveLength(1)
-    expect(container.firstElementChild?.classList.contains('clock')).toBe(true)
+    expect(container.firstElementChild).toBe(box(container))
+    expect(box(container).children).toHaveLength(1)
+    expect(box(container).firstElementChild?.classList.contains('clock')).toBe(true)
+  })
+
+  it('sits in the cells of its place: columns and rows count from 1, as CSS lines do', () => {
+    const { container } = render(
+      <WidgetBox
+        definition={clockDefinition}
+        options={{}}
+        page={{ hour12: false }}
+        rect={{ col: 11, h: 2, row: 1, w: 2 }}
+      />,
+    )
+    const { style } = box(container) as HTMLElement
+    expect(style.gridColumn).toBe('11 / span 2')
+    expect(style.gridRow).toBe('1 / span 2')
+  })
+
+  it('is named for the Widget it holds, so a page and a test can tell the boxes apart', () => {
+    const { container } = render(
+      <WidgetBox definition={clockDefinition} options={{}} page={{ hour12: false }} rect={RECT} />,
+    )
+    expect(box(container).getAttribute('data-widget')).toBe('clock')
+  })
+
+  it('stays when its needs are unmet or the source has no reading: the box is the place, empty', () => {
+    const waiting: WidgetDefinition<{ on: boolean }> = {
+      name: 'Example',
+      needs: [{ id: 'a', met: () => false }],
+      options: [{ control: 'switch', default: false, id: 'on', label: 'On' }],
+      sizes: EXAMPLE_SIZES,
+      type: 'example',
+      View: () => <p class="example" />,
+    }
+    const { container } = render(
+      <WidgetBox definition={waiting} options={{}} page={{ hour12: false }} rect={RECT} />,
+    )
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('reads the options through the definition: a missing one is its default, a bad one costs the Widget its options', () => {
@@ -66,12 +119,20 @@ describe('WidgetHost', () => {
       },
     }
 
-    render(<WidgetHost definition={example} options={{ other: true }} page={{ hour12: false }} />)
     render(
-      <WidgetHost
+      <WidgetBox
+        definition={example}
+        options={{ other: true }}
+        page={{ hour12: false }}
+        rect={RECT}
+      />,
+    )
+    render(
+      <WidgetBox
         definition={example}
         options={{ flag: false, other: 'nope' }}
         page={{ hour12: false }}
+        rect={RECT}
       />,
     )
 
@@ -89,7 +150,7 @@ const settle = (give: () => void) =>
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
 
-describe('WidgetHost with needs', () => {
+describe('WidgetBox with needs', () => {
   type Options = { on: boolean }
 
   /** A Widget made up here: it draws its name, and needs whatever the test gives it. */
@@ -105,10 +166,11 @@ describe('WidgetHost with needs', () => {
 
   it('draws the View in its first render when every need is met at once', () => {
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={example([{ id: 'a', met: () => true }])}
         options={{ on: true }}
         page={page}
+        rect={RECT}
       />,
     )
     expect(container.querySelector('.example')?.textContent).toBe('on')
@@ -116,16 +178,17 @@ describe('WidgetHost with needs', () => {
 
   it('draws nothing while a need is unmet', () => {
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={example([
           { id: 'a', met: () => true },
           { id: 'b', met: () => false },
         ])}
         options={{ on: true }}
         page={page}
+        rect={RECT}
       />,
     )
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('draws nothing while checking, then the View once every need is met', async () => {
@@ -134,9 +197,9 @@ describe('WidgetHost with needs', () => {
       { id: 'a', met: () => new Promise<boolean>((resolve) => (answer = resolve)) },
     ])
     const { container } = render(
-      <WidgetHost definition={definition} options={{ on: true }} page={page} />,
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
     )
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
 
     await settle(() => answer(true))
 
@@ -149,26 +212,30 @@ describe('WidgetHost with needs', () => {
       { id: 'a', met: () => new Promise<boolean>((resolve) => (answer = resolve)) },
     ])
     const { container } = render(
-      <WidgetHost definition={definition} options={{ on: true }} page={page} />,
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
     )
 
     await settle(() => answer(false))
 
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('asks the needs with the options as the definition reads them', () => {
     const met = vi.fn(() => true)
-    render(<WidgetHost definition={example([{ id: 'a', met }])} options={{}} page={page} />)
+    render(
+      <WidgetBox definition={example([{ id: 'a', met }])} options={{}} page={page} rect={RECT} />,
+    )
     expect(met).toHaveBeenCalledWith({ on: false })
   })
 
   it('checks again when the stored options change, and draws once they meet the need', () => {
     const definition = example([{ id: 'on', met: (options) => options.on }])
-    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
-    expect(view.container.children).toHaveLength(0)
+    const view = render(<WidgetBox definition={definition} options={{}} page={page} rect={RECT} />)
+    expect(box(view.container).children).toHaveLength(0)
 
-    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    view.rerender(
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
+    )
 
     expect(view.container.querySelector('.example')?.textContent).toBe('on')
   })
@@ -176,8 +243,10 @@ describe('WidgetHost with needs', () => {
   it('does not check again when it is drawn again with the same options', () => {
     const met = vi.fn(() => true)
     const definition = example([{ id: 'a', met }])
-    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
-    view.rerender(<WidgetHost definition={definition} options={{}} page={{ hour12: true }} />)
+    const view = render(<WidgetBox definition={definition} options={{}} page={page} rect={RECT} />)
+    view.rerender(
+      <WidgetBox definition={definition} options={{}} page={{ hour12: true }} rect={RECT} />,
+    )
     expect(met).toHaveBeenCalledTimes(1)
   })
 
@@ -186,15 +255,17 @@ describe('WidgetHost with needs', () => {
     const definition = example([
       { id: 'a', met: () => new Promise<boolean>((resolve) => answers.push(resolve)) },
     ])
-    const view = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    const view = render(<WidgetBox definition={definition} options={{}} page={page} rect={RECT} />)
     await settle(() => answers[0]!(true))
     expect(view.container.querySelector('.example')?.textContent).toBe('off')
 
-    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    view.rerender(
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
+    )
     expect(view.container.querySelector('.example')?.textContent).toBe('on')
 
     await settle(() => answers[1]!(false))
-    expect(view.container.children).toHaveLength(0)
+    expect(box(view.container).children).toHaveLength(0)
   })
 
   it('hides a Widget whose need became unmet, also while its needs are checked again', async () => {
@@ -206,34 +277,41 @@ describe('WidgetHost with needs', () => {
           options.on ? new Promise<boolean>((resolve) => answers.push(resolve)) : false,
       },
     ])
-    const view = render(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
+    const view = render(
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
+    )
     await settle(() => answers[0]!(true))
-    expect(view.container.children).toHaveLength(1)
+    expect(box(view.container).children).toHaveLength(1)
 
-    view.rerender(<WidgetHost definition={definition} options={{ on: false }} page={page} />)
-    expect(view.container.children).toHaveLength(0)
+    view.rerender(
+      <WidgetBox definition={definition} options={{ on: false }} page={page} rect={RECT} />,
+    )
+    expect(box(view.container).children).toHaveLength(0)
 
-    view.rerender(<WidgetHost definition={definition} options={{ on: true }} page={page} />)
-    expect(view.container.children).toHaveLength(0)
+    view.rerender(
+      <WidgetBox definition={definition} options={{ on: true }} page={page} rect={RECT} />,
+    )
+    expect(box(view.container).children).toHaveLength(0)
 
     await settle(() => answers[1]!(true))
-    expect(view.container.children).toHaveLength(1)
+    expect(box(view.container).children).toHaveLength(1)
   })
 
-  it('adds no element of its own once its needs are met', () => {
+  it('adds only its box once its needs are met', () => {
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={example([{ id: 'a', met: () => true }])}
         options={{ on: true }}
         page={page}
+        rect={RECT}
       />,
     )
-    expect(container.children).toHaveLength(1)
-    expect(container.firstElementChild?.classList.contains('example')).toBe(true)
+    expect(box(container).children).toHaveLength(1)
+    expect(box(container).firstElementChild?.classList.contains('example')).toBe(true)
   })
 })
 
-describe('WidgetHost with a source', () => {
+describe('WidgetBox with a source', () => {
   type Options = { name: string }
 
   /** A source that keeps nothing, so every check fetches. */
@@ -291,40 +369,48 @@ describe('WidgetHost with a source', () => {
   it('draws the View with the reading and what the source carried once it has one', async () => {
     const fetch = vi.fn(() => Promise.resolve(7))
     const definition = example(() => ({ fetch, key: 'k' }))
-    const { container } = render(<WidgetHost definition={definition} options={{}} page={page} />)
-    expect(container.children).toHaveLength(0)
+    const { container } = render(
+      <WidgetBox definition={definition} options={{}} page={page} rect={RECT} />,
+    )
+    expect(box(container).children).toHaveLength(0)
 
     await settleSource()
 
     expect(container.querySelector('.example')?.textContent).toBe('7 context a')
-    expect(container.children).toHaveLength(1)
+    expect(box(container).children).toHaveLength(1)
   })
 
   it('draws nothing while there is no query to load', async () => {
     const { container } = render(
-      <WidgetHost definition={example(() => null)} options={{}} page={page} />,
+      <WidgetBox definition={example(() => null)} options={{}} page={page} rect={RECT} />,
     )
     await settleSource()
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('draws nothing when the source has no reading, because the fetch failed', async () => {
     const fetch = vi.fn(() => Promise.resolve(null))
     const { container } = render(
-      <WidgetHost definition={example(() => ({ fetch, key: 'k' }))} options={{}} page={page} />,
+      <WidgetBox
+        definition={example(() => ({ fetch, key: 'k' }))}
+        options={{}}
+        page={page}
+        rect={RECT}
+      />,
     )
     await settleSource()
     expect(fetch).toHaveBeenCalled()
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('builds the query from the options as the definition reads them', async () => {
     const seen: string[] = []
     render(
-      <WidgetHost
+      <WidgetBox
         definition={example(() => null, undefined, seen)}
         options={{ name: 'not a choice' }}
         page={page}
+        rect={RECT}
       />,
     )
     await settleSource()
@@ -343,7 +429,9 @@ describe('WidgetHost with a source', () => {
       ],
       seen,
     )
-    const { container } = render(<WidgetHost definition={definition} options={{}} page={page} />)
+    const { container } = render(
+      <WidgetBox definition={definition} options={{}} page={page} rect={RECT} />,
+    )
     await settleSource()
     expect(seen).toEqual([])
     expect(fetch).not.toHaveBeenCalled()
@@ -359,16 +447,17 @@ describe('WidgetHost with a source', () => {
     const fetch = vi.fn(() => Promise.resolve(7))
     const seen: string[] = []
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={example(() => ({ fetch, key: 'k' }), [{ id: 'a', met: () => false }], seen)}
         options={{}}
         page={page}
+        rect={RECT}
       />,
     )
     await settleSource()
     expect(seen).toEqual([])
     expect(fetch).not.toHaveBeenCalled()
-    expect(container.children).toHaveLength(0)
+    expect(box(container).children).toHaveLength(0)
   })
 
   it('shows a reading the source has cached without fetching', async () => {
@@ -379,10 +468,11 @@ describe('WidgetHost with a source', () => {
       cache: { get: () => Promise.resolve(cached), set: () => Promise.resolve() },
     }
     const { container } = render(
-      <WidgetHost
+      <WidgetBox
         definition={example(() => ({ fetch, key: 'k' }), undefined, [], cachedSource)}
         options={{}}
         page={page}
+        rect={RECT}
       />,
     )
     await settleSource()
