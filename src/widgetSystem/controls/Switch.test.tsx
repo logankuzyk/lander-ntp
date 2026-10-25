@@ -41,4 +41,22 @@ describe('Switch', () => {
 
     expect(onChange).toHaveBeenCalledWith(false)
   })
+
+  it('is turned off by disabled: it keeps its state, and a click changes nothing', () => {
+    const onChange = vi.fn()
+    render(<Switch checked disabled label="Show seconds" onChange={onChange} />)
+
+    const control = screen.getByRole('switch', { name: 'Show seconds' }) as HTMLInputElement
+    fireEvent.click(control)
+
+    expect(control.disabled).toBe(true)
+    expect(control.checked).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('is enabled unless it is told otherwise', () => {
+    render(<Switch checked label="Show seconds" onChange={vi.fn()} />)
+
+    expect((screen.getByRole('switch') as HTMLInputElement).disabled).toBe(false)
+  })
 })

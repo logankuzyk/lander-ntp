@@ -303,4 +303,31 @@ describe('PlaceControl', () => {
       expect(screen.queryByText('Place')).toBeNull()
     })
   })
+
+  describe('disabled', () => {
+    it('shows the place, with a Change button that does nothing', () => {
+      const onChange = vi.fn()
+      render(
+        <PlaceControl
+          disabled
+          label="Place"
+          onChange={onChange}
+          value={{ followDevice: false, place: VICTORIA }}
+        />,
+      )
+      const change = screen.getByRole('button', { name: 'Change' }) as HTMLButtonElement
+      fireEvent.click(change)
+
+      expect(change.disabled).toBe(true)
+      expect(screen.getByText(/^Victoria/)).toBeTruthy()
+      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('shows the search box without a place, which cannot be typed in', () => {
+      render(<PlaceControl disabled label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+      expect((search() as HTMLInputElement).disabled).toBe(true)
+    })
+  })
 })

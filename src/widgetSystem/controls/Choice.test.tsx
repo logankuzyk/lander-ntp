@@ -45,4 +45,17 @@ describe('Choice', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith('fahrenheit')
   })
+
+  it('is turned off by disabled: it shows the choice and does not open', () => {
+    const onChange = vi.fn()
+    render(<Choice choices={UNITS} disabled label="Units" onChange={onChange} value="celsius" />)
+
+    const menu = screen.getByRole('combobox', { name: 'Units' }) as HTMLButtonElement
+    fireEvent.click(menu)
+
+    expect(menu.disabled).toBe(true)
+    expect(menu.textContent).toContain('Celsius')
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })

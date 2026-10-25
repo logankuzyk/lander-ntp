@@ -194,4 +194,42 @@ describe('OrderedListControl', () => {
     expect([down, upAtTop, downAtEnd]).toEqual([false, false, false])
     expect(other).toBe(true)
   })
+
+  it('is turned off by disabled: nothing moves, shows or hides, and the rows cannot be dragged', () => {
+    const onChange = vi.fn()
+    render(
+      <>
+        <h3 id="points-heading">Points</h3>
+        <OrderedListControl
+          disabled
+          items={ITEMS}
+          labelledBy="points-heading"
+          onChange={onChange}
+          value={LIST}
+        />
+      </>,
+    )
+
+    for (const name of ['Reorder North', 'Show North', 'Show East']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      fireEvent.click(button)
+    }
+    // A drag goes nowhere, so there is nothing to drop.
+    const [north, south] = screen.getAllByRole('listitem')
+    fireEvent.dragStart(north as HTMLElement)
+    fireEvent.dragOver(south as HTMLElement)
+    fireEvent.dragEnd(north as HTMLElement)
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(rows()).toEqual(['North', 'South', 'East', 'West'])
+  })
+
+  it('can be used unless it is told otherwise', () => {
+    draw()
+
+    expect((screen.getByRole('button', { name: 'Show North' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    )
+  })
 })

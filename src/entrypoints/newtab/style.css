@@ -446,7 +446,8 @@ body {
   margin-top: var(--popover-block);
 }
 
-.settings h3 {
+.settings h3,
+.options-form h3 {
   font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -534,7 +535,8 @@ body {
   cursor: pointer;
 }
 
-.settings :focus-visible {
+.settings :focus-visible,
+.options-form :focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
@@ -579,6 +581,41 @@ body {
 .settings__note a {
   color: inherit;
   text-underline-offset: 0.2em;
+}
+
+/* A Widget's options, drawn from its description: stacked as a settings section is. Each option
+   sits in an element that names it, which takes no box of its own. */
+.options-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--popover-gap);
+  min-width: 0;
+}
+
+.options-form__option {
+  display: contents;
+}
+
+/* Options that may not be changed: shown as they are, dimmed, with nothing that looks pressable. */
+.options-form--disabled {
+  opacity: 0.55;
+}
+
+.options-form--disabled .switch,
+.options-form--disabled .dropdown__field,
+.options-form--disabled .fields__row,
+.options-form--disabled .fields__eye,
+.options-form--disabled .settings__link {
+  cursor: default;
+}
+
+/* The heading of an ordered list is set off from the rows above it, as a section would be. */
+.options-form h3 {
+  margin-top: var(--popover-gap);
+}
+
+.options-form .options-form__credit {
+  margin-top: var(--popover-block);
 }
 
 /* A list of rows to drag into order, each with an eye to show or hide it. */

@@ -12,6 +12,7 @@ import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
 import type { Settings, WeatherSettings } from '@/settings/schema'
 import { allowLocation } from '@/weather/consent'
+import { weatherDefinition } from '@/widgets/Weather/definition'
 import { Choice } from '@/widgetSystem/controls/Choice'
 import { PlaceControl } from '@/widgetSystem/controls/PlaceControl'
 import { Switch } from '@/widgetSystem/controls/Switch'
@@ -162,6 +163,8 @@ function ClockSection({ onChange, settings }: SectionProps) {
 
 function WeatherSection({ onChange, settings }: SectionProps) {
   const current = settings.weather
+  // The line is the Weather's own, which its options show; the panel draws it until they replace it.
+  const { credit } = weatherDefinition
   const [, setRefused] = useState(0)
 
   // The place control's following and `enable` wait on the browser's prompts, and the settings
@@ -215,9 +218,9 @@ function WeatherSection({ onChange, settings }: SectionProps) {
           <WeatherFields fields={current.fields} onChange={(fields) => weather({ fields })} />
         </section>
       )}
-      {current.enabled && (
+      {current.enabled && credit && (
         <p class="settings__note settings__credit">
-          <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+          <a href={credit.href}>{credit.text}</a>
         </p>
       )}
     </>

@@ -1,6 +1,8 @@
 import { Dropdown } from './Dropdown'
 
 type SelectProps<T extends string> = {
+  /** Shows the value but does not open. */
+  disabled?: boolean
   labelId: string
   onChange: (value: T) => void
   options: readonly (readonly [T, string])[]
@@ -8,11 +10,17 @@ type SelectProps<T extends string> = {
 }
 
 /** Pick one option. The menu closes on a choice. */
-export function Select<T extends string>({ labelId, onChange, options, value }: SelectProps<T>) {
+export function Select<T extends string>({
+  disabled,
+  labelId,
+  onChange,
+  options,
+  value,
+}: SelectProps<T>) {
   const current = options.find(([id]) => id === value)?.[1] ?? ''
 
   return (
-    <Dropdown labelId={labelId} popup="listbox" value={current}>
+    <Dropdown disabled={disabled} labelId={labelId} popup="listbox" value={current}>
       {(close) =>
         options.map(([id, text]) => (
           <button

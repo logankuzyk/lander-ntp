@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { OptionDescription, WidgetDefinition } from './definition'
-import { defaultOptions, readOptions } from './options'
+import { defaultOptions, readOptions, writeOptions } from './options'
 
 /** A Widget with one option of every control, made up for these tests. */
 const definition: WidgetDefinition<Record<string, unknown>> = {
@@ -236,5 +236,114 @@ describe('a page-wide value option', () => {
     }
 
     expect(option.id).toBe('hour12')
+  })
+})
+
+describe('writeOptions', () => {
+  it('lays the change over what is stored, and gives back the whole object', () => {
+    expect(writeOptions(definition, stored, { flag: true })).toEqual({ ...stored, flag: true })
+    expect(writeOptions(definition, stored, { flag: true, size: 'small' })).toEqual({
+      ...stored,
+      flag: true,
+      size: 'small',
+    })
+  })
+
+  it('changes a place by both its keys at once', () => {
+    const elsewhere = { latitude: 1, longitude: 2, name: 'Elsewhere' }
+
+    expect(writeOptions(definition, stored, { followDevice: true, place: elsewhere })).toEqual({
+      ...stored,
+      followDevice: true,
+      place: elsewhere,
+    })
+  })
+
+  it('keeps every key it does not know, and every key that is valid, as stored', () => {
+    const unknown = { added: { by: 'a newer device' }, count: 2 }
+
+    expect(writeOptions(definition, { ...stored, ...unknown }, { flag: true })).toEqual({
+      ...stored,
+      ...unknown,
+      flag: true,
+    })
+  })
+
+  it('replaces only the key that failed its check with its default, and keeps the rest', () => {
+    const unknown = { added: 1 }
+    const damaged = { ...stored, ...unknown, size: 'huge' }
+
+    expect(writeOptions(definition, damaged, { flag: true })).toEqual({
+      ...stored,
+      ...unknown,
+      flag: true,
+      size: 'small',
+    })
+    // Not the whole Widget back to its defaults, as reading it does.
+    expect(readOptions(definition, damaged)).toEqual({ ...defaultOptions(definition), ...unknown })
+  })
+
+  it('replaces a place whose two keys disagree in type one key at a time', () => {
+    expect(writeOptions(definition, { ...stored, followDevice: 1 }, { flag: true })).toEqual({
+      ...stored,
+      flag: true,
+      followDevice: false,
+    })
+    expect(writeOptions(definition, { ...stored, place: 'Victoria' }, { flag: true })).toEqual({
+      ...stored,
+      flag: true,
+      place: null,
+    })
+  })
+
+  it('replaces an ordered list that does not hold each item once with its default', () => {
+    const [a, b] = stored.rows
+
+    expect(writeOptions(definition, { ...stored, rows: [a, b] }, { flag: true })).toEqual({
+      ...stored,
+      flag: true,
+      rows: defaultOptions(definition).rows,
+    })
+  })
+
+  it('fills in a key that is missing with its default, so what is saved is whole', () => {
+    expect(
+      writeOptions(definition, without(stored, 'size', 'followDevice'), { flag: true }),
+    ).toEqual({ ...stored, flag: true, followDevice: false, size: 'small' })
+  })
+
+  it('writes the change over a key that failed its check, not the default', () => {
+    expect(writeOptions(definition, { ...stored, size: 'huge' }, { size: 'large' })).toEqual({
+      ...stored,
+      size: 'large',
+    })
+  })
+
+  it('starts from the defaults when what is stored is not an object', () => {
+    for (const nothing of [undefined, null, 'clock', 3, []]) {
+      expect(writeOptions(definition, nothing, { flag: false })).toEqual({
+        ...defaultOptions(definition),
+        flag: false,
+      })
+    }
+  })
+
+  it("drops what is stored under a shared option, which is the page's and never the Widget's", () => {
+    expect(writeOptions(definition, { ...stored, hour12: true }, { flag: true })).toEqual({
+      ...stored,
+      flag: true,
+    })
+  })
+
+  it('does not write what is stored, and shares nothing with it', () => {
+    const given = { ...stored, added: { by: 'a newer device' } }
+    const before = structuredClone(given)
+    const written = writeOptions(definition, given, { flag: true })
+
+    expect(given).toEqual(before)
+    expect(written.rows).not.toBe(given.rows)
+    expect(written.place).not.toBe(given.place)
+    expect(written.added).toEqual(given.added)
+    expect(written.added).not.toBe(given.added)
   })
 })

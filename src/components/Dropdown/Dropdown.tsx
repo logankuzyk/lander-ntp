@@ -10,6 +10,8 @@ type DropdownProps = {
   children: (close: () => void) => ComponentChildren
   /** For a field that holds chips rather than a line of text. */
   chips?: boolean
+  /** Shows the value but does not open. */
+  disabled?: boolean
   /** Id of the visible label, which names the field and its menu. */
   labelId: string
   /** `listbox` when the menu is only options; `dialog` when it has other controls as well. */
@@ -24,7 +26,14 @@ type DropdownProps = {
  * it. Arrow keys move between options, and Escape, a click outside or tabbing away close it.
  * Select and MultiSelect fill it in.
  */
-export function Dropdown({ children, chips = false, labelId, popup, value }: DropdownProps) {
+export function Dropdown({
+  children,
+  chips = false,
+  disabled = false,
+  labelId,
+  popup,
+  value,
+}: DropdownProps) {
   const menuId = useId()
   const [open, setOpen] = useState(false)
   const field = useRef<HTMLButtonElement>(null)
@@ -126,6 +135,7 @@ export function Dropdown({ children, chips = false, labelId, popup, value }: Dro
         aria-haspopup={popup}
         aria-labelledby={labelId}
         class={chips ? 'dropdown__field dropdown__field--chips' : 'dropdown__field'}
+        disabled={disabled}
         onClick={() => setOpen((was) => !was)}
         onKeyDown={onFieldKeyDown}
         ref={field}

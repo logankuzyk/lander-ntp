@@ -73,6 +73,8 @@ function useSlide(list: { current: HTMLElement | null }, order: string) {
 }
 
 type OrderedListControlProps<E extends ListEntry> = {
+  /** Shows the list as it is, out of reach: the order and what is shown may not be changed. */
+  disabled?: boolean
   /** The ids the list holds, with what to call each. */
   items: readonly { id: E['id']; label: string }[]
   /** The id of the heading that names the list. */
@@ -87,6 +89,7 @@ type OrderedListControlProps<E extends ListEntry> = {
  * into place, or moved with the arrow keys from their handle; the eye shows and hides a row.
  */
 export function OrderedListControl<E extends ListEntry>({
+  disabled = false,
   items,
   labelledBy,
   onChange,
@@ -166,11 +169,12 @@ export function OrderedListControl<E extends ListEntry>({
           return (
             <li
               class={classes.join(' ')}
-              draggable
+              draggable={!disabled}
               key={field.id}
               onDragEnd={finish}
               onDragOver={(event) => dragOver(event, index)}
               onDragStart={(event) => {
+                if (disabled) return event.preventDefault()
                 // Firefox only starts a drag that carries data.
                 event.dataTransfer?.setData('text/plain', label)
                 if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
@@ -182,6 +186,7 @@ export function OrderedListControl<E extends ListEntry>({
               <button
                 aria-label={`Reorder ${label}`}
                 class="fields__handle"
+                disabled={disabled}
                 onKeyDown={(event) => onHandleKeyDown(event, index)}
                 title="Drag, or use the arrow keys, to reorder"
                 type="button"
@@ -193,6 +198,7 @@ export function OrderedListControl<E extends ListEntry>({
                 aria-label={`Show ${label}`}
                 aria-pressed={field.shown}
                 class="fields__eye"
+                disabled={disabled}
                 onClick={() => onChange(toggle(fields, field.id))}
                 type="button"
               >

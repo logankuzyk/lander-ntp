@@ -7,6 +7,8 @@ import type { PlaceValue } from '../definition'
 import { PlaceSearch } from './PlaceSearch'
 
 type PlaceControlProps = {
+  /** Shows the place, or the search box, but changes nothing. */
+  disabled?: boolean
   /** What people read beside the place once there is one. */
   label: string
   /** Both keys at once, whichever changed: a place picked, or the device followed. */
@@ -23,7 +25,7 @@ type PlaceControlProps = {
  * the position itself goes to local storage, where the widget picks it up, and the value only
  * records that the device is followed.
  */
-export function PlaceControl({ label, onChange, value }: PlaceControlProps) {
+export function PlaceControl({ disabled = false, label, onChange, value }: PlaceControlProps) {
   const [changing, setChanging] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
 
@@ -54,13 +56,19 @@ export function PlaceControl({ label, onChange, value }: PlaceControlProps) {
       <span>{label}</span>
       <span>
         {value.followDevice ? CURRENT_LOCATION : value.place?.name}{' '}
-        <button class="settings__link" onClick={() => setChanging(true)} type="button">
+        <button
+          class="settings__link"
+          disabled={disabled}
+          onClick={() => setChanging(true)}
+          type="button"
+        >
           Change
         </button>
       </span>
     </div>
   ) : (
     <PlaceSearch
+      disabled={disabled}
       locateFailed={locateFailed}
       onLocate={() => void follow()}
       onSelect={(place) => {

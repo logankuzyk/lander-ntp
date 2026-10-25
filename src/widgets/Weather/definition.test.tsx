@@ -159,6 +159,19 @@ describe('the Weather definition', () => {
     )
   })
 
+  it('marks "24-hour time" as the opposite of the hour12 it shows, so a form inverts it', () => {
+    expect(weatherDefinition.options.find((option) => option.id === 'hour12')).toMatchObject({
+      invert: true,
+    })
+  })
+
+  it('credits Open-Meteo at the foot of its options', () => {
+    expect(weatherDefinition.credit).toEqual({
+      href: 'https://open-meteo.com/',
+      text: 'Weather data by Open-Meteo.com',
+    })
+  })
+
   it("words its options as the settings panel does, in the panel's order", () => {
     expect(weatherDefinition.options.map(({ id, label }) => [id, label])).toEqual([
       ['place', 'Place'],
