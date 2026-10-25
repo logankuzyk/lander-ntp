@@ -40,6 +40,13 @@ export const clockDefinition: WidgetDefinition<ClockOptions> = {
       label: 'Show seconds',
     },
   ],
+  // First guesses (LR-16): W8 fixes the smallest and largest by measuring.
+  sizes: {
+    largest: { h: 4, w: 8 },
+    smallest: { h: 2, w: 3 },
+    // Seconds need six columns. Both widths are even, so a new Clock is centred (LR-12).
+    starting: (options) => ({ h: 2, w: options.showSeconds ? 6 : 4 }),
+  },
   type: 'clock',
   View: ClockView,
 }

@@ -1,6 +1,7 @@
 import { act, render } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import { EXAMPLE_SIZES } from '@/test/fixtures'
 import { clockDefinition } from '@/widgets/Clock/definition'
 
 import type { WidgetDefinition } from './definition'
@@ -57,6 +58,7 @@ describe('WidgetHost', () => {
         { control: 'switch', default: true, id: 'flag', label: 'Flag' },
         { control: 'switch', default: false, id: 'other', label: 'Other' },
       ],
+      sizes: EXAMPLE_SIZES,
       type: 'example',
       View: ({ options }) => {
         seen.push(options)
@@ -95,6 +97,7 @@ describe('WidgetHost with needs', () => {
     name: 'Example',
     needs,
     options: [{ control: 'switch', default: false, id: 'on', label: 'On' }],
+    sizes: EXAMPLE_SIZES,
     type: 'example',
     View: ({ options }) => <p class="example">{options.on ? 'on' : 'off'}</p>,
   })
@@ -262,6 +265,7 @@ describe('WidgetHost with a source', () => {
         label: 'Name',
       },
     ],
+    sizes: EXAMPLE_SIZES,
     source: {
       source: from,
       useQuery: (options) => {
