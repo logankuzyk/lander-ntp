@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { checkLayout } from '@/layout/check'
+import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
+import { layoutItem } from '@/layout/storage'
+import type { Layout } from '@/layout/types'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
@@ -98,6 +102,19 @@ const VICTORIA = { latitude: 48.4284, longitude: -123.3656, name: 'Victoria' }
 const changeSettings = (change: (settings: Settings) => Settings) => async () =>
   settingsItem.setValue(change(await settingsItem.getValue()))
 
+/** The stored Layout of LR-15's example, through the real item: a Clock and a Weather. */
+const storeExampleLayout = async (): Promise<Layout> => {
+  await layoutItem.setValue(checkLayout(exampleLayout()))
+  const layout = await layoutItem.getValue()
+  if (!layout) throw new Error('the Layout was not stored')
+  return layout
+}
+
+/** The Layout the real item reads back, with `change` made to it, stored through the item. */
+const changeLayout = (change: (layout: Layout) => Layout) => async () => {
+  await layoutItem.setValue(change(await storeExampleLayout()))
+}
+
 const changeOnboarding = (change: (record: Onboarding) => Onboarding) => async () =>
   onboardingItem.setValue(change((await onboardingItem.getValue()) ?? SEED_ONBOARDING))
 
@@ -111,6 +128,11 @@ type PhaseTwoWrite = {
    * The write starts from no synced onboarding record, so it has no `dismissed` ids to keep.
    */
   fromNoRecord?: boolean
+  /**
+   * The write is to `sync:layout` and nothing else: `sync:settings` and `sync:onboarding` are
+   * exactly as they were, and the Layout is stored with `v: 1`.
+   */
+  layoutOnly?: boolean
   /**
    * A write only the settings panel's Clock and Weather tabs make. W17 deletes those tabs, and
    * deletes these rows with them: from then on nothing may change `clock.*` other than
@@ -143,8 +165,9 @@ type PhaseTwoWrite = {
  * what v0.2.3 already writes (photos, dim, font, as the panel does now). It never removes a
  * block, never gives a value v0.2.3 does not know, never adds a key inside a block. Removing a
  * Clock writes only `sync:layout`; it never writes `clock.enabled`. `sync:onboarding` only gains
- * ids in `dismissed`. `sync:layout` is not here: v0.2.3 never reads it (its own row arrives
- * with the PR that adds it).
+ * ids in `dismissed`. `sync:layout` is written only by the rows marked `layoutOnly`, which must
+ * leave the settings and onboarding exactly as they were; v0.2.3 never reads or writes it (see
+ * the tests below the table).
  *
  * `recordInstall('install')` writes only `local:onboarding`, which is not synced, so it is
  * correctly not a row. The "answer the welcome" row starts from a synced record, where a real
@@ -261,6 +284,46 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     },
   },
   {
+    layoutOnly: true,
+    name: 'the first change stores the whole Layout (sync:layout)',
+    write: async () => {
+      await layoutItem.setValue(checkLayout(exampleLayout()))
+    },
+  },
+  {
+    layoutOnly: true,
+    name: 'remove the Clock: only sync:layout is written, never clock.enabled',
+    write: changeLayout((layout) => ({
+      ...layout,
+      widgets: layout.widgets.filter(
+        (widget) => widget.kind === 'known' && widget.placed.type !== 'clock',
+      ),
+    })),
+  },
+  {
+    layoutOnly: true,
+    name: 'delete every Widget: an empty Layout is stored, not removed',
+    write: changeLayout((layout) => ({ ...layout, widgets: [] })),
+  },
+  {
+    layoutOnly: true,
+    name: 'change a Widget’s options (sync:layout; the Clock’s blocks in settings stay frozen)',
+    write: changeLayout((layout) => ({
+      ...layout,
+      widgets: layout.widgets.map((widget) =>
+        widget.kind === 'known' && widget.placed.type === 'clock'
+          ? {
+              ...widget,
+              placed: {
+                ...widget.placed,
+                options: { ...widget.placed.options, showDate: true, showSeconds: true },
+              },
+            }
+          : widget,
+      ),
+    })),
+  },
+  {
     name: 'answer the welcome',
     write: changeOnboarding((record) => ({ ...record, welcomed: true })),
   },
@@ -315,7 +378,7 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
 
   it.each(PHASE_2_WRITES)(
     '$name',
-    async ({ changes, fromNoRecord, legacyPanel, stampsVersion, write }) => {
+    async ({ changes, fromNoRecord, layoutOnly, legacyPanel, stampsVersion, write }) => {
       await write()
       const stored = await fakeBrowser.storage.sync.get(null)
 
@@ -326,6 +389,12 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       expect(disallowed).toEqual([])
       if (isObject(stored.settings) && 'v' in stored.settings) expect(stored.settings.v).toBe(1)
       if (stampsVersion) expect(stored.settings).toHaveProperty('v', 1)
+      // Removing a Clock, say, is a change to the Layout alone.
+      if (layoutOnly) {
+        expect(stored.settings).toEqual(SEED)
+        expect(stored.onboarding).toEqual(SEED_ONBOARDING)
+        expect(stored.layout).toHaveProperty('v', 1)
+      }
       // `dismissed` only gains ids.
       if (!fromNoRecord) {
         expect((stored.onboarding as Onboarding).dismissed).toEqual(
@@ -348,4 +417,44 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       expect(onboarding).toEqual(stored.onboarding)
     },
   )
+})
+
+describe('sync:layout, which v0.2.3 never reads', () => {
+  const v023Settings = { ...SETTINGS_0_2_3, v: 1 }
+
+  it('does not change what v0.2.3 draws, however the Layout is stored', async () => {
+    const without = await asV023({ settings: v023Settings })
+
+    for (const layout of [
+      exampleLayout(),
+      { v: 2, whatever: ['a', 'newer', 'shape'], widgets: [] },
+      'not even an object',
+      { v: 1 },
+    ]) {
+      const withLayout = await asV023({ layout, settings: v023Settings })
+
+      expect(withLayout.fellBack).toBe(false)
+      expect(withLayout.settings).toEqual(without.settings)
+      expect(withLayout.onboarding).toEqual(without.onboarding)
+    }
+  })
+
+  it('is left exactly as it is by a save of v0.2.3’s own', async () => {
+    const layout = JSON.parse(EXAMPLE_LAYOUT_JSON) as unknown
+
+    const after = await saveLikeV023({ layout, settings: v023Settings }, { font: 'system' })
+
+    expect(JSON.stringify(after.raw.layout)).toBe(EXAMPLE_LAYOUT_JSON)
+    expect(after.settings).toEqual({ ...v023Settings, font: 'system' })
+    expect(after.fellBack).toBe(false)
+  })
+
+  it('is left alone when v0.2.3 resets to the defaults, as it would for settings it cannot read', async () => {
+    const layout = { v: 2, widgets: [] }
+    const unreadable = { ...v023Settings, weather: { ...SETTINGS_0_2_3.weather, unit: 'kelvin' } }
+
+    const after = await saveLikeV023({ layout, settings: unreadable }, { dim: false })
+
+    expect(after.raw.layout).toEqual(layout)
+  })
 })

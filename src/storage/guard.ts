@@ -47,6 +47,17 @@ type GuardedItemOptions<T> = {
   check: (raw: unknown) => T
   fallback: T
   key: `sync:${string}`
+  /**
+   * What is written for a value, when that is not the value itself. A value that is read as a
+   * checked structure is stored as plain data.
+   */
+  serialize?: (value: T) => unknown
+  /**
+   * A stored value of the version this code knows, but of a shape it can make nothing of, which
+   * `check` would replace with something else. It is treated like a newer one: read-only, and
+   * never written over, so nothing in it is lost.
+   */
+  unreadable?: (raw: unknown) => boolean
   /** The version this code knows. */
   version: number
 }
@@ -59,6 +70,8 @@ export function defineGuardedItem<T>({
   check,
   fallback,
   key,
+  serialize = (value) => value,
+  unreadable = () => false,
   version,
 }: GuardedItemOptions<T>): GuardedItem<T> {
   // The raw value, unchecked: the guard needs the version as stored, not as the check reads it.
@@ -66,7 +79,7 @@ export function defineGuardedItem<T>({
 
   const newerThanKnown = (stored: unknown) => {
     const found = versionOf(stored)
-    return found === 'unreadable' || found > version
+    return found === 'unreadable' || found > version || (stored !== null && unreadable(stored))
   }
   const readOf = (stored: unknown): GuardedRead<T> => ({
     newer: newerThanKnown(stored),
@@ -80,7 +93,7 @@ export function defineGuardedItem<T>({
     watch: (callback) => raw.watch((stored) => callback(stored === null ? null : readOf(stored))),
     write: async (value) => {
       if (newerThanKnown(await raw.getValue())) throw new NewerVersionError(key)
-      await raw.setValue(value)
+      await raw.setValue(serialize(value))
     },
   }
 }
