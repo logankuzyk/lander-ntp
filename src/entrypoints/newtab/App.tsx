@@ -1,8 +1,9 @@
-import { useCallback, useLayoutEffect, useState } from 'preact/hooks'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
+import { Notice } from '@/components/Notice/Notice'
 import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
 import { PhotoInfo } from '@/components/PhotoInfo/PhotoInfo'
 import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/SettingsPanel'
@@ -27,9 +28,23 @@ type SettingsEntry = { section: SectionId; tour: boolean }
 
 const FROM_GEAR: SettingsEntry = { section: 'photos', tour: false }
 
+/** How long "Couldn't save that" stays, unless it is dismissed or a save goes through first. */
+const SAVE_FAILED_MS = 8_000
+
 export function App() {
-  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem)
-  const [onboarding, setOnboarding] = useStorageItem(onboardingItem)
+  // Whether to say so, and how many have failed: each failure starts the 8 seconds over.
+  const [saveFailed, setSaveFailed] = useState(false)
+  const [saveFailures, setSaveFailures] = useState(0)
+  // From either item: the next save that goes through, whichever it is, clears the line.
+  const saveOutcome = {
+    onRejected: () => {
+      setSaveFailed(true)
+      setSaveFailures((count) => count + 1)
+    },
+    onSaved: () => setSaveFailed(false),
+  }
+  const [settings, setSettings, settingsLoaded] = useStorageItem(settingsItem, saveOutcome)
+  const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
   const [photoLoading, setPhotoLoading] = useState(false)
@@ -63,6 +78,12 @@ export function App() {
       }
     })()
   }
+
+  useEffect(() => {
+    if (saveFailures === 0) return
+    const timer = setTimeout(() => setSaveFailed(false), SAVE_FAILED_MS)
+    return () => clearTimeout(timer)
+  }, [saveFailures])
 
   // Before paint, so the clock is never drawn in one font and then redrawn in another.
   useLayoutEffect(() => {
@@ -138,6 +159,10 @@ export function App() {
           }}
         />
       )}
+      <Notice
+        message={saveFailed ? "Couldn't save that. Try again in a minute." : null}
+        onDismiss={() => setSaveFailed(false)}
+      />
       <Controls
         busy={photoLoading}
         infoOpen={popover === 'info'}
