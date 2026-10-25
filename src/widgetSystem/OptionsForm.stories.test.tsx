@@ -38,11 +38,11 @@ describe('options form stories', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Show seconds' }))
     await waitFor(() => expect(checked('Show seconds')).toBe(true))
-    expect((await settingsItem.getValue()).clock.showSeconds).toBe(true)
+    await waitFor(async () => expect((await settingsItem.getValue()).clock.showSeconds).toBe(true))
 
     fireEvent.click(screen.getByRole('switch', { name: '24-hour time' }))
     await waitFor(() => expect(checked('24-hour time')).toBe(false))
-    expect((await settingsItem.getValue()).clock.hour12).toBe(true)
+    await waitFor(async () => expect((await settingsItem.getValue()).clock.hour12).toBe(true))
   })
 
   it('Weather draws every option, with the place named and the credit', async () => {
@@ -66,8 +66,11 @@ describe('options form stories', () => {
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Units' }).textContent).toContain('Fahrenheit'),
     )
+    // Saved one at a time, after the form has shown the change.
+    await waitFor(async () =>
+      expect((await settingsItem.getValue()).weather.unit).toBe('fahrenheit'),
+    )
     const { weather } = await settingsItem.getValue()
-    expect(weather.unit).toBe('fahrenheit')
     expect(weather.place?.name).toBe('Victoria')
   })
 

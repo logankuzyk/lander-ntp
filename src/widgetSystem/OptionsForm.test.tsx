@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { EXAMPLE_SIZES } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
@@ -47,6 +48,7 @@ const example: WidgetDefinition<Record<string, unknown>> = {
     },
     { control: 'switch', id: 'hour12', label: 'Twelve-hour time', shared: 'hour12' },
   ],
+  sizes: EXAMPLE_SIZES,
   type: 'example',
   View: () => null,
 }

@@ -22,6 +22,7 @@ const SETTINGS: Settings = {
   dim: true,
   font: 'system',
   photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
+  v: 1,
   weather: {
     enabled: true,
     fields: [
