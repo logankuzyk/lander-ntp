@@ -1,4 +1,6 @@
-import { drawnRects, type DrawnWidget } from '@/layout/geometry'
+import type { JSX } from 'preact'
+
+import { COLS, drawnRects, type DrawnWidget, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 import type { PageValues } from '@/widgetSystem/definition'
 import { Box, WidgetBox } from '@/widgetSystem/WidgetBox'
@@ -26,7 +28,11 @@ const inReadingOrder = (a: DrawnWidget, b: DrawnWidget) =>
  */
 export function Grid({ layout, page }: GridProps) {
   return (
-    <div class="grid">
+    // The styles lay the cells out from these, so the Grid's size is geometry.ts's alone.
+    <div
+      class="grid"
+      style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
+    >
       {drawnRects(layout)
         .sort(inReadingOrder)
         .map(({ rect, widget }) =>

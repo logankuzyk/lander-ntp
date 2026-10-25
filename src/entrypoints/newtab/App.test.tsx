@@ -2,11 +2,12 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
-import { makeManifest, makePhoto } from '@/test/fixtures'
+import { makeManifest, makePhoto, makeWeather } from '@/test/fixtures'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
 
@@ -411,6 +412,13 @@ describe('App, on the Grid', () => {
     weather: { ...DEFAULT_SETTINGS.weather, ...settings.weather },
   })
 
+  /** A reading cached for the place, so a Weather on the page asks nothing of the forecast. */
+  const cacheReading = () =>
+    weatherSource.cache.set(cacheKey(PLACE, 'celsius'), {
+      data: makeWeather(),
+      fetchedAt: Date.now(),
+    })
+
   /** Waits until the page has drawn the Grid, which it does once settings and Layout are known. */
   const drawn = async (container: ParentNode) => {
     await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
@@ -427,7 +435,10 @@ describe('App, on the Grid', () => {
   it('draws no Grid before the stored settings and Layout are known', async () => {
     await seedPhotos()
     // A Weather stored in the settings: drawn from the defaults first, it would not be there.
-    await settingsItem.setValue(settingsWith({ weather: { enabled: true, place: PLACE } }))
+    await settingsItem.setValue(
+      settingsWith({ weather: { enabled: true, place: PLACE, unit: 'celsius' } }),
+    )
+    await cacheReading()
     const { container } = render(<App />)
 
     expect(container.querySelector('.grid')).toBeNull()
@@ -437,11 +448,55 @@ describe('App, on the Grid', () => {
     expect(boxes(container).map(([type]) => type)).toEqual(['weather', 'clock'])
   })
 
+  /** Holds a stored item's read until `release` is called, then lets it answer as it would. */
+  const holdRead = <T,>(item: { read: () => Promise<T> }) => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const read = item.read.bind(item)
+    vi.spyOn(item, 'read').mockImplementation(async () => {
+      await held
+      return read()
+    })
+    return release
+  }
+
+  /** Long enough for everything that is not held to have arrived and been drawn. */
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 30)))
+
+  it('draws no Grid while the stored Layout is still being read, however soon the settings arrive', async () => {
+    await seedPhotos()
+    const release = holdRead(layoutItem)
+    const { container } = render(<App />)
+
+    await settle()
+    // The settings are in (the photo credit and controls are not held back), the Layout is not.
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
+    expect(container.querySelector('.grid')).toBeNull()
+
+    release()
+    await drawn(container)
+    vi.restoreAllMocks()
+  })
+
+  it('draws no Grid while the stored settings are still being read, however soon the Layout arrives', async () => {
+    await seedPhotos()
+    const release = holdRead(settingsItem)
+    const { container } = render(<App />)
+
+    await settle()
+    expect(container.querySelector('.grid')).toBeNull()
+
+    release()
+    await drawn(container)
+    vi.restoreAllMocks()
+  })
+
   it('draws the Weather of an updated user at column 11, row 1, and the Clock where it was', async () => {
     await seedPhotos()
     await settingsItem.setValue(
       settingsWith({ weather: { enabled: true, place: PLACE, unit: 'celsius' } }),
     )
+    await cacheReading()
     const { container } = render(<App />)
 
     await drawn(container)

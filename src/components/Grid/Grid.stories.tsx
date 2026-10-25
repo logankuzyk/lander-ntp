@@ -4,12 +4,12 @@ import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 // The whole page, as `App` stories are: no `withPage`. Each story seeds the storage it needs, and
-// makes no request. The window is 1440 by 900; the toolbar's Viewport menu has 1366 by 768, the
-// other size to look at. The seeds are in PAGE_SEEDS, where src/test/seed.test.tsx checks each
+// makes no request. They fill the window; the toolbar's Viewport menu has the two sizes to look
+// at, 1440 by 900 and 1366 by 768 (a story that sets `globals.viewport` would lock the menu, so
+// none does). The seeds are in PAGE_SEEDS, where src/test/seed.test.tsx checks each
 // draws what its story says.
 const meta = {
   component: App,
-  globals: { viewport: { isRotated: false, value: 'laptop1440' } },
   title: 'Grid',
 } satisfies Meta<typeof App>
 export default meta
