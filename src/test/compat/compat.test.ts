@@ -241,15 +241,23 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     },
   },
   {
-    changes: { dim: true },
+    changes: { photos: { ...SEED.photos, pinnedId: 'p19' } },
     name: 'a burst of saves through the write queue (W2: it writes nothing new; the last value wins)',
     write: async () => {
-      const queue = createWriteQueue((value: Settings) => settingsItem.setValue(value))
+      const writes: (string | null)[] = []
+      const queue = createWriteQueue(async (value: Settings) => {
+        writes.push(value.photos.pinnedId)
+        await settingsItem.setValue(value)
+      })
       const base = await settingsItem.getValue()
-      // Twenty flicks of Dim, the way the page makes them: the last of them leaves it on.
+      // Twenty pins in a row, the way the page makes them, each a different photo: the first goes
+      // straight out, and of the nineteen behind it only the last is written.
       await Promise.all(
-        Array.from({ length: 20 }, (_, i) => queue.save({ ...base, dim: i % 2 === 1 })),
+        Array.from({ length: 20 }, (_, i) =>
+          queue.save({ ...base, photos: { ...base.photos, pinnedId: `p${i}` } }),
+        ),
       )
+      expect(writes).toEqual(['p0', 'p19'])
     },
   },
   {

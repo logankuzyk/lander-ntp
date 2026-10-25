@@ -539,6 +539,11 @@ body {
   opacity: 0.55;
 }
 
+/* A disabled fieldset leaves draggable rows, which are not form controls, alone. */
+.settings__fieldset:disabled .fields__row {
+  pointer-events: none;
+}
+
 .settings__link {
   padding: 0;
   border: 0;

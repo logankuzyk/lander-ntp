@@ -17,8 +17,18 @@ export type StorageItemLike<T> = {
   watch: (callback: (value: T | null, newer?: boolean) => void) => () => void
 }
 
-const readOf = async <T>(item: StorageItemLike<T>) =>
-  item.read ? item.read() : { newer: false, value: await item.getValue() }
+/**
+ * Calls `then` with what is stored. It is the stored value's own promise that `then` hangs on,
+ * with no hop in between: a change that lands in the same tick as the read has to beat it
+ * (see the test "keeps a change that lands before the first read resolves").
+ */
+const whenRead = <T>(
+  item: StorageItemLike<T>,
+  then: (stored: { newer: boolean; value: T }) => void,
+) =>
+  item.read
+    ? item.read().then(then)
+    : item.getValue().then((value) => then({ newer: false, value }))
 
 /** What to do about a save, besides showing the new value at once. */
 export type StorageItemOptions = {
@@ -88,8 +98,7 @@ export function useStorageItem<T>(
       }
       setLoaded(true)
     }
-    if (item.read) void item.read().then(arrived)
-    else void item.getValue().then((stored) => arrived({ newer: false, value: stored }))
+    void whenRead(item, arrived)
     const unwatch = item.watch((next, newer) => {
       changed = true
       setValue(next ?? item.fallback)
@@ -122,8 +131,9 @@ export function useStorageItem<T>(
         // Put back what the browser still holds, unless a newer change has taken over: that one
         // is on its way to storage, and puts itself back if it fails too.
         try {
-          const stored = await readOf(item)
-          if (entry.latest === mine) setValue(stored.value)
+          await whenRead(item, (stored) => {
+            if (entry.latest === mine) setValue(stored.value)
+          })
         } catch {
           // Nothing to put back from: leave what is shown.
         }

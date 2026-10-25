@@ -291,6 +291,7 @@ export function SettingsPanel({
   tour = [],
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
+  const readOnlyId = useId()
   const { close, container } = usePopover(onClose)
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
@@ -369,7 +370,11 @@ export function SettingsPanel({
         </button>
       </header>
 
-      {readOnly && <p class="settings__note settings__readonly">{UPDATE_TO_CHANGE}</p>}
+      {readOnly && (
+        <p class="settings__note settings__readonly" id={readOnlyId}>
+          {UPDATE_TO_CHANGE}
+        </p>
+      )}
 
       <div class="settings__layout">
         <div aria-orientation="vertical" class="settings__nav" role="tablist">
@@ -402,7 +407,11 @@ export function SettingsPanel({
           role="tabpanel"
         >
           {/* Switches every control in the section off at once; the tabs stay, to look around. */}
-          <fieldset class="settings__fieldset" disabled={readOnly}>
+          <fieldset
+            aria-describedby={readOnly ? readOnlyId : undefined}
+            class="settings__fieldset"
+            disabled={readOnly}
+          >
             {section === 'photos' && (
               <PhotosSection
                 currentId={currentId}
