@@ -133,3 +133,55 @@ describe('defineGuardedItem', () => {
     ])
   })
 })
+
+describe('defineGuardedItem, for a value the check can make nothing of', () => {
+  /** The item guards a name; a `name` that is not a string cannot be read at all. */
+  const strict = () =>
+    defineGuardedItem<Thing>({
+      check: (raw) => ({ name: String((raw as { name?: unknown }).name ?? ''), v: 1 }),
+      fallback: FALLBACK,
+      key: 'sync:thing',
+      unreadable: (raw) => typeof (raw as { name?: unknown } | null)?.name !== 'string',
+      version: 1,
+    })
+
+  it('treats it as newer, so it is read-only and never written over', async () => {
+    const item = strict()
+    await fakeBrowser.storage.sync.set({ thing: { name: 7 } })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+    expect((await item.read()).newer).toBe(true)
+    await expect(item.write({ name: 'mine', v: 1 })).rejects.toBeInstanceOf(NewerVersionError)
+
+    expect(set).not.toHaveBeenCalled()
+    expect(await stored()).toEqual({ name: 7 })
+  })
+
+  it('writes over what it can read', async () => {
+    const item = strict()
+    await fakeBrowser.storage.sync.set({ thing: { name: 'fine' } })
+
+    expect((await item.read()).newer).toBe(false)
+    await item.write({ name: 'mine', v: 1 })
+
+    expect(await stored()).toEqual({ name: 'mine', v: 1 })
+  })
+})
+
+describe('defineGuardedItem, with a value stored in another shape than it is read as', () => {
+  it('writes what `serialize` makes of the value, and keeps the fallback null when nothing is stored', async () => {
+    const item = defineGuardedItem<{ name: string } | null>({
+      check: (raw) => ({ name: (raw as { stored: string }).stored }),
+      fallback: null,
+      key: 'sync:thing',
+      serialize: (value) => ({ stored: value?.name, v: 1 }),
+      version: 1,
+    })
+    expect(await item.read()).toEqual({ newer: false, value: null })
+
+    await item.write({ name: 'mine' })
+
+    expect(await stored()).toEqual({ stored: 'mine', v: 1 })
+    expect((await item.read()).value).toEqual({ name: 'mine' })
+  })
+})

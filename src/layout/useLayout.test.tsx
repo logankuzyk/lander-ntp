@@ -1,0 +1,301 @@
+import { act, render, waitFor } from '@testing-library/preact'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
+
+import { weatherDefinition } from '@/widgets/Weather/definition'
+import { defaultOptions } from '@/widgetSystem/options'
+
+import { layoutWidget } from './check'
+import {
+  EXAMPLE_LAYOUT_JSON,
+  exampleLayout,
+  knownAt,
+  storedAt,
+  syncBytes,
+  widgetAt,
+} from './fixtures'
+import type { Layout, PlacedWidget, StoredLayout } from './types'
+import { useLayout } from './useLayout'
+
+afterEach(() => vi.restoreAllMocks())
+
+/** Draws nothing; the test holds on to what the hook gives, and reads it with `current()`. */
+function mount(options?: { onRejected?: () => void }) {
+  const api = {} as ReturnType<typeof useLayout>
+  function Probe() {
+    Object.assign(api, useLayout(options))
+    return null
+  }
+  render(<Probe />)
+  return {
+    commit: (next: Layout) => act(() => api.commit(next)),
+    current: () => api,
+  }
+}
+
+/** What the sync area holds under `layout`, as the browser keeps it. */
+const stored = async () =>
+  (await fakeBrowser.storage.sync.get('layout')).layout as StoredLayout | undefined
+
+/** What is stored: it must be there. */
+const storedLayout = async (): Promise<StoredLayout> => {
+  const layout = await stored()
+  if (!layout) throw new Error('nothing is stored')
+  return layout
+}
+
+/** The Layout as the page holds it once it has been read. */
+const loaded = async (page: ReturnType<typeof mount>): Promise<Layout> => {
+  await waitFor(() => expect(page.current().loaded).toBe(true))
+  const { layout } = page.current()
+  if (!layout) throw new Error('no Layout was stored')
+  return layout
+}
+
+const placedAt = (layout: Layout, index: number) => knownAt(layout, index).placed
+
+/** The Layout with the Widget at `index` replaced, as a change of its options would make it. */
+const withPlaced = (layout: Layout, index: number, placed: PlacedWidget): Layout => ({
+  ...layout,
+  widgets: layout.widgets.map((widget, i) => (i === index ? layoutWidget(placed) : widget)),
+})
+
+describe('useLayout', () => {
+  it('has no Layout when none is stored, and says it has looked', async () => {
+    const page = mount()
+
+    await waitFor(() => expect(page.current().loaded).toBe(true))
+
+    expect(page.current().layout).toBeNull()
+    expect(page.current().readOnly).toBe(false)
+    expect(await stored()).toBeUndefined()
+  })
+
+  it('reads the stored Layout and writes nothing', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const page = mount()
+
+    const layout = await loaded(page)
+
+    expect(layout.widgets.map((widget) => widget.kind)).toEqual(['known', 'known'])
+    expect(page.current().readOnly).toBe(false)
+    expect(set).not.toHaveBeenCalled()
+  })
+
+  it('stores a Layout it has read and not changed byte for byte, for the example in LR-15', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const page = mount()
+    const layout = await loaded(page)
+
+    await page.commit(layout)
+
+    await waitFor(async () => expect(JSON.stringify(await stored())).toBe(EXAMPLE_LAYOUT_JSON))
+    expect(syncBytes('layout', await stored())).toBe(480)
+  })
+
+  it('keeps a top-level key, an option key and a Widget type it does not know through a commit', async () => {
+    const raw = {
+      ...exampleLayout(),
+      snapTo: 'grid',
+      widgets: [
+        ...exampleLayout().widgets,
+        {
+          col: 1,
+          h: 2,
+          id: 'zz9y8x7w',
+          options: { limit: 5 },
+          row: 7,
+          type: 'bookmarks',
+          w: 3,
+        },
+      ],
+    }
+    storedAt(raw, 0).options.hands = 'analog'
+    await fakeBrowser.storage.sync.set({ layout: raw })
+    const page = mount()
+
+    await page.commit(await loaded(page))
+
+    await waitFor(async () => expect(await stored()).toEqual(raw))
+  })
+
+  it('stores a Layout with no Widgets as such: deleting everything is a Layout, not no Layout', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const page = mount()
+    const layout = await loaded(page)
+
+    await page.commit({ ...layout, widgets: [] })
+
+    await waitFor(async () => expect(await stored()).toEqual({ v: 1, widgets: [] }))
+  })
+
+  it('draws options that fail their check as defaults, and changes the stored ones only when that Widget’s options are committed', async () => {
+    const raw = exampleLayout()
+    const weather = storedAt(raw, 1)
+    weather.options = { ...weather.options, unit: 'kelvin' }
+    await fakeBrowser.storage.sync.set({ layout: raw })
+    const page = mount()
+    const layout = await loaded(page)
+
+    // Drawn as the Widget's defaults.
+    expect(knownAt(layout, 1).options).toEqual(defaultOptions(weatherDefinition))
+
+    // A commit of something else leaves the stored options as they are.
+    await page.commit({ ...layout, widgets: [...layout.widgets] })
+    await waitFor(async () => expect(JSON.stringify(await stored())).toBe(JSON.stringify(raw)))
+    expect(storedAt(await storedLayout(), 1).options.unit).toBe('kelvin')
+
+    // Committing this Widget's options writes them.
+    await page.commit(
+      withPlaced(layout, 1, {
+        ...placedAt(layout, 1),
+        options: { ...placedAt(layout, 1).options, unit: 'fahrenheit' },
+      }),
+    )
+    await waitFor(async () =>
+      expect(storedAt(await storedLayout(), 1).options.unit).toBe('fahrenheit'),
+    )
+  })
+
+  it('loads nine Widgets', async () => {
+    const widgets = Array.from({ length: 9 }, (_, i) => ({
+      ...exampleLayout().widgets[0],
+      id: `clock00${i}`,
+      row: i + 1,
+    }))
+    await fakeBrowser.storage.sync.set({ layout: { v: 1, widgets } })
+    const page = mount()
+
+    const layout = await loaded(page)
+
+    expect(layout.widgets).toHaveLength(9)
+    expect(layout.widgets.every((widget) => widget.kind === 'known')).toBe(true)
+  })
+
+  it('follows a Layout that arrives from another tab or device, and one that is removed', async () => {
+    const page = mount()
+    await waitFor(() => expect(page.current().loaded).toBe(true))
+
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    await waitFor(() => expect(page.current().layout?.widgets).toHaveLength(2))
+
+    await fakeBrowser.storage.sync.remove('layout')
+    await waitFor(() => expect(page.current().layout).toBeNull())
+  })
+
+  it('saves one change at a time: twenty commits are two writes, the last carrying the final Layout', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const page = mount()
+    const layout = await loaded(page)
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+    await act(async () => {
+      for (let i = 0; i < 20; i++) {
+        page.current().commit(withPlaced(layout, 0, { ...placedAt(layout, 0), col: (i % 8) + 1 }))
+      }
+    })
+
+    await waitFor(async () => expect(storedAt(await storedLayout(), 0).col).toBe(4))
+    expect(set).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('useLayout, over a Layout from a newer version', () => {
+  const newer = { snapTo: 'cells', v: 2, widgets: exampleLayout().widgets }
+
+  it('is read-only, shows what it can, and writes nothing on commit', async () => {
+    await fakeBrowser.storage.sync.set({ layout: newer })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const onRejected = vi.fn()
+    const page = mount({ onRejected })
+    const layout = await loaded(page)
+
+    expect(page.current().readOnly).toBe(true)
+    expect(layout.widgets).toHaveLength(2)
+
+    await page.commit({ ...layout, widgets: [] })
+
+    expect(set).not.toHaveBeenCalled()
+    expect(onRejected).not.toHaveBeenCalled()
+    expect(await stored()).toEqual(newer)
+  })
+
+  it('does not write over a newer Layout that arrived after the read', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const onRejected = vi.fn()
+    const page = mount({ onRejected })
+    const layout = await loaded(page)
+    expect(page.current().readOnly).toBe(false)
+
+    // Another device syncs a newer Layout in; this page's copy of it has not been told yet.
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    await fakeBrowser.storage.sync.set({ layout: newer })
+    set.mockClear()
+    await page.commit({ ...layout, widgets: [] })
+
+    await waitFor(() => expect(page.current().readOnly).toBe(true))
+    expect(set).not.toHaveBeenCalled()
+    expect(onRejected).not.toHaveBeenCalled()
+    expect(await stored()).toEqual(newer)
+  })
+
+  it.each([
+    ['something that is not an object', 'a layout'],
+    ['an object with no Widgets', { v: 1 }],
+    ['Widgets that are not a list', { v: 1, widgets: { clock: {} } }],
+    ['a `v` that is not a version', { v: 'one', widgets: [] }],
+  ])('is read-only for %s, and writes nothing', async (_, raw) => {
+    await fakeBrowser.storage.sync.set({ layout: raw })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const page = mount()
+    const layout = await loaded(page)
+
+    expect(page.current().readOnly).toBe(true)
+    expect(layout.widgets).toEqual([])
+
+    await page.commit(layout)
+
+    expect(set).not.toHaveBeenCalled()
+    expect(await stored()).toEqual(raw)
+  })
+})
+
+describe('useLayout, when the browser rejects a save', () => {
+  /** What Chrome says when an item is over 8,192 bytes. */
+  const overQuota = () =>
+    vi
+      .spyOn(fakeBrowser.storage.sync, 'set')
+      .mockRejectedValue(new Error('QUOTA_BYTES_PER_ITEM quota exceeded'))
+
+  it('puts back the stored Layout and says so, for a Layout that is too big', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const onRejected = vi.fn()
+    const page = mount({ onRejected })
+    const layout = await loaded(page)
+    overQuota()
+
+    await page.commit({ ...layout, widgets: [widgetAt(layout, 0)] })
+
+    await waitFor(() => expect(onRejected).toHaveBeenCalledTimes(1))
+    // What is on screen is what is stored again: both Widgets.
+    await waitFor(() => expect(page.current().layout?.widgets).toHaveLength(2))
+    expect(page.current().readOnly).toBe(false)
+    expect(await stored()).toEqual(exampleLayout())
+  })
+
+  it('goes on saving after a rejection', async () => {
+    await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    const onRejected = vi.fn()
+    const page = mount({ onRejected })
+    const layout = await loaded(page)
+    const rejecting = overQuota()
+    await page.commit({ ...layout, widgets: [] })
+    await waitFor(() => expect(onRejected).toHaveBeenCalled())
+    rejecting.mockRestore()
+
+    await page.commit({ ...layout, widgets: [widgetAt(layout, 0)] })
+
+    await waitFor(async () => expect((await storedLayout()).widgets).toHaveLength(1))
+  })
+})
