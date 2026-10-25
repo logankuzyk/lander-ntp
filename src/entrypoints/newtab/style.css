@@ -870,7 +870,7 @@ button.chip:hover {
   opacity: 1;
 }
 
-/* Suggestions under the place search (SettingsPanel/PlaceSearch): a menu as wide as the box. */
+/* Suggestions under the place search (widgetSystem/controls/PlaceSearch): a menu as wide as the box. */
 
 .suggestions {
   max-width: none;
