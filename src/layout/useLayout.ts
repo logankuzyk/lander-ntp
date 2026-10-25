@@ -15,6 +15,10 @@ import type { Layout } from './types'
  *   Saves go one at a time with only the latest waiting (twenty commits are two writes). When
  *   the browser rejects the write the stored Layout is put back and `onRejected` is called, so
  *   the page can say so. It does nothing while read-only.
+ *
+ * Call `commit` only once `loaded` is true. Before the stored Layout has arrived `readOnly` is
+ * still false, and the write-time guard (see storage/guard) protects only a newer or unreadable
+ * Layout, so a commit made too early can overwrite a normal version-1 Layout it has not seen.
  */
 export function useLayout(options?: StorageItemOptions) {
   const [layout, update, loaded, readOnly] = useStorageItem(layoutItem, options)

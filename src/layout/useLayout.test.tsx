@@ -2,10 +2,11 @@ import { act, render, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import { defaultOptions } from '@/widgetSystem/options'
 
-import { layoutWidget } from './check'
+import { checkLayout, layoutWidget } from './check'
 import {
   EXAMPLE_LAYOUT_JSON,
   exampleLayout,
@@ -43,6 +44,23 @@ const storedLayout = async (): Promise<StoredLayout> => {
   if (!layout) throw new Error('nothing is stored')
   return layout
 }
+
+/**
+ * Settings and onboarding as another part of the page left them. A Layout change is a change to
+ * `sync:layout` alone: removing a Clock, say, never touches `clock.enabled`.
+ */
+const OTHERS = {
+  onboarding: { dismissed: ['weather'], welcomed: false },
+  settings: {
+    ...DEFAULT_SETTINGS,
+    clock: { ...DEFAULT_SETTINGS.clock, enabled: true },
+    font: 'geist',
+  },
+}
+
+const seedOthers = () => fakeBrowser.storage.sync.set(OTHERS)
+
+const others = () => fakeBrowser.storage.sync.get(['settings', 'onboarding'])
 
 /** The Layout as the page holds it once it has been read. */
 const loaded = async (page: ReturnType<typeof mount>): Promise<Layout> => {
@@ -85,6 +103,7 @@ describe('useLayout', () => {
 
   it('stores a Layout it has read and not changed byte for byte, for the example in LR-15', async () => {
     await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    await seedOthers()
     const page = mount()
     const layout = await loaded(page)
 
@@ -92,6 +111,18 @@ describe('useLayout', () => {
 
     await waitFor(async () => expect(JSON.stringify(await stored())).toBe(EXAMPLE_LAYOUT_JSON))
     expect(syncBytes('layout', await stored())).toBe(480)
+    expect(await others()).toEqual(OTHERS)
+  })
+
+  it('stores the first Layout when none was stored, and writes nothing to the settings or onboarding', async () => {
+    await seedOthers()
+    const page = mount()
+    await waitFor(() => expect(page.current().loaded).toBe(true))
+
+    await page.commit(checkLayout(exampleLayout()))
+
+    await waitFor(async () => expect(JSON.stringify(await stored())).toBe(EXAMPLE_LAYOUT_JSON))
+    expect(await others()).toEqual(OTHERS)
   })
 
   it('keeps a top-level key, an option key and a Widget type it does not know through a commit', async () => {
@@ -122,12 +153,15 @@ describe('useLayout', () => {
 
   it('stores a Layout with no Widgets as such: deleting everything is a Layout, not no Layout', async () => {
     await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+    await seedOthers()
     const page = mount()
     const layout = await loaded(page)
 
     await page.commit({ ...layout, widgets: [] })
 
     await waitFor(async () => expect(await stored()).toEqual({ v: 1, widgets: [] }))
+    // Emptying the Layout takes the Clock off the page without touching `clock.enabled`.
+    expect(await others()).toEqual(OTHERS)
   })
 
   it('draws options that fail their check as defaults, and changes the stored ones only when that Widget’s options are committed', async () => {
@@ -220,6 +254,23 @@ describe('useLayout, over a Layout from a newer version', () => {
     expect(onRejected).not.toHaveBeenCalled()
     expect(await stored()).toEqual(newer)
   })
+
+  it.each([
+    ['a newer version', { v: 2, widgets: [] }],
+    ['a value with no shape to read', 'a layout'],
+  ])(
+    'turns read-only when %s arrives while the page is open, with no commit made',
+    async (_, raw) => {
+      await fakeBrowser.storage.sync.set({ layout: exampleLayout() })
+      const page = mount()
+      await loaded(page)
+      expect(page.current().readOnly).toBe(false)
+
+      await fakeBrowser.storage.sync.set({ layout: raw })
+
+      await waitFor(() => expect(page.current().readOnly).toBe(true))
+    },
+  )
 
   it('does not write over a newer Layout that arrived after the read', async () => {
     await fakeBrowser.storage.sync.set({ layout: exampleLayout() })

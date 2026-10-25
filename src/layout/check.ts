@@ -90,11 +90,12 @@ export function checkLayout(raw: unknown, registry: Registry = widgetDefinition)
 /** What is stored for a Layout: everything it was read from, and `v: 1`. */
 export function storedLayout(layout: Layout): StoredLayout {
   return {
+    // First, so that a key in `extra` can never replace one of the keys below.
+    ...layout.extra,
     v: 1,
     widgets: layout.widgets.map((widget) =>
       widget.kind === 'malformed' ? (widget.raw as PlacedWidget) : widget.placed,
     ),
     ...(layout.waiting === undefined ? {} : { waiting: layout.waiting }),
-    ...layout.extra,
   }
 }

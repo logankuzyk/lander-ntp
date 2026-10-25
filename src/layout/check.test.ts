@@ -58,6 +58,22 @@ describe('checkLayout', () => {
     expect(storedLayout(checkLayout({ v: 2, widgets: [] })).v).toBe(1)
   })
 
+  it('never lets a key in `extra` replace `v`, `widgets` or `waiting`', () => {
+    const layout = checkLayout(exampleLayout())
+    const built = {
+      ...layout,
+      extra: { snapTo: 'grid', v: 9, waiting: { clock: 1 }, widgets: 'none' },
+      waiting: { clock: { showDate: true, showSeconds: false } },
+    }
+
+    const stored = storedLayout(built)
+
+    expect(stored.v).toBe(1)
+    expect(stored.widgets).toHaveLength(2)
+    expect(stored.waiting).toEqual({ clock: { showDate: true, showSeconds: false } })
+    expect(stored).toHaveProperty('snapTo', 'grid')
+  })
+
   it('keeps a top-level key it does not know, and stores it back', () => {
     const raw = { ...exampleLayout(), snapTo: 'grid' }
 
@@ -143,6 +159,7 @@ describe('checkLayout', () => {
     ['a type that is not text', { type: null }],
     ['options that are not an object', { options: 'none' }],
     ['no options', { options: undefined }],
+    ['options that are a list', { options: [] }],
   ])('keeps a Widget with %s as it was, not drawn', (_, change) => {
     const bad = { ...clock('badbad01'), ...change }
     const raw = { v: 1, widgets: [clock('goodgd01'), bad] }
