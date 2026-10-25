@@ -294,4 +294,14 @@ describe('drawnRects', () => {
 
     expect(drawnRects(layout).map(({ widget }) => widget.placed.id)).toEqual(['z', 'm', 'a'])
   })
+
+  it('keeps the size a Widget is stored at, over its largest or under its smallest', () => {
+    // A Clock's sizes run from 3 by 2 to 8 by 4. LR-15 keeps what is stored, so these are drawn
+    // as stored; limits apply to a resize (see `clampSize`), not to what is already there.
+    const big = layoutOf(clock('big', 1, 1, { h: 8, w: 12 }))
+    const tiny = layoutOf(clock('tiny', 2, 2, { h: 1, w: 1 }))
+
+    expect(drawnRects(big).map(({ rect: place }) => place)).toEqual([rect(1, 1, 12, 8)])
+    expect(drawnRects(tiny).map(({ rect: place }) => place)).toEqual([rect(2, 2, 1, 1)])
+  })
 })

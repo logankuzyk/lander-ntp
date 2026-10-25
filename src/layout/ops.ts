@@ -32,7 +32,11 @@ export type Refusal =
 /** What `useLayout` gives that a change needs: the Layout, and whether it may be changed. */
 export type Editable = { layout: Layout; readOnly: boolean }
 
-/** A change that was allowed: the Layout as it is after it. The one it came from is untouched. */
+/**
+ * A change that was allowed: the Layout as it is after it. The one it came from is untouched.
+ * When a move or resize leaves the Widget as it is, `layout` is the very Layout it was given
+ * (the same object), so a caller can tell there is nothing to save.
+ */
 export type Changed = { layout: Layout; ok: true }
 
 /** A Widget that was added: the Layout after it, and the new Widget's id. */
@@ -48,6 +52,31 @@ function find(layout: Layout, id: string): Drawable | undefined {
   return layout.widgets.find(
     (widget): widget is Drawable => widget.kind !== 'malformed' && widget.placed.id === id,
   )
+}
+
+const sameCells = (a: Rect, b: Rect) =>
+  a.col === b.col && a.row === b.row && a.w === b.w && a.h === b.h
+
+/**
+ * The Layout with every Widget stored where it is drawn. A Widget drawn away from its stored
+ * place (off the Grid, or on another) is corrected in the next change that is saved, as LR-15
+ * says: without that, a later change that frees its stored place would make it jump there. Every
+ * Widget is drawn exactly as before, and a Widget with no place to be drawn is left as it is. It
+ * is the same Layout, not a copy, when nothing needs correcting, so settling twice changes
+ * nothing. Every change below starts from it, so what was on screen is what is saved.
+ */
+export function settle(layout: Layout): Layout {
+  const places = new Map(drawnRects(layout).map(({ rect, widget }) => [widget, rect]))
+  let changed = false
+  const widgets = layout.widgets.map((widget) => {
+    if (widget.kind === 'malformed') return widget
+    const place = places.get(widget)
+    if (!place || sameCells(place, widget.placed)) return widget
+    changed = true
+    const { col, h, row, w } = place
+    return { ...widget, placed: { ...widget.placed, col, h, row, w } }
+  })
+  return changed ? { ...layout, widgets } : layout
 }
 
 /** The Layout with one Widget replaced. */
@@ -70,7 +99,8 @@ function takeWaiting(
   type: string,
 ): { rest: WaitingOptions | undefined; taken: unknown } {
   const waiting = layout.waiting as Record<string, unknown> | undefined
-  if (!waiting || !(type in waiting)) return { rest: layout.waiting, taken: undefined }
+  // Own keys only: a type named `constructor` or `toString` is not waiting because objects have those.
+  if (!waiting || !Object.hasOwn(waiting, type)) return { rest: layout.waiting, taken: undefined }
   const { [type]: taken, ...rest } = waiting
   return { rest: Object.keys(rest).length === 0 ? undefined : (rest as WaitingOptions), taken }
 }
@@ -81,16 +111,17 @@ function takeWaiting(
  *
  * It starts from the options an update kept for its type, if any are waiting, and takes them out
  * of `waiting` in the same Layout; every later one starts from the defaults. The Widget limit is
- * not checked here.
+ * not checked here. The Layout is settled first (see `settle`).
  */
 export function addWidget(
-  { layout, readOnly }: Editable,
+  { layout: given, readOnly }: Editable,
   type: string,
   registry: Registry = widgetDefinition,
 ): Added | Refused {
   if (readOnly) return refused('read only')
   const definition = registry(type)
   if (!definition) return refused('unknown type')
+  const layout = settle(given)
 
   const { rest, taken: waitingOptions } = takeWaiting(layout, type)
   const options =
@@ -131,14 +162,16 @@ function checkPlace(layout: Layout, widget: Drawable, place: Rect): Refusal | nu
 /**
  * Moves a Widget so that its top left cell is `to`, keeping its size. It is checked against the
  * cells the other Widgets are drawn in, which is what the user sees. A Widget of a type this
- * version does not know can be moved.
+ * version does not know can be moved. The Layout is settled first (see `settle`). Moving a Widget
+ * to the place it is already stored and drawn at gives back the Layout it was given.
  */
 export function moveWidget(
-  { layout, readOnly }: Editable,
+  { layout: given, readOnly }: Editable,
   id: string,
   to: { col: number; row: number },
 ): Changed | Refused {
   if (readOnly) return refused('read only')
+  const layout = settle(given)
   const widget = find(layout, id)
   if (!widget) return refused('not found')
   const current = drawnPlace(layout, widget)
@@ -147,6 +180,11 @@ export function moveWidget(
   const place = { col: to.col, h: current.h, row: to.row, w: current.w }
   const reason = checkPlace(layout, widget, place)
   if (reason) return refused(reason)
+  // Where it already is, as stored and as drawn: nothing to save.
+  const before = find(given, id)
+  if (before && sameCells(before.placed, place) && sameCells(current, place)) {
+    return { layout: given, ok: true }
+  }
 
   const next = { ...widget, placed: { ...widget.placed, col: to.col, row: to.row } }
   return { layout: replace(layout, widget, next), ok: true }
@@ -156,14 +194,18 @@ export function moveWidget(
  * Gives a Widget a new size, keeping its top left cell (where it is drawn, if that is not where
  * it is stored). The size must be whole cells between the Widget's smallest and largest, and
  * fit on the Grid clear of the others. A Widget of a type this version does not know cannot be
- * resized: it has no sizes.
+ * resized: it has no sizes. The Layout is settled first (see `settle`). Resizing to the size it
+ * already has, where it is stored and drawn, gives back the Layout it was given. A size it is
+ * stored at, outside its smallest and largest, is kept until it is resized: a caller that
+ * resizes by dragging clamps with `clampSize` first.
  */
 export function resizeWidget(
-  { layout, readOnly }: Editable,
+  { layout: given, readOnly }: Editable,
   id: string,
   size: Cells,
 ): Changed | Refused {
   if (readOnly) return refused('read only')
+  const layout = settle(given)
   const widget = find(layout, id)
   if (!widget) return refused('not found')
   if (widget.kind === 'unknown') return refused('unknown type')
@@ -177,6 +219,11 @@ export function resizeWidget(
   const place = { col: current.col, h: size.h, row: current.row, w: size.w }
   const reason = checkPlace(layout, widget, place)
   if (reason) return refused(reason)
+  // The size it already has, as stored and as drawn: nothing to save.
+  const before = find(given, id)
+  if (before && sameCells(before.placed, place) && sameCells(current, place)) {
+    return { layout: given, ok: true }
+  }
 
   const next = { ...widget, placed: { ...widget.placed, ...place } }
   return { layout: replace(layout, widget, next), ok: true }
@@ -184,10 +231,12 @@ export function resizeWidget(
 
 /**
  * Takes a Widget out of the Layout, along with its options. It can be a Widget of a type this
- * version does not know, or one with no place to be drawn.
+ * version does not know, or one with no place to be drawn. The Layout is settled first (see
+ * `settle`), so the Widgets left stay where they were drawn.
  */
-export function removeWidget({ layout, readOnly }: Editable, id: string): Changed | Refused {
+export function removeWidget({ layout: given, readOnly }: Editable, id: string): Changed | Refused {
   if (readOnly) return refused('read only')
+  const layout = settle(given)
   const widget = find(layout, id)
   if (!widget) return refused('not found')
   return {

@@ -132,6 +132,10 @@ function readingOrder(a: Drawable, b: Drawable): number {
  * - A Widget that is not well-formed is not drawn and holds no cells.
  * - A Widget of a type this version does not know is placed like any other.
  *
+ * - A stored size is kept as it is: it is not clamped to the Widget's smallest and largest, so a
+ *   Clock stored at 12 by 8 is drawn at 12 by 8. LR-15 keeps what is stored. The limits apply
+ *   when a size is chosen (`clampSize`, `resizeWidget`), not to what is already there.
+ *
  * The result does not depend on the order the Widgets are stored in.
  */
 export function drawnRects(layout: Layout): DrawnWidget[] {
