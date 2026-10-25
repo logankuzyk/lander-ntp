@@ -25,7 +25,12 @@ const isPageValue = (option: OptionDescription): option is PageValueOption =>
 
 type OptionsFormProps = {
   definition: AnyWidgetDefinition
-  /** Draws every control as it is, and passes no change on: for options that may not be changed. */
+  /**
+   * Draws every control as it is, and passes no change on, not even one a control was waiting on
+   * the browser for: for options that may not be changed. It disables the shared 24-hour switch
+   * too. That switch is the page's, so W27 may need an additive `pageValuesDisabled`, to follow
+   * the settings' own state rather than the Layout's.
+   */
   disabled?: boolean
   /**
    * The id of the option to put focus on when the form appears: the first thing its control can
@@ -36,7 +41,12 @@ type OptionsFormProps = {
   onChange: (options: Record<string, unknown>) => void
   /** A page-wide value changed. It is the page's, so it does not go through `onChange`. */
   onPageValueChange: <N extends PageValueName>(name: N, value: PageValues[N]) => void
-  /** What is stored for the Widget. Read the way the Widget reads it; never written here. */
+  /**
+   * What is stored for the Widget. Read the way the Widget reads it; never written here. A change
+   * is made on the options as of the last render, so whoever draws the form must hand the new
+   * options back before the next change: two changes before that second one is made from the
+   * old options, and the first is lost.
+   */
   options: unknown
   page: PageValues
 }
@@ -62,12 +72,14 @@ export function OptionsForm({
   const read: Record<string, unknown> = readOptions(definition, options)
 
   // A change from a control that waited on the browser (the place, following the device) is made
-  // on the options as they are when it comes, not as they were at the click.
-  const latest = useRef(options)
-  latest.current = options
+  // on the options as they are when it comes, not as they were at the click, and not at all if
+  // the form has been disabled since.
+  const latest = useRef({ disabled, options })
+  latest.current = { disabled, options }
 
   const change = (changes: Record<string, unknown>) => {
-    onChange(writeOptions(definition, latest.current, changes))
+    if (latest.current.disabled) return
+    onChange(writeOptions(definition, latest.current.options, changes))
   }
 
   // Only when the form appears. The controls know nothing of their option's id, so each option
@@ -91,7 +103,9 @@ export function OptionsForm({
             checked={page[name] !== invert}
             disabled={disabled}
             label={option.label}
-            onChange={(on) => onPageValueChange(name, on !== invert)}
+            onChange={(on) => {
+              if (!latest.current.disabled) onPageValueChange(name, on !== invert)
+            }}
           />
           <p class="settings__note">{PAGE_VALUE_NOTES[name]}</p>
         </>

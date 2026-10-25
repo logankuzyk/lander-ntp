@@ -564,7 +564,8 @@ body {
 }
 
 /* The ring inside the box rather than around it, so the suggestions under it are its width. */
-.settings .settings__input:focus-visible {
+.settings .settings__input:focus-visible,
+.options-form .settings__input:focus-visible {
   outline-offset: -2px;
 }
 
@@ -607,6 +608,16 @@ body {
 .options-form--disabled .fields__eye,
 .options-form--disabled .settings__link {
   cursor: default;
+}
+
+/* The eye and the handle lighten under the pointer; disabled, they stay as they were. */
+.options-form--disabled .fields__row .fields__eye:hover,
+.options-form--disabled .fields__row .fields__handle:hover {
+  opacity: 0.6;
+}
+
+.options-form--disabled .fields__row--hidden .fields__eye:hover {
+  opacity: 0.45;
 }
 
 /* The heading of an ordered list is set off from the rows above it, as a section would be. */

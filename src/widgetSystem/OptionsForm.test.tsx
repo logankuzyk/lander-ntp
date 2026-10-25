@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { devicePosition } from '@/weather/deviceLocation'
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 
@@ -281,6 +282,18 @@ describe('OptionsForm', () => {
       })
     })
 
+    it('from the options it was given at the last render: two changes before the parent feeds the first back lose the first', () => {
+      // The documented contract: whoever draws the form hands the new options back at once.
+      const { onChange } = draw()
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Flag' }))
+      fireEvent.click(screen.getByRole('combobox', { name: 'Size' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Small' }))
+
+      expect(onChange).toHaveBeenCalledTimes(2)
+      expect(onChange).toHaveBeenLastCalledWith({ ...stored, flag: false, size: 'small' })
+    })
+
     it('from the options as they are now, when they change between two changes', () => {
       const { onChange, rerender } = draw()
 
@@ -516,6 +529,40 @@ describe('OptionsForm', () => {
       expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
       expect(onChange).not.toHaveBeenCalled()
       expect(onPageValueChange).not.toHaveBeenCalled()
+    })
+
+    it('calls neither callback for a change that reaches a switch anyway', () => {
+      const { onChange, onPageValueChange } = draw({ disabled: true })
+
+      fireEvent.change(screen.getByRole('switch', { name: 'Flag' }))
+      fireEvent.change(screen.getByRole('switch', { name: 'Twelve-hour time' }))
+
+      expect(onChange).not.toHaveBeenCalled()
+      expect(onPageValueChange).not.toHaveBeenCalled()
+    })
+
+    it('calls onChange for no change that was waiting on the browser when it became disabled', async () => {
+      let answer: (position: unknown) => void = () => undefined
+      vi.stubGlobal('navigator', {
+        geolocation: { getCurrentPosition: (done: (position: unknown) => void) => (answer = done) },
+        language: 'en-CA',
+      })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
+      )
+      const { onChange, rerender } = draw({ options: { ...stored, place: null } })
+      const search = screen.getByRole('combobox', { name: 'Search for a place' })
+      fireEvent.focus(search)
+      fireEvent.click(screen.getByRole('option', { name: 'Current location' }))
+
+      rerender({ disabled: true, options: { ...stored, place: null } })
+      answer({ coords: { latitude: 48.4359, longitude: -123.35155 } })
+      // The position is put away just before the change would have been made.
+      await waitFor(async () => expect(await devicePosition.getValue()).not.toBeNull())
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(onChange).not.toHaveBeenCalled()
     })
 
     it('is enabled again when it is not disabled', () => {

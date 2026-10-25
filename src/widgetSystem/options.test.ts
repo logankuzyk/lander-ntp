@@ -346,4 +346,22 @@ describe('writeOptions', () => {
     expect(written.added).toEqual(given.added)
     expect(written.added).not.toBe(given.added)
   })
+
+  it('shares nothing with the change it is given either', () => {
+    const rows = [
+      { id: 'b', shown: true },
+      { id: 'a', shown: false },
+    ]
+    const place = { ...VICTORIA }
+    const written = writeOptions(definition, stored, { place, rows })
+
+    expect(written.rows).toEqual(rows)
+    expect(written.rows).not.toBe(rows)
+    expect(written.place).not.toBe(place)
+    rows[0]!.shown = false
+    expect(written.rows).toEqual([
+      { id: 'b', shown: true },
+      { id: 'a', shown: false },
+    ])
+  })
 })
