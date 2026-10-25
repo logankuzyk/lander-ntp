@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { WEATHER_FIELDS } from '@/settings/schema'
 import { makePlace, makeWeather } from '@/test/fixtures'
 
+import { withBox } from '../../../.storybook/withBox'
 import { withPage } from '../../../.storybook/withPage'
 import { Weather } from './Weather'
 
@@ -16,7 +17,9 @@ const meta = {
     weather: makeWeather(),
   },
   component: Weather,
-  decorators: [withPage],
+  decorators: [withBox, withPage],
+  // Where the page puts a Weather: the top right corner, 2 by 2.
+  parameters: { box: { col: 11, h: 2, row: 1, w: 2 } },
 } satisfies Meta<typeof Weather>
 export default meta
 

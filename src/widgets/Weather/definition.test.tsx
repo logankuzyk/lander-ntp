@@ -2,18 +2,22 @@ import { act, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
+import { Grid } from '@/components/Grid/Grid'
+import { deriveLayout } from '@/layout/derive'
 import { manifestCache } from '@/photos/storage'
 import { DEFAULT_SETTINGS, type Settings, type WeatherSettings } from '@/settings/schema'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
 import { MAX_AGE_MS, MAX_STALE_MS, weatherSource } from '@/weather/weatherSource'
-import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
+import { pageValues } from '@/widgetSystem/fromSettings'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
-import { widgetDefinition } from '@/widgetSystem/registry'
-import { WidgetHost } from '@/widgetSystem/WidgetHost'
+import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { weatherDefinition } from './definition'
+
+/** Where the Weather sits on the Grid when it is added: the top right. */
+const RECT = { col: 11, h: 2, row: 1, w: 2 }
 
 const PLACE = { latitude: 48.43, longitude: -123.37, name: 'Victoria' }
 
@@ -74,24 +78,7 @@ function Probe({ settings }: { settings: WeatherSettings | null }) {
     clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
     weather: settings,
   }
-  return (
-    <main>
-      {page &&
-        widgetsFromSettings(page).map(({ options, type }) => {
-          const definition = widgetDefinition(type)
-          return (
-            definition && (
-              <WidgetHost
-                definition={definition}
-                key={type}
-                options={options}
-                page={pageValues(page)}
-              />
-            )
-          )
-        })}
-    </main>
-  )
+  return <main>{page && <Grid layout={deriveLayout(page)} page={pageValues(page)} />}</main>
 }
 
 /** The temperature on the page, or 'none' when the Weather draws nothing. */
@@ -200,7 +187,7 @@ describe('the Weather definition', () => {
 })
 
 describe('the Weather on the page', () => {
-  it('draws the Weather with no wrapper of its own, in the place it always was', async () => {
+  it('draws the Weather alone in its box, on the Grid, in the top right corner', async () => {
     await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
@@ -209,10 +196,12 @@ describe('the Weather on the page', () => {
     const { container } = render(<Probe settings={ON} />)
 
     await waitFor(() => expect(shown()).toBe('5'))
-    const main = container.querySelector('main')
-    expect(main?.children).toHaveLength(1)
-    expect(main?.firstElementChild?.classList.contains('weather')).toBe(true)
-    expect(screen.getByRole('region', { name: 'Weather' })).toBe(main?.firstElementChild)
+    const boxes = container.querySelectorAll<HTMLElement>('.grid > .widget-box')
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0]?.style.gridColumn).toBe('11 / span 2')
+    expect(boxes[0]?.style.gridRow).toBe('1 / span 2')
+    expect(boxes[0]?.children).toHaveLength(1)
+    expect(screen.getByRole('region', { name: 'Weather' })).toBe(boxes[0]?.firstElementChild)
   })
 
   it('reads the sun times in the page’s 12/24-hour time', async () => {
@@ -228,13 +217,25 @@ describe('the Weather on the page', () => {
     }
 
     const twentyFour = render(
-      <WidgetHost definition={weatherDefinition} options={options} page={{ hour12: false }} />,
+      <WidgetBox
+        definition={weatherDefinition}
+        options={options}
+        page={{ hour12: false }}
+        rect={RECT}
+      />,
     )
     await waitFor(() => expect(shown()).toBe('5'))
     expect(screen.getByLabelText('Sunrise').textContent).toBe('07:13')
     twentyFour.unmount()
 
-    render(<WidgetHost definition={weatherDefinition} options={options} page={{ hour12: true }} />)
+    render(
+      <WidgetBox
+        definition={weatherDefinition}
+        options={options}
+        page={{ hour12: true }}
+        rect={RECT}
+      />,
+    )
     await waitFor(() => expect(shown()).toBe('5'))
     expect(screen.getByLabelText('Sunrise').textContent).toBe('7:13')
   })
@@ -261,7 +262,9 @@ describe('the Weather', () => {
       ...DEFAULT_SETTINGS,
       weather: { ...ON, place: null },
     }
-    expect(widgetsFromSettings(settings).map(({ type }) => type)).toContain('weather')
+    expect(
+      deriveLayout(settings).widgets.map((widget) => widget.kind === 'known' && widget.placed.type),
+    ).toContain('weather')
 
     const { container } = render(<Probe settings={{ ...ON, place: null }} />)
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -406,8 +409,18 @@ describe('the Weather', () => {
 
       render(
         <>
-          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
-          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
         </>,
       )
 
@@ -426,8 +439,18 @@ describe('the Weather', () => {
 
       render(
         <>
-          <WidgetHost definition={weatherDefinition} options={options(PLACE)} page={page} />
-          <WidgetHost definition={weatherDefinition} options={options(OTHER)} page={page} />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(OTHER)}
+            page={page}
+            rect={RECT}
+          />
         </>,
       )
 
