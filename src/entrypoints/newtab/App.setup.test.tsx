@@ -7,13 +7,15 @@ import { settingsItem } from '@/settings/storage'
 import { makePlace, makeWeather } from '@/test/fixtures'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
+import { weatherDefinition, type WeatherOptions } from '@/widgets/Weather/definition'
+import type { Need } from '@/widgetSystem/needs'
 
 import { App } from './App'
 
 const SETTINGS: Settings = { ...DEFAULT_SETTINGS, v: 1 }
 
 /** What the button says: the Widget's name and then the need's words, as a reader reads it. */
-const BUTTON = 'Weather Choose a place'
+const BUTTON = 'Weather, Choose a place'
 
 const clock = {
   col: 5,
@@ -409,12 +411,93 @@ describe('App, the setup button', () => {
     })
   })
 
+  describe('an ask need before the place (what W16 puts first on Firefox)', () => {
+    const original = weatherDefinition.needs
+    let granted = false
+    let result: () => Promise<unknown>
+    const ask = vi.fn(() => result())
+    const allow: Need<WeatherOptions> = {
+      action: { kind: 'ask', run: ask },
+      id: 'allow',
+      label: 'Allow it',
+      met: () => granted,
+    }
+
+    beforeEach(() => {
+      granted = false
+      ask.mockClear()
+      result = () => {
+        granted = true
+        return Promise.resolve()
+      }
+      // One array, set once, as a definition's is: a new one each render would start new checks.
+      weatherDefinition.needs = [allow, ...(original ?? [])]
+    })
+
+    afterEach(() => {
+      weatherDefinition.needs = original
+    })
+
+    const allowButton = () => screen.getByRole('button', { name: 'Weather, Allow it' })
+
+    it('shows its button first, and the options stay shut', async () => {
+      await drawn()
+
+      expect(allowButton()).toBeTruthy()
+      expect(screen.queryByRole('button', { name: BUTTON })).toBeNull()
+      expect(popover()).toBeNull()
+    })
+
+    it('opens the options at the place search, straight away, when it is met and the place is next', async () => {
+      await drawn()
+
+      fireEvent.click(allowButton())
+      await settled()
+
+      expect(ask).toHaveBeenCalledTimes(1)
+      expect(popover()).not.toBeNull()
+      expect(document.activeElement).toBe(search())
+      // The place's own button took its place behind the popover.
+      expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy()
+    })
+
+    it('opens nothing when the browser says no and the same need is still first', async () => {
+      result = () => Promise.resolve(false)
+      await drawn()
+
+      fireEvent.click(allowButton())
+      await settled()
+
+      expect(ask).toHaveBeenCalledTimes(1)
+      expect(popover()).toBeNull()
+      expect(allowButton()).toBeTruthy()
+    })
+
+    it('opens nothing for a Weather that already has its place: the button just goes', async () => {
+      const place = makePlace()
+      await weatherSource.cache.set(cacheKey(place, 'celsius'), {
+        data: makeWeather(),
+        fetchedAt: Date.now(),
+      })
+      await drawn({
+        v: 1,
+        widgets: [clock, weather('weather1', 11, { place, unit: 'celsius' })],
+      })
+
+      fireEvent.click(allowButton())
+      await settled()
+
+      expect(popover()).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Weather, Allow it' })).toBeNull()
+    })
+  })
+
   describe('the keyboard', () => {
     it('does it all: Tab to the button, Enter, type, pick, Escape', async () => {
       await drawn()
       // Tab order: the button is a stop in the Weather's box; the box itself is not outside edit mode.
       const box = weatherBox()
-      expect(box.getAttribute('tabindex')).toBe('-1')
+      expect(box.hasAttribute('tabindex')).toBe(false)
       const button = within(box).getByRole('button', { name: BUTTON })
       button.focus()
       expect(document.activeElement).toBe(button)
@@ -429,11 +512,15 @@ describe('App, the setup button', () => {
       escape()
       expect(screen.queryByRole('dialog')).toBeNull()
       expect(document.activeElement).toBe(box)
+      // Focusable only while it holds focus that was handed back: no stop in the tab order after.
+      expect(box.getAttribute('tabindex')).toBe('-1')
+      box.blur()
+      expect(box.hasAttribute('tabindex')).toBe(false)
     })
 
     it('keeps the box out of the tab order outside edit mode, and in it in edit mode', async () => {
       await drawn()
-      expect(weatherBox().getAttribute('tabindex')).toBe('-1')
+      expect(weatherBox().hasAttribute('tabindex')).toBe(false)
 
       edit()
 

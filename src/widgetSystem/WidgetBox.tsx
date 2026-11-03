@@ -12,7 +12,7 @@ import type {
   WidgetViewProps,
 } from './definition'
 import { accessibleName } from './name'
-import { CHECKING, useUnmetNeed } from './needs'
+import { CHECKING, useRecheck, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { hasSetup, SetupButton, type SetupNeed } from './SetupButton'
 import { useSourceState } from './source'
@@ -95,9 +95,7 @@ export function Box({
               },
         tabIndex: 0,
       }
-    : // Not a tab stop, but focus can be given to it: it is where focus goes when a popover opened
-      // from a setup button closes and the button has gone (see `OptionsPopover`).
-      { tabIndex: -1 }
+    : {}
   return (
     <div
       aria-label={name}
@@ -269,10 +267,10 @@ function Contents<O, R, C>({
 }: Omit<WidgetBoxProps<O, R, C>, 'rect'>) {
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
-  // Counts the times the needs are to be asked again without the options having changed: a
-  // setup button asked the browser for something.
-  const [recheck, setRecheck] = useState(0)
-  const unmet = useUnmetNeed(definition.needs, read, recheck)
+  // The needs are asked again, with the options unchanged, when a setup button has asked the
+  // browser for something (and whenever something else calls `recheck`).
+  const [rechecks, recheck] = useRecheck()
+  const unmet = useUnmetNeed(definition.needs, read, rechecks)
   const popover = useOptionsPopover()
 
   // What was drawn stays while the needs are checked again, so an edit does not make a Widget
@@ -310,7 +308,7 @@ function Contents<O, R, C>({
         need={drawn}
         onAsked={() => {
           setAsked(drawn.id)
-          setRecheck((count) => count + 1)
+          recheck()
         }}
       />
     )

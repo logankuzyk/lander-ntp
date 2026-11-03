@@ -299,8 +299,7 @@ describe('Grid in edit mode', () => {
 
     expect(grid.classList.contains('grid--editing')).toBe(false)
     expect(grid.querySelector('.grid__dots')).toBeNull()
-    // Focus can be given to a box (-1), but none is a tab stop.
-    expect(grid.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0)
+    expect(grid.querySelectorAll('[tabindex]')).toHaveLength(0)
     expect(grid.querySelectorAll('.widget-box__name')).toHaveLength(0)
     // Changed by W20: each box is a named group outside edit mode too (it has a tab stop and a
     // drawn name only in edit mode).

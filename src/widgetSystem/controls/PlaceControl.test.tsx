@@ -322,6 +322,26 @@ describe('PlaceControl', () => {
       expect(search().getAttribute('aria-expanded')).toBe('true')
     })
 
+    it('does not move focus to Change later if the pick was never kept', async () => {
+      answering({ results: [{ id: 1, latitude: 48.44, longitude: -123.35, name: 'Victoria' }] })
+      // A parent that ignores the change (the options were not saved): the search stays.
+      const { rerender } = draw(EMPTY)
+
+      fireEvent.input(search(), { target: { value: 'Victoria' } })
+      fireEvent.click(await screen.findByRole('option', { name: 'Victoria' }))
+      // Let the page draw once with the pick unkept, then:
+      // the place arrives later, from another tab, and focus is somewhere else by then.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const elsewhere = document.createElement('button')
+      document.body.append(elsewhere)
+      elsewhere.focus()
+      rerender({ followDevice: false, place: VICTORIA })
+
+      await screen.findByRole('button', { name: 'Change' })
+      expect(document.activeElement).toBe(elsewhere)
+      elsewhere.remove()
+    })
+
     it('moves focus to Change when a place is picked and the row replaces the search', async () => {
       answering({ results: [{ id: 1, latitude: 48.44, longitude: -123.35, name: 'Victoria' }] })
       function Kept() {

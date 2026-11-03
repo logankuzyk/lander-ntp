@@ -80,15 +80,16 @@ describe('the setup button', () => {
 
       // The group is "Example"; inside it the button is read as the words it shows.
       expect(screen.getByRole('group', { name: 'Example' })).toBeTruthy()
-      expect(setupButton('Example Allow access').getAttribute('aria-label')).toBeNull()
+      // The comma between the two is in the name, not drawn.
+      expect(setupButton('Example, Allow access').textContent).toBe('ExampleAllow access')
     })
 
     it('is a plain button: not a submit, and no popup unless it opens one', () => {
       const { need } = asking()
       draw(example([need]))
 
-      expect(setupButton('Example Allow access').getAttribute('type')).toBe('button')
-      expect(setupButton('Example Allow access').getAttribute('aria-haspopup')).toBeNull()
+      expect(setupButton('Example, Allow access').getAttribute('type')).toBe('button')
+      expect(setupButton('Example, Allow access').getAttribute('aria-haspopup')).toBeNull()
     })
 
     it('draws the first need that is unmet, not a later one', () => {
@@ -128,7 +129,7 @@ describe('the setup button', () => {
       fireEvent.click(screen.getByText('enter'))
 
       expect(container.querySelectorAll('.widget-setup')).toHaveLength(1)
-      expect(setupButton('Example Allow access')).toBeTruthy()
+      expect(setupButton('Example, Allow access')).toBeTruthy()
     })
   })
 
@@ -138,7 +139,7 @@ describe('the setup button', () => {
       draw(example([need]))
 
       // Not inside `act` or `await`: Firefox only shows its prompt from the click's own call.
-      fireEvent.click(setupButton('Example Allow access'))
+      fireEvent.click(setupButton('Example, Allow access'))
 
       expect(run).toHaveBeenCalledTimes(1)
     })
@@ -147,7 +148,7 @@ describe('the setup button', () => {
       const { need } = asking()
       const { container } = draw(example([need]))
 
-      await settle(() => fireEvent.click(setupButton('Example Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
 
       expect(container.querySelector('.example')?.textContent).toBe('ready')
       expect(container.querySelector('.widget-setup')).toBeNull()
@@ -163,8 +164,8 @@ describe('the setup button', () => {
       }
       draw(example([need]))
 
-      await settle(() => fireEvent.click(setupButton('Example Allow access')))
-      await settle(() => fireEvent.click(setupButton('Example Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
 
       expect(run).toHaveBeenCalledTimes(2)
     })
@@ -184,9 +185,9 @@ describe('the setup button', () => {
         }
         const { unmount } = draw(example([need]))
 
-        await settle(() => fireEvent.click(setupButton('Example Allow access')))
+        await settle(() => fireEvent.click(setupButton('Example, Allow access')))
 
-        expect(setupButton('Example Allow access')).toBeTruthy()
+        expect(setupButton('Example, Allow access')).toBeTruthy()
         unmount()
       }
     })
@@ -202,8 +203,8 @@ describe('the setup button', () => {
       }
       draw(example([need]))
 
-      fireEvent.click(setupButton('Example Allow access'))
-      fireEvent.click(setupButton('Example Allow access'))
+      fireEvent.click(setupButton('Example, Allow access'))
+      fireEvent.click(setupButton('Example, Allow access'))
       await settle(answer)
 
       expect(run).toHaveBeenCalledTimes(1)
@@ -219,9 +220,9 @@ describe('the setup button', () => {
       }
       const { container } = draw(example([need, next]))
 
-      await settle(() => fireEvent.click(setupButton('Example Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
 
-      expect(setupButton('Example Then this')).toBeTruthy()
+      expect(setupButton('Example, Then this')).toBeTruthy()
       expect(container.querySelectorAll('.widget-setup')).toHaveLength(1)
     })
 
@@ -240,7 +241,7 @@ describe('the setup button', () => {
         met: () => (granted ? new Promise<boolean>((resolve) => answers.push(resolve)) : false),
       }
       const { container } = draw(example([need]))
-      const button = setupButton('Example Allow access')
+      const button = setupButton('Example, Allow access')
       button.focus()
 
       await settle(() => fireEvent.click(button))
@@ -264,7 +265,7 @@ describe('the setup button', () => {
       }
       draw(example([need]), {}, 'example1')
 
-      expect((setupButton('Example Name it') as HTMLButtonElement).disabled).toBe(true)
+      expect((setupButton('Example, Name it') as HTMLButtonElement).disabled).toBe(true)
     })
 
     it('goes when the option is set, and the View takes its place', () => {
@@ -290,11 +291,11 @@ describe('the setup button', () => {
   })
 
   describe('focus', () => {
-    it('makes the box something focus can be given to, without making it a tab stop outside edit mode', () => {
+    it('leaves the box with no tabindex outside edit mode: not a tab stop, and not focused by a click', () => {
       const { need } = asking()
       const { container } = draw(example([need]))
 
-      expect(container.querySelector('.widget-box')?.getAttribute('tabindex')).toBe('-1')
+      expect(container.querySelector('.widget-box')?.hasAttribute('tabindex')).toBe(false)
     })
 
     it('makes the box a tab stop in edit mode, as before', () => {

@@ -48,9 +48,14 @@ export function PlaceControl({
   const change = useRef<HTMLButtonElement>(null)
   const refocus = useRef(false)
   useEffect(() => {
-    if (!refocus.current || !change.current) return
+    // Asked once, by the next render. A pick that was not kept draws nothing new, so its ask can
+    // be answered by a later render, when focus may have gone somewhere else (a place arriving
+    // from another tab): it is given only if focus is on nothing, as it is when the search that
+    // had it goes, and is never kept for later.
+    const wanted = refocus.current
     refocus.current = false
-    change.current.focus()
+    const lost = !document.activeElement || document.activeElement === document.body
+    if (wanted && lost) change.current?.focus()
   })
 
   // The click that shows the browser's prompt.

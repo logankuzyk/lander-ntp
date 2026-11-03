@@ -191,8 +191,7 @@ body {
     animation: none;
   }
 
-  .widget-box__options,
-  .widget-setup {
+  .widget-box__options {
     transition: none;
   }
 }
@@ -283,6 +282,13 @@ body {
   cursor: default;
 }
 
+/* After its own rule, which sets the transition and would win over a rule above it. */
+@media (prefers-reduced-motion: reduce) {
+  .widget-setup {
+    transition: none;
+  }
+}
+
 .widget-setup__name {
   font-size: 0.857em; /* 0.75rem at the full size */
   /* The name is the quieter line, but at this size it still needs to read on a bright photo. */
@@ -293,11 +299,35 @@ body {
   font-weight: 600;
 }
 
-/* The box takes focus when a popover closes and the button has gone; outside edit mode it has no frame. */
-.widget-box:focus-visible {
-  outline: 2px solid var(--color-fg);
-  outline-offset: -2px;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
+/*
+ * In edit mode the frame keeps the top left corner for the Options button (to 2rem down) and the
+ * bottom left for the name (from 1.625rem up). At the Weather's smallest box on a short window
+ * (127 by 128px, 800 by 600) the button, centred, ran under the Options button, so it keeps clear
+ * of both: a margin at each end (and, in the shortest, tighter padding). Only where the box is
+ * tall enough to hold that; shorter boxes cannot clear both.
+ */
+@container (min-height: 7.75rem) {
+  .grid--editing .widget-setup {
+    max-height: calc(100% - 4rem);
+    margin-block: 2.25rem 1.75rem;
+  }
+}
+
+/* A short box (the smallest, on a short window) has no room for the full padding as well. */
+@container (min-height: 7.75rem) and (max-height: 9rem) {
+  .grid--editing .widget-setup {
+    padding-block: 0.25em;
+  }
+}
+
+/*
+ * The box takes focus when a popover closes and the setup button has gone (it is given a
+ * tabindex only for that: see OptionsPopover). Outside edit mode it has no frame, and a ring
+ * round the whole box would be a white line round empty photo; in edit mode the frame's own
+ * focus ring above is the more specific rule.
+ */
+.widget-box:focus {
+  outline: none;
 }
 
 /* Clock */

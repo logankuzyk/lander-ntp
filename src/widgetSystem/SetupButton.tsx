@@ -24,7 +24,7 @@ type SetupButtonProps<O> = {
 /**
  * The button a Widget shows in place of its content while a need is unmet: the Widget's name and
  * the need's words, in the page's panel look (see `.widget-setup` in the page's styles), centred
- * in the box. Its accessible name is what it shows, name first ("Weather Choose a place"); the
+ * in the box. Its accessible name is what it shows, name first, with a comma between ("Weather, Choose a place"); the
  * box around it is the group that names the Widget.
  *
  * What pressing it does is the need's action. To open the options it is a toggle, as the Options
@@ -37,6 +37,9 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
   const { action, label } = need
   // Not state: a second press in the same moment must see it, before any render.
   const asking = useRef(false)
+  // What it shows, with a comma between: left to work out from its spans, a browser reads the two
+  // lines as one run ("Weather Choose a place") or puts the comma where it was not written.
+  const accessibleName = `${name}, ${label}`
   const words = (
     <>
       <span class="widget-setup__name">{name}</span>
@@ -51,6 +54,7 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
       <button
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={accessibleName}
         class="widget-setup"
         // Opens and closes the popover itself, so pressing it isn't a click outside.
         data-popover-toggle
@@ -69,6 +73,7 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
 
   return (
     <button
+      aria-label={accessibleName}
       class="widget-setup"
       onClick={() => {
         if (asking.current) return

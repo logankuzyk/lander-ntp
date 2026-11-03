@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 /**
  * What pressing a Widget's setup button does about an unmet need.
@@ -189,4 +189,17 @@ export function useUnmetNeed<O>(
   if (current.now !== undefined) return current.now
   // The answer to an earlier check, for other options, is not this one's.
   return settled?.check === current ? settled.unmet : CHECKING
+}
+
+/**
+ * The count `useUnmetNeed` takes as its `recheck`, and the function that adds one to it: asking
+ * the needs again when something outside the options changed (a permission was granted or
+ * revoked). The function is the same on every render, so a listener can hold it. The setup
+ * button's `ask` actions call it when the browser has answered; what else calls it (the tab
+ * coming back into view, a permission changing) is for whoever adds those listeners.
+ */
+export function useRecheck(): [count: number, recheck: () => void] {
+  const [count, setCount] = useState(0)
+  const recheck = useCallback(() => setCount((current) => current + 1), [])
+  return [count, recheck]
 }

@@ -58,7 +58,18 @@ export function OptionsPopover({
   // is something left to set up), and else to the Widget's box.
   const { close, container } = usePopover(onClose, {
     keepFocus: true,
-    returnTo: () => box()?.querySelector<HTMLElement>('.widget-setup') ?? box(),
+    returnTo: () => {
+      const widget = box()
+      const button = widget?.querySelector<HTMLElement>('.widget-setup')
+      if (button || !widget) return button ?? widget
+      // The box is not a tab stop outside edit mode, so it can only take focus while this gives
+      // it some, and is left as it was when focus moves on.
+      if (!widget.hasAttribute('tabindex')) {
+        widget.tabIndex = -1
+        widget.addEventListener('blur', () => widget.removeAttribute('tabindex'), { once: true })
+      }
+      return widget
+    },
   })
   const form = useRef<HTMLDivElement>(null)
 

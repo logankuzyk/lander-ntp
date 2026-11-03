@@ -221,7 +221,7 @@ describe('the Weather setup stories', () => {
       await seedPage(weatherSetupSeed(size))
       const { container } = render(<App />)
 
-      const button = await screen.findByRole('button', { name: 'Weather Choose a place' })
+      const button = await screen.findByRole('button', { name: 'Weather, Choose a place' })
       expect(button.textContent).toBe('WeatherChoose a place')
       const { col, h, row, w } = weatherBoxRect(size)
       expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
@@ -235,7 +235,7 @@ describe('the Weather setup stories', () => {
     await seedPage(weatherSetupSeed('starting'))
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Weather Choose a place' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Weather, Choose a place' }))
 
     expect(screen.getByRole('dialog', { name: 'Weather options' })).toBeTruthy()
     expect(document.activeElement).toBe(
