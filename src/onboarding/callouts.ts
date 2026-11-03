@@ -2,8 +2,9 @@ import type { SectionId } from '@/components/SettingsPanel/SettingsPanel'
 import type { Settings } from '@/settings/schema'
 import { getEndpoints } from '@/weather/endpoints'
 
-/** A short note about one part of the settings, drawn by components/Callout. */
-export type CalloutInfo = {
+import type { CalloutTarget } from './target'
+
+type CalloutBase = {
   /** Whether the feature can be used at all right now. Checked once, before the note is shown. */
   available?: () => Promise<boolean>
   body: string
@@ -11,13 +12,36 @@ export type CalloutInfo = {
   id: string
   /** False once there is nothing left to point out, such as a widget already switched on. */
   relevant?: (settings: Settings) => boolean
-  /** The settings section it is about. */
-  section: SectionId
   title: string
 }
 
+/**
+ * A short note about one part of the settings, drawn by components/Callout: a stop on the
+ * settings panel's own tour, or news of something to set up there. It sits where the
+ * `callout--<section>` rule in style.css puts it.
+ */
+export type SettingsStop = CalloutBase & {
+  /** The settings section it is about. */
+  section: SectionId
+  target?: undefined
+}
+
+/**
+ * A short note about something on the page itself, such as the Edit button or a Widget: placed
+ * beside it by script, with a pointer at it, so it follows the thing if it moves (see
+ * `CalloutTarget` and components/Callout). It needs no rule in style.css. Not drawn while its
+ * target is not on the page; a news item that cannot be drawn is not used up, and holds the
+ * ones behind it back (like one that is `available`), so that they keep their order.
+ */
+export type PageCallout = CalloutBase & {
+  section?: undefined
+  target: CalloutTarget
+}
+
+export type CalloutInfo = PageCallout | SettingsStop
+
 /** The tour a new install is offered after the welcome: one stop per settings section, in order. */
-export const TOUR: readonly CalloutInfo[] = [
+export const TOUR: readonly SettingsStop[] = [
   {
     body: 'Choose how often the photo changes, and which tags to draw from. Or pick one from the gallery to keep.',
     id: 'tour-photos',
