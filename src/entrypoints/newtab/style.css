@@ -338,6 +338,17 @@ body {
   opacity: 0.85;
 }
 
+/*
+ * On a narrow window the buttons (four of them with Edit, and Done is wider than Edit) take up to
+ * 15.5rem from the right edge, and a long credit would run under them. It wraps before them
+ * instead, and grows upward. Not below 8rem, where there is no room to keep clear anyway.
+ */
+@media (max-width: 48rem) {
+  .credit {
+    max-width: max(8rem, calc(100% - 17rem));
+  }
+}
+
 .credit a {
   color: inherit;
   text-decoration: underline;
@@ -1264,6 +1275,11 @@ button.chip:hover {
 .control--done:hover,
 .control--done:focus-visible {
   background: var(--color-fg);
+}
+
+/* Not currentColor: its text is dark, and the ring is on the photo. */
+.control--done:focus-visible {
+  outline-color: var(--color-fg);
 }
 
 /* A cross-fade holds the old photo until the new one is ready, so the button that was

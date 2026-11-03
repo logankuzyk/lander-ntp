@@ -20,6 +20,10 @@ _Avoid_: Arrangement, dashboard
 The fixed strip along the bottom of the page holding the photo credit and the page's buttons. It belongs to the page, not to the user's layout.
 _Avoid_: Footer, controls, toolbar
 
+**Edit mode**:
+How the page is while the user arranges it: the Grid shows a dot at every cell corner and each widget sits in a frame with its name. Entered with the Edit button in the bottom bar or the E key, and left with Done, E or Escape. It belongs to the open tab and is never stored, so every new tab starts out of it.
+_Avoid_: Design mode, layout mode
+
 **Need**:
 Something that must be true before a widget can show anything, such as a granted permission, a chosen place, or a connected account. A widget lists its needs in order.
 _Avoid_: Requirement, prerequisite

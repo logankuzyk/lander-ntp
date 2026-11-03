@@ -392,6 +392,17 @@ describe('the Grid styles', () => {
     expect(rule('.widget-box')).toMatch(/align-content:\s*center/)
   })
 
+  it('fades the dots and the wash in, and not under reduced motion', () => {
+    expect(rule('.grid__dots')).toMatch(/animation:\s*edit-appear/)
+    expect(rule('.grid--editing::before')).toMatch(/animation:\s*edit-appear/)
+    const reduced = css.slice(
+      css.indexOf('@media (prefers-reduced-motion: reduce) {\n  .grid--editing'),
+    )
+    expect(reduced.slice(0, reduced.indexOf('\n}\n'))).toMatch(
+      /\.grid--editing::before,\s*\.grid__dots\s*{\s*animation:\s*none/,
+    )
+  })
+
   it("lays the cells out from the Grid's custom properties", () => {
     expect(rule('.grid')).toContain('repeat(var(--cols)')
     expect(rule('.grid')).toContain('repeat(var(--rows)')
