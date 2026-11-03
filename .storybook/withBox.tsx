@@ -16,7 +16,7 @@ const MIDDLE: Rect = { col: 5, h: 2, row: 4, w: 4 }
 export const withBox: Decorator = (Story, context) => (
   // The styles lay the cells out from these, as the Grid does; without them the box fills the lot.
   <div class="grid" style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}>
-    <Box rect={(context.parameters.box as Rect | undefined) ?? MIDDLE} widget="story">
+    <Box name="Widget" rect={(context.parameters.box as Rect | undefined) ?? MIDDLE} widget="story">
       <Story />
     </Box>
   </div>

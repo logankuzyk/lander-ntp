@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
 import { Controls } from '@/components/Controls/Controls'
+import { EditModeProvider } from '@/components/EditMode/useEditMode'
 import { Grid } from '@/components/Grid/Grid'
 import { Notice } from '@/components/Notice/Notice'
 import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
@@ -50,7 +51,11 @@ export function App() {
   )
   // The Layout is the stored one, or worked out from the settings while there is none. Only
   // right once the stored settings have loaded, as the hook starts from the defaults.
-  const { layout, loaded: layoutLoaded } = useLayout(settings, saveOutcome)
+  const {
+    layout,
+    loaded: layoutLoaded,
+    readOnly: layoutReadOnly,
+  } = useLayout(settings, saveOutcome)
   const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)
@@ -100,78 +105,80 @@ export function App() {
   }, [settings.font])
 
   return (
-    <main class="app">
-      {photo && (
-        <Background
-          dim={settings.dim}
-          onLoad={() => {
-            if (upcoming) preloadNext(upcoming)
+    <EditModeProvider canChange={!layoutReadOnly}>
+      <main class="app">
+        {photo && (
+          <Background
+            dim={settings.dim}
+            onLoad={() => {
+              if (upcoming) preloadNext(upcoming)
+            }}
+            onLoadingChange={setPhotoLoading}
+            photo={photo}
+          />
+        )}
+        {/*
+          Stored settings and the stored Layout land a beat after the first paint. Drawing the
+          defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
+          and the Layout worked out from the defaults would put the wrong Widgets in the wrong
+          places, so anything that depends on them waits for both. The photo already does:
+          usePhotoRotation is held back until the settings are known.
+        */}
+        {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+        {photo && <PhotoCredit photo={photo} />}
+        {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
+        {popover === 'settings' && (
+          <SettingsPanel
+            currentId={photo?.id ?? null}
+            initialSection={entry.section}
+            onChange={setSettings}
+            onClose={close}
+            photos={photos}
+            readOnly={settingsReadOnly}
+            settings={settings}
+            tour={entry.tour ? TOUR : undefined}
+          />
+        )}
+        {news && (
+          <Callout
+            action={{
+              label: 'Set up',
+              onClick: () => {
+                dismiss(news.id)
+                openSettings({ section: news.section, tour: false })
+              },
+            }}
+            body={news.body}
+            class={`callout--${news.section}`}
+            onDismiss={() => dismiss(news.id)}
+            title={news.title}
+          />
+        )}
+        {onboarding && !onboarding.welcomed && (
+          <Welcome
+            onSkip={() => setOnboarding({ ...onboarding, welcomed: true })}
+            onTour={() => {
+              setOnboarding({ ...onboarding, welcomed: true })
+              openSettings({ section: 'photos', tour: true })
+            }}
+          />
+        )}
+        <Notice
+          message={saveFailed ? "Couldn't save that. Try again in a minute." : null}
+          onDismiss={() => setSaveFailed(false)}
+        />
+        <Controls
+          busy={photoLoading}
+          infoOpen={popover === 'info'}
+          onNext={showNext}
+          onToggleInfo={photo ? () => toggle('info') : undefined}
+          onToggleSettings={() => {
+            setEntry(FROM_GEAR)
+            toggle('settings')
           }}
-          onLoadingChange={setPhotoLoading}
-          photo={photo}
+          settingsOpen={popover === 'settings'}
         />
-      )}
-      {/*
-        Stored settings and the stored Layout land a beat after the first paint. Drawing the
-        defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
-        and the Layout worked out from the defaults would put the wrong Widgets in the wrong
-        places, so anything that depends on them waits for both. The photo already does:
-        usePhotoRotation is held back until the settings are known.
-      */}
-      {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
-      {photo && <PhotoCredit photo={photo} />}
-      {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
-      {popover === 'settings' && (
-        <SettingsPanel
-          currentId={photo?.id ?? null}
-          initialSection={entry.section}
-          onChange={setSettings}
-          onClose={close}
-          photos={photos}
-          readOnly={settingsReadOnly}
-          settings={settings}
-          tour={entry.tour ? TOUR : undefined}
-        />
-      )}
-      {news && (
-        <Callout
-          action={{
-            label: 'Set up',
-            onClick: () => {
-              dismiss(news.id)
-              openSettings({ section: news.section, tour: false })
-            },
-          }}
-          body={news.body}
-          class={`callout--${news.section}`}
-          onDismiss={() => dismiss(news.id)}
-          title={news.title}
-        />
-      )}
-      {onboarding && !onboarding.welcomed && (
-        <Welcome
-          onSkip={() => setOnboarding({ ...onboarding, welcomed: true })}
-          onTour={() => {
-            setOnboarding({ ...onboarding, welcomed: true })
-            openSettings({ section: 'photos', tour: true })
-          }}
-        />
-      )}
-      <Notice
-        message={saveFailed ? "Couldn't save that. Try again in a minute." : null}
-        onDismiss={() => setSaveFailed(false)}
-      />
-      <Controls
-        busy={photoLoading}
-        infoOpen={popover === 'info'}
-        onNext={showNext}
-        onToggleInfo={photo ? () => toggle('info') : undefined}
-        onToggleSettings={() => {
-          setEntry(FROM_GEAR)
-          toggle('settings')
-        }}
-        settingsOpen={popover === 'settings'}
-      />
-    </main>
+      </main>
+    </EditModeProvider>
   )
 }

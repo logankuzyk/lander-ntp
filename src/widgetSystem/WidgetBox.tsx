@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
 
+import { useEditMode } from '@/components/EditMode/useEditMode'
 import type { Rect } from '@/layout/geometry'
 
 import type {
@@ -28,16 +29,25 @@ type WidgetBoxProps<O, R, C> = {
  * The box a Widget sits in, on the Grid: the cells of its place, a size container for the
  * Widget to lay itself out in (see `.widget-box` in the page's styles), its content centred.
  * `widget` names what it holds, for a test or a rule in the styles to find it by.
+ *
+ * In edit mode the box is a frame: a tab stop, a group named `name`, with the name drawn in it.
+ * The boxes are in reading order in the document (see Grid), which is the order Tab takes.
  */
 export function Box({
   children,
+  name,
   rect,
   widget,
 }: {
   children?: ComponentChildren
+  /** What people call it, such as "Clock": read out and drawn in edit mode. */
+  name: string
   rect: Rect
   widget: string
 }) {
+  const { editing } = useEditMode()
+  // Spread rather than written out: only while editing is the box a group, and a tab stop.
+  const frame = editing ? { 'aria-label': name, role: 'group' as const, tabIndex: 0 } : {}
   return (
     <div
       class="widget-box"
@@ -46,8 +56,14 @@ export function Box({
         gridColumn: `${rect.col} / span ${rect.w}`,
         gridRow: `${rect.row} / span ${rect.h}`,
       }}
+      {...frame}
     >
       {children}
+      {editing && (
+        <span aria-hidden="true" class="widget-box__name">
+          {name}
+        </span>
+      )}
     </div>
   )
 }
@@ -140,7 +156,7 @@ function SourcedView<O, R, C>({
  */
 export function WidgetBox<O, R, C>({ definition, options, page, rect }: WidgetBoxProps<O, R, C>) {
   return (
-    <Box rect={rect} widget={definition.type}>
+    <Box name={definition.name} rect={rect} widget={definition.type}>
       <Contents definition={definition} options={options} page={page} />
     </Box>
   )
