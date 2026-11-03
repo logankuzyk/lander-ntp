@@ -19,6 +19,7 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
+import { usePruneReadings } from '@/widgets/Weather/usePruneReadings'
 import { pageValues } from '@/widgetSystem/fromSettings'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
@@ -56,6 +57,13 @@ export function App() {
     loaded: layoutLoaded,
     readOnly: layoutReadOnly,
   } = useLayout(settings, saveOutcome)
+  // Readings no Weather uses are forgotten once both are known: before that the Layout is the
+  // one worked out from the defaults, which has no Weather. A local clean-up: it writes nothing
+  // to the synced storage, and nothing to the Layout.
+  usePruneReadings(layout, {
+    loaded: settingsLoaded && layoutLoaded,
+    readOnly: layoutReadOnly,
+  })
   const [onboarding, setOnboarding] = useStorageItem(onboardingItem, saveOutcome)
   const [popover, setPopover] = useState<Popover>(null)
   const [entry, setEntry] = useState<SettingsEntry>(FROM_GEAR)

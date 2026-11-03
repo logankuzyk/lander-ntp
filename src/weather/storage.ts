@@ -11,7 +11,8 @@ export type WeatherReading = {
 
 /**
  * The readings kept between tabs, one for each place and unit that was asked for; see
- * `cacheKey`. Local, not synced: they are this device's, and cheap to fetch again.
+ * `cacheKey`. Local, not synced: they are this device's, and cheap to fetch again. The page
+ * forgets the ones no Weather in the Layout uses (see `usePruneReadings`).
  *
  * This is a new key. v0.2.3 kept a single reading under `local:weatherCache`, which nothing
  * reads or writes any more; it costs one fetch, so it is not migrated.
