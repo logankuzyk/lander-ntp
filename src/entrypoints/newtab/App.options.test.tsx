@@ -173,9 +173,10 @@ describe('App, the options popover', () => {
       const input = document.createElement('input')
       frame.append(button, input)
 
+      // Each on its own: were the first heard, the second would close what it opened.
       fireEvent.keyDown(button, { key: 'o' })
+      expect(dialog(WEATHER)).toBeNull()
       fireEvent.keyDown(input, { key: 'o' })
-
       expect(dialog(WEATHER)).toBeNull()
     })
 
@@ -515,6 +516,7 @@ describe('App, the options popover', () => {
       edit()
       open('Weather')
       const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+      const getValue = vi.spyOn(settingsItem, 'getValue')
 
       fireEvent.click(
         within(screen.getByRole('dialog')).getByRole('switch', { name: '24-hour time' }),
@@ -523,6 +525,8 @@ describe('App, the options popover', () => {
 
       expect(set).not.toHaveBeenCalled()
       expect(await stored('settings')).toEqual(newer)
+      // Nor was there any reading of them to build a write from: the page is read-only.
+      expect(getValue).not.toHaveBeenCalled()
     })
   })
 
