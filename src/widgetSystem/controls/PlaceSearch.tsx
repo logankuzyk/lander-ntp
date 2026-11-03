@@ -68,7 +68,8 @@ export function PlaceSearch({
   const name = query.trim()
   useEffect(() => {
     const mine = ++request.current
-    if (name.length < MIN_LENGTH) return setResults(null)
+    // A box that is held back sends nothing, whatever gets typed into it.
+    if (disabled || name.length < MIN_LENGTH) return setResults(null)
     const timer = setTimeout(() => {
       void searchPlaces(name).then((found) => {
         if (mine !== request.current) return
@@ -78,7 +79,7 @@ export function PlaceSearch({
       })
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [name])
+  }, [disabled, name])
 
   const found = results !== 'failed' && results ? results : []
   const suggestions =
@@ -98,6 +99,7 @@ export function PlaceSearch({
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (disabled) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       // One slot past the suggestions is the text as typed, between the last and the first.
@@ -131,11 +133,14 @@ export function PlaceSearch({
             class="settings__input"
             disabled={disabled}
             onBlur={close}
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              if (!disabled) setOpen(true)
+            }}
             onFocus={() => {
-              if (!quiet.current) setOpen(true)
+              if (!quiet.current && !disabled) setOpen(true)
             }}
             onInput={(event) => {
+              if (disabled) return
               setQuery(event.currentTarget.value)
               setActive(null)
               setOpen(true)
@@ -160,7 +165,7 @@ export function PlaceSearch({
           )}
         </div>
       </div>
-      {open && (
+      {open && !disabled && (
         <ul
           aria-label="Places"
           class="dropdown__menu suggestions"

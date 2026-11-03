@@ -198,6 +198,15 @@ describe('the Weather definition', () => {
     ])
   })
 
+  it('keeps the place option, which sends what is typed in it, behind the location agreement', () => {
+    expect(weatherDefinition.options.find((option) => option.id === 'place')?.needs).toEqual([
+      'locationConsent',
+    ])
+    expect(weatherDefinition.options.filter((option) => option.needs).map(({ id }) => id)).toEqual([
+      'place',
+    ])
+  })
+
   it('has a place when one is picked or the device is followed, and not otherwise', () => {
     const place = weatherDefinition.needs?.find(({ id }) => id === 'place')
     const options = defaultOptions(weatherDefinition)

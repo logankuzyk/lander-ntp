@@ -981,6 +981,11 @@ body {
   display: contents;
 }
 
+/* The button under an option that is held back until something is allowed: a link, not a bar. */
+.options-form__option > .settings__link {
+  align-self: start;
+}
+
 /* Options that may not be changed: shown as they are, dimmed, with nothing that looks pressable. */
 .options-form--disabled {
   opacity: 0.55;

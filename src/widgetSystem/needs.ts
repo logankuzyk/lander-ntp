@@ -234,6 +234,19 @@ function watchPermissions(recheck: () => void): () => void {
   }
 }
 
+/** The rechecks of every Widget and form that is watching, to be called together. */
+const watching = new Set<() => void>()
+
+/**
+ * Asks every watching Widget and form to check its needs again: something that meets a need
+ * from one place (the button in an options form) has to tell the others (the Widget's own setup
+ * button) without waiting for the browser to say a permission changed, which not every browser
+ * does for every permission.
+ */
+export function recheckAll(): void {
+  for (const recheck of [...watching]) recheck()
+}
+
 /**
  * The count `useUnmetNeed` takes as its `recheck`, and the function that adds one to it: asking
  * the needs again when something outside the options changed (a permission was granted or
@@ -251,16 +264,46 @@ export function useRecheck(watch = false): [count: number, recheck: () => void] 
 
   useEffect(() => {
     if (!watch) return
+    watching.add(recheck)
     const onVisibility = () => {
       if (!document.hidden) recheck()
     }
     document.addEventListener('visibilitychange', onVisibility)
     const stopWatching = watchPermissions(recheck)
     return () => {
+      watching.delete(recheck)
       document.removeEventListener('visibilitychange', onVisibility)
       stopWatching()
     }
   }, [watch, recheck])
 
   return [count, recheck]
+}
+
+/**
+ * Runs a need's `ask` action for a button: `run` is called at once, as the first thing the click
+ * does and with nothing awaited before it, since Firefox shows its prompt only from a click's own
+ * call. While it is waiting a second press does nothing. When it settles, whatever it gave,
+ * `onAsked` is called so the needs are asked again; if it threw or its promise rejected they are
+ * not, and the button can be pressed again. The function is the same on every render.
+ */
+export function useAsk(onAsked: () => void): (run: () => unknown) => void {
+  // Not state: a second press in the same moment must see it, before any render.
+  const asking = useRef(false)
+  const answered = useRef(onAsked)
+  answered.current = onAsked
+  return useCallback((run) => {
+    if (asking.current) return
+    asking.current = true
+    void (async () => {
+      try {
+        await run()
+      } catch {
+        return
+      } finally {
+        asking.current = false
+      }
+      answered.current()
+    })()
+  }, [])
 }

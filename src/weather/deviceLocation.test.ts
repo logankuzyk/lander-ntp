@@ -64,6 +64,20 @@ describe('askForLocation', () => {
     await expect(answer).resolves.toBeNull()
   })
 
+  it('waits a minute by default: not at 59 999 ms, gone at 60 000', async () => {
+    vi.useFakeTimers()
+    browserAsking()
+    const answer = askForLocation()
+    let settled = false
+    void answer.then(() => (settled = true))
+
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+
+    await expect(answer).resolves.toBeNull()
+  })
+
   it('leaves no timer running once the browser has answered', async () => {
     vi.useFakeTimers()
     const asking = browserAsking()

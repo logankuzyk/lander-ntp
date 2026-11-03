@@ -119,6 +119,9 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
       },
       id: 'place',
       label: 'Place',
+      // Searching sends what is typed, and "Current location" the device's position, so neither
+      // is allowed before the user has agreed to send a place (on Firefox).
+      needs: ['locationConsent'],
     },
     {
       choices: [

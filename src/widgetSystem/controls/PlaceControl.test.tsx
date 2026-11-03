@@ -384,5 +384,28 @@ describe('PlaceControl', () => {
 
       expect((search() as HTMLInputElement).disabled).toBe(true)
     })
+
+    it('sends nothing to the place search, and does not offer the device, whatever reaches the box', async () => {
+      vi.useFakeTimers()
+      try {
+        const fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true })
+        vi.stubGlobal('fetch', fetch)
+        const getCurrentPosition = vi.fn()
+        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition }, language: 'en-CA' })
+        render(<PlaceControl disabled label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+        fireEvent.input(search(), { target: { value: 'Victoria' } })
+        fireEvent.click(search())
+        fireEvent.focus(search())
+        fireEvent.keyDown(search(), { key: 'ArrowDown' })
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(fetch).not.toHaveBeenCalled()
+        expect(screen.queryByRole('option')).toBeNull()
+        expect(getCurrentPosition).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

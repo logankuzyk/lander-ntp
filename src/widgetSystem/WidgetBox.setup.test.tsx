@@ -305,6 +305,158 @@ describe('the setup button', () => {
     })
   })
 
+  describe('when the last button goes', () => {
+    const box = () => document.querySelector<HTMLElement>('.widget-box')!
+
+    it('gives focus to the box when it was on the button, so the keyboard is not dropped on the page', async () => {
+      const { need } = asking()
+      draw(example([need]))
+      const button = setupButton('Example, Allow access')
+      button.focus()
+
+      await settle(() => fireEvent.click(button))
+
+      expect(document.querySelector('.example')).not.toBeNull()
+      expect(document.activeElement).toBe(box())
+    })
+
+    it('makes the box focusable only for that, and takes it back when focus moves on', async () => {
+      const { need } = asking()
+      draw(example([need]))
+      expect(box().hasAttribute('tabindex')).toBe(false)
+      const button = setupButton('Example, Allow access')
+      button.focus()
+
+      await settle(() => fireEvent.click(button))
+      expect(box().getAttribute('tabindex')).toBe('-1')
+      box().blur()
+
+      expect(box().hasAttribute('tabindex')).toBe(false)
+    })
+
+    it('does the same when a state panel, and not the View, takes its place', async () => {
+      const { need } = asking()
+      const definition: WidgetDefinition<Options> = {
+        ...example([need]),
+        source: {
+          source: {
+            cache: { get: () => Promise.resolve(undefined), keys: () => Promise.resolve([]) },
+          } as never,
+          useQuery: () => ({ context: undefined, query: null }),
+        },
+      } as never
+      draw(definition)
+      const button = setupButton('Example, Allow access')
+      button.focus()
+
+      await settle(() => fireEvent.click(button))
+
+      expect(document.querySelector('.example')).toBeNull()
+      expect(document.activeElement).toBe(box())
+    })
+
+    it('leaves focus where it is when it was not on the button', async () => {
+      const { need } = asking()
+      render(
+        <>
+          <input aria-label="Elsewhere" />
+          <EditModeProvider>
+            <WidgetBox definition={example([need])} options={{}} page={PAGE} rect={RECT} />
+          </EditModeProvider>
+        </>,
+      )
+      const elsewhere = screen.getByLabelText('Elsewhere')
+      elsewhere.focus()
+
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+
+      expect(document.activeElement).toBe(elsewhere)
+      expect(box().hasAttribute('tabindex')).toBe(false)
+    })
+
+    it('does not touch the box’s own tab stop in edit mode', async () => {
+      const { need } = asking()
+      function Edit() {
+        const { enter } = useEditMode()
+        return <button onClick={enter}>enter</button>
+      }
+      render(
+        <EditModeProvider>
+          <Edit />
+          <WidgetBox definition={example([need])} options={{}} page={PAGE} rect={RECT} />
+        </EditModeProvider>,
+      )
+      fireEvent.click(screen.getByText('enter'))
+      const button = setupButton('Example, Allow access')
+      button.focus()
+
+      await settle(() => fireEvent.click(button))
+
+      expect(document.activeElement).toBe(box())
+      expect(box().getAttribute('tabindex')).toBe('0')
+      box().blur()
+      expect(box().getAttribute('tabindex')).toBe('0')
+    })
+  })
+
+  describe('an action that fails', () => {
+    it('can be pressed again after one that rejects, and asks nothing again for it', async () => {
+      const run = vi
+        .fn()
+        .mockImplementationOnce(() => Promise.reject(new Error('no')))
+        .mockImplementation(() => Promise.resolve())
+      const need: Need<Options> = {
+        action: { kind: 'ask', run },
+        id: 'allowed',
+        label: 'Allow access',
+        met: () => false,
+      }
+      draw(example([need]))
+
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+
+      expect(run).toHaveBeenCalledTimes(2)
+    })
+
+    it('can be pressed again after one that throws', async () => {
+      const run = vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw new Error('no')
+        })
+        .mockImplementation(() => Promise.resolve())
+      const need: Need<Options> = {
+        action: { kind: 'ask', run },
+        id: 'allowed',
+        label: 'Allow access',
+        met: () => false,
+      }
+      draw(example([need]))
+
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+
+      expect(run).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not check the needs again for an action that failed', async () => {
+      const met = vi.fn(() => false)
+      const need: Need<Options> = {
+        action: { kind: 'ask', run: () => Promise.reject(new Error('no')) },
+        id: 'allowed',
+        label: 'Allow access',
+        met,
+      }
+      draw(example([need]))
+      const asked = met.mock.calls.length
+
+      await settle(() => fireEvent.click(setupButton('Example, Allow access')))
+
+      expect(met).toHaveBeenCalledTimes(asked)
+    })
+  })
+
   describe('an option need', () => {
     it('is drawn, and not pressable, where there is no popover to open (a Widget drawn alone)', () => {
       const need: Need<Options> = {

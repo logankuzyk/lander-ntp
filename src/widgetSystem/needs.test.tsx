@@ -519,12 +519,14 @@ describe('useUnmetNeed', () => {
     it('stops listening to all of it when the Widget goes', async () => {
       const events = permissionEvents()
       const { status } = device()
+      const unlisten = vi.spyOn(status, 'removeEventListener')
       const view = render(<Probe watch />)
       await answer(() => {})
       const removed = vi.spyOn(document, 'removeEventListener')
 
       view.unmount()
 
+      expect(unlisten).toHaveBeenCalledWith('change', expect.any(Function))
       expect(events.listening()).toBe(0)
       expect(removed).toHaveBeenCalledWith('visibilitychange', expect.anything())
       // The status can still say it changed; nothing is listening, and nothing throws.

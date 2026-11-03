@@ -1,6 +1,7 @@
-import { useRef } from 'preact/hooks'
+import { useLayoutEffect, useRef } from 'preact/hooks'
 
-import type { Need, NeedAction } from './needs'
+import { focusBox } from './focusBox'
+import { type Need, type NeedAction, useAsk } from './needs'
 import { useOptionsPopover } from './useOptionsPopover'
 
 /** A need that says what to tell people and what pressing the button does. */
@@ -30,13 +31,26 @@ type SetupButtonProps<O> = {
  * What pressing it does is the need's action. To open the options it is a toggle, as the Options
  * button is: pressed again it closes them. To ask the browser it calls `run` first of all, with
  * nothing awaited before it, since Firefox shows its prompt only from a click's own call, and
- * it does not ask again while the first is waiting.
+ * it does not ask again while the first is waiting (see `useAsk`). When the button goes with
+ * focus on it, focus goes to the Widget's box.
  */
 export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>) {
   const options = useOptionsPopover()
   const { action, label } = need
-  // Not state: a second press in the same moment must see it, before any render.
-  const asking = useRef(false)
+  const ask = useAsk(onAsked)
+  const button = useRef<HTMLButtonElement>(null)
+  // When the button goes (its need is met, and the View or a state panel takes its place) with
+  // focus on it, focus goes to the Widget's box rather than being dropped on the page. The box is
+  // not a tab stop outside edit mode: it takes focus only for this (see `focusBox`).
+  useLayoutEffect(
+    () => () => {
+      const current = button.current
+      if (!current || document.activeElement !== current) return
+      const box = current.closest<HTMLElement>('.widget-box')
+      if (box) focusBox(box).focus()
+    },
+    [],
+  )
   // What it shows, with a comma between: left to work out from its spans, a browser reads the two
   // lines as one run ("Weather Choose a place") or puts the comma where it was not written.
   const accessibleName = `${name}, ${label}`
@@ -66,6 +80,7 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
           if (open) options.close()
           else options.open(id, action.option)
         }}
+        ref={button}
         type="button"
       >
         {words}
@@ -79,27 +94,9 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
       class="widget-setup"
       // What a callout points at (see onboarding/target).
       data-callout-target="setup"
-      onClick={() => {
-        if (asking.current) return
-        asking.current = true
-        let answer: unknown
-        try {
-          // First, before anything is awaited or drawn: the browser's prompt needs the click.
-          answer = action.run()
-        } catch {
-          asking.current = false
-          return
-        }
-        void Promise.resolve(answer).then(
-          () => {
-            asking.current = false
-            onAsked()
-          },
-          () => {
-            asking.current = false
-          },
-        )
-      }}
+      // First, before anything is awaited or drawn: the browser's prompt needs the click.
+      onClick={() => ask(action.run)}
+      ref={button}
       type="button"
     >
       {words}

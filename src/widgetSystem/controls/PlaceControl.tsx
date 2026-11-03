@@ -60,7 +60,7 @@ export function PlaceControl({
 
   // The click that shows the browser's prompt.
   const follow = async () => {
-    if (locating.current) return
+    if (locating.current || disabled) return
     locating.current = true
     setLocateFailed(false)
     try {
