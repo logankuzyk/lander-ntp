@@ -48,6 +48,18 @@ const preview: Preview = {
           styles: { height: '900px', width: '1440px' },
           type: 'desktop',
         },
+        // For the stories about a window too small for the options popover to sit beside a
+        // widget: shorter than its form, and a phone's width.
+        phone390: {
+          name: '390 by 800',
+          styles: { height: '800px', width: '390px' },
+          type: 'mobile',
+        },
+        short1366: {
+          name: '1366 by 400',
+          styles: { height: '400px', width: '1366px' },
+          type: 'desktop',
+        },
       },
     },
   },

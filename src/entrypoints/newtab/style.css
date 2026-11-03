@@ -152,10 +152,47 @@ body {
   pointer-events: none;
 }
 
+/*
+ * The Options button, in the top left corner a frame keeps for it: round, dark enough to read on
+ * a bright photo, and bigger to hit than it looks (the ring is 1.75rem, the icon 14px).
+ */
+.widget-box__options {
+  position: absolute;
+  top: 0.375rem;
+  left: 0.375rem;
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 45%);
+  color: inherit;
+  cursor: pointer;
+  text-shadow: none;
+  transition: background-color 150ms;
+}
+
+.widget-box__options:hover,
+.widget-box__options[aria-expanded='true'] {
+  background: rgb(0 0 0 / 70%);
+}
+
+.widget-box__options:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .grid--editing::before,
   .grid__dots {
     animation: none;
+  }
+
+  .widget-box__options {
+    transition: none;
   }
 }
 
@@ -880,6 +917,33 @@ body {
   margin-top: var(--popover-block);
 }
 
+/*
+ * A Widget's options, beside its box. It is a popover in the look of the others, but not in
+ * their corner: where it goes is set from the script (left, top, max-height: see placeBeside),
+ * against the Widget. The header stays, and the options scroll under it when the window is too
+ * short. Nothing here is positioned inside the body, so a menu opened in the form is placed
+ * against the popover and not clipped by the scrolling.
+ */
+.options-popover {
+  right: auto;
+  bottom: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(20rem, calc(100vw - 1rem));
+}
+
+.options-popover__body {
+  min-height: 0;
+  /* Room for the focus ring the controls draw outside themselves. */
+  margin: -0.25rem;
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 30%) transparent;
+}
+
 /* A list of rows to drag into order, each with an eye to show or hide it. */
 
 .fields {
@@ -1530,9 +1594,10 @@ button.chip:hover {
 /* Below this width the settings panel (40rem and the margins beside it) reaches the photo
    credit's side, and a photo's details (20rem) do from about 38rem. The note moves to the top
    of the page for as long as one is open, so it never lands on the panel the person is using:
-   below the clock and the weather, above the panel. */
+   below the clock and the weather, above the panel. A Widget's options popover is not one of
+   them: it sits by its Widget, and the note at the top would cover its title. */
 @media (max-width: 60rem) {
-  .popover ~ .notice {
+  .popover:not(.options-popover) ~ .notice {
     top: 6rem;
     bottom: auto;
   }

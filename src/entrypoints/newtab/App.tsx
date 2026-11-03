@@ -20,7 +20,9 @@ import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
 import { useStorageItem } from '@/settings/useStorageItem'
 import { usePruneReadings } from '@/widgets/Weather/usePruneReadings'
+import type { PageValueName, PageValues } from '@/widgetSystem/definition'
 import { pageValues } from '@/widgetSystem/fromSettings'
+import { OptionsPopoverProvider } from '@/widgetSystem/useOptionsPopover'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
@@ -53,6 +55,7 @@ export function App() {
   // The Layout is the stored one, or worked out from the settings while there is none. Only
   // right once the stored settings have loaded, as the hook starts from the defaults.
   const {
+    commit,
     layout,
     loaded: layoutLoaded,
     readOnly: layoutReadOnly,
@@ -101,6 +104,17 @@ export function App() {
     })()
   }
 
+  // The shared 24-hour switch in a Widget's options is the page's `clock.hour12`: the one setting
+  // a Widget's options write, and the one phase 2 may write to the settings' Clock block. Laid
+  // over the settings as stored now, so what another tab changed meanwhile is not saved over.
+  const setPageValue = <N extends PageValueName>(name: N, value: PageValues[N]) => {
+    void (async () => {
+      if (settingsReadOnly) return
+      const latest = await settingsItem.getValue()
+      setSettings({ ...latest, clock: { ...latest.clock, [name]: value } })
+    })()
+  }
+
   useEffect(() => {
     if (saveFailures === 0) return
     const timer = setTimeout(() => setSaveFailed(false), SAVE_FAILED_MS)
@@ -132,7 +146,18 @@ export function App() {
           places, so anything that depends on them waits for both. The photo already does:
           usePhotoRotation is held back until the settings are known.
         */}
-        {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+        <OptionsPopoverProvider
+          commit={commit}
+          layout={layout}
+          loaded={settingsLoaded && layoutLoaded}
+          onOpen={close}
+          onPageValueChange={setPageValue}
+          // The corner above the controls is for one popover at a time; this one sits by its Widget.
+          otherOpen={popover !== null}
+          page={pageValues(settings)}
+        >
+          {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+        </OptionsPopoverProvider>
         {photo && <PhotoCredit photo={photo} />}
         {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
         {popover === 'settings' && (
