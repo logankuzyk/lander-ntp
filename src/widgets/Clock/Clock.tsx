@@ -29,7 +29,8 @@ export function Clock({ hour12, locale, showDate, showSeconds }: ClockProps) {
   }, [showSeconds])
 
   return (
-    <div class="clock">
+    // The modifiers tell the styles how much to fit in the box (see `.clock` in the page's styles).
+    <div class={`clock${showSeconds ? ' clock--seconds' : ''}${showDate ? ' clock--date' : ''}`}>
       <time class="clock__time" dateTime={now.toISOString()}>
         {formatTime(now, { hour12, locale, showSeconds })}
       </time>
