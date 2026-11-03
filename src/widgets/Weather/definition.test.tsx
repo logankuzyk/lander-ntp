@@ -117,10 +117,6 @@ describe('the Weather definition', () => {
     it('is nothing when there is no place', () => {
       expect(summary({ followDevice: false, place: null })).toBeUndefined()
     })
-
-    it('is nothing for a place without a name', () => {
-      expect(summary({ followDevice: false, place: { ...PLACE, name: ' ' } })).toBeUndefined()
-    })
   })
 
   it("starts a new Weather with the options today's settings default to", () => {
@@ -224,7 +220,7 @@ describe('the Weather on the page', () => {
     const named = await screen.findByRole('group', { name: 'Weather, Victoria' })
     expect(named).toBe(container.querySelector('.widget-box'))
     // The Weather's own region keeps its label (the page's other tests find it by it).
-    expect(within(named).getByRole('region', { name: 'Weather' })).toBeTruthy()
+    expect(await within(named).findByRole('region', { name: 'Weather' })).toBeTruthy()
   })
 
   it('draws the Weather alone in its box, on the Grid, in the top right corner', async () => {

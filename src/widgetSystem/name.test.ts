@@ -23,17 +23,42 @@ describe('accessibleName', () => {
   })
 
   it('adds the summary after a comma', () => {
-    expect(accessibleName(example((o) => o.place), { place: 'Victoria' })).toBe('Example, Victoria')
+    expect(
+      accessibleName(
+        example((o) => o.place),
+        { place: 'Victoria' },
+      ),
+    ).toBe('Example, Victoria')
   })
 
   it('is just the name when the summary has nothing to say', () => {
-    expect(accessibleName(example(() => undefined), { place: 'Victoria' })).toBe('Example')
-    expect(accessibleName(example(() => ''), { place: 'Victoria' })).toBe('Example')
-    expect(accessibleName(example(() => '   '), { place: 'Victoria' })).toBe('Example')
+    expect(
+      accessibleName(
+        example(() => undefined),
+        { place: 'Victoria' },
+      ),
+    ).toBe('Example')
+    expect(
+      accessibleName(
+        example(() => ''),
+        { place: 'Victoria' },
+      ),
+    ).toBe('Example')
+    expect(
+      accessibleName(
+        example(() => '   '),
+        { place: 'Victoria' },
+      ),
+    ).toBe('Example')
   })
 
   it('trims the summary', () => {
-    expect(accessibleName(example(() => '  Victoria '), { place: '' })).toBe('Example, Victoria')
+    expect(
+      accessibleName(
+        example(() => '  Victoria '),
+        { place: '' },
+      ),
+    ).toBe('Example, Victoria')
   })
 
   it('gives the summary the options it was asked about', () => {

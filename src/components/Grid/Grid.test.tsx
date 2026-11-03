@@ -83,11 +83,11 @@ describe('Grid, the names of the boxes', () => {
     ])
   })
 
-  it('leaves a box for a Widget this version does not know without a name it cannot give', () => {
+  it('calls a Widget this version does not know by the name edit mode gives it', () => {
     const grid = drawnGrid(layoutOf(stored('what0001', 'tomorrow', [1, 1, 2, 2])))
     const box = grid.querySelector('.widget-box')
-    expect(box?.getAttribute('aria-label')).toBeNull()
-    expect(box?.getAttribute('role')).toBeNull()
+    expect(box?.getAttribute('aria-label')).toBe('Unknown widget')
+    expect(box?.getAttribute('role')).toBe('group')
   })
 })
 
@@ -298,7 +298,13 @@ describe('Grid in edit mode', () => {
     expect(grid.querySelector('.grid__dots')).toBeNull()
     expect(grid.querySelectorAll('[tabindex]')).toHaveLength(0)
     expect(grid.querySelectorAll('.widget-box__name')).toHaveLength(0)
-    expect(screen.queryByRole('group')).toBeNull()
+    // Changed by W20: each box is a named group outside edit mode too (it has a tab stop and a
+    // drawn name only in edit mode).
+    expect(screen.getAllByRole('group').map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Weather',
+      'Clock',
+      'Clock',
+    ])
   })
 
   it('draws a dot at every cell corner: 13 by 9, from edge to edge of the Grid', () => {
@@ -351,6 +357,24 @@ describe('Grid in edit mode', () => {
     const names = [...grid.querySelectorAll('.widget-box__name')]
     expect(names.map((name) => name.textContent)).toEqual(['Weather', 'Clock', 'Clock'])
     expect(names.every((name) => name.getAttribute('aria-hidden') === 'true')).toBe(true)
+  })
+
+  it('says the same in the frame as the box did: two Weathers are told apart by their places', () => {
+    const { grid } = renderEditable(
+      layoutOf(
+        stored('wthr0001', 'weather', [1, 1, 2, 2], { followDevice: false, place: PLACE }),
+        stored('wthr0002', 'weather', [4, 1, 2, 2], { followDevice: true }),
+      ),
+    )
+    const before = screen.getAllByRole('group').map((group) => group.getAttribute('aria-label'))
+    edit()
+
+    const groups = screen.getAllByRole('group')
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(before)
+    expect(before).toEqual(['Weather, Victoria', 'Weather, Current location'])
+    expect([...grid.querySelectorAll('.widget-box__name')].map((name) => name.textContent)).toEqual(
+      before,
+    )
   })
 
   it('goes row by row, left to right, for Tab: three Widgets stored out of order', () => {
