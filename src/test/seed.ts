@@ -36,6 +36,19 @@ export type PageSeed = {
 const absolute = (url: string) => new URL(url, globalThis.location.href).href
 
 /**
+ * Stores a reading for a place, fresh. For a story whose `play` adds a Weather for a place no
+ * Weather on the page was at: the page forgets readings no Weather uses once it has loaded
+ * (`usePruneReadings`), so one seeded with the page is gone by then.
+ */
+export async function seedReading(
+  place: Place,
+  unit: Settings['weather']['unit'],
+  weather: Weather,
+) {
+  await weatherSource.cache.set(cacheKey(place, unit), { data: weather, fetchedAt: Date.now() })
+}
+
+/**
  * Fills the (fake) browser storage so `App` draws a given state of the page with nothing to
  * fetch: the photos come from a fresh manifest cache, so `getManifest` serves them and does not
  * revalidate. Stories call it from `beforeEach`; tests call it before rendering.

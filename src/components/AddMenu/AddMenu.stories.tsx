@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
+import { expect, waitFor } from 'storybook/test'
 
 import { App } from '@/entrypoints/newtab/App'
-import { PAGE_SEEDS, seedPage } from '@/test/seed'
+import { makePlace, makeWeather } from '@/test/fixtures'
+import { PAGE_SEEDS, seedPage, seedReading } from '@/test/seed'
+import { weatherSource } from '@/weather/weatherSource'
 
 import { addFromMenu, openAddMenu, startEditing } from '../../../.storybook/startEditing'
 
@@ -58,6 +61,10 @@ export const WaitingOptions: Story = {
   play: async ({ canvasElement }) => {
     const canvas = await startEditing(canvasElement)
     await openAddMenu(canvas)
+    // The page forgets the reading when it sees no Weather uses it; once it has, a person would
+    // wait for the forecast, and a story makes no request, so the reading is put back.
+    await waitFor(async () => expect(await weatherSource.cache.keys()).toEqual([]))
+    await seedReading(makePlace(), 'celsius', makeWeather({ temperature: 13.4 }))
     await addFromMenu(canvas, 'Weather')
   },
 }

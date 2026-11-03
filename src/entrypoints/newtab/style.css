@@ -514,6 +514,17 @@ body {
   }
 }
 
+/*
+ * While editing, Add makes the buttons 3rem wider again, which on a phone leaves the credit no
+ * room beside them at all. It moves up to the line above them, where it has the window's width.
+ */
+@media (max-width: 30rem) {
+  .grid--editing ~ .credit {
+    bottom: 4.25rem;
+    max-width: calc(100% - 3rem);
+  }
+}
+
 .credit a {
   color: inherit;
   text-decoration: underline;
@@ -1531,6 +1542,18 @@ button.chip:hover {
   background: rgb(24 24 24 / 94%);
   box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 40%);
   text-shadow: none;
+}
+
+/*
+ * On a narrow window Add is far from the right edge (the buttons after it take the room), so a
+ * menu with its right edge on Add's would run off the left of the window. Its left edge goes on
+ * Add's instead.
+ */
+@media (max-width: 30rem) {
+  .add-menu {
+    right: auto;
+    left: 0;
+  }
 }
 
 .add-menu__header {
