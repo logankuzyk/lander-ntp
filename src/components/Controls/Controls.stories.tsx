@@ -49,7 +49,11 @@ type Story = StoryObj<typeof meta>
 /** Browsing: the Edit button beside the page's own, first, a pencil like theirs. */
 export const Browsing: Story = {}
 
-/** Editing, after pressing Edit: Add joins Done, which is pressed; the rest stay put. */
+/**
+ * Editing, after pressing Edit: Add joins Done, which is pressed; the rest stay put. It shows
+ * the bar alone: on a narrow window the page also lifts the photo credit above the buttons while
+ * editing (it follows the Grid's edit mode), which only the page's own stories (`AddMenu`) show.
+ */
 export const Editing: Story = {
   play: async ({ canvasElement }) => {
     await startEditing(canvasElement)

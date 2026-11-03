@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { layoutItem } from '@/layout/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makePlace, makeWeather } from '@/test/fixtures'
@@ -207,6 +208,38 @@ describe('App, adding a Widget from the Add menu', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('menu')).toBeTruthy()
+  })
+})
+
+describe('App, an add the browser rejects', () => {
+  it('puts focus back on Add, says nothing was added, and says the save failed', async () => {
+    await drawn(v023({ clock: true, weather: false }))
+    vi.spyOn(layoutItem, 'setValue').mockRejectedValueOnce(new Error('QUOTA_BYTES_PER_ITEM'))
+    edit()
+
+    add('Weather')
+    await settled()
+
+    // The Widget went with the save: the Layout is the one that is stored.
+    expect(document.querySelector('.widget-box[data-widget="weather"]')).toBeNull()
+    // Focus was on the new Widget's frame, which is gone: it is on Add, not on the page.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add' }))
+    const live = [...document.querySelectorAll('[aria-live="polite"]')].map((el) => el.textContent)
+    expect(live.join('')).not.toContain('Weather added.')
+    expect(screen.getByRole('status').textContent).toContain("Couldn't save that")
+  })
+
+  it('keeps the line and the focus when the save goes through', async () => {
+    await drawn(v023({ clock: true, weather: false }))
+    edit()
+
+    add('Weather')
+    await settled()
+
+    const box = await newestBox()
+    expect(document.activeElement).toBe(box)
+    const live = [...document.querySelectorAll('[aria-live="polite"]')].map((el) => el.textContent)
+    expect(live.join('')).toContain('Weather added.')
   })
 })
 

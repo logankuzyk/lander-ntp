@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import { addWidget } from '@/layout/ops'
 import type { Layout } from '@/layout/types'
+import { widgetBox } from '@/widgetSystem/focusBox'
 import { WIDGETS } from '@/widgetSystem/registry'
 
 import { type ItemState, itemState, menuNote } from './availability'
@@ -18,16 +19,19 @@ type AddMenuProps = {
   open: boolean
 }
 
-/** How long "Weather added." stays in the live region, so the same words can be said again. */
+/**
+ * How long "Weather added." stays in the live region, and how long an add is watched for its save
+ * being rejected (which takes the Widget away again).
+ */
 const SAID_MS = 3_000
 
-const ITEM = '[role="menuitem"]'
+/**
+ * A live region says what changes, so the same words again are silent. Every second line has this
+ * (it is read as nothing) on its end, so a second add at once is a change.
+ */
+const ZERO_WIDTH_SPACE = '\u200B'
 
-/** The Widget's box on the page, by the id it is stored under. */
-const boxOf = (id: string) =>
-  [...document.querySelectorAll<HTMLElement>('.widget-box')].find(
-    (box) => box.dataset.widgetId === id,
-  ) ?? null
+const ITEM = '[role="menuitem"]'
 
 /**
  * The Add button and its menu, in the Bottom bar while editing. The menu lists the registry's
@@ -49,8 +53,9 @@ export function AddMenu({ layout, loaded, onCommit, onOpenChange, open }: AddMen
   const noteId = useId()
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
-  const [said, setSaid] = useState('')
-  const pending = useRef<string | null>(null)
+  const [said, setSaid] = useState<{ n: number; text: string } | null>(null)
+  // The Widget just added, until its line has gone; `seen` once the Layout has had it.
+  const added = useRef<{ id: string; seen: boolean } | null>(null)
 
   const editable = { layout, readOnly: !canChange || !loaded }
   const note = menuNote(editable)
@@ -74,27 +79,43 @@ export function AddMenu({ layout, loaded, onCommit, onOpenChange, open }: AddMen
   }, [open, onOpenChange])
 
   // The new Widget is in the document once the Layout has been drawn with it: focus goes to its
-  // frame. If it cannot be found, to the button, so that focus is not left on the page.
+  // frame. If it cannot be found, to the button, so that focus is not left on the page. If the
+  // save is then rejected the Layout goes back without it, and so does what was said: focus goes
+  // to the button if it was on the frame that has gone.
   useEffect(() => {
-    const id = pending.current
-    if (id === null) return
-    pending.current = null
-    ;(boxOf(id) ?? button.current)?.focus()
+    const watched = added.current
+    if (watched === null) return
+    const present = layout.widgets.some(
+      (widget) => widget.kind !== 'malformed' && widget.placed.id === watched.id,
+    )
+    if (!watched.seen) {
+      if (!present) return
+      watched.seen = true
+      ;(widgetBox(watched.id) ?? button.current)?.focus()
+    } else if (!present) {
+      added.current = null
+      setSaid(null)
+      const focused = document.activeElement
+      if (!focused || focused === document.body || !focused.isConnected) button.current?.focus()
+    }
   }, [layout])
 
   useEffect(() => {
-    if (said === '') return
-    const timer = setTimeout(() => setSaid(''), SAID_MS)
+    if (said === null) return
+    const timer = setTimeout(() => {
+      added.current = null
+      setSaid(null)
+    }, SAID_MS)
     return () => clearTimeout(timer)
   }, [said])
 
   const pick = (type: string, name: string) => {
-    const added = addWidget(editable, type)
-    if (!added.ok) return
+    const result = addWidget(editable, type)
+    if (!result.ok) return
     onOpenChange(false)
-    pending.current = added.id
-    onCommit(added.layout)
-    setSaid(`${name} added.`)
+    added.current = { id: result.id, seen: false }
+    onCommit(result.layout)
+    setSaid((was) => ({ n: (was?.n ?? 0) + 1, text: `${name} added.` }))
   }
 
   const onMenuKeyDown = (event: KeyboardEvent) => {
@@ -197,7 +218,7 @@ export function AddMenu({ layout, loaded, onCommit, onOpenChange, open }: AddMen
       )}
       {/* Said when a Widget is added, to people who cannot see it appear. Always on the page. */}
       <p aria-live="polite" class="visually-hidden">
-        {said}
+        {said && said.text + (said.n % 2 === 0 ? ZERO_WIDTH_SPACE : '')}
       </p>
     </div>
   )
@@ -214,11 +235,9 @@ function MenuItem({
   state: ItemState
   type: string
 }) {
-  const reasonId = useId()
   const reason = state.available ? null : state.reason
   return (
     <button
-      aria-describedby={reason !== null ? reasonId : undefined}
       // Not `disabled`: it stays a stop for focus, so that its reason is read out.
       aria-disabled={state.available ? undefined : true}
       class="add-menu__item"
@@ -230,11 +249,7 @@ function MenuItem({
       type="button"
     >
       <span>{name}</span>
-      {reason !== null && (
-        <span class="add-menu__reason" id={reasonId}>
-          {reason}
-        </span>
-      )}
+      {reason !== null && <span class="add-menu__reason">{reason}</span>}
     </button>
   )
 }

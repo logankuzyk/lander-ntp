@@ -34,8 +34,9 @@ type ControlsProps = {
 
 /**
  * Bottom-right controls. The → and i keys do the same as the buttons, E does what the Edit
- * button does, and A opens the Add menu while editing. Escape leaves edit mode, but not when something else used it first: a popover or
- * a dropdown closes on its Escape, ahead of this listener, so the innermost thing goes first.
+ * button does, and A opens the Add menu while editing. Escape leaves edit mode, but not when
+ * something else used it first: a menu, a popover or a dropdown closes on its Escape, ahead of
+ * this listener, so the innermost thing goes first.
  */
 export function Controls({
   busy,

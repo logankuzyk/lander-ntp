@@ -135,9 +135,33 @@ describe('Controls, the Add menu', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'a' })
     fireEvent.keyDown(screen.getByRole('button', { name: 'Inside' }), { key: 'a' })
     fireEvent.keyDown(window, { ctrlKey: true, key: 'a' })
+    fireEvent.keyDown(window, { key: 'a', metaKey: true })
+    fireEvent.keyDown(window, { altKey: true, key: 'a' })
     fireEvent.keyDown(window, { key: 'A', shiftKey: true })
 
     expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('does nothing for A outside edit mode, and leaves the menu shut when edit mode starts', () => {
+    renderControls()
+
+    fireEvent.keyDown(window, { key: 'a' })
+    fireEvent.keyDown(window, { key: 'e' })
+
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(addButton().getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('is shut, not only gone, the next time edit mode starts', () => {
+    renderControls()
+    openMenu()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    edit()
+
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(addButton().getAttribute('aria-expanded')).toBe('false')
   })
 
   it('moves with the arrow keys, wrapping, and with Home and End', () => {
@@ -259,6 +283,21 @@ describe('Controls, picking a Widget', () => {
     expect(next.widgets).toHaveLength(2)
   })
 
+  it('says it again when a second one of the same kind is added at once', () => {
+    renderControls()
+    openMenu()
+    fireEvent.click(item('Weather'))
+    const live = () => document.querySelector('[aria-live="polite"]')?.textContent ?? ''
+    const first = live()
+
+    fireEvent.click(addButton())
+    fireEvent.click(item('Weather'))
+
+    // A live region says what changes: the same text again would be silent.
+    expect(live()).not.toBe(first)
+    expect(live().replaceAll('​', '')).toBe('Weather added.')
+  })
+
   it('says what was added, politely', () => {
     renderControls()
     openMenu()
@@ -317,16 +356,13 @@ describe('Controls, a Widget with no room', () => {
     expect(item(/Weather/).getAttribute('aria-disabled')).toBeNull()
   })
 
-  it('describes the unavailable item by the reason', () => {
+  it('reads the reason once: in the item, not again as a description of it', () => {
     renderControls({ layout: FULL })
     openMenu()
 
     const weather = item(/Weather/)
-    const description = weather.getAttribute('aria-describedby')
-    expect(description).toBeTruthy()
-    expect(document.getElementById(description ?? '')?.textContent).toBe(
-      'There is no room for a Weather.',
-    )
+    expect(weather.getAttribute('aria-describedby')).toBeNull()
+    expect(weather.textContent).toContain('There is no room for a Weather.')
   })
 })
 
@@ -348,6 +384,40 @@ describe('Controls, when the Layout cannot be changed', () => {
     expect(item('Weather').getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(item('Weather'))
     expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('still adds at eight widgets: the Widget limit is not this menu’s to check yet', () => {
+    const weather = (id: string, col: number, row: number) => ({
+      col,
+      h: 2,
+      id,
+      options: {},
+      row,
+      type: 'weather',
+      w: 2,
+    })
+    // Eight Weathers along the top and bottom edges, with the middle free.
+    const eight = checkLayout({
+      v: 1,
+      widgets: [
+        weather('weather1', 1, 1),
+        weather('weather2', 3, 1),
+        weather('weather3', 9, 1),
+        weather('weather4', 11, 1),
+        weather('weather5', 1, 7),
+        weather('weather6', 3, 7),
+        weather('weather7', 9, 7),
+        weather('weather8', 11, 7),
+      ],
+    })
+    const { onCommit } = renderControls({ layout: eight })
+    openMenu()
+
+    expect(item('Clock').getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(item('Clock'))
+
+    const [next] = onCommit.mock.calls[0] as [Layout]
+    expect(next.widgets).toHaveLength(9)
   })
 
   it('offers a Clock on an empty Grid, as an update with the Clock off finds it', () => {
