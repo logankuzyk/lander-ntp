@@ -83,6 +83,8 @@ export function Controls({
         aria-label={editing ? 'Done' : 'Edit'}
         aria-pressed={editing}
         class={editing ? 'control control--done' : 'control'}
+        // What a callout points at (see onboarding/target).
+        data-callout-target="edit"
         // Where focus goes when edit mode ends with a Widget's frame focused (see useEditMode).
         data-edit-toggle
         onClick={editing ? leave : enter}

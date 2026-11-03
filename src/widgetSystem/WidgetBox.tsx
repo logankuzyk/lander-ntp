@@ -100,6 +100,8 @@ export function Box({
     <div
       aria-label={name}
       class="widget-box"
+      // What a callout points at (see onboarding/target): a Widget by its type.
+      data-callout-target={`widget:${widget}`}
       data-widget={widget}
       data-widget-id={id}
       role="group"
@@ -116,6 +118,8 @@ export function Box({
           aria-haspopup="dialog"
           aria-label={optionsLabel ?? `${name} options`}
           class="widget-box__options"
+          // What a callout points at (see onboarding/target).
+          data-callout-target="options"
           // Opens and closes the popover itself, so pressing it isn't a click outside.
           data-popover-toggle
           onClick={() => options.toggle(optionsId)}

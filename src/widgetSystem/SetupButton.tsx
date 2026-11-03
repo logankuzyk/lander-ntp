@@ -56,6 +56,8 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
         aria-haspopup="dialog"
         aria-label={accessibleName}
         class="widget-setup"
+        // What a callout points at (see onboarding/target).
+        data-callout-target="setup"
         // Opens and closes the popover itself, so pressing it isn't a click outside.
         data-popover-toggle
         disabled={!available}
@@ -75,6 +77,8 @@ export function SetupButton<O>({ id, name, need, onAsked }: SetupButtonProps<O>)
     <button
       aria-label={accessibleName}
       class="widget-setup"
+      // What a callout points at (see onboarding/target).
+      data-callout-target="setup"
       onClick={() => {
         if (asking.current) return
         asking.current = true
