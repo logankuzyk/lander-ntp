@@ -82,6 +82,33 @@ describe('openDatabase', () => {
     }
   })
 
+  it('opens one cold database file from several processes at once', async () => {
+    const moduleUrl = new URL('./database.ts', import.meta.url).href
+    const source = `
+      import { openDatabase, runMigrations } from ${JSON.stringify(moduleUrl)}
+      const db = openDatabase(process.argv[1])
+      runMigrations(db, [{ id: 1, up(database) {
+        database.exec('CREATE TABLE IF NOT EXISTS things (id INTEGER)')
+      } }])
+      db.close()
+    `
+    const exitCodes: number[] = []
+    for (let round = 0; round < 4; round += 1) {
+      const path = databasePath()
+      const starts = Array.from(
+        { length: 6 },
+        () =>
+          new Promise<number>((resolve, reject) => {
+            const child = spawn(process.execPath, ['--input-type=module', '--eval', source, path])
+            child.once('error', reject)
+            child.once('exit', (code) => resolve(code ?? 1))
+          }),
+      )
+      exitCodes.push(...(await Promise.all(starts)))
+    }
+    expect(exitCodes).toEqual(Array.from({ length: 24 }, () => 0))
+  })
+
   it('rolls back a failed migration without recording its id', () => {
     const db = openDatabase(':memory:')
     try {
@@ -133,6 +160,7 @@ describe('openDatabase', () => {
           { id: 5, up: () => undefined },
         ]),
       ).toThrow('Duplicate server migration 5')
+      expect(db.prepare('SELECT id FROM server_migrations').all()).toEqual([])
     } finally {
       db.close()
     }
