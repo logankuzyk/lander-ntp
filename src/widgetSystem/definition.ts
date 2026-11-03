@@ -137,12 +137,27 @@ export type Credit = {
 }
 
 /**
+ * The one line the box says in place of a Widget that has nothing to show: while it loads,
+ * when it cannot, and when its source is switched off. Any left out use the shared words.
+ */
+export type StateMessages = {
+  failed?: string
+  loading?: string
+  off?: string
+}
+
+/**
  * What a Widget declares. `R` is what its source loads and `C` what the source carries to the
  * View. Both are only for definitions with a `source`; a Widget without one leaves them alone.
  */
 export type WidgetDefinition<O, R = undefined, C = undefined> = {
   /** A line at the foot of its options, such as who its data is from. */
   credit?: Credit
+  /**
+   * The words for the box's loading, failed and switched-off states, for a Widget with a
+   * source. See `StateMessages`.
+   */
+  messages?: StateMessages
   /** What people read: "Weather". Free to change. */
   name: string
   /**
@@ -155,7 +170,8 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
   sizes: WidgetSizes<O>
   /**
    * Where its data comes from. Run once every need is met; the View is drawn only with a
-   * reading. Defined once, not rebuilt on each render.
+   * reading, and without one the box says why (see `messages`). Defined once, not rebuilt on
+   * each render.
    */
   source?: WidgetSource<O, R, C>
   /** The id that is stored. Never renamed or reused. */

@@ -1,4 +1,5 @@
 import { checkLayout } from '@/layout/check'
+import { COLS, type Rect } from '@/layout/geometry'
 import { layoutItem } from '@/layout/storage'
 import type { StoredLayout } from '@/layout/types'
 import { NEWS } from '@/onboarding/callouts'
@@ -10,12 +11,16 @@ import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
+import { weatherDefinition } from '@/widgets/Weather/definition'
+import { defaultOptions } from '@/widgetSystem/options'
 
 import { makeManifest, makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
 
 export type PageSeed = {
   /** What `sync:layout` holds. Without it the page works the Layout out from `settings`. */
   layout?: StoredLayout
+  /** The photo manifest's say over the weather: `{ enabled: false }` switches it off. */
+  manifestWeather?: { enabled: boolean }
   /** The record synced between devices: what a returning install has. */
   onboarding?: Onboarding
   /** A new install's record, kept on this device until the welcome is answered. */
@@ -35,19 +40,23 @@ const absolute = (url: string) => new URL(url, globalThis.location.href).href
  */
 export async function seedPage({
   layout,
+  manifestWeather,
   onboarding,
   pending,
   settings = DEFAULT_SETTINGS,
   weather,
 }: PageSeed = {}) {
   await manifestCache.setValue({
-    data: makeManifest(
-      STORY_PHOTOS.map((photo) => ({
-        ...photo,
-        pageUrl: absolute(photo.pageUrl),
-        sizes: photo.sizes.map((size) => ({ ...size, url: absolute(size.url) })),
-      })),
-    ),
+    data: {
+      ...makeManifest(
+        STORY_PHOTOS.map((photo) => ({
+          ...photo,
+          pageUrl: absolute(photo.pageUrl),
+          sizes: photo.sizes.map((size) => ({ ...size, url: absolute(size.url) })),
+        })),
+      ),
+      ...(manifestWeather && { weather: manifestWeather }),
+    },
     etag: null,
     fetchedAt: Date.now(),
   })
@@ -172,3 +181,64 @@ export const PAGE_SEEDS = {
     weather: makeWeather({ temperature: 13.4 }),
   },
 } satisfies Record<string, PageSeed>
+
+/** What a Weather's box says when it has no reading to show. */
+export type WeatherBoxState = 'failed' | 'loading' | 'off'
+
+/** The sizes the Weather stories draw it at. */
+export type WeatherBoxSize = 'largest' | 'smallest' | 'starting'
+
+/**
+ * The cells a Weather is drawn in at one of its sizes, from the Grid's top right corner, where
+ * an update puts it. Worked out from its definition, so the stories follow its sizes.
+ */
+export function weatherBoxRect(size: WeatherBoxSize): Rect {
+  const { sizes } = weatherDefinition
+  const { h, w } =
+    size === 'starting' ? sizes.starting(defaultOptions(weatherDefinition)) : sizes[size]
+  return { col: COLS + 1 - w, h, row: 1, w }
+}
+
+/**
+ * A page with one Weather, at one of its sizes, that has no reading to show: `loading` has none
+ * cached and its request never answers (see `stubRequests`), `failed` has none and its request
+ * fails, and `off` has the photo manifest switch the weather off. The Weather stories and the
+ * test that checks them both draw from this.
+ */
+export function weatherStateSeed(state: WeatherBoxState, size: WeatherBoxSize): PageSeed {
+  const { col, h, row, w } = weatherBoxRect(size)
+  return {
+    layout: {
+      v: 1,
+      widgets: [
+        {
+          col,
+          h,
+          id: 'weather1',
+          options: { place: makePlace(), unit: 'celsius' },
+          row,
+          type: 'weather',
+          w,
+        },
+      ],
+    },
+    manifestWeather: state === 'off' ? { enabled: false } : undefined,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+  }
+}
+
+/**
+ * Stands in for the network in a story, so it asks nobody: `hang` never answers, so a
+ * Weather is left loading; `fail` fails as if offline. Returns what puts the real one back.
+ */
+export function stubRequests(kind: 'fail' | 'hang'): () => void {
+  const real = globalThis.fetch
+  globalThis.fetch = () =>
+    kind === 'hang'
+      ? new Promise<Response>(() => {})
+      : Promise.reject(new TypeError('Failed to fetch'))
+  return () => {
+    globalThis.fetch = real
+  }
+}

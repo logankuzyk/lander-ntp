@@ -85,6 +85,9 @@ function Probe({ settings }: { settings: WeatherSettings | null }) {
 const shown = () =>
   document.querySelector('.weather__temperature')?.textContent?.replace('°', '') ?? 'none'
 
+/** The panel the box draws instead of the Weather when it has nothing to show, if it does. */
+const statePanel = () => document.querySelector('.widget-state')
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
@@ -339,6 +342,45 @@ describe('the Weather', () => {
     expect(shown()).toBe('none')
   })
 
+  it("says it can't reach the forecast when the fetch fails and nothing recent is cached", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(statePanel()?.getAttribute('data-state')).toBe('failed'))
+    expect(statePanel()?.textContent).toBe("WeatherCan't reach the forecast")
+    expect(shown()).toBe('none')
+  })
+
+  it('says it is loading, after a moment, while the forecast is being fetched', async () => {
+    // A fetch that never ends stays in the loader's list of requests under way for its key, for
+    // as long as the module lives: a place of its own keeps it from holding up the other tests.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+    const elsewhere = { latitude: 1.5, longitude: 2.5, name: 'Elsewhere' }
+
+    render(<Probe settings={{ ...ON, place: elsewhere }} />)
+    expect(statePanel()).toBeNull()
+
+    await waitFor(() => expect(statePanel()?.getAttribute('data-state')).toBe('loading'))
+    expect(statePanel()?.textContent).toBe('WeatherLoading')
+  })
+
+  it('says nothing while a cached reading is shown, even when the refresh fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
+      data: READING,
+      fetchedAt: Date.now() - MAX_AGE_MS - 1,
+    })
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(shown()).toBe('5'))
+    expect(statePanel()).toBeNull()
+  })
+
   it('waits until the tab is looked at before asking', async () => {
     const fetch = vi.fn().mockResolvedValue(forecast(12))
     vi.stubGlobal('fetch', fetch)
@@ -373,6 +415,9 @@ describe('the Weather', () => {
 
     expect(shown()).toBe('none')
     expect(fetch).not.toHaveBeenCalled()
+    // Not a blank box: it says it is switched off, in the same place.
+    expect(statePanel()?.getAttribute('data-state')).toBe('off')
+    expect(statePanel()?.textContent).toBe('WeatherSwitched off for now')
   })
 
   it('ignores a cache for another place or unit', async () => {

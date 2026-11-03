@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/entrypoints/newtab/App'
 
 import { STORY_PHOTOS } from './fixtures'
-import { PAGE_SEEDS, seedPage } from './seed'
+import { PAGE_SEEDS, seedPage, weatherBoxRect, type WeatherBoxSize, weatherStateSeed } from './seed'
 
 const fetchSpy = vi.fn()
 
@@ -186,4 +186,72 @@ describe('the Grid editing stories', () => {
     expect(document.activeElement).toBe(first)
     expect(first?.getAttribute('aria-label')).toBe('Weather')
   })
+})
+
+// Last, because a Weather left loading keeps its request under way for the rest of the file.
+describe('the Weather state stories', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+  const panel = () => document.querySelector('.widget-state')
+
+  it('put the Weather in the top right corner at each of its sizes, the largest bigger than the smallest', () => {
+    const smallest = weatherBoxRect('smallest')
+    const starting = weatherBoxRect('starting')
+    const largest = weatherBoxRect('largest')
+    for (const rect of [smallest, starting, largest]) {
+      expect(rect.row).toBe(1)
+      expect(rect.col + rect.w).toBe(13)
+    }
+    expect(starting.w).toBeGreaterThanOrEqual(smallest.w)
+    expect(largest.w * largest.h).toBeGreaterThan(smallest.w * smallest.h)
+  })
+
+  it.each(SIZES)(
+    'give a Weather that is switched off the off panel at %s, asking nothing',
+    async (size) => {
+      await seedPage(weatherStateSeed('off', size))
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('off'))
+      expect(panel()?.textContent).toBe('WeatherSwitched off for now')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that cannot reach the forecast the failed panel at %s',
+    async (size) => {
+      fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))
+      await seedPage(weatherStateSeed('failed', size))
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('failed'))
+      expect(panel()?.textContent).toBe("WeatherCan't reach the forecast")
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that is loading the loading panel at %s, after a moment',
+    async (size) => {
+      let release!: (response: unknown) => void
+      fetchSpy.mockReturnValue(new Promise((resolve) => (release = resolve)))
+      try {
+        await seedPage(weatherStateSeed('loading', size))
+        const { container } = render(<App />)
+
+        await waitFor(() => expect(container.querySelector('.widget-box')).not.toBeNull())
+        expect(panel()).toBeNull()
+        await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('loading'))
+        expect(panel()?.textContent).toBe('WeatherLoading')
+        const { col, h, row, w } = weatherBoxRect(size)
+        expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      } finally {
+        // Let the request end, so it is not left under way for the next test of this place.
+        release({ ok: false })
+      }
+    },
+  )
 })
