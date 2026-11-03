@@ -317,3 +317,26 @@ describe('Controls', () => {
     })
   })
 })
+
+describe('Controls, the Edit button and a held key', () => {
+  // The settings panel's Edit button hands focus to this one, so a person still holding Enter
+  // from it would press this one on every repeat, and edit mode would flicker (Done, Edit, Done).
+  // A browser clicks a button on each Enter keydown, repeats included; stopping the repeat's
+  // default stops those clicks.
+  it('is not pressed again by the repeats of a held Enter, which it did not see go down', () => {
+    renderControls()
+    const button = screen.getByRole('button', { name: 'Edit' })
+
+    // `fireEvent` says false when the keydown's default was stopped.
+    expect(fireEvent.keyDown(button, { key: 'Enter', repeat: true })).toBe(false)
+  })
+
+  it('is still pressed by an Enter that goes down on it, and by Space', () => {
+    renderControls()
+    const button = screen.getByRole('button', { name: 'Edit' })
+
+    expect(fireEvent.keyDown(button, { key: 'Enter' })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: ' ' })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: ' ', repeat: true })).toBe(true)
+  })
+})

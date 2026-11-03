@@ -902,11 +902,6 @@ body {
   opacity: 0.55;
 }
 
-/* A disabled fieldset leaves draggable rows, which are not form controls, alone. */
-.settings__fieldset:disabled .fields__row {
-  pointer-events: none;
-}
-
 /* Under the section, a block clear of it, like the sections from each other. */
 .popover .settings__edit {
   margin-top: var(--popover-block);
@@ -961,11 +956,6 @@ body {
 .settings__input::placeholder {
   color: inherit;
   opacity: 0.5;
-}
-
-/* Its own block, as far below the section as sections are from each other. */
-.popover .settings__credit {
-  margin-top: var(--popover-block);
 }
 
 .settings__note a {

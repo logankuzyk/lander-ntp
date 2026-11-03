@@ -473,6 +473,21 @@ describe('the settings panel, now it has no Clock or Weather options (W17)', () 
     expect(settings.clock).toEqual(CUSTOM.clock)
     expect(settings.weather).toEqual(CUSTOM.weather)
   })
+
+  it('keeps a top-level key it does not know through a panel save, and v0.2.3 still reads it', async () => {
+    // Something a later version added next to the blocks, that this one does not recognise.
+    await fakeBrowser.storage.sync.set({ settings: { ...CUSTOM, future: { a: 1 } } })
+    await changeSettings((s) => ({ ...s, font: 'instrument-serif' }))()
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    const { fellBack, settings } = await asV023(stored)
+
+    expect(stored.settings).toMatchObject({ font: 'instrument-serif', future: { a: 1 } })
+    expect(fellBack).toBe(false)
+    expect(settings.clock).toEqual(CUSTOM.clock)
+    expect(settings.weather).toEqual(CUSTOM.weather)
+    expect(settings).toMatchObject({ future: { a: 1 } })
+  })
 })
 
 describe('sync:layout, which v0.2.3 never reads', () => {
