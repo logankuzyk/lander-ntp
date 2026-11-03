@@ -42,6 +42,16 @@ export type Source<R> = {
 /** What to load: the key a reading is cached under, and how to get a new one (null if it failed). */
 export type Query<R> = { fetch: () => Promise<R | null>; key: string }
 
+/**
+ * Where a source stands for the key it was asked for. `ready` has a reading to show; `loading`
+ * has none yet (nothing is cached, or there is no query); `failed` has none, because the fetch
+ * failed and nothing cached is recent enough to show; `off` is switched off, and shows nothing.
+ */
+export type SourceStatus = 'failed' | 'loading' | 'off' | 'ready'
+
+/** A reading to show if there is one, and where the source stands. `reading` is set only when `ready`. */
+export type SourceState<R> = { reading: R | null; status: SourceStatus }
+
 /** The fetches under way in this tab, by cache and then key. */
 const inFlight = new WeakMap<object, Map<string, Promise<Reading<unknown> | null>>>()
 
@@ -62,7 +72,13 @@ function fetchOnce<R>(
 
   const requests = byKey
   const request = (async () => {
-    const data = await fetch()
+    // A fetch that throws, or rejects, has failed just as one that gives nothing has.
+    let data: R | null
+    try {
+      data = await fetch()
+    } catch {
+      data = null
+    }
     if (data == null) return null
     const reading = { data, fetchedAt: Date.now() }
     await cache.set(key, reading)
@@ -74,7 +90,18 @@ function fetchOnce<R>(
 
 /**
  * The reading for the query, or null while there is none to show: there is no query, the source
- * is switched off, or nothing recent enough is cached and the network is unavailable.
+ * is switched off, or nothing recent enough is cached and the network is unavailable. See
+ * `useSourceState` for which of those it is.
+ */
+export function useSource<R>(source: Source<R>, query: Query<R> | null): R | null {
+  return useSourceState(source, query).reading
+}
+
+/**
+ * The reading for the query and where the source stands: `ready` with a reading, or without
+ * one `loading`, `failed` (the fetch failed and nothing recent enough is cached) or `off`
+ * (switched off). A failure is remembered for its key only: a new key starts as `loading`, and
+ * a failure stays `failed` through the retries until one succeeds.
  *
  * Stale-while-revalidate, like the photo manifest: a cached reading for this key is shown
  * straight away and refreshed once older than `maxAgeMs`, and again each time that passes
@@ -88,9 +115,11 @@ function fetchOnce<R>(
  * `source` must be a stable object, such as one defined at module level: the loader starts over
  * whenever it, or the query's key, changes.
  */
-export function useSource<R>(source: Source<R>, query: Query<R> | null): R | null {
+export function useSourceState<R>(source: Source<R>, query: Query<R> | null): SourceState<R> {
   const key = query?.key ?? null
   const [shown, setShown] = useState<(Reading<R> & { key: string }) | null>(null)
+  // Why there is nothing to show, for a key: only `failed` and `off` are known; no reason is loading.
+  const [problem, setProblem] = useState<{ key: string; status: 'failed' | 'off' } | null>(null)
   // The effect below runs once per key; the fetch it calls is whichever the latest render gave.
   const latest = useRef(query)
   latest.current = query
@@ -122,8 +151,11 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
         // Switched off: not even the cached reading, which would never refresh.
         if (!enabled) {
           setShown(null)
+          setProblem({ key, status: 'off' })
           return again(source.maxAgeMs)
         }
+        // Back on: that it was off is over. A failure stays until a fetch settles it.
+        setProblem((old) => (old?.status === 'off' ? null : old))
         const age = cached ? Date.now() - cached.fetchedAt : Infinity
         if (cached && age < source.maxStaleMs) setShown({ ...cached, key })
         if (age < source.maxAgeMs) return again(source.maxAgeMs - age)
@@ -133,6 +165,7 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
         if (current?.key !== key) return
         const reading = await fetchOnce(source.cache, key, current.fetch)
         if (!active) return
+        setProblem(reading ? null : { key, status: 'failed' })
         setShown((old) =>
           reading
             ? { ...reading, key }
@@ -163,6 +196,7 @@ export function useSource<R>(source: Source<R>, query: Query<R> | null): R | nul
     }
   }, [source, key])
 
-  // A reading for the last key is not this key's.
-  return shown && shown.key === key ? shown.data : null
+  // A reading for the last key is not this key's, nor is its failure.
+  if (shown && shown.key === key) return { reading: shown.data, status: 'ready' }
+  return { reading: null, status: problem?.key === key ? problem.status : 'loading' }
 }

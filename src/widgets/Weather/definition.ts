@@ -82,6 +82,8 @@ const LABELS: Record<WeatherField, string> = {
 
 export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceName> = {
   credit: { href: 'https://open-meteo.com/', text: 'Weather data by Open-Meteo.com' },
+  // Loading and switched off say what the shared words do.
+  messages: { failed: "Can't reach the forecast" },
   name: 'Weather',
   needs: [locationConsent, place],
   // The order and wording are copied from the settings panel (the page-wide switch last).
