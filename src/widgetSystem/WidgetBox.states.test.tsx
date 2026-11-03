@@ -100,7 +100,65 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
+})
+
+/** Says whether the tab is in view, and tells the page it changed. */
+const seen = (hidden: boolean, spy: { mockReturnValue: (value: boolean) => unknown }) => {
+  spy.mockReturnValue(hidden)
+  document.dispatchEvent(new Event('visibilitychange'))
+}
+
+describe('WidgetBox states: a tab out of view', () => {
+  it('does not count the wait while the tab is hidden, so a tab opened in the background does not flash loading when it is looked at', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    const { definition } = setup({ fetch: () => new Promise<number>(() => undefined) })
+    const { container } = render(draw(definition))
+
+    await pass(LOADING_DELAY_MS * 5)
+    expect(panel(container)).toBeNull()
+
+    await act(async () => seen(false, hidden))
+    await pass(LOADING_DELAY_MS - 1)
+    expect(panel(container)).toBeNull()
+
+    await pass(1)
+    expect(words(container)).toEqual(['Example', 'Loading'])
+  })
+
+  it('starts the wait again when the tab is looked at, whatever had passed in view before', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    const { definition } = setup({ fetch: () => new Promise<number>(() => undefined) })
+    const { container } = render(draw(definition))
+    await pass(LOADING_DELAY_MS - 100)
+
+    await act(async () => seen(true, hidden))
+    await pass(LOADING_DELAY_MS * 5)
+    expect(panel(container)).toBeNull()
+
+    await act(async () => seen(false, hidden))
+    await pass(LOADING_DELAY_MS - 1)
+    expect(panel(container)).toBeNull()
+    await pass(1)
+    expect(panel(container)?.getAttribute('data-state')).toBe('loading')
+  })
+
+  it('hides a loading panel that is showing when the tab goes out of view, and waits again on its return', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+    const { definition } = setup({ fetch: () => new Promise<number>(() => undefined) })
+    const { container } = render(draw(definition))
+    await pass(LOADING_DELAY_MS)
+    expect(panel(container)).not.toBeNull()
+
+    await act(async () => seen(true, hidden))
+    expect(panel(container)).toBeNull()
+
+    await act(async () => seen(false, hidden))
+    expect(panel(container)).toBeNull()
+    await pass(LOADING_DELAY_MS)
+    expect(panel(container)).not.toBeNull()
+  })
 })
 
 describe('WidgetBox states: loading', () => {
@@ -410,5 +468,55 @@ describe('WidgetBox states with needs', () => {
     await pass(LOADING_DELAY_MS * 2)
 
     expect(panel(shown.container)?.getAttribute('data-state')).toBe('failed')
+  })
+})
+
+describe('WidgetBox states: the wait for loading, once it has been served', () => {
+  it('takes a loading panel that is showing away at once when the reading asked for changes, and waits again before it comes back', async () => {
+    const { definition } = setup({ fetch: () => new Promise<number>(() => undefined) })
+    const shown = render(draw(definition, { name: 'a' }))
+    await pass(LOADING_DELAY_MS)
+    expect(words(shown.container)).toEqual(['Example', 'Loading'])
+
+    shown.rerender(draw(definition, { name: 'b' }))
+    await pass()
+    expect(panel(shown.container)).toBeNull()
+
+    await pass(LOADING_DELAY_MS - 1)
+    expect(panel(shown.container)).toBeNull()
+    await pass(1)
+    expect(words(shown.container)).toEqual(['Example', 'Loading'])
+  })
+
+  it('waits again for the same reading when it is loading again after it was not: what was waited for before does not count', async () => {
+    let enabled = true
+    let slow = true
+    const { definition, readings } = setup({
+      enabled: () => Promise.resolve(enabled),
+      fetch: () =>
+        slow
+          ? new Promise<number>((resolve) => setTimeout(() => resolve(7), 1_000))
+          : new Promise<number>(() => undefined),
+    })
+    const { container } = render(draw(definition))
+    await pass(LOADING_DELAY_MS)
+    expect(panel(container)?.getAttribute('data-state')).toBe('loading')
+    await pass(1_000)
+    expect(view(container)).toBe('7')
+
+    // Switched off, then on again with nothing cached and a request that does not answer.
+    enabled = false
+    await pass(MAX_AGE_MS)
+    expect(panel(container)?.getAttribute('data-state')).toBe('off')
+    enabled = true
+    slow = false
+    readings.clear()
+    await pass(MAX_AGE_MS)
+    expect(panel(container)).toBeNull()
+
+    await pass(LOADING_DELAY_MS - 1)
+    expect(panel(container)).toBeNull()
+    await pass(1)
+    expect(panel(container)?.getAttribute('data-state')).toBe('loading')
   })
 })

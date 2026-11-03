@@ -388,7 +388,7 @@ describe('WidgetBox with a source', () => {
     expect(box(container).children).toHaveLength(0)
   })
 
-  it('draws no View when the source has no reading, because the fetch failed (the box says so: see the states)', async () => {
+  it('draws no View, but the failed state, when the source has no reading because the fetch failed', async () => {
     const fetch = vi.fn(() => Promise.resolve(null))
     const { container } = render(
       <WidgetBox
@@ -401,6 +401,8 @@ describe('WidgetBox with a source', () => {
     await settleSource()
     expect(fetch).toHaveBeenCalled()
     expect(container.querySelector('.example')).toBeNull()
+    expect(box(container).children).toHaveLength(1)
+    expect(container.querySelector('.widget-state[data-state=failed]')).not.toBeNull()
   })
 
   it('builds the query from the options as the definition reads them', async () => {

@@ -191,3 +191,89 @@ describe('useSourceState', () => {
     expect(shown()).toBe('loading none')
   })
 })
+
+describe('useSourceState: the stale limit', () => {
+  it('does not show a reading exactly as old as the limit', async () => {
+    const { cache, source } = makeSource()
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_STALE_MS })
+    render(<Probe query={{ fetch: fetching(null), key: 'a' }} source={source} />)
+    await pass()
+    expect(shown()).toBe('failed none')
+  })
+
+  it('does not show a reading exactly as old as the limit while its refresh is still pending', async () => {
+    const { cache, source } = makeSource()
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_STALE_MS })
+    const fetch = vi.fn(() => new Promise<number>(() => undefined))
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+
+    await pass()
+
+    expect(fetch).toHaveBeenCalled()
+    expect(shown()).toBe('loading none')
+  })
+
+  it('shows a reading a moment younger than the limit', async () => {
+    const { cache, source } = makeSource()
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_STALE_MS + 1 })
+    render(<Probe query={{ fetch: fetching(null), key: 'a' }} source={source} />)
+    await pass()
+    expect(shown()).toBe('ready 5')
+  })
+
+  it('stops showing a reading kept through a failed refresh at the moment it is as old as the limit', async () => {
+    const { cache, source } = makeSource()
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_STALE_MS + RETRY_MS })
+    render(<Probe query={{ fetch: fetching(null), key: 'a' }} source={source} />)
+    await pass()
+    expect(shown()).toBe('ready 5')
+
+    await pass(RETRY_MS - 1)
+    expect(shown()).toBe('ready 5')
+    await pass(1)
+    expect(shown()).toBe('failed none')
+  })
+})
+
+describe('useSourceState: a fetch that throws', () => {
+  it('is failed, as when it gives nothing, and is tried again after the retry wait', async () => {
+    const { source } = makeSource()
+    const fetch = vi
+      .fn<() => Promise<number | null>>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(9)
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+
+    await pass()
+    expect(shown()).toBe('failed none')
+
+    await pass(RETRY_MS)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(shown()).toBe('ready 9')
+  })
+
+  it('is failed too when it throws before it returns a promise', async () => {
+    const { source } = makeSource()
+    const fetch = vi.fn<() => Promise<number | null>>(() => {
+      throw new Error('no such thing')
+    })
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+
+    await pass()
+    expect(shown()).toBe('failed none')
+
+    await pass(RETRY_MS)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the stale reading it has when the fetch throws', async () => {
+    const { cache, source } = makeSource()
+    await cache.set('a', { data: 5, fetchedAt: Date.now() - MAX_AGE_MS - 1 })
+    const fetch = vi.fn<() => Promise<number | null>>().mockRejectedValue(new Error('offline'))
+    render(<Probe query={{ fetch, key: 'a' }} source={source} />)
+
+    await pass()
+
+    expect(shown()).toBe('ready 5')
+  })
+})

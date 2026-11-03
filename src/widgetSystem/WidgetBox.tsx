@@ -58,6 +58,19 @@ export function Box({
  */
 export const LOADING_DELAY_MS = 400
 
+/** Whether the tab is in view. A tab nobody is looking at checks nothing, so waits for nothing. */
+function useVisible(): boolean {
+  const [visible, setVisible] = useState(!document.hidden)
+  useEffect(() => {
+    const update = () => setVisible(!document.hidden)
+    document.addEventListener('visibilitychange', update)
+    // It may have changed between the first render and now.
+    update()
+    return () => document.removeEventListener('visibilitychange', update)
+  }, [])
+  return visible
+}
+
 /**
  * Whether `waiting` has been true for `ms` for this `token`. Starts again when it goes false
  * and again, or the token changes, so a new reading asked for waits as long as the first did.
@@ -103,7 +116,10 @@ function SourcedView<O, R, C>({
 }: SourcedViewProps<O, R, C>) {
   const { context, query } = source.useQuery(options)
   const { reading, status } = useSourceState(source.source, query)
-  const waited = useWaited(status === 'loading', query?.key ?? '', LOADING_DELAY_MS)
+  // Only time in view counts: a tab opened in the background has not started loading, as far as
+  // anyone can tell, and must not flash "Loading" when it is looked at.
+  const visible = useVisible()
+  const waited = useWaited(status === 'loading' && visible, query?.key ?? '', LOADING_DELAY_MS)
   if (status === 'ready') {
     // `ready` is a reading to show; the check keeps the types honest.
     return reading === null ? null : (

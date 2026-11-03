@@ -72,7 +72,13 @@ function fetchOnce<R>(
 
   const requests = byKey
   const request = (async () => {
-    const data = await fetch()
+    // A fetch that throws, or rejects, has failed just as one that gives nothing has.
+    let data: R | null
+    try {
+      data = await fetch()
+    } catch {
+      data = null
+    }
     if (data == null) return null
     const reading = { data, fetchedAt: Date.now() }
     await cache.set(key, reading)
