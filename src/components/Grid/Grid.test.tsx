@@ -51,6 +51,45 @@ const boxes = (grid: Element) =>
     box.style.gridRow,
   ])
 
+describe('Grid, the names of the boxes', () => {
+  const weatherAt = (id: string, col: number, options: Record<string, unknown>) =>
+    stored(id, 'weather', [col, 1, 2, 2], options)
+
+  it('names each box for its Widget and what tells it from another of its kind', () => {
+    const grid = drawnGrid(
+      layoutOf(
+        stored('clock0001', 'clock', [5, 4, 4, 2]),
+        weatherAt('wthr0001', 1, { followDevice: false, place: PLACE }),
+        weatherAt('wthr0002', 4, {
+          followDevice: false,
+          place: { latitude: 49.28, longitude: -123.12, name: 'Vancouver' },
+        }),
+        weatherAt('wthr0003', 7, { followDevice: true }),
+        weatherAt('wthr0004', 10, { followDevice: false, place: null }),
+      ),
+    )
+    expect(
+      [...grid.querySelectorAll('.widget-box')].map((box) => [
+        box.getAttribute('role'),
+        box.getAttribute('aria-label'),
+      ]),
+    ).toEqual([
+      ['group', 'Weather, Victoria'],
+      ['group', 'Weather, Vancouver'],
+      ['group', 'Weather, Current location'],
+      ['group', 'Weather'],
+      ['group', 'Clock'],
+    ])
+  })
+
+  it('leaves a box for a Widget this version does not know without a name it cannot give', () => {
+    const grid = drawnGrid(layoutOf(stored('what0001', 'tomorrow', [1, 1, 2, 2])))
+    const box = grid.querySelector('.widget-box')
+    expect(box?.getAttribute('aria-label')).toBeNull()
+    expect(box?.getAttribute('role')).toBeNull()
+  })
+})
+
 describe('Grid', () => {
   it('draws the Clock of a new install in the middle: column 5, row 4, 4 by 2', () => {
     const grid = drawnGrid(deriveLayout(DEFAULT_SETTINGS))
