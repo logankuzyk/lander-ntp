@@ -186,6 +186,101 @@ describe('a callout beside its target', () => {
     })
   })
 
+  describe('when its target is hidden after it was shown', () => {
+    // A resize is the first thing that makes it look again; nothing was added to the page.
+    it('goes when the target is not drawn any more, such as display: none on it or on what it is in', () => {
+      const target = addTarget('widget:clock', [600, 200, 800, 400])
+      draw('widget:clock')
+      expect(note()).not.toBeNull()
+
+      drawAt(target, [0, 0, 0, 0])
+      act(() => {
+        fireEvent(window, new Event('resize'))
+      })
+
+      expect(note()).toBeNull()
+    })
+
+    it('goes when the target is made invisible but still takes room', () => {
+      const target = addTarget('widget:clock', [600, 200, 800, 400])
+      draw('widget:clock')
+
+      target.style.visibility = 'hidden'
+      act(() => {
+        fireEvent(window, new Event('resize'))
+      })
+
+      expect(note()).toBeNull()
+    })
+
+    it('comes back when it is drawn again', () => {
+      const target = addTarget('widget:clock', [600, 200, 800, 400])
+      draw('widget:clock')
+      drawAt(target, [0, 0, 0, 0])
+      act(() => {
+        fireEvent(window, new Event('resize'))
+      })
+
+      drawAt(target, [600, 200, 800, 400])
+      act(() => {
+        fireEvent(window, new Event('resize'))
+      })
+
+      // Nothing is listening for it while it is not drawn but the page's own changes.
+      document.body.append(document.createElement('span'))
+      return waitFor(() => expect(note()).not.toBeNull())
+    })
+  })
+
+  describe('when the component goes', () => {
+    it('stops listening: the window, the page’s elements and the sizes it watched', () => {
+      const added: [string, unknown][] = []
+      const removed: [string, unknown][] = []
+      const add = window.addEventListener.bind(window)
+      const remove = window.removeEventListener.bind(window)
+      vi.spyOn(window, 'addEventListener').mockImplementation(((type: string, handler: never) => {
+        added.push([type, handler])
+        add(type, handler)
+      }) as never)
+      vi.spyOn(window, 'removeEventListener').mockImplementation(((
+        type: string,
+        handler: never,
+      ) => {
+        removed.push([type, handler])
+        remove(type, handler)
+      }) as never)
+      const disconnected: boolean[] = []
+      const RealMutationObserver = MutationObserver
+      vi.stubGlobal(
+        'MutationObserver',
+        class extends RealMutationObserver {
+          mine: number
+          constructor(callback: MutationCallback) {
+            super(callback)
+            disconnected.push(false)
+            this.mine = disconnected.length - 1
+          }
+          override disconnect() {
+            disconnected[this.mine] = true
+            super.disconnect()
+          }
+        },
+      )
+      addTarget('widget:clock', [600, 200, 800, 400])
+      const { unmount } = draw('widget:clock')
+      expect(disconnected.length).toBeGreaterThan(0)
+
+      unmount()
+
+      // Each resize listener it added, it took away; every observer is let go.
+      const resizes = added.filter(([type]) => type === 'resize')
+      expect(resizes.length).toBeGreaterThan(0)
+      for (const listener of resizes) expect(removed).toContainEqual(listener)
+      expect(disconnected.every(Boolean)).toBe(true)
+      expect(FakeResizeObserver.all.every((observer) => observer.observed.size === 0)).toBe(true)
+    })
+  })
+
   describe('is placed again, once, when', () => {
     it('it shows', () => {
       addTarget('widget:clock', [600, 200, 800, 400])
@@ -382,6 +477,29 @@ describe('a callout beside its target', () => {
       act(() => FakeResizeObserver.fire(popover))
 
       expect(placed().dataset.side).toBe('left')
+    })
+
+    it('with a little room between: not touching it', () => {
+      addTarget('widget:clock', [300, 200, 500, 400])
+      // The callout would go to 512..768; this starts 4 pixels after it.
+      addOpen('popover options-popover', [772, 0, 1100, 900])
+
+      draw('widget:clock')
+
+      expect(placed().dataset.side).toBe('left')
+    })
+
+    it('the note that a change could not be saved, which comes and goes above the Bottom bar', async () => {
+      addTarget('edit', [100, 834, 140, 874])
+      draw('edit')
+      expect(placed().dataset.side).toBe('above')
+
+      // 16 to 288 wide, over where the callout is, 64 up from the foot of the window.
+      const notice = addOpen('notice', [24, 760, 280, 836])
+      await waitFor(() => expect(placed().dataset.side).not.toBe('above'))
+
+      notice.remove()
+      await waitFor(() => expect(placed().dataset.side).toBe('above'))
     })
 
     it('goes beside a menu, not over it, when its target is an item in the menu', () => {

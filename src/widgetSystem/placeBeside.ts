@@ -20,16 +20,16 @@ export type Placement = {
 }
 
 /** Between the widget and the popover. */
-const GAP = 12
+export const GAP = 12
 /** Between the popover and the window's edge. */
-const EDGE = 8
+export const EDGE = 8
 /**
  * The least height worth putting a popover above or below a widget in: it holds a header and a
  * few options. With less than this on either side it is put over the widget instead.
  */
 const LEAST_HEIGHT = 160
 
-const clamp = (value: number, least: number, most: number) =>
+export const clamp = (value: number, least: number, most: number) =>
   Math.min(Math.max(value, least), Math.max(least, most))
 
 /**

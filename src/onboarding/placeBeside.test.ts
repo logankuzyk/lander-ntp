@@ -268,6 +268,62 @@ describe('placeBeside', () => {
     })
   })
 
+  describe('at the very edge of fitting', () => {
+    // 256 wide and 140 tall, 12 from the target, and 8 from the window's edge.
+    it('takes the right when it fits exactly, and not when it is a pixel short', () => {
+      expect(placeBeside(edges(1000, 200, 1164, 400), CALLOUT, LAPTOP).side).toBe('right')
+      expect(placeBeside(edges(1000, 200, 1165, 400), CALLOUT, LAPTOP).side).toBe('left')
+    })
+
+    it('takes the left when it fits exactly, and not when it is a pixel short', () => {
+      expect(
+        placeBeside(edges(276, 200, 400, 400), CALLOUT, LAPTOP, { prefer: ['left'] }),
+      ).toMatchObject({
+        left: 8,
+        side: 'left',
+      })
+      expect(
+        placeBeside(edges(275, 200, 400, 400), CALLOUT, LAPTOP, { prefer: ['left'] }).side,
+      ).toBe('right')
+    })
+
+    it('takes below when it fits exactly, and not when it is a pixel short', () => {
+      expect(
+        placeBeside(edges(600, 700, 700, 740), CALLOUT, LAPTOP, { prefer: ['below'] }),
+      ).toMatchObject({
+        side: 'below',
+        top: 752,
+      })
+      expect(
+        placeBeside(edges(600, 700, 700, 741), CALLOUT, LAPTOP, { prefer: ['below'] }).side,
+      ).toBe('right')
+    })
+
+    it('takes above when it fits exactly, and not when it is a pixel short', () => {
+      expect(
+        placeBeside(edges(600, 160, 700, 200), CALLOUT, LAPTOP, { prefer: ['above'] }),
+      ).toMatchObject({
+        side: 'above',
+        top: 8,
+      })
+      expect(
+        placeBeside(edges(600, 159, 700, 200), CALLOUT, LAPTOP, { prefer: ['above'] }).side,
+      ).toBe('right')
+    })
+  })
+
+  it('takes the side with the most room when none has enough', () => {
+    // A small window: the room on the right is -236, on the left -76, below -80 and above -100.
+    const small = { height: 200, width: 300 }
+    const target = edges(200, 60, 260, 120)
+
+    const placed = placeBeside(target, CALLOUT, small)
+
+    expect(placed.side).toBe('left')
+    // Slid into the window, level with the target's middle (90, less half the callout).
+    expect([placed.left, placed.top]).toEqual([8, 20])
+  })
+
   it('never covers the target where any side has room', () => {
     for (let left = 0; left <= 1340; left += 134) {
       for (let top = 0; top <= 800; top += 100) {

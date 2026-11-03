@@ -1,4 +1,4 @@
-import type { Edges, Size } from '@/widgetSystem/placeBeside'
+import { clamp, EDGE, type Edges, GAP, type Size } from '@/widgetSystem/placeBeside'
 
 export type { Edges, Size }
 
@@ -32,18 +32,11 @@ type Options = {
   within?: Edges
 }
 
-/** Between the target and the callout, which is room for the pointer. */
-const GAP = 12
-/** Between the callout and the window's edge. */
-const EDGE = 8
 /** The least the pointer is from either end of its edge: clear of the rounded corners. */
 const CORNER = 20
 
 /** Where to look when the caller has no preference. */
 const ORDER: readonly Side[] = ['right', 'left', 'below', 'above']
-
-const clamp = (value: number, least: number, most: number) =>
-  Math.min(Math.max(value, least), Math.max(least, most))
 
 const overlap = (a: Edges, b: Edges) =>
   Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *

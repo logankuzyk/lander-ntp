@@ -2,8 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/pre
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { checkLayout } from '@/layout/check'
+import { layoutItem } from '@/layout/storage'
+import type { StoredLayout } from '@/layout/types'
 import type { CalloutInfo } from '@/onboarding/callouts'
 import { onboardingItem } from '@/onboarding/storage'
+import { makePlace } from '@/test/fixtures'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 import { App } from './App'
@@ -162,15 +166,91 @@ describe('App, with news that points at the page', () => {
     expect(screen.queryByRole('note')).toBeNull()
   })
 
-  it('writes only the id it was dismissed by: nothing else of the synced settings', async () => {
-    news.current = [AT_EDIT]
-    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+  it.each(['Dismiss', 'Got it'])(
+    'writes only the id it was dismissed by, with %s: nothing else of the synced settings',
+    async (button) => {
+      news.current = [AT_EDIT]
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+      render(<App />)
+
+      fireEvent.click(await screen.findByRole('button', { name: button }))
+      // Settled first: the dismissal has landed, and long enough has gone by for any other save
+      // (the settings' queue is a few milliseconds) to have been written too.
+      await vi.waitFor(async () =>
+        expect((await onboardingItem.getValue())?.dismissed).toEqual(['at-edit']),
+      )
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      const keys = set.mock.calls.flatMap(([items]) => Object.keys(items))
+      expect(new Set(keys)).toEqual(new Set(['onboarding']))
+    },
+  )
+
+  it('follows a Widget the Layout moves, with nothing but its place changing', async () => {
+    const weatherAt = (col: number): StoredLayout => ({
+      v: 1,
+      widgets: [
+        {
+          col,
+          h: 2,
+          id: 'weather1',
+          options: { place: makePlace(), unit: 'celsius' },
+          row: 1,
+          type: 'weather',
+          w: 2,
+        },
+      ],
+    })
+    news.current = [{ ...AT_EDIT, id: 'at-weather', target: 'widget:weather' }]
+    await seedPage({
+      ...PAGE_SEEDS.gridUpdatedClockAndWeather,
+      layout: weatherAt(11),
+      onboarding: { dismissed: [], welcomed: true },
+    })
+    // The box is drawn where its grid column says: the test DOM has no grid to lay it out.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const col = Number.parseInt(this.style.gridColumn, 10)
+      return this.classList.contains('widget-box')
+        ? new DOMRect(col * 100, 100, 200, 100)
+        : new DOMRect(1100, 834, 40, 40)
+    })
+    // With the page's own word that something was added or taken away out of the way, so that
+    // the Layout alone is what moves the callout: a Widget's place is a style, not an element.
+    vi.stubGlobal(
+      'MutationObserver',
+      class {
+        disconnect() {}
+        observe() {}
+        takeRecords() {
+          return []
+        }
+      },
+    )
     render(<App />)
+    const note = await screen.findByRole('note')
+    // No room on its right at column 11: to its left.
+    expect(note.dataset.side).toBe('left')
+    const before = note.style.left
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
-    await waitFor(() => expect(set).toHaveBeenCalled())
+    await layoutItem.setValue(checkLayout(weatherAt(3)))
 
-    const keys = set.mock.calls.flatMap(([items]) => Object.keys(items))
-    expect(new Set(keys)).toEqual(new Set(['onboarding']))
+    await waitFor(() => expect(note.dataset.side).toBe('right'))
+    expect(note.style.left).not.toBe(before)
+    expect(note.style.left).toBe(`${3 * 100 + 200 + 12}px`)
+  })
+
+  it('has the news about the settings before the Grid too, where a keyboard comes to it first', async () => {
+    news.current = [{ body: 'See it here.', id: 'at-settings', section: 'weather', title: 'New' }]
+    const { container } = render(<App />)
+
+    const note = await screen.findByRole('note')
+    const grid = await waitFor(() => {
+      const found = container.querySelector('.grid')
+      if (!found) throw new Error('no Grid yet')
+      return found
+    })
+    expect(note.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

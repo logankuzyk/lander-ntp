@@ -68,6 +68,15 @@ describe('findTarget', () => {
     expect(findTarget('edit')).toBeNull()
   })
 
+  it('finds a value with a quote or a backslash in it, which would end the selector’s quote', () => {
+    const quoted = addTarget('widget:a"b')
+    const slashed = addTarget('widget:a\\b')
+    addTarget('widget:ab')
+
+    expect(findTarget('widget:a"b')).toBe(quoted)
+    expect(findTarget('widget:a\\b')).toBe(slashed)
+  })
+
   it('looks only inside the root it is given', () => {
     const inside = document.createElement('div')
     document.body.append(inside)

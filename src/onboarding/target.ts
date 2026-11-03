@@ -36,10 +36,10 @@ const isShown = (element: Element) => {
  * goes on to its next stop (see `nextShown`).
  */
 export function findTarget(target: CalloutTarget, root: ParentNode = document): HTMLElement | null {
-  // The value is quoted in the selector, so the two characters that could end the quote are escaped.
-  const value = target.replace(/["\\]/g, '\\$&')
-  for (const element of root.querySelectorAll<HTMLElement>(`[${TARGET_ATTRIBUTE}="${value}"]`)) {
-    if (isShown(element)) return element
+  // Compared as text, not put in a selector: a value with a quote or a backslash in it is not
+  // the selector's to parse.
+  for (const element of root.querySelectorAll<HTMLElement>(`[${TARGET_ATTRIBUTE}]`)) {
+    if (element.getAttribute(TARGET_ATTRIBUTE) === target && isShown(element)) return element
   }
   return null
 }

@@ -4,10 +4,24 @@ import { useEditMode } from '@/components/EditMode/useEditMode'
 import { type Edges, placeBeside } from '@/onboarding/placeBeside'
 import { type CalloutTarget, findTarget, preferredSides } from '@/onboarding/target'
 
-/** What a callout keeps clear of: the popovers (settings, details, a Widget's options) and menus. */
-const OPEN = '.popover, [role="menu"], [role="listbox"]'
+/**
+ * What a callout keeps clear of: the popovers (settings, details, a Widget's options), menus and
+ * lists of choices, and the note above the Bottom bar ("Couldn't save that"), which comes and
+ * goes. The note's wrapper has no box while it is empty.
+ */
+const OPEN = '.popover, [role="menu"], [role="listbox"], .notice'
+
+/** Left between the callout and what is open, so they do not touch. */
+const MARGIN = 8
 
 const edgesOf = ({ bottom, left, right, top }: DOMRect): Edges => ({ bottom, left, right, top })
+
+const grownBy = (edges: Edges, by: number): Edges => ({
+  bottom: edges.bottom + by,
+  left: edges.left - by,
+  right: edges.right + by,
+  top: edges.top - by,
+})
 
 const sizeOf = (element: Element) => {
   const { height, width } = element.getBoundingClientRect()
@@ -74,7 +88,9 @@ export function useBeside(target: CalloutTarget | undefined, watch: unknown) {
 
   const place = () => {
     const callout = ref.current
-    const point = target === undefined ? null : findTarget(target)
+    // Asked again, not remembered: a target hidden since the page last drew has to take the
+    // callout with it, which `look` does by changing what is found.
+    const point = target === undefined ? null : look()
     if (!callout || !point || target === undefined) return
     const open = openThings(callout)
     const avoid: Edges[] = []
@@ -83,7 +99,7 @@ export function useBeside(target: CalloutTarget | undefined, watch: unknown) {
     for (const element of open) {
       const edges = edgesOf(element.getBoundingClientRect())
       if (!element.contains(point)) {
-        avoid.push(edges)
+        avoid.push(grownBy(edges, MARGIN))
       } else if (within) {
         within = {
           bottom: Math.max(within.bottom, edges.bottom),
