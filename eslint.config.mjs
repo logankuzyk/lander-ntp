@@ -13,6 +13,7 @@ export default defineConfig([
     '.output/',
     '.wxt/',
     'coverage/',
+    'server/',
     'storybook-static/',
     'web-ext-artifacts/',
   ]),

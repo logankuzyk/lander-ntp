@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Server runtime data and local config
+server/data/
+server/dist/
+server/.env
+
 # WXT build output
 .output/
 .wxt/
