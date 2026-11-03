@@ -199,6 +199,55 @@ describe('Controls', () => {
       expect(editButton()).toBeTruthy()
     })
 
+    it('is toggled once by a held E: the keydowns that repeat are ignored', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      // Each repeat is checked, as an even number of them would put it back by themselves.
+      for (let held = 0; held < 4; held++) {
+        fireEvent.keyDown(window, { key: 'e', repeat: true })
+        expect(doneButton()).toBeTruthy()
+      }
+
+      fireEvent.keyDown(window, { key: 'e' })
+      for (let held = 0; held < 4; held++) {
+        fireEvent.keyDown(window, { key: 'e', repeat: true })
+        expect(editButton()).toBeTruthy()
+      }
+    })
+
+    it('keeps focus on the Edit button when it ends with a frame focused, from Escape or E', () => {
+      renderControls()
+      render(
+        // A button stands in for the frame, which is a tab stop: only what is in a `.widget-box` counts.
+        <button class="widget-box" type="button">
+          Clock
+        </button>,
+      )
+      const frame = () => document.querySelector<HTMLElement>('.widget-box')
+
+      for (const key of ['Escape', 'e']) {
+        fireEvent.keyDown(window, { key: 'e' })
+        frame()?.focus()
+        expect(document.activeElement).toBe(frame())
+
+        fireEvent.keyDown(frame() ?? window, { key })
+
+        expect(document.activeElement).toBe(editButton())
+      }
+    })
+
+    it('leaves focus alone when it ends with focus somewhere else', () => {
+      renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+      const next = screen.getByRole('button', { name: 'Next photo' })
+      next.focus()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(document.activeElement).toBe(next)
+    })
+
     it('is left with Escape, and Escape does nothing otherwise', () => {
       renderControls()
 
@@ -227,7 +276,7 @@ describe('Controls', () => {
       fireEvent.keyDown(window, { key: 'e', metaKey: true })
       fireEvent.keyDown(window, { ctrlKey: true, key: 'e' })
       fireEvent.keyDown(window, { altKey: true, key: 'e' })
-      fireEvent.keyDown(window, { key: 'E', shiftKey: true })
+      fireEvent.keyDown(window, { key: 'e', shiftKey: true })
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'e' })
       fireEvent.keyDown(screen.getByRole('button', { name: 'Beach' }), { key: 'e' })
       fireEvent.keyDown(screen.getByRole('button', { name: 'Skip' }), { key: 'e' })

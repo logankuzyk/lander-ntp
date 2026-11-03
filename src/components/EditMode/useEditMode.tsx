@@ -38,7 +38,15 @@ type EditModeProviderProps = {
 export function EditModeProvider({ canChange = true, children }: EditModeProviderProps) {
   const [editing, setEditing] = useState(false)
   const enter = useCallback(() => setEditing(true), [])
-  const leave = useCallback(() => setEditing(false), [])
+  const leave = useCallback(() => {
+    // A frame stops being a tab stop when editing ends, and focus on it would drop to the page.
+    // It goes to the button that entered edit mode (it is still there, and now reads Edit).
+    const focused = document.activeElement
+    if (focused instanceof Element && focused.closest('.widget-box')) {
+      document.querySelector<HTMLElement>('[data-edit-toggle]')?.focus()
+    }
+    setEditing(false)
+  }, [])
   const value = useMemo(
     () => ({ canChange, editing, enter, leave }),
     [canChange, editing, enter, leave],

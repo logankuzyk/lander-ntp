@@ -403,6 +403,27 @@ describe('the Grid styles', () => {
     )
   })
 
+  it('lets presses through the wash and the dots to the Widgets under them', () => {
+    expect(rule('.grid--editing::before')).toMatch(/pointer-events:\s*none/)
+    expect(rule('.grid__dots')).toMatch(/pointer-events:\s*none/)
+  })
+
+  it('positions the frames, so they paint above the wash and the dots, which come first', () => {
+    expect(rule('.grid--editing .widget-box')).toMatch(/position:\s*relative/)
+  })
+
+  it('rings a focused frame in white with a dark line outside it, to show on a bright photo', () => {
+    const focused = rule('.grid--editing .widget-box:focus-visible')
+    expect(focused).toMatch(/outline:\s*2px solid var\(--color-fg\)/)
+    expect(focused).toMatch(/box-shadow:\s*0 0 0 1px rgb\(0 0 0 \/ 60%\)/)
+  })
+
+  it('keeps a long credit clear of the buttons on a narrow window', () => {
+    expect(css).toMatch(
+      /@media \(max-width: 48rem\) {\s*\.credit {\s*max-width: max\(8rem, calc\(100% - 17rem\)\);/,
+    )
+  })
+
   it("lays the cells out from the Grid's custom properties", () => {
     expect(rule('.grid')).toContain('repeat(var(--cols)')
     expect(rule('.grid')).toContain('repeat(var(--rows)')

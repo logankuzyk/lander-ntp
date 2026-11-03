@@ -131,6 +131,8 @@ body {
 .grid--editing .widget-box:focus-visible {
   outline: 2px solid var(--color-fg);
   outline-offset: -2px;
+  /* A dark line outside the white ring, so it shows on a bright photo too. */
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
 
 .widget-box__name {

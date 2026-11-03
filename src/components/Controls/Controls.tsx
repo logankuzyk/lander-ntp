@@ -58,7 +58,8 @@ export function Controls({
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
-      } else if (event.key === 'e') {
+      } else if (event.key === 'e' && !event.repeat) {
+        // Not a held key's repeats: they would switch it on and off as long as it is down.
         event.preventDefault()
         if (editing) leave()
         else enter()
@@ -82,6 +83,8 @@ export function Controls({
         aria-label={editing ? 'Done' : 'Edit'}
         aria-pressed={editing}
         class={editing ? 'control control--done' : 'control'}
+        // Where focus goes when edit mode ends with a Widget's frame focused (see useEditMode).
+        data-edit-toggle
         onClick={editing ? leave : enter}
         title={editing ? 'Done (E)' : 'Edit (E)'}
         type="button"

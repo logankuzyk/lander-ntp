@@ -81,6 +81,33 @@ describe('useEditMode', () => {
     expect(state()).toBe('editing cannot')
   })
 
+  it('moves focus from a Widget frame to the edit button when it leaves, however it is called', () => {
+    render(
+      <EditModeProvider>
+        <Probe />
+        <button data-edit-toggle type="button">
+          toggle
+        </button>
+        <button class="widget-box" type="button">
+          frame
+        </button>
+      </EditModeProvider>,
+    )
+    const frame = screen.getByText('frame')
+    const elsewhere = screen.getByText('enter')
+
+    fireEvent.click(screen.getByText('enter'))
+    frame.focus()
+    fireEvent.click(screen.getByText('leave'))
+    expect(document.activeElement).toBe(screen.getByText('toggle'))
+
+    // Focus anywhere else stays where it is.
+    fireEvent.click(screen.getByText('enter'))
+    elsewhere.focus()
+    fireEvent.click(screen.getByText('leave'))
+    expect(document.activeElement).toBe(elsewhere)
+  })
+
   it('is not editing for what is drawn outside a provider, such as a Widget on its own', () => {
     render(<Probe />)
 

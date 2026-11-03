@@ -118,12 +118,12 @@ export function App() {
           />
         )}
         {/*
-        Stored settings and the stored Layout land a beat after the first paint. Drawing the
-        defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
-        and the Layout worked out from the defaults would put the wrong Widgets in the wrong
-        places, so anything that depends on them waits for both. The photo already does:
-        usePhotoRotation is held back until the settings are known.
-      */}
+          Stored settings and the stored Layout land a beat after the first paint. Drawing the
+          defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
+          and the Layout worked out from the defaults would put the wrong Widgets in the wrong
+          places, so anything that depends on them waits for both. The photo already does:
+          usePhotoRotation is held back until the settings are known.
+        */}
         {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
         {photo && <PhotoCredit photo={photo} />}
         {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
