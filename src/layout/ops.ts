@@ -3,9 +3,17 @@ import { defaultOptions, readOptions } from '@/widgetSystem/options'
 import { widgetDefinition } from '@/widgetSystem/registry'
 
 import { layoutWidget, type Registry } from './check'
-import { collides, type Drawable, drawnRects, fitNew, isOnGrid, type Rect } from './geometry'
+import {
+  collides,
+  type Drawable,
+  drawnRects,
+  fitNew,
+  isOnGrid,
+  nearestFreeTo,
+  type Rect,
+} from './geometry'
 import { newId } from './id'
-import type { KnownWidget, Layout, WaitingOptions } from './types'
+import type { KnownWidget, Layout, PlacedWidget, WaitingOptions } from './types'
 
 /**
  * Why a change to the Layout was refused:
@@ -41,6 +49,12 @@ export type Changed = { layout: Layout; ok: true }
 
 /** A Widget that was added: the Layout after it, and the new Widget's id. */
 export type Added = Changed & { id: string }
+
+/**
+ * A Widget that was removed: the Layout after it, and the Widget as it was stored, at the place
+ * it was drawn, to put back with `restoreWidget`.
+ */
+export type Removed = Changed & { removed: PlacedWidget }
 
 /** A change that was refused, and why. Nothing has changed. */
 export type Refused = { ok: false; reason: Refusal }
@@ -232,9 +246,10 @@ export function resizeWidget(
 /**
  * Takes a Widget out of the Layout, along with its options. It can be a Widget of a type this
  * version does not know, or one with no place to be drawn. The Layout is settled first (see
- * `settle`), so the Widgets left stay where they were drawn.
+ * `settle`), so the Widgets left stay where they were drawn. The Widget comes back as it was
+ * stored, for `restoreWidget`: the Layout does not keep it.
  */
-export function removeWidget({ layout: given, readOnly }: Editable, id: string): Changed | Refused {
+export function removeWidget({ layout: given, readOnly }: Editable, id: string): Refused | Removed {
   if (readOnly) return refused('read only')
   const layout = settle(given)
   const widget = find(layout, id)
@@ -242,7 +257,38 @@ export function removeWidget({ layout: given, readOnly }: Editable, id: string):
   return {
     layout: { ...layout, widgets: layout.widgets.filter((other) => other !== widget) },
     ok: true,
+    removed: widget.placed,
   }
+}
+
+/**
+ * Puts back a Widget `removeWidget` took out, with its id and options, in the place it had. When
+ * another Widget has taken that, it goes in the free place of its size nearest to it, and when
+ * there is none the answer is `no room`. Whether the Widget limit is reached is not a question
+ * here: putting back what was just removed is not adding (LR-12). A Widget with that id already
+ * in the Layout (put back from another tab) is left, and the Layout given comes back as it was.
+ * The Layout is settled first (see `settle`).
+ */
+export function restoreWidget(
+  { layout: given, readOnly }: Editable,
+  removed: PlacedWidget,
+  registry: Registry = widgetDefinition,
+): Added | Refused {
+  if (readOnly) return refused('read only')
+  const layout = settle(given)
+  if (idsOf(layout).includes(removed.id)) return { id: removed.id, layout: given, ok: true }
+
+  const { col, h, row, w } = removed
+  const taken = drawnRects(layout).map(({ rect }) => rect)
+  const was = { col, h, row, w }
+  const place =
+    isOnGrid(was) && !taken.some((other) => collides(was, other))
+      ? was
+      : nearestFreeTo({ h, w }, taken, was)
+  if (!place) return refused('no room')
+
+  const widget = layoutWidget({ ...removed, ...place }, registry)
+  return { id: removed.id, layout: { ...layout, widgets: [...layout.widgets, widget] }, ok: true }
 }
 
 /**

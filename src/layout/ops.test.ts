@@ -12,6 +12,7 @@ import {
   type Refusal,
   removeWidget,
   resizeWidget,
+  restoreWidget,
   setOptions,
   settle,
 } from './ops'
@@ -485,6 +486,138 @@ describe('removeWidget', () => {
     const snapshot = JSON.stringify(stored(layout))
     removeWidget(editable(layout), 'a')
     expect(JSON.stringify(stored(layout))).toBe(snapshot)
+  })
+})
+
+describe('removeWidget, for undoing it', () => {
+  it('hands back the Widget as it was stored, options and unknown keys included', () => {
+    const kept = clock('a', 5, 4, { options: { later: 1, showDate: true, showSeconds: false } })
+    const layout = layoutOf(kept, weather('b', 11, 1))
+
+    const result = removeWidget(editable(layout), 'a')
+
+    expect(result.ok && result.removed).toEqual(kept)
+  })
+
+  it('hands back the place the Widget was drawn at, not the one it was stored at', () => {
+    // 'b' is stored on top of 'a', so it is drawn in the free place nearest the middle.
+    const layout = layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+    const drawn = drawnRects(layout).find(({ widget }) => widget.placed.id === 'b')?.rect
+
+    const result = removeWidget(editable(layout), 'b')
+
+    expect(drawn).not.toEqual({ col: 5, h: 2, row: 4, w: 4 })
+    expect(result.ok && result.removed).toMatchObject(drawn ?? {})
+  })
+})
+
+describe('restoreWidget', () => {
+  const removedFrom = (layout: Layout, id: string) => {
+    const result = removeWidget(editable(layout), id)
+    if (!result.ok) throw new Error('refused')
+    return result
+  }
+  const placeOf = (layout: Layout, id: string) =>
+    drawnRects(layout).find(({ widget }) => widget.placed.id === id)?.rect
+
+  it('puts a removed Widget back where it was, with its id and options', () => {
+    const options = { later: 1, showDate: true, showSeconds: true }
+    const layout = layoutOf(clock('a', 5, 4, { options }), weather('b', 11, 1))
+    const { layout: without, removed } = removedFrom(layout, 'a')
+
+    const result = restoreWidget(editable(without), removed)
+
+    expect(result.ok && result.id).toBe('a')
+    expect(stored(accepted(result)).widgets).toEqual(
+      expect.arrayContaining([clock('a', 5, 4, { options }), weather('b', 11, 1)]),
+    )
+  })
+
+  it('puts a Widget of a type this version does not know back as it was', () => {
+    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'bookmarks', w: 2 }
+    const { layout: without, removed } = removedFrom(layoutOf(future, clock('a', 5, 4)), 'fut')
+
+    const next = accepted(restoreWidget(editable(without), removed))
+
+    expect(stored(next).widgets).toContainEqual(future)
+  })
+
+  it('leaves everything else in the Layout as it was', () => {
+    const layout = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: {} },
+      widgets: [clock('a', 5, 4), weather('b', 11, 1)],
+    })
+    const { layout: without, removed } = removedFrom(layout, 'a')
+
+    const next = accepted(restoreWidget(editable(without), removed))
+
+    expect(stored(next)).toMatchObject({ extra: 1, v: 1, waiting: { weather: {} } })
+    expect(stored(next).widgets).toHaveLength(2)
+  })
+
+  it('puts it in the nearest free place of its size to where it was, when that was taken', () => {
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+
+    const next = accepted(restoreWidget(editable(layoutOf(clock('b', 5, 4))), removed))
+
+    // The rows just above the Clock that has the middle now (the rows below are as near, and
+    // the first place row by row wins).
+    expect(placeOf(next, 'a')).toEqual({ col: 5, h: 2, row: 2, w: 4 })
+    expect(placeOf(next, 'b')).toEqual({ col: 5, h: 2, row: 4, w: 4 })
+  })
+
+  it('takes the place nearest where it was, not the one nearest the middle', () => {
+    const { removed } = removedFrom(layoutOf(weather('a', 11, 1)), 'a')
+    const layout = layoutOf(clock('c', 5, 4), weather('x', 11, 1))
+
+    const next = accepted(restoreWidget(editable(layout), removed))
+
+    // Beside the Weather that has its corner, not beside the Clock in the middle.
+    expect(placeOf(next, 'a')).toEqual({ col: 9, h: 2, row: 1, w: 2 })
+  })
+
+  it('refuses when there is no room for it', () => {
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+    const full = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }))
+
+    expect(refusal(restoreWidget(editable(full), removed))).toBe('no room')
+  })
+
+  it('refuses a read-only Layout', () => {
+    const { layout: without, removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+
+    expect(refusal(restoreWidget({ layout: without, readOnly: true }, removed))).toBe('read only')
+  })
+
+  it('does nothing when the Widget is already there, as when it was put back from another tab', () => {
+    const layout = layoutOf(clock('a', 5, 4))
+    const { removed } = removedFrom(layout, 'a')
+
+    const result = restoreWidget(editable(layout), removed)
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('is allowed with eight Widgets already on the Grid: putting back is not adding', () => {
+    const eight = layoutOf(
+      ...Array.from({ length: 8 }, (_, i) => weather(`w${i}`, 1 + (i % 6) * 2, i < 6 ? 1 : 3)),
+    )
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 6)), 'a')
+
+    const next = accepted(restoreWidget(editable(eight), removed))
+
+    expect(next.widgets).toHaveLength(9)
+  })
+
+  it('does not change the Layout it was given', () => {
+    const { layout: without, removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+    const snapshot = JSON.stringify(stored(without))
+
+    restoreWidget(editable(without), removed)
+
+    expect(JSON.stringify(stored(without))).toBe(snapshot)
   })
 })
 
