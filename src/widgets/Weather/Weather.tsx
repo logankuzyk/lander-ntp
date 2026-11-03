@@ -1,5 +1,5 @@
 import { Sunrise, Sunset } from 'lucide-preact'
-import type { ComponentChildren } from 'preact'
+import type { ComponentChildren, JSX } from 'preact'
 
 import type { WeatherField, WeatherSettings } from '@/settings/schema'
 import { formatTime } from '@/utils/time'
@@ -7,6 +7,7 @@ import { describeCode } from '@/weather/conditions'
 import type { Weather as Reading } from '@/weather/openMeteo'
 
 import { ConditionIcon } from './ConditionIcon'
+import { weatherFit } from './fit'
 
 type WeatherProps = {
   fields: WeatherSettings['fields']
@@ -31,7 +32,11 @@ function SunTime({ at, hour12, label }: { at: string; hour12: boolean; label: st
   )
 }
 
-/** Top right: the weather now, over the optional lines that are switched on, in their order. */
+/**
+ * The weather now, over the optional lines that are switched on, in their order. It fills its
+ * box: the styles size the type from the room it says it needs (see `weatherFit`), the most the
+ * box can give at which what is drawn fits across and down.
+ */
 export function Weather({ fields, hour12, place, weather }: WeatherProps) {
   const { condition, label } = describeCode(weather.code)
   // Where the sun doesn't rise or set today, the forecast gives both as the same midnight.
@@ -49,22 +54,46 @@ export function Weather({ fields, hour12, place, weather }: WeatherProps) {
         {degrees(weather.low)}
       </li>
     ),
-    location: () => <li key="location">{place}</li>,
+    // The line is cut short where the box ends, so the whole name is on hover.
+    location: () => (
+      <li key="location" title={place}>
+        {place}
+      </li>
+    ),
     sun: () => (
       <li class="weather__sun" key="sun">
-        <Sunrise aria-hidden="true" size={16} />
+        <Sunrise aria-hidden="true" size="1.15em" />
         <SunTime at={weather.sunrise} hour12={hour12} label="Sunrise" />
-        <Sunset aria-hidden="true" size={16} />
+        <Sunset aria-hidden="true" size="1.15em" />
         <SunTime at={weather.sunset} hour12={hour12} label="Sunset" />
       </li>
     ),
   }
 
+  const temperature = degrees(weather.temperature)
+  const fit = weatherFit({
+    // The lines other than the place and the sun, as drawn.
+    lines: [
+      ...(shown.includes('condition') ? [label] : []),
+      ...(shown.includes('feelsLike') ? [`Feels like ${degrees(weather.feelsLike)}`] : []),
+      ...(shown.includes('highLow')
+        ? [`H ${degrees(weather.high)} · L ${degrees(weather.low)}`]
+        : []),
+    ],
+    place: shown.includes('location') ? place : null,
+    sun: shown.includes('sun'),
+    temperature,
+  })
+
   return (
-    <section aria-label="Weather" class="weather">
+    <section
+      aria-label="Weather"
+      class="weather"
+      style={{ '--weather-height': fit.height, '--weather-width': fit.width } as JSX.CSSProperties}
+    >
       <div class="weather__now" title={label}>
-        <ConditionIcon condition={condition} isDay={weather.isDay} size={36} />
-        <span class="weather__temperature">{degrees(weather.temperature)}</span>
+        <ConditionIcon condition={condition} isDay={weather.isDay} size="1em" />
+        <span class="weather__temperature">{temperature}</span>
         {/* The icon says it for the eye; with the line below switched on, that says it. */}
         {!shown.includes('condition') && <span class="visually-hidden">{label}</span>}
       </div>
