@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/preact'
+import { act, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
@@ -100,6 +100,25 @@ describe('the Weather definition', () => {
     expect(weatherDefinition.name).toBe('Weather')
   })
 
+  describe('summary', () => {
+    const options = defaultOptions(weatherDefinition)
+    const summary = (changes: Partial<typeof options>) =>
+      weatherDefinition.summary?.({ ...options, ...changes })
+
+    it("is the place's name", () => {
+      expect(summary({ followDevice: false, place: PLACE })).toBe('Victoria')
+    })
+
+    it('is "Current location" while following the device, whatever place is stored', () => {
+      expect(summary({ followDevice: true, place: null })).toBe('Current location')
+      expect(summary({ followDevice: true, place: PLACE })).toBe('Current location')
+    })
+
+    it('is nothing when there is no place', () => {
+      expect(summary({ followDevice: false, place: null })).toBeUndefined()
+    })
+  })
+
   it("starts a new Weather with the options today's settings default to", () => {
     const { fields, followDevice, place, unit } = DEFAULT_SETTINGS.weather
     expect(defaultOptions(weatherDefinition)).toEqual({ fields, followDevice, place, unit })
@@ -190,6 +209,20 @@ describe('the Weather definition', () => {
 })
 
 describe('the Weather on the page', () => {
+  it('names its box for the Weather and its place, and leaves the Weather inside as it was', async () => {
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
+      data: READING,
+      fetchedAt: Date.now(),
+    })
+
+    const { container } = render(<Probe settings={ON} />)
+
+    const named = await screen.findByRole('group', { name: 'Weather, Victoria' })
+    expect(named).toBe(container.querySelector('.widget-box'))
+    // The Weather's own region keeps its label (the page's other tests find it by it).
+    expect(await within(named).findByRole('region', { name: 'Weather' })).toBeTruthy()
+  })
+
   it('draws the Weather alone in its box, on the Grid, in the top right corner', async () => {
     await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,

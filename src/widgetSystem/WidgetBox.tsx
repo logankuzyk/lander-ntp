@@ -11,6 +11,7 @@ import type {
   WidgetSource,
   WidgetViewProps,
 } from './definition'
+import { accessibleName } from './name'
 import { CHECKING, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { useSourceState } from './source'
@@ -30,8 +31,11 @@ type WidgetBoxProps<O, R, C> = {
  * Widget to lay itself out in (see `.widget-box` in the page's styles), its content centred.
  * `widget` names what it holds, for a test or a rule in the styles to find it by.
  *
- * In edit mode the box is a frame: a tab stop, a group named `name`, with the name drawn in it.
- * The boxes are in reading order in the document (see Grid), which is the order Tab takes.
+ * The box is a group named `name` (see `accessibleName`: "Weather, Victoria"), in and out of
+ * edit mode. The name is fixed text, not a live region: a reader says it on reaching the box and
+ * never when what is inside changes, such as the Clock's time. In edit mode the box is also a
+ * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
+ * (see Grid), which is the order Tab takes.
  */
 export function Box({
   children,
@@ -40,18 +44,20 @@ export function Box({
   widget,
 }: {
   children?: ComponentChildren
-  /** What people call it, such as "Clock": read out and drawn in edit mode. */
+  /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
   name: string
   rect: Rect
   widget: string
 }) {
   const { editing } = useEditMode()
-  // Spread rather than written out: only while editing is the box a group, and a tab stop.
-  const frame = editing ? { 'aria-label': name, role: 'group' as const, tabIndex: 0 } : {}
+  // Spread rather than written out: only while editing is the box a tab stop.
+  const frame = editing ? { tabIndex: 0 } : {}
   return (
     <div
+      aria-label={name}
       class="widget-box"
       data-widget={widget}
+      role="group"
       style={{
         gridColumn: `${rect.col} / span ${rect.w}`,
         gridRow: `${rect.row} / span ${rect.h}`,
@@ -156,7 +162,11 @@ function SourcedView<O, R, C>({
  */
 export function WidgetBox<O, R, C>({ definition, options, page, rect }: WidgetBoxProps<O, R, C>) {
   return (
-    <Box name={definition.name} rect={rect} widget={definition.type}>
+    <Box
+      name={accessibleName(definition, readOptions(definition, options))}
+      rect={rect}
+      widget={definition.type}
+    >
       <Contents definition={definition} options={options} page={page} />
     </Box>
   )

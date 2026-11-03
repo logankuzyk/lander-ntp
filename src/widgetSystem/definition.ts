@@ -174,6 +174,13 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
    * each render.
    */
   source?: WidgetSource<O, R, C>
+  /**
+   * A few words from the options that tell one Widget of this type from another, such as the
+   * Weather's place. The box's accessible name is `name`, a comma and this ("Weather,
+   * Victoria"). Nothing, or an empty string, leaves the name alone. It must not follow what the
+   * Widget shows (the Clock's time would change every second), only the options.
+   */
+  summary?: (options: O) => string | undefined
   /** The id that is stored. Never renamed or reused. */
   type: string
   View: ComponentType<WidgetViewProps<O, R, C>>
