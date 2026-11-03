@@ -105,6 +105,44 @@ describe('Weather', () => {
     expect(Number(weather?.style.getPropertyValue('--weather-height'))).toBeCloseTo(fit.height)
   })
 
+  it('reserves room for every line it draws, with the longest condition and a negative temperature', () => {
+    // Code 96 reads "Thunderstorm with hail", the longest the Weather says.
+    const reading = {
+      ...READING,
+      code: 96,
+      feelsLike: -14.2,
+      high: -9.1,
+      low: -15.3,
+      temperature: -12,
+    }
+    const { container } = renderWeather(WEATHER_FIELDS.slice(), { reading })
+
+    const weather = container.querySelector<HTMLElement>('.weather')
+    const fit = weatherFit({
+      lines: ['Thunderstorm with hail', 'Feels like -14°', 'H -9° · L -15°'],
+      place: 'Victoria',
+      sun: true,
+      temperature: '-12°',
+    })
+    expect(Number(weather?.style.getPropertyValue('--weather-width'))).toBeCloseTo(fit.width)
+    expect(Number(weather?.style.getPropertyValue('--weather-height'))).toBeCloseTo(fit.height)
+  })
+
+  it('reserves room for the temperature alone, as wide as its sign and digits', () => {
+    const { container } = renderWeather([], { reading: { ...READING, temperature: -12 } })
+
+    const weather = container.querySelector<HTMLElement>('.weather')
+    const fit = weatherFit({ lines: [], place: null, sun: false, temperature: '-12°' })
+    expect(Number(weather?.style.getPropertyValue('--weather-width'))).toBeCloseTo(fit.width)
+    expect(Number(weather?.style.getPropertyValue('--weather-height'))).toBeCloseTo(fit.height)
+  })
+
+  it('names the place on hover, as it may be cut short to fit the box', () => {
+    const { container } = renderWeather(['location'])
+
+    expect(container.querySelector('.weather__details li')?.getAttribute('title')).toBe('Victoria')
+  })
+
   it('reserves no room for the sun where the sun does neither today', () => {
     const midnight = '2026-10-01T00:00'
     const { container } = renderWeather(['sun'], {

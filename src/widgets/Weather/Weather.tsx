@@ -54,7 +54,12 @@ export function Weather({ fields, hour12, place, weather }: WeatherProps) {
         {degrees(weather.low)}
       </li>
     ),
-    location: () => <li key="location">{place}</li>,
+    // The line is cut short where the box ends, so the whole name is on hover.
+    location: () => (
+      <li key="location" title={place}>
+        {place}
+      </li>
+    ),
     sun: () => (
       <li class="weather__sun" key="sun">
         <Sunrise aria-hidden="true" size="1.15em" />

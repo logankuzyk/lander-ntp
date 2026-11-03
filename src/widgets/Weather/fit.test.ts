@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { SLACK, weatherFit } from './fit'
+import { CHAR_WIDTH, PLACE_CHARS, SLACK, SUN_WIDTH, weatherFit } from './fit'
 
 const NONE = { lines: [], place: null, sun: false, temperature: '12°' }
 const ALL = {
@@ -67,5 +67,20 @@ describe('the room a Weather reserves', () => {
     expect(weatherFit({ ...NONE, temperature: '-12°' }).width).toBeGreaterThan(
       weatherFit({ ...NONE, temperature: '9°' }).width,
     )
+  })
+
+  it('pins the numbers measured in a browser, so a change to one is a decision', () => {
+    expect(CHAR_WIDTH).toBe(0.6)
+    expect(PLACE_CHARS).toBe(16)
+    expect(SLACK).toBe(1.03)
+  })
+
+  it('is as wide as the sun line when that is the widest', () => {
+    expect(weatherFit({ ...NONE, sun: true }).width).toBeCloseTo(SUN_WIDTH * 1.03)
+    expect(SUN_WIDTH).toBeCloseTo(9.8)
+  })
+
+  it('reserves a place no more than 16 characters across, however long it is', () => {
+    expect(weatherFit({ ...NONE, place: 'x'.repeat(40) }).width).toBeCloseTo(16 * 0.6 * 1.03)
   })
 })
