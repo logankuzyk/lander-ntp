@@ -7,14 +7,16 @@ import { checkLayout } from '@/layout/check'
 import type { Layout } from '@/layout/types'
 import { makePlace, makeWeather } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
-import { weatherReadings } from '@/weather/storage'
 import { weatherSource } from '@/weather/weatherSource'
 import { defaultOptions } from '@/widgetSystem/options'
 
 import { weatherDefinition } from './definition'
 import { usePruneReadings } from './usePruneReadings'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 const VICTORIA = makePlace()
 const VANCOUVER = makePlace({ latitude: 49.28, longitude: -123.12, name: 'Vancouver' })
@@ -246,17 +248,69 @@ describe('usePruneReadings', () => {
     expect(getCurrentPosition).not.toHaveBeenCalled()
   })
 
-  it('does not fail the page when the readings cannot be changed', async () => {
-    await seed(KEY.victoria, KEY.vancouver)
-    vi.spyOn(weatherReadings, 'setValue').mockRejectedValue(new Error('quota'))
-    const unhandled = vi.fn()
-    process.on('unhandledRejection', unhandled)
+  it('does not prune again for a Layout that changes without changing the keys in use', async () => {
+    await seed(KEY.victoria)
+    const prune = vi.spyOn(weatherSource.cache, 'prune')
+    const { rerender } = render(<Probe layout={layoutAt(VICTORIA)} />)
+    await waitFor(() => expect(prune).toHaveBeenCalledTimes(1))
 
-    render(<Probe layout={layoutAt(VICTORIA)} />)
+    // Another Weather on the same key, then a moved one: new Layouts, the same readings in use.
+    rerender(<Probe layout={layoutAt(VICTORIA, VICTORIA)} />)
+    await settle()
+    rerender(<Probe layout={layoutAt(VICTORIA)} />)
     await settle()
 
-    process.off('unhandledRejection', unhandled)
-    expect(unhandled).not.toHaveBeenCalled()
-    expect(await kept()).toEqual([KEY.victoria, KEY.vancouver])
+    expect(prune).toHaveBeenCalledTimes(1)
+  })
+
+  it('goes by a position that changed while the first read was on its way, not by that older read', async () => {
+    await devicePosition.setValue({ latitude: 48.43, longitude: -123.37, name: 'Victoria' })
+    await seed(KEY.victoria, KEY.vancouver)
+    // The read answers late, and with what was kept before the position moved.
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const read = devicePosition.getValue.bind(devicePosition)
+    vi.spyOn(devicePosition, 'getValue').mockImplementation(async () => {
+      const older = await read()
+      await held
+      return older
+    })
+
+    render(<Probe layout={layoutAt('device')} />)
+    await settle()
+    await devicePosition.setValue({ latitude: 49.28, longitude: -123.12, name: 'Vancouver' })
+    await waitFor(async () => expect(await kept()).toEqual([KEY.vancouver]))
+
+    release()
+    await settle()
+
+    expect(await kept()).toEqual([KEY.vancouver])
+  })
+
+  it('handles a failure to change the readings, so the page does not fail', async () => {
+    await seed(KEY.victoria, KEY.vancouver)
+    // A rejection nothing handles fails the page, so the hook must give the promise a handler:
+    // `catch`, like `await` in a `try`, asks for the rejection through `then`. The stand-in is a
+    // plain function, not a spy: a spy that returns a promise calls `then` on it itself.
+    const asked: unknown[][] = []
+    const original = weatherSource.cache.prune
+    weatherSource.cache.prune = () => {
+      const failed = Promise.reject(new Error('quota'))
+      const then = failed.then.bind(failed)
+      failed.then = ((...args: unknown[]) => {
+        asked.push(args)
+        return then(...(args as Parameters<typeof then>))
+      }) as typeof failed.then
+      return failed
+    }
+
+    try {
+      render(<Probe layout={layoutAt(VICTORIA)} />)
+
+      await waitFor(() => expect(asked).toHaveLength(1))
+      expect(asked[0]?.[1]).toBeTypeOf('function')
+    } finally {
+      weatherSource.cache.prune = original
+    }
   })
 })

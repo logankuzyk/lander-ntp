@@ -174,6 +174,20 @@ describe('App, forgetting the readings no Widget uses', () => {
     expect(await kept()).toEqual([KEY.victoria, KEY.kelowna])
   })
 
+  it('forgets nothing when the stored settings are from a newer version and no Layout is stored', async () => {
+    await seedPhotos()
+    // Unreadable as settings, so the page uses the defaults and works out a Layout with no
+    // Weather; a newer device may have one, and its readings are not this version's to forget.
+    await fakeBrowser.storage.sync.set({ settings: { somethingNew: true, v: 2 } })
+    await seedReadings(KEY.victoria, KEY.kelowna)
+
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    await settle()
+
+    expect(await kept()).toEqual([KEY.victoria, KEY.kelowna])
+  })
+
   it('forgets nothing while a Weather follows the device and no position has been kept', async () => {
     await seedPhotos()
     await fakeBrowser.storage.sync.set({
