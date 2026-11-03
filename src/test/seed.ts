@@ -141,6 +141,15 @@ const TWO_WEATHERS: StoredLayout = {
 }
 
 /**
+ * A Clock in the middle and a Weather with room on its right (column 2, row 2): the options
+ * popover opens to the right of it. Stored, so the page draws it where it says.
+ */
+const OPTIONS_WEATHER_BESIDE: StoredLayout = {
+  v: 1,
+  widgets: [clockAt('clock0aa', 5, 4, 4), weatherAt('weather1', 2, 2)],
+}
+
+/**
  * The states of the whole page that the `App` stories show. Defined once, so a story and
  * the test that checks it cannot drift apart.
  */
@@ -187,6 +196,16 @@ export const PAGE_SEEDS = {
   },
   /** The first tab after installing: the welcome, over the photo. */
   newInstall: { pending: { dismissed: SEEN_NEWS, welcomed: false } },
+  /**
+   * A Clock in the middle and a Weather with room on its right, both stored: the options
+   * popover opens to the right of either.
+   */
+  optionsWeatherBeside: {
+    layout: OPTIONS_WEATHER_BESIDE,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
   /** Someone using it day to day, with the settings as they come. */
   settledInstall: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
   /** Someone who had the extension before the weather arrived, and is told about it. */

@@ -15,16 +15,28 @@ import { accessibleName } from './name'
 import { CHECKING, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { useSourceState } from './source'
+import { useOptionsPopover } from './useOptionsPopover'
 import { WidgetState } from './WidgetState'
 
 type WidgetBoxProps<O, R, C> = {
   definition: WidgetDefinition<O, R, C>
+  /** The id it is stored under, which its Options button opens its options by. */
+  id?: string
   /** What is stored for this Widget, which may be missing or wrong; the definition reads it. */
   options: unknown
   page: PageValues
   /** The cells the Widget is drawn in: as the Grid says, not as stored. */
   rect: Rect
 }
+
+/** O on its own: not a held key, and not with a modifier (those are the browser's). */
+const isOptionsKey = (event: KeyboardEvent) =>
+  event.key === 'o' &&
+  !event.repeat &&
+  !event.altKey &&
+  !event.ctrlKey &&
+  !event.metaKey &&
+  !event.shiftKey
 
 /**
  * The box a Widget sits in, on the Grid: the cells of its place, a size container for the
@@ -35,28 +47,60 @@ type WidgetBoxProps<O, R, C> = {
  * edit mode. The name is fixed text, not a live region: a reader says it on reaching the box and
  * never when what is inside changes, such as the Clock's time. In edit mode the box is also a
  * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
- * (see Grid), which is the order Tab takes.
+ * (see Grid), which is the order Tab takes. A box given an `id` also has an Options button at
+ * its top left, which opens the Widget's options in a popover beside it (see
+ * `OptionsPopoverProvider`), and so does O pressed on the frame.
  */
 export function Box({
   children,
+  id,
   name,
+  optionsLabel,
   rect,
   widget,
 }: {
   children?: ComponentChildren
+  /** Gives the box an Options button. Not for a Widget that has no options to open. */
+  id?: string
   /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
   name: string
+  /**
+   * What the Options button is called: "Weather options", the Widget's type and not its summary,
+   * as the button is read inside the box's group, which has the full name. By default the box's.
+   */
+  optionsLabel?: string
   rect: Rect
   widget: string
 }) {
   const { editing } = useEditMode()
-  // Spread rather than written out: only while editing is the box a tab stop.
-  const frame = editing ? { tabIndex: 0 } : {}
+  const options = useOptionsPopover()
+  const optionsId = editing && options.available ? id : undefined
+  // Spread rather than written out: only while editing is the box a tab stop, and where O opens
+  // the Widget's options (on the frame or its own button: a key typed into anything else is
+  // that thing's).
+  const frame = editing
+    ? {
+        onKeyDown:
+          optionsId === undefined
+            ? undefined
+            : (event: KeyboardEvent) => {
+                const own =
+                  event.target === event.currentTarget ||
+                  (event.target instanceof Element &&
+                    event.target.closest('.widget-box__options') !== null)
+                if (!own || !isOptionsKey(event)) return
+                event.preventDefault()
+                options.toggle(optionsId)
+              },
+        tabIndex: 0,
+      }
+    : {}
   return (
     <div
       aria-label={name}
       class="widget-box"
       data-widget={widget}
+      data-widget-id={id}
       role="group"
       style={{
         gridColumn: `${rect.col} / span ${rect.w}`,
@@ -65,6 +109,35 @@ export function Box({
       {...frame}
     >
       {children}
+      {optionsId !== undefined && (
+        <button
+          aria-expanded={options.openId === optionsId}
+          aria-haspopup="dialog"
+          aria-label={optionsLabel ?? `${name} options`}
+          class="widget-box__options"
+          // Opens and closes the popover itself, so pressing it isn't a click outside.
+          data-popover-toggle
+          onClick={() => options.toggle(optionsId)}
+          title="Options (O)"
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="14"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="14"
+          >
+            <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+            <circle cx="16" cy="7" r="2" />
+            <circle cx="8" cy="17" r="2" />
+          </svg>
+        </button>
+      )}
       {editing && (
         <span aria-hidden="true" class="widget-box__name">
           {name}
@@ -160,10 +233,18 @@ function SourcedView<O, R, C>({
  * once every need is met, and its View is drawn only with a reading; without one the box says
  * why (loading, failed or switched off: see `SourcedView`), in the same place and size.
  */
-export function WidgetBox<O, R, C>({ definition, options, page, rect }: WidgetBoxProps<O, R, C>) {
+export function WidgetBox<O, R, C>({
+  definition,
+  id,
+  options,
+  page,
+  rect,
+}: WidgetBoxProps<O, R, C>) {
   return (
     <Box
+      id={id}
       name={accessibleName(definition, readOptions(definition, options))}
+      optionsLabel={`${definition.name} options`}
       rect={rect}
       widget={definition.type}
     >
@@ -173,7 +254,11 @@ export function WidgetBox<O, R, C>({ definition, options, page, rect }: WidgetBo
 }
 
 /** What goes in the box. A component of its own, so that the box does not wait for its hooks. */
-function Contents<O, R, C>({ definition, options, page }: Omit<WidgetBoxProps<O, R, C>, 'rect'>) {
+function Contents<O, R, C>({
+  definition,
+  options,
+  page,
+}: Omit<WidgetBoxProps<O, R, C>, 'id' | 'rect'>) {
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
   const unmet = useUnmetNeed(definition.needs, read)

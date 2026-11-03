@@ -3,6 +3,7 @@ import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { checkLayout } from '@/layout/check'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
+import { setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
 import { recordInstall } from '@/onboarding/install'
@@ -10,6 +11,8 @@ import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
+import { weatherDefinition } from '@/widgets/Weather/definition'
+import { writeOptions } from '@/widgetSystem/options'
 
 import { asV023, saveLikeV023 } from './compat'
 
@@ -324,6 +327,29 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    layoutOnly: true,
+    name: 'change a Weather’s options in its popover (writeOptions then setOptions: sync:layout alone)',
+    write: changeLayout((layout) => {
+      const weather = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'weather',
+      )
+      if (weather?.kind !== 'known') throw new Error('the example Layout has a Weather')
+      const options = writeOptions(weatherDefinition, weather.placed.options, {
+        unit: 'fahrenheit',
+      })
+      const changed = setOptions({ layout, readOnly: false }, weather.placed.id, options)
+      if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
+      return changed.layout
+    }),
+  },
+  {
+    name: 'the shared 24-hour switch in a popover, after a first Layout write: clock.hour12 only',
+    write: async () => {
+      await storeExampleLayout()
+      await changeSettings((s) => ({ ...s, clock: { ...s.clock, hour12: !s.clock.hour12 } }))()
+    },
+  },
+  {
     name: 'answer the welcome',
     write: changeOnboarding((record) => ({ ...record, welcomed: true })),
   },
@@ -417,6 +443,26 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       expect(onboarding).toEqual(stored.onboarding)
     },
   )
+})
+
+describe('the options popover’s writes', () => {
+  it('leave the settings as they were, apart from `v` and `clock.hour12`, and v0.2.3 reads that as the Clock’s setting', async () => {
+    await settingsItem.setValue(SEED)
+    await storeExampleLayout()
+    const afterLayout = await fakeBrowser.storage.sync.get(null)
+    expect(afterLayout.settings).toEqual(SEED)
+
+    await changeSettings((s) => ({ ...s, clock: { ...s.clock, hour12: !s.clock.hour12 } }))()
+    const stored = await fakeBrowser.storage.sync.get(null)
+    const { fellBack, settings } = await asV023(stored)
+
+    expect(changedPaths(SEED, stored.settings)).toEqual(['clock.hour12'])
+    expect(fellBack).toBe(false)
+    expect(settings.clock.hour12).toBe(!SEED.clock.hour12)
+    expect(settings.clock).toEqual({ ...SEED.clock, hour12: !SEED.clock.hour12 })
+    // And the Layout is there, for the devices that read it.
+    expect(stored.layout).toHaveProperty('v', 1)
+  })
 })
 
 describe('sync:layout, which v0.2.3 never reads', () => {

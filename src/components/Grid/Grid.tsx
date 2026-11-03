@@ -68,6 +68,7 @@ export function Grid({ layout, page }: GridProps) {
             widget.kind === 'known' ? (
               <WidgetBox
                 definition={widget.definition}
+                id={widget.placed.id}
                 key={widget.placed.id}
                 options={widget.placed.options}
                 page={page}
