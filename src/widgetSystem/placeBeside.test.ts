@@ -100,4 +100,55 @@ describe('placeBeside', () => {
 
     expect(placed.left).toBeGreaterThanOrEqual(8)
   })
+
+  describe('at the edge of what fits', () => {
+    it('takes the right when its width fits exactly, and the left when it is a pixel short', () => {
+      // 1440 - 8 (the edge) - (1100 + 12 (the gap)) is 320: just the popover's width.
+      const exact = { bottom: 400, left: 700, right: 1100, top: 200 }
+      const short = { ...exact, right: 1101 }
+
+      expect(placeBeside(exact, POPOVER, LAPTOP).side).toBe('right')
+      expect(placeBeside(short, POPOVER, LAPTOP)).toMatchObject({ left: 368, side: 'left' })
+    })
+
+    it('takes the left when its width fits exactly, and goes below when it is a pixel short', () => {
+      // 340 - 12 (the gap) - 320 is 8: the popover's left edge on the window's margin.
+      const exact = { bottom: 400, left: 340, right: 1130, top: 200 }
+      const short = { ...exact, left: 339 }
+
+      expect(placeBeside(exact, POPOVER, LAPTOP)).toMatchObject({ left: 8, side: 'left' })
+      expect(placeBeside(short, POPOVER, LAPTOP).side).toBe('below')
+    })
+
+    it('prefers below to above when its whole height fits there exactly', () => {
+      // 800 - 8 - (520 + 12) is 260, with 480 above: both would hold it, and below comes first.
+      const anchor = { bottom: 520, left: 100, right: 290, top: 500 }
+
+      expect(placeBeside(anchor, { height: 260, width: 320 }, PHONE)).toMatchObject({
+        maxHeight: 260,
+        side: 'below',
+      })
+    })
+
+    it('goes above or below only with at least 160 pixels there, else over the widget', () => {
+      // Below has 800 - 8 - (620 + 12) = 160 and above has 100; a pixel less is over.
+      const exact = { bottom: 620, left: 100, right: 290, top: 120 }
+      const short = { ...exact, bottom: 621 }
+      const tall = { height: 400, width: 320 }
+
+      expect(placeBeside(exact, tall, PHONE)).toMatchObject({ maxHeight: 160, side: 'below' })
+      expect(placeBeside(short, tall, PHONE).side).toBe('over')
+    })
+
+    it('keeps its right edge inside the window for a popover wider than the window', () => {
+      const anchor = { bottom: 300, left: 200, right: 300, top: 100 }
+      const viewport = { height: 800, width: 360 }
+
+      const { left } = placeBeside(anchor, { height: 200, width: 600 }, viewport)
+
+      // The room is 344 wide, so it starts at the margin and ends at the other one.
+      expect(left + Math.min(600, viewport.width - 16)).toBeLessThanOrEqual(viewport.width - 8)
+      expect(left).toBe(8)
+    })
+  })
 })

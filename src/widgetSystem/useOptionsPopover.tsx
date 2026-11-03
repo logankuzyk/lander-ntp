@@ -152,6 +152,11 @@ export function OptionsPopoverProvider({
       )
     : undefined
   const target = widget?.kind === 'known' ? widget : null
+  // A Widget that goes (another device removed it) takes its options with it for good: were they
+  // only hidden, they would come back, uninvited, if it came back with the same id (an undo).
+  useEffect(() => {
+    if (opened && !target) close()
+  }, [close, opened, target])
 
   // What each change starts from: the Layout as of the last change made, so a second change
   // before the page has drawn the first still has it. Each render brings it up to date.

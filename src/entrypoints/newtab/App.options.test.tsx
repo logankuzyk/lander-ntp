@@ -148,15 +148,46 @@ describe('App, the options popover', () => {
       expect(dialog(WEATHER)).not.toBeNull()
     })
 
-    it('ignores O in a popover, with a modifier, or held down', async () => {
+    it.each([
+      ['with Control', { ctrlKey: true }],
+      ['with Alt', { altKey: true }],
+      ['with Meta', { metaKey: true }],
+      ['with Shift', { shiftKey: true }],
+      ['held down', { repeat: true }],
+    ])('ignores O pressed %s', async (_how, modifiers) => {
       await drawn(THREE)
       edit()
       const frame = screen.getByRole('group', { name: WEATHER })
       frame.focus()
 
-      fireEvent.keyDown(frame, { ctrlKey: true, key: 'o' })
-      fireEvent.keyDown(frame, { key: 'o', repeat: true })
+      fireEvent.keyDown(frame, { key: 'o', ...modifiers })
 
+      expect(dialog(WEATHER)).toBeNull()
+    })
+
+    it('ignores O pressed in a button or an input inside the box, which is that control’s key', async () => {
+      await drawn(THREE)
+      edit()
+      const frame = screen.getByRole('group', { name: WEATHER })
+      const button = document.createElement('button')
+      const input = document.createElement('input')
+      frame.append(button, input)
+
+      fireEvent.keyDown(button, { key: 'o' })
+      fireEvent.keyDown(input, { key: 'o' })
+
+      expect(dialog(WEATHER)).toBeNull()
+    })
+
+    it('takes O pressed on the Options button itself, which opens and closes the options', async () => {
+      await drawn(THREE)
+      edit()
+      const button = optionsButton('Weather')
+
+      fireEvent.keyDown(button, { key: 'o' })
+      expect(dialog(WEATHER)).not.toBeNull()
+
+      fireEvent.keyDown(button, { key: 'o' })
       expect(dialog(WEATHER)).toBeNull()
     })
 
@@ -388,18 +419,32 @@ describe('App, the options popover', () => {
       expect(writtenKeys(set).every((keys) => keys === 'layout')).toBe(true)
     })
 
-    it('writes nothing for a change that changes nothing', async () => {
-      await drawn(THREE)
+    it('saves the Widgets that were drawn away from their stored place where they were drawn', async () => {
+      // Two Clocks stored on the same cells: the page draws the second in the nearest free place.
+      await drawn({ v: 1, widgets: [clock('clock0aa', 5), clock('clock0bb', 5)] })
+      const place = (id: string) => {
+        const box = document.querySelector<HTMLElement>(`[data-widget-id="${id}"]`)
+        return [box?.style.gridColumn, box?.style.gridRow]
+      }
+      const drawnBefore = { first: place('clock0aa'), second: place('clock0bb') }
+      expect(drawnBefore.second).not.toEqual(['5 / span 4', '4 / span 2'])
       edit()
-      open('Weather')
-      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+      openById('clock0aa')
 
-      // Units: choosing Celsius again, while it is Celsius.
-      fireEvent.click(screen.getByRole('combobox', { name: 'Units' }))
-      fireEvent.click(screen.getByRole('option', { name: 'Celsius' }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('switch', { name: 'Show date' }))
       await settled()
 
-      expect(set).not.toHaveBeenCalled()
+      const saved = (await stored('layout')) as {
+        widgets: { col: number; id: string; row: number }[]
+      }
+      const cells = (id: string) => {
+        const widget = saved.widgets.find((candidate) => candidate.id === id)
+        return [`${widget?.col} / span 4`, `${widget?.row} / span 2`]
+      }
+      // The displaced one is saved where it is drawn, not on row 4 where it was stored.
+      expect(cells('clock0bb')).toEqual(drawnBefore.second)
+      expect(cells('clock0aa')).toEqual(drawnBefore.first)
+      expect(place('clock0bb')).toEqual(drawnBefore.second)
     })
   })
 
@@ -458,6 +503,26 @@ describe('App, the options popover', () => {
       const settings = (await stored('settings')) as Settings
       expect(settings.font).toBe('instrument-serif')
       expect(settings.clock.hour12).toBe(true)
+    })
+  })
+
+  describe('when the settings are from a newer version', () => {
+    it('does not save the 24-hour switch over them', async () => {
+      await drawn(THREE)
+      const newer = { ...SETTINGS, v: 2 }
+      await fakeBrowser.storage.sync.set({ settings: newer })
+      await settled()
+      edit()
+      open('Weather')
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('switch', { name: '24-hour time' }),
+      )
+      await settled()
+
+      expect(set).not.toHaveBeenCalled()
+      expect(await stored('settings')).toEqual(newer)
     })
   })
 

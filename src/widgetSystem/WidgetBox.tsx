@@ -85,7 +85,9 @@ export function Box({
             ? undefined
             : (event: KeyboardEvent) => {
                 const own =
-                  event.target === event.currentTarget || event.target instanceof HTMLButtonElement
+                  event.target === event.currentTarget ||
+                  (event.target instanceof Element &&
+                    event.target.closest('.widget-box__options') !== null)
                 if (!own || !isOptionsKey(event)) return
                 event.preventDefault()
                 options.toggle(optionsId)
