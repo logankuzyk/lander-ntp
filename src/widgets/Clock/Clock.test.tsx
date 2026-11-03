@@ -64,4 +64,17 @@ describe('Clock', () => {
 
     expect(time(container)).toBe('21:05:10')
   })
+
+  it('says what it shows on its root, for the styles to size it by', () => {
+    const plain = render(<Clock hour12={false} showDate={false} showSeconds={false} />)
+    const root = plain.container.querySelector('.clock')
+    expect(root?.classList.contains('clock--seconds')).toBe(false)
+    expect(root?.classList.contains('clock--date')).toBe(false)
+    plain.unmount()
+
+    const full = render(<Clock hour12={false} showDate showSeconds />)
+    const fullRoot = full.container.querySelector('.clock')
+    expect(fullRoot?.classList.contains('clock--seconds')).toBe(true)
+    expect(fullRoot?.classList.contains('clock--date')).toBe(true)
+  })
 })

@@ -80,19 +80,46 @@ body {
 
 /* Clock */
 
+/*
+ * The Clock fills its box, with no cap. Its size is the largest at which the reading fits both
+ * ways: across (100cqw over how wide the reading is, in ems) and down (100cqh over how tall,
+ * in ems). The reading's width is worked out from how many digits and colons it draws, at the
+ * widest of the four fonts' digits and colons (measured, so the other fonts fit with room to
+ * spare), because CSS cannot ask a font. The time and the date are in ems of this size, so they
+ * scale together and stay centred as one.
+ */
 .clock {
+  --clock-digit: 0.61; /* em: the widest tabular digit of the four fonts (0.599) with letter-spacing */
+  --clock-colon: 0.58; /* em: Geist Mono's colon, as wide as a digit */
+  --clock-digits: 4;
+  --clock-colons: 1;
+  --clock-lines: 1.05; /* em tall: the time alone */
+
   display: grid;
   justify-items: center;
-  gap: 0.25rem;
+  gap: 0.04em;
+  font-size: min(
+    calc(
+      100cqw / (var(--clock-digits) * var(--clock-digit) + var(--clock-colons) * var(--clock-colon))
+    ),
+    calc(100cqh / var(--clock-lines))
+  );
+  text-align: center;
+}
+
+/* HH:MM:SS: two more digits and one more colon. */
+.clock--seconds {
+  --clock-digits: 6;
+  --clock-colons: 2;
+}
+
+/* The date under the time: 0.04em of gap and one line at 0.17em. */
+.clock--date {
+  --clock-lines: 1.3;
 }
 
 .clock__time {
-  /*
-   * 16vw reaches the 9rem cap around a 900px window, so the clock only starts giving up size
-   * on genuinely narrow ones. The 4rem floor is what keeps the longest reading — 12-hour with
-   * seconds, in the widest of the four fonts — inside a 320px window.
-   */
-  font-size: clamp(4rem, 16vw, 9rem);
+  font-size: 1em;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -100,7 +127,9 @@ body {
 }
 
 .clock__date {
-  font-size: clamp(1rem, 2.2vw, 1.4rem);
+  /* In ems of the time (v0.2.3's was about 0.155), but never under 12px: the smallest box holds it. */
+  font-size: max(0.17em, 0.75rem);
+  line-height: 1.2;
   opacity: 0.9;
 }
 

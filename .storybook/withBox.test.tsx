@@ -22,6 +22,14 @@ describe('withBox', () => {
     expect(box.style.gridRow).toBe('1 / span 2')
   })
 
+  it("lays the Grid's cells out from the geometry's columns and rows, so a box takes its own cells", () => {
+    renderWithBox({})
+
+    const grid = boxOfStory().parentElement as HTMLElement
+    expect(grid.style.getPropertyValue('--cols')).toBe('12')
+    expect(grid.style.getPropertyValue('--rows')).toBe('8')
+  })
+
   it("puts a story that does not say where in the middle, at the Clock's starting size", () => {
     renderWithBox({})
 
