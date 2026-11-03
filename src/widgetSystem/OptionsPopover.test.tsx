@@ -26,6 +26,7 @@ const draw = (
     <OptionsPopover
       box={() => box}
       definition={clockDefinition}
+      name="Clock"
       onChange={vi.fn()}
       onClose={onClose}
       onPageValueChange={vi.fn()}

@@ -16,6 +16,12 @@ const OPENS: Record<StoryName, string> = {
   WeatherFlipped: 'Weather',
 }
 
+/** What the popover of each is called: its box's name, with the place for a Weather. */
+const DIALOGS: Record<string, string> = {
+  Clock: 'Clock options',
+  Weather: 'Weather, Victoria options',
+}
+
 const fetchSpy = vi.fn()
 
 beforeEach(() => {
@@ -43,7 +49,7 @@ describe('the options popover stories', () => {
       fireEvent.click(await screen.findByRole('button', { name: `${widget} options` }))
 
       await waitFor(() =>
-        expect(screen.getByRole('dialog', { name: `${widget} options` })).toBeTruthy(),
+        expect(screen.getByRole('dialog', { name: DIALOGS[widget] })).toBeTruthy(),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
     },

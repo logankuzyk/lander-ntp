@@ -11,6 +11,7 @@ import type {
   WidgetSource,
   WidgetViewProps,
 } from './definition'
+import { accessibleName } from './name'
 import { CHECKING, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { useSourceState } from './source'
@@ -42,35 +43,43 @@ const isOptionsKey = (event: KeyboardEvent) =>
  * Widget to lay itself out in (see `.widget-box` in the page's styles), its content centred.
  * `widget` names what it holds, for a test or a rule in the styles to find it by.
  *
- * In edit mode the box is a frame: a tab stop, a group named `name`, with the name drawn in it.
- * The boxes are in reading order in the document (see Grid), which is the order Tab takes. A box
- * given an `id` also has an Options button at its top left, which opens the Widget's options in
- * a popover beside it (see `OptionsPopoverProvider`), and so does O pressed on the frame.
+ * The box is a group named `name` (see `accessibleName`: "Weather, Victoria"), in and out of
+ * edit mode. The name is fixed text, not a live region: a reader says it on reaching the box and
+ * never when what is inside changes, such as the Clock's time. In edit mode the box is also a
+ * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
+ * (see Grid), which is the order Tab takes. A box given an `id` also has an Options button at
+ * its top left, which opens the Widget's options in a popover beside it (see
+ * `OptionsPopoverProvider`), and so does O pressed on the frame.
  */
 export function Box({
   children,
   id,
   name,
+  optionsLabel,
   rect,
   widget,
 }: {
   children?: ComponentChildren
   /** Gives the box an Options button. Not for a Widget that has no options to open. */
   id?: string
-  /** What people call it, such as "Clock": read out and drawn in edit mode. */
+  /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
   name: string
+  /**
+   * What the Options button is called: "Weather options", the Widget's type and not its summary,
+   * as the button is read inside the box's group, which has the full name. By default the box's.
+   */
+  optionsLabel?: string
   rect: Rect
   widget: string
 }) {
   const { editing } = useEditMode()
   const options = useOptionsPopover()
   const optionsId = editing && options.available ? id : undefined
-  // Spread rather than written out: only while editing is the box a group, a tab stop, and
-  // where O opens the Widget's options (on the frame or its own button: a key typed into
-  // anything else is that thing's).
+  // Spread rather than written out: only while editing is the box a tab stop, and where O opens
+  // the Widget's options (on the frame or its own button: a key typed into anything else is
+  // that thing's).
   const frame = editing
     ? {
-        'aria-label': name,
         onKeyDown:
           optionsId === undefined
             ? undefined
@@ -81,15 +90,16 @@ export function Box({
                 event.preventDefault()
                 options.toggle(optionsId)
               },
-        role: 'group' as const,
         tabIndex: 0,
       }
     : {}
   return (
     <div
+      aria-label={name}
       class="widget-box"
       data-widget={widget}
       data-widget-id={id}
+      role="group"
       style={{
         gridColumn: `${rect.col} / span ${rect.w}`,
         gridRow: `${rect.row} / span ${rect.h}`,
@@ -101,7 +111,7 @@ export function Box({
         <button
           aria-expanded={options.openId === optionsId}
           aria-haspopup="dialog"
-          aria-label={`${name} options`}
+          aria-label={optionsLabel ?? `${name} options`}
           class="widget-box__options"
           // Opens and closes the popover itself, so pressing it isn't a click outside.
           data-popover-toggle
@@ -229,7 +239,13 @@ export function WidgetBox<O, R, C>({
   rect,
 }: WidgetBoxProps<O, R, C>) {
   return (
-    <Box id={id} name={definition.name} rect={rect} widget={definition.type}>
+    <Box
+      id={id}
+      name={accessibleName(definition, readOptions(definition, options))}
+      optionsLabel={`${definition.name} options`}
+      rect={rect}
+      widget={definition.type}
+    >
       <Contents definition={definition} options={options} page={page} />
     </Box>
   )

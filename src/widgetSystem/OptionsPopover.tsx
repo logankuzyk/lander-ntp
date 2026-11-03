@@ -16,6 +16,11 @@ type OptionsPopoverProps = {
   disabled?: boolean
   /** The option to put focus on, where the first is not the one wanted (a setup button's). */
   focusOption?: string
+  /**
+   * What the Widget's box is called to a reader (see `accessibleName`: "Weather, Victoria"), which
+   * names the dialog and its heading, so two of one type are told apart as their boxes are.
+   */
+  name: string
   /** The Widget's whole options, with the change made: see `OptionsForm`. */
   onChange: (options: Record<string, unknown>) => void
   onClose: () => void
@@ -41,13 +46,14 @@ export function OptionsPopover({
   definition,
   disabled = false,
   focusOption,
+  name,
   onChange,
   onClose,
   onPageValueChange,
   options,
   page,
 }: OptionsPopoverProps) {
-  const title = `${definition.name} options`
+  const title = `${name} options`
   const { close, container } = usePopover(onClose, { keepFocus: true, returnTo: box })
   const form = useRef<HTMLDivElement>(null)
 

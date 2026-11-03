@@ -13,6 +13,10 @@ describe('the Clock definition', () => {
     expect(clockDefinition.name).toBe('Clock')
   })
 
+  it('has no summary: the time is not part of its name, which would change every second', () => {
+    expect(clockDefinition.summary).toBeUndefined()
+  })
+
   it("starts a new Clock with the options today's settings default to", () => {
     expect(defaultOptions(clockDefinition)).toEqual({ showDate, showSeconds })
   })

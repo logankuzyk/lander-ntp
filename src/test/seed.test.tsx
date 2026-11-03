@@ -161,7 +161,24 @@ describe('the Grid editing stories', () => {
     expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
     expect(
       (await screen.findAllByRole('group')).map((frame) => frame.getAttribute('aria-label')),
-    ).toEqual(['Weather', 'Clock'])
+    ).toEqual(['Weather, Victoria', 'Clock'])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give two Weathers frames that say which place each is for', async () => {
+    await seedPage(PAGE_SEEDS.gridTwoWeathers)
+    render(<App />)
+
+    await startEditing()
+
+    expect(
+      (await screen.findAllByRole('group')).map((frame) => frame.getAttribute('aria-label')),
+    ).toEqual(['Weather, Victoria', 'Weather, Vancouver'])
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+      ).toEqual(['13°', '9°']),
+    )
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -184,7 +201,7 @@ describe('the Grid editing stories', () => {
     first?.focus()
 
     expect(document.activeElement).toBe(first)
-    expect(first?.getAttribute('aria-label')).toBe('Weather')
+    expect(first?.getAttribute('aria-label')).toBe('Weather, Victoria')
   })
 })
 

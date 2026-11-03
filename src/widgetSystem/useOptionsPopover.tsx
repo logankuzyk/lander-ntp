@@ -7,6 +7,8 @@ import { setOptions, settle } from '@/layout/ops'
 import type { Layout, PlacedWidget } from '@/layout/types'
 
 import type { PageValueName, PageValues } from './definition'
+import { accessibleName } from './name'
+import { readOptions } from './options'
 import { OptionsPopover } from './OptionsPopover'
 
 /** What a Widget's box needs of the options popover: whether there is one, and how to open it. */
@@ -184,6 +186,10 @@ export function OptionsPopoverProvider({
           disabled={!canChange || !loaded}
           focusOption={opened.focusOption}
           key={opened.id}
+          name={accessibleName(
+            target.definition,
+            readOptions(target.definition, target.placed.options),
+          )}
           onChange={(next) => change(opened.id, next)}
           onClose={close}
           onPageValueChange={onPageValueChange}

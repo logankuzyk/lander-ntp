@@ -13,6 +13,13 @@ import { App } from './App'
 
 const PLACE = makePlace()
 
+/**
+ * What the Weather's box and its popover are called: the box's name, with its place (see
+ * `accessibleName`). The Options button is named for the type alone, "Weather options", as it is
+ * read inside that box; the dialog stands outside it, so it carries the box's whole name.
+ */
+const WEATHER = 'Weather, Victoria'
+
 /** Stored settings with the 24-hour clock, so a change to 12-hour time is easy to see. */
 const SETTINGS: Settings = {
   ...DEFAULT_SETTINGS,
@@ -103,13 +110,24 @@ describe('App, the options popover', () => {
       expect(optionsButton('Weather').getAttribute('aria-expanded')).toBe('false')
     })
 
+    it('names the Options button for the Widget’s type and the dialog for its box', async () => {
+      await drawn(THREE)
+      edit()
+
+      open('Weather')
+
+      expect(optionsButton('Weather').getAttribute('aria-label')).toBe('Weather options')
+      expect(screen.getByRole('dialog', { name: 'Weather, Victoria options' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Weather, Victoria options' })).toBeTruthy()
+    })
+
     it('opens a dialog labelled with the Widget’s name, focus on its first option', async () => {
       await drawn(THREE)
       edit()
 
       open('Weather')
 
-      const popover = screen.getByRole('dialog', { name: 'Weather options' })
+      const popover = screen.getByRole('dialog', { name: `${WEATHER} options` })
       expect(popover.getAttribute('aria-modal')).toBeNull()
       expect(optionsButton('Weather').getAttribute('aria-expanded')).toBe('true')
       // The Weather's first option is its place, which shows the one it has.
@@ -123,23 +141,23 @@ describe('App, the options popover', () => {
       await drawn(THREE)
       edit()
 
-      const frame = screen.getByRole('group', { name: 'Weather' })
+      const frame = screen.getByRole('group', { name: WEATHER })
       frame.focus()
       fireEvent.keyDown(frame, { key: 'o' })
 
-      expect(dialog('Weather')).not.toBeNull()
+      expect(dialog(WEATHER)).not.toBeNull()
     })
 
     it('ignores O in a popover, with a modifier, or held down', async () => {
       await drawn(THREE)
       edit()
-      const frame = screen.getByRole('group', { name: 'Weather' })
+      const frame = screen.getByRole('group', { name: WEATHER })
       frame.focus()
 
       fireEvent.keyDown(frame, { ctrlKey: true, key: 'o' })
       fireEvent.keyDown(frame, { key: 'o', repeat: true })
 
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
     })
 
     it('closes with its ×, and focus goes back to the Widget', async () => {
@@ -147,10 +165,10 @@ describe('App, the options popover', () => {
       edit()
       open('Weather')
 
-      fireEvent.click(screen.getByRole('button', { name: 'Close Weather options' }))
+      fireEvent.click(screen.getByRole('button', { name: `Close ${WEATHER} options` }))
 
-      expect(dialog('Weather')).toBeNull()
-      expect(document.activeElement).toBe(screen.getByRole('group', { name: 'Weather' }))
+      expect(dialog(WEATHER)).toBeNull()
+      expect(document.activeElement).toBe(screen.getByRole('group', { name: WEATHER }))
     })
 
     it('closes with a click elsewhere, but not with a click inside it', async () => {
@@ -158,11 +176,11 @@ describe('App, the options popover', () => {
       edit()
       open('Weather')
 
-      fireEvent.pointerDown(screen.getByRole('dialog', { name: 'Weather options' }))
-      expect(dialog('Weather')).not.toBeNull()
+      fireEvent.pointerDown(screen.getByRole('dialog', { name: `${WEATHER} options` }))
+      expect(dialog(WEATHER)).not.toBeNull()
 
       fireEvent.pointerDown(screen.getAllByRole('group', { name: 'Clock' })[0] as HTMLElement)
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
     })
 
     it('closes on the first Escape and leaves edit mode on the second', async () => {
@@ -171,7 +189,7 @@ describe('App, the options popover', () => {
       open('Weather')
 
       fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
       expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
 
       fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
@@ -185,7 +203,7 @@ describe('App, the options popover', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
     })
 
     it('closes the one that is open when another Widget’s Options button is pressed, and opens that one', async () => {
@@ -199,7 +217,7 @@ describe('App, the options popover', () => {
       fireEvent.pointerDown(first)
       fireEvent.click(first)
 
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
       expect(dialog('Clock')).not.toBeNull()
     })
 
@@ -211,7 +229,7 @@ describe('App, the options popover', () => {
       fireEvent.pointerDown(optionsButton('Weather'))
       fireEvent.click(optionsButton('Weather'))
 
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
     })
 
     it('is never open together with the settings panel', async () => {
@@ -222,11 +240,11 @@ describe('App, the options popover', () => {
       fireEvent.pointerDown(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy()
-      expect(dialog('Weather')).toBeNull()
+      expect(dialog(WEATHER)).toBeNull()
 
       fireEvent.pointerDown(optionsButton('Weather'))
       fireEvent.click(optionsButton('Weather'))
-      expect(dialog('Weather')).not.toBeNull()
+      expect(dialog(WEATHER)).not.toBeNull()
       expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
     })
 
@@ -241,7 +259,7 @@ describe('App, the options popover', () => {
         })
       })
 
-      await waitFor(() => expect(dialog('Weather')).toBeNull())
+      await waitFor(() => expect(dialog(WEATHER)).toBeNull())
     })
 
     it('ignores E, the arrows and Delete pressed inside it', async () => {

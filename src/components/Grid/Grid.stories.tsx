@@ -79,6 +79,20 @@ export const EditingTwoWidgets: Story = {
   },
 }
 
+/**
+ * Edit mode with two Weathers, for Victoria and for Vancouver: each frame's name says its place,
+ * so the two can be told apart (to the eye and to a screen reader).
+ */
+export const EditingTwoWeathers: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridTwoWeathers)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await startEditing(canvasElement)
+  },
+}
+
 /** Edit mode with no Widgets: the dots alone. */
 export const EditingEmpty: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.gridEmpty),
