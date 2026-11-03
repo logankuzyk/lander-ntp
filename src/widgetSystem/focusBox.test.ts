@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { focusBox } from './focusBox'
+import { focusBox, widgetBox } from './focusBox'
 
 const makeBox = () => {
   const box = document.createElement('div')
@@ -47,5 +47,16 @@ describe('focusBox', () => {
     box.blur()
 
     expect(box.getAttribute('tabindex')).toBe('0')
+  })
+})
+
+describe('widgetBox', () => {
+  it('finds the box of a Widget by its id, and nothing for an id that is not on the page', () => {
+    const box = makeBox()
+    box.className = 'widget-box'
+    box.dataset.widgetId = 'clock0aa'
+
+    expect(widgetBox('clock0aa')).toBe(box)
+    expect(widgetBox('clock0bb')).toBeNull()
   })
 })

@@ -2,8 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { EditModeProvider } from '@/components/EditMode/useEditMode'
+import { deriveLayout } from '@/layout/derive'
+import { DEFAULT_SETTINGS } from '@/settings/schema'
 
 import { Controls } from './Controls'
+
+const LAYOUT = deriveLayout(DEFAULT_SETTINGS)
 
 const renderControls = ({ busy = false, withInfo = true } = {}) => {
   const onNext = vi.fn()
@@ -14,6 +18,9 @@ const renderControls = ({ busy = false, withInfo = true } = {}) => {
       <Controls
         busy={busy}
         infoOpen={false}
+        layout={LAYOUT}
+        layoutLoaded
+        onCommit={vi.fn()}
         onNext={onNext}
         onToggleInfo={withInfo ? onToggleInfo : undefined}
         onToggleSettings={onToggleSettings}

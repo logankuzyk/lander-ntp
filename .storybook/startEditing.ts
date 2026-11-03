@@ -18,3 +18,16 @@ export async function startEditing(canvasElement: HTMLElement) {
 export async function openOptions(canvas: ReturnType<typeof within>, widget: string) {
   await userEvent.click(await canvas.findByRole('button', { name: `${widget} options` }))
 }
+
+/**
+ * For a story's `play`, after `startEditing`: presses Add, so the story is shown with its menu
+ * open.
+ */
+export async function openAddMenu(canvas: ReturnType<typeof within>) {
+  await userEvent.click(await canvas.findByRole('button', { name: 'Add' }))
+}
+
+/** For a story's `play`, after `openAddMenu`: picks a Widget from the menu, as a person would. */
+export async function addFromMenu(canvas: ReturnType<typeof within>, widget: string) {
+  await userEvent.click(await canvas.findByRole('menuitem', { name: widget }))
+}

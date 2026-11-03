@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { checkLayout } from '@/layout/check'
+import { deriveLayout } from '@/layout/derive'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
-import { removeWidget, restoreWidget, setOptions } from '@/layout/ops'
+import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
 import { recordInstall } from '@/onboarding/install'
@@ -300,6 +301,30 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     layoutOnly: true,
     name: 'delete every Widget: an empty Layout is stored, not removed',
     write: changeLayout((layout) => ({ ...layout, widgets: [] })),
+  },
+  {
+    layoutOnly: true,
+    name: 'add a Clock or a Weather from the Add menu (addWidget: sync:layout alone, never clock.enabled)',
+    write: async () => {
+      const first = addWidget({ layout: await storeExampleLayout(), readOnly: false }, 'weather')
+      if (!first.ok) throw new Error(`the add was refused: ${first.reason}`)
+      const second = addWidget({ layout: first.layout, readOnly: false }, 'clock')
+      if (!second.ok) throw new Error(`the add was refused: ${second.reason}`)
+      await layoutItem.setValue(second.layout)
+    },
+  },
+  {
+    layoutOnly: true,
+    name: 'the first add after an update with the Clock off: the waiting options are used and removed in one Layout write',
+    write: async () => {
+      // The Layout worked out from settings stored by v0.2.3 with the Clock off keeps its options.
+      const derived = deriveLayout({ ...SEED, clock: { ...SEED.clock, enabled: false } })
+      expect(derived.waiting).toHaveProperty('clock')
+      const added = addWidget({ layout: derived, readOnly: false }, 'clock')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      expect(added.layout.waiting).not.toHaveProperty('clock')
+      await layoutItem.setValue(added.layout)
+    },
   },
   {
     layoutOnly: true,

@@ -36,6 +36,19 @@ export type PageSeed = {
 const absolute = (url: string) => new URL(url, globalThis.location.href).href
 
 /**
+ * Stores a reading for a place, fresh. For a story whose `play` adds a Weather for a place no
+ * Weather on the page was at: the page forgets readings no Weather uses once it has loaded
+ * (`usePruneReadings`), so one seeded with the page is gone by then.
+ */
+export async function seedReading(
+  place: Place,
+  unit: Settings['weather']['unit'],
+  weather: Weather,
+) {
+  await weatherSource.cache.set(cacheKey(place, unit), { data: weather, fetchedAt: Date.now() })
+}
+
+/**
  * Fills the (fake) browser storage so `App` draws a given state of the page with nothing to
  * fetch: the photos come from a fresh manifest cache, so `getManifest` serves them and does not
  * revalidate. Stories call it from `beforeEach`; tests call it before rendering.
@@ -132,6 +145,29 @@ const EIGHT_WIDGETS: StoredLayout = {
   ],
 }
 
+/**
+ * The whole Grid taken by four Clocks of sizes a Clock may have (8 by 4 and 4 by 4): no cell is
+ * left, so the Add menu has no room for anything.
+ */
+const FULL_OF_CLOCKS: StoredLayout = {
+  v: 1,
+  widgets: [
+    clockAt('clock0aa', 1, 1, 8),
+    clockAt('clock0bb', 9, 1, 4),
+    clockAt('clock0cc', 1, 5, 8),
+    clockAt('clock0dd', 9, 5, 4),
+  ].map((clock) => ({ ...clock, h: 4 })),
+}
+
+/**
+ * An update from v0.2.3 with the Weather off but set up for Victoria (in degrees Celsius): its
+ * options are kept as waiting, and the first Weather added starts from them.
+ */
+const WEATHER_OFF_BUT_SET_UP: Settings = {
+  ...DEFAULT_SETTINGS,
+  weather: { ...DEFAULT_SETTINGS.weather, enabled: false, place: makePlace(), unit: 'celsius' },
+}
+
 const VANCOUVER = makePlace({ latitude: 49.28, longitude: -123.12, name: 'Vancouver' })
 
 /** Two Weathers for different places, side by side near the top: they differ only by name. */
@@ -154,6 +190,19 @@ const OPTIONS_WEATHER_BESIDE: StoredLayout = {
  * the test that checks it cannot drift apart.
  */
 export const PAGE_SEEDS = {
+  /** No cell is free: the Add menu's items are unavailable, each with its reason. */
+  addMenuNoRoom: {
+    layout: FULL_OF_CLOCKS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+  },
+  /** A new install, past the welcome: the Add menu has the Clock and the Weather to offer. */
+  addMenuOpen: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
+  /** Weather off but set up for Victoria; the first Weather added starts from that. */
+  addMenuWaitingOptions: {
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: WEATHER_OFF_BUT_SET_UP,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
   /** A Clock with seconds, which is wider. */
   gridClockWithSeconds: {
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },

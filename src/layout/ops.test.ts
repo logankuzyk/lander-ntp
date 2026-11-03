@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
@@ -923,5 +923,22 @@ describe('waiting options and a type named like something every object has', () 
 
     expect(next.widgets[0]).toMatchObject({ placed: { options: { showDate: true } } })
     expect(next.waiting).toEqual({ weather: waitingWeather })
+  })
+
+  it('never gives the new Widget the id of a malformed one', () => {
+    // A malformed Widget keeps its id in the Layout, so the new id must still avoid it.
+    const malformed = { col: 'x', h: 1, id: 'aaaaaaaa', options: {}, row: 1, type: 'clock', w: 1 }
+    const layout = checkLayout({ v: 1, widgets: [malformed] })
+    // The first eight characters drawn are all "a" (byte 0), the next ones all "b" (byte 1).
+    const draws = [0, 1]
+    const random = vi.spyOn(crypto, 'getRandomValues').mockImplementation(((bytes: Uint8Array) => {
+      bytes.fill(draws.shift() ?? 2)
+      return bytes
+    }) as typeof crypto.getRandomValues)
+
+    const added = addWidget(editable(layout), 'clock')
+    random.mockRestore()
+
+    expect(added.ok && added.id).toBe('bbbbbbbb')
   })
 })
