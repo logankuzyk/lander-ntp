@@ -190,8 +190,12 @@ describe('the Weather definition', () => {
     ])
   })
 
-  it('needs, in order, the location agreement and then a place', () => {
-    expect(weatherDefinition.needs?.map(({ id }) => id)).toEqual(['locationConsent', 'place'])
+  it("needs, in order, the location agreement, a place and, when it follows the device, the device's location", () => {
+    expect(weatherDefinition.needs?.map(({ id }) => id)).toEqual([
+      'locationConsent',
+      'place',
+      'deviceLocation',
+    ])
   })
 
   it('has a place when one is picked or the device is followed, and not otherwise', () => {
@@ -210,10 +214,16 @@ describe('the Weather definition', () => {
     expect(weatherDefinition.options.some(({ id }) => id === 'place')).toBe(true)
   })
 
-  it('leaves the location agreement without words or an action until it can be asked from the button', () => {
+  it('asks for the location agreement with the words "Allow sending your place", by asking the browser', () => {
     const consent = weatherDefinition.needs?.find(({ id }) => id === 'locationConsent')
-    expect(consent?.label).toBeUndefined()
-    expect(consent?.action).toBeUndefined()
+    expect(consent?.label).toBe('Allow sending your place')
+    expect(consent?.action?.kind).toBe('ask')
+  })
+
+  it('asks for the device\'s location with the words "Allow location", by asking the browser', () => {
+    const location = weatherDefinition.needs?.find(({ id }) => id === 'deviceLocation')
+    expect(location?.label).toBe('Allow location')
+    expect(location?.action?.kind).toBe('ask')
   })
 
   it('has the location agreement at once on browsers that do not ask for it', () => {
@@ -687,7 +697,7 @@ describe('the Weather', () => {
     })
 
     it('moves when settings pick the position again while the tab is open', async () => {
-      device('prompt')
+      device('granted')
       answering(15, 'Vancouver')
       await devicePosition.setValue({ ...HERE, name: 'Victoria' })
       await cached(HERE)

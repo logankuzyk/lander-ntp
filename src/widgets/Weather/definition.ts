@@ -7,8 +7,8 @@ import {
   type WeatherField,
   type WeatherSettings,
 } from '@/settings/schema'
-import { locationConsented } from '@/weather/consent'
-import { CURRENT_LOCATION } from '@/weather/deviceLocation'
+import { allowLocation, locationConsented } from '@/weather/consent'
+import { askForLocation, CURRENT_LOCATION, locationAllowed } from '@/weather/deviceLocation'
 import { cacheKey, fetchWeather, type Weather as Reading } from '@/weather/openMeteo'
 import { useDevicePosition } from '@/weather/useDevicePosition'
 import { weatherSource } from '@/weather/weatherSource'
@@ -40,12 +40,14 @@ function WeatherView({
 
 /**
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
- * has to ask, so everywhere else this is met at once, in the first render. It has no words or
- * action yet: asking for it from the setup button is a later change, until which the panel's
- * "Show weather" switch asks and the box draws nothing while it is unmet.
+ * has to ask, so everywhere else this is met at once, in the first render. On Firefox the setup
+ * button asks for it: `allowLocation` is called first thing in the click, which is what shows
+ * Firefox's prompt. (The settings panel's "Show weather" switch asks too, until it goes.)
  */
 const locationConsent: Need<WeatherOptions> = {
+  action: { kind: 'ask', run: allowLocation },
   id: 'locationConsent',
+  label: 'Allow sending your place',
   met: () => (import.meta.env.BROWSER === 'firefox' ? locationConsented() : true),
 }
 
@@ -58,6 +60,19 @@ const place: Need<WeatherOptions> = {
   id: 'place',
   label: 'Choose a place',
   met: (options) => options.followDevice || options.place !== null,
+}
+
+/**
+ * While following the device, the browser lets this page read where it is. Permissions are not
+ * synced, so a Weather told to follow the device on another device has not been allowed there:
+ * without this it would show the last position stored, or nothing. A picked place does not need
+ * it, so that is met at once. The setup button asks the browser for it, from the click.
+ */
+const deviceLocation: Need<WeatherOptions> = {
+  action: { kind: 'ask', run: () => askForLocation() },
+  id: 'deviceLocation',
+  label: 'Allow location',
+  met: ({ followDevice }) => (followDevice ? locationAllowed() : true),
 }
 
 /**
@@ -92,7 +107,7 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
   // Loading and switched off say what the shared words do.
   messages: { failed: "Can't reach the forecast" },
   name: 'Weather',
-  needs: [locationConsent, place],
+  needs: [locationConsent, place, deviceLocation],
   // The order and wording are copied from the settings panel (the page-wide switch last).
   // Defaults come from today's settings, so those cannot drift.
   options: [

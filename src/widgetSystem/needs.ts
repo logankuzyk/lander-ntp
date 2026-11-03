@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { browser } from 'wxt/browser'
 
 /**
  * What pressing a Widget's setup button does about an unmet need.
@@ -192,14 +193,74 @@ export function useUnmetNeed<O>(
 }
 
 /**
+ * Asks `recheck` to run when the browser's permissions may have changed: one was added or
+ * removed (an extension permission, Firefox's data agreement), or the geolocation permission
+ * changed state (granted or revoked from the address bar, or the site settings). Returns what
+ * stops it. Every part is allowed to be missing: a browser without one of these events, or a
+ * page that cannot ask, is simply not told.
+ */
+function watchPermissions(recheck: () => void): () => void {
+  const stops: (() => void)[] = []
+  for (const event of [browser.permissions?.onAdded, browser.permissions?.onRemoved]) {
+    try {
+      event.addListener(recheck)
+      stops.push(() => event.removeListener(recheck))
+    } catch {
+      // No such event here.
+    }
+  }
+
+  let active = true
+  void (async () => {
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' })
+      if (!active) return
+      status.addEventListener('change', recheck)
+      stops.push(() => status.removeEventListener('change', recheck))
+    } catch {
+      // Not a page that can ask.
+    }
+  })()
+
+  return () => {
+    active = false
+    for (const stop of stops) {
+      try {
+        stop()
+      } catch {
+        // Already gone.
+      }
+    }
+  }
+}
+
+/**
  * The count `useUnmetNeed` takes as its `recheck`, and the function that adds one to it: asking
  * the needs again when something outside the options changed (a permission was granted or
  * revoked). The function is the same on every render, so a listener can hold it. The setup
- * button's `ask` actions call it when the browser has answered; what else calls it (the tab
- * coming back into view, a permission changing) is for whoever adds those listeners.
+ * button's `ask` actions call it when the browser has answered.
+ *
+ * With `watch`, it is also called when the tab comes back into view and when a permission
+ * changes (see `watchPermissions`), so a grant given or taken back elsewhere, in the address bar
+ * or the browser's settings, shows up without a reload. A Widget with no needs has nothing to
+ * watch and leaves `watch` off.
  */
-export function useRecheck(): [count: number, recheck: () => void] {
+export function useRecheck(watch = false): [count: number, recheck: () => void] {
   const [count, setCount] = useState(0)
   const recheck = useCallback(() => setCount((current) => current + 1), [])
+
+  useEffect(() => {
+    if (!watch) return
+    const onVisibility = () => {
+      if (!document.hidden) recheck()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    const stopWatching = watchPermissions(recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      stopWatching()
+    }
+  }, [watch, recheck])
+
   return [count, recheck]
 }

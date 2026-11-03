@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 
 import { App } from '@/entrypoints/newtab/App'
 
 import { STORY_PHOTOS } from './fixtures'
+import { device } from './permissions'
 import {
   PAGE_SEEDS,
   seedPage,
@@ -243,6 +245,56 @@ describe('the Weather setup stories', () => {
     )
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+})
+
+describe('the Weather setup stories for the browser’s permissions', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+  const stories = (container: ParentNode) =>
+    [...container.querySelectorAll('.widget-setup')].map((button) => button.textContent)
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it.each(SIZES)(
+    'give a Weather on Firefox, with a place and no agreement, the button to allow sending it at %s, asking nothing',
+    async (size) => {
+      vi.stubEnv('BROWSER', 'firefox')
+      const contains = vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      const request = vi.spyOn(browser.permissions, 'request')
+      await seedPage(weatherSetupSeed(size, 'consent'))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', {
+        name: 'Weather, Allow sending your place',
+      })
+      expect(button.textContent).toBe('WeatherAllow sending your place')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(stories(container)).toHaveLength(1)
+      expect(contains).toHaveBeenCalled()
+      expect(request).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that follows the device, where the location is not allowed, the button to allow it at %s, asking nothing',
+    async (size) => {
+      const here = device('prompt')
+      await seedPage(weatherSetupSeed(size, 'location'))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', { name: 'Weather, Allow location' })
+      expect(button.textContent).toBe('WeatherAllow location')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(stories(container)).toHaveLength(1)
+      expect(here.getCurrentPosition).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
 })
 
 // Last, because a Weather left loading keeps its request under way for the rest of the file.

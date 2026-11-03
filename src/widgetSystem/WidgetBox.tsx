@@ -269,7 +269,7 @@ function Contents<O, R, C>({
   const read = readOptions(definition, options)
   // The needs are asked again, with the options unchanged, when a setup button has asked the
   // browser for something (and whenever something else calls `recheck`).
-  const [rechecks, recheck] = useRecheck()
+  const [rechecks, recheck] = useRecheck(Boolean(definition.needs?.length))
   const unmet = useUnmetNeed(definition.needs, read, rechecks)
   const popover = useOptionsPopover()
 

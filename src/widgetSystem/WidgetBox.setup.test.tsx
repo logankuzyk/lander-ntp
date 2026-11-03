@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/preact'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode'
 import { EXAMPLE_SIZES } from '@/test/fixtures'
@@ -252,6 +252,56 @@ describe('the setup button', () => {
 
       await settle(() => answers[0]!(true))
       expect(container.querySelector('.example')?.textContent).toBe('ready')
+    })
+  })
+
+  describe('when the browser changes what it allows', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('asks the needs again when the tab comes back into view', async () => {
+      const met = vi.fn(() => false)
+      const { container } = draw(example([{ id: 'quiet', met }]))
+      await settle()
+      const asked = met.mock.calls.length
+
+      await settle(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      expect(met.mock.calls.length).toBeGreaterThan(asked)
+      expect(container.querySelector('.widget-box')?.children).toHaveLength(0)
+    })
+
+    it('listens to nothing for a Widget that has no needs', async () => {
+      const listen = vi.spyOn(document, 'addEventListener')
+      const none: WidgetDefinition<Options> = { ...example([]), needs: undefined }
+
+      draw(none)
+      await settle()
+
+      expect(listen).not.toHaveBeenCalledWith('visibilitychange', expect.anything())
+    })
+
+    it('draws the button again when a need that was met is not, at the next check', async () => {
+      let allowed = true
+      const need: Need<Options> = {
+        action: { kind: 'ask', run: vi.fn() },
+        id: 'allowed',
+        label: 'Allow access',
+        met: () => allowed,
+      }
+      const { container } = draw(example([need]))
+      expect(container.querySelector('.example')).not.toBeNull()
+
+      allowed = false
+      await settle(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      expect(container.querySelector('.example')).toBeNull()
+      expect(setupButton('Example, Allow access')).toBeTruthy()
     })
   })
 

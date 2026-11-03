@@ -5,6 +5,7 @@ import { fakeBrowser } from 'wxt/testing/fake-browser'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makePlace, makeWeather } from '@/test/fixtures'
+import { device } from '@/test/permissions'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
 import { weatherDefinition, type WeatherOptions } from '@/widgets/Weather/definition'
@@ -72,6 +73,12 @@ const stored = async (key: string) => (await fakeBrowser.storage.sync.get(key))[
 const writtenKeys = (set: { mock: { calls: unknown[][] } }) =>
   set.mock.calls.map(([items]) => Object.keys(items as object).join(','))
 const settled = () => act(() => new Promise((resolve) => setTimeout(resolve, 30)))
+/** Lets the page settle, a few ticks at a time (effects run inside `act`), until `done` holds. */
+async function until(done: () => boolean) {
+  for (let tick = 0; tick < 40 && !done(); tick++) {
+    await act(() => new Promise((resolve) => setTimeout(resolve, 5)))
+  }
+}
 
 const VICTORIA = {
   admin1: 'British Columbia',
@@ -142,13 +149,26 @@ describe('App, the setup button', () => {
       expect(container.querySelector('.widget-setup')).toBeNull()
     })
 
-    it('gives a Weather that follows the device no button, as it has met the need', async () => {
+    it('gives a Weather that follows the device no button where the browser lets the page have its location', async () => {
+      device('granted')
       const { container } = await drawn({
         v: 1,
         widgets: [clock, weather('weather1', 11, { followDevice: true })],
       })
+      await settled()
 
       expect(container.querySelector('.widget-setup')).toBeNull()
+    })
+
+    it('gives a Weather that follows the device a button for the location where the browser has not', async () => {
+      device('prompt')
+      await drawn({
+        v: 1,
+        widgets: [clock, weather('weather1', 11, { followDevice: true })],
+      })
+
+      expect(await screen.findByRole('button', { name: 'Weather, Allow location' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: BUTTON })).toBeNull()
     })
 
     it('keeps the button in edit mode, beside the frame’s name and Options button', async () => {
@@ -319,14 +339,16 @@ describe('App, the setup button', () => {
             done({ coords: { latitude: 48.43, longitude: -123.35 } }),
         },
         language: 'en-CA',
+        // What the browser says once the prompt it was shown has been allowed.
+        permissions: { query: () => Promise.resolve({ state: 'granted' }) },
       })
       await drawn()
       press(setup())
 
       fireEvent.click(search())
       fireEvent.click(screen.getByRole('option', { name: 'Current location' }))
-      await settled()
-
+      // The location is asked about once the place is in, so the button goes a moment later.
+      await until(() => screen.queryByRole('button', { name: BUTTON }) === null)
       expect(screen.queryByRole('button', { name: BUTTON })).toBeNull()
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change' }))
     })
