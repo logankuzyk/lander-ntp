@@ -119,7 +119,12 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
     { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
   // The smallest holds every line the options can turn on, and a Weather starts there for
-  // everyone (owner answer 1 on LR-19, over LR-16's 2 by 1). W9 fixes the largest by measuring.
+  // everyone (owner answer 1 on LR-19, over LR-16's 2 by 1). Measured in Storybook (LR-87), in all
+  // four fonts at 1440 by 900, 1366 by 768, 1280 by 720, 800 by 600, 600 by 700 and 390 by 800:
+  // at 2 by 2 all five lines fit across and down, with type of 20px (1440 by 900) to 13px (800 by
+  // 600); below that the Grid's cells are too small to read and the type shrinks to fit. The
+  // Weather fills any box, as big as fits across and down. It is nearly as wide as tall, so 4 by
+  // 3 is as much room as it can use on a desktop window; the fourth column helps on a narrow one.
   sizes: {
     largest: { h: 3, w: 4 },
     smallest: { h: 2, w: 2 },

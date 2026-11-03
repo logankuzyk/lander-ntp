@@ -1,6 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/preact'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode'
@@ -9,6 +7,7 @@ import { deriveLayout } from '@/layout/derive'
 import type { Layout } from '@/layout/types'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { makeWeather } from '@/test/fixtures'
+import { css, rule } from '@/test/styles'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
 
@@ -441,13 +440,6 @@ describe('Grid in edit mode', () => {
  * as a guard on what was measured to matter. The measurements are in the pull request.
  */
 describe('the Grid styles', () => {
-  const css = readFileSync(join(process.cwd(), 'src/entrypoints/newtab/style.css'), 'utf8')
-  const rule = (selector: string) => {
-    const start = css.indexOf(`\n${selector} {`)
-    if (start === -1) throw new Error(`no rule for ${selector}`)
-    return css.slice(start, css.indexOf('}', start))
-  }
-
   it("centres a box's content when it is wider or taller than the box, not only when it fits", () => {
     // `place-items` aligns the item inside its track, and the implicit track grows from the
     // left edge, so overflow runs only right. The tracks have to be centred too.
