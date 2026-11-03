@@ -202,6 +202,20 @@ describe('the Weather definition', () => {
     expect(place?.met({ ...options, followDevice: true, place: null })).toBe(true)
   })
 
+  it('asks for a place with the words "Choose a place", by opening the options at the place', () => {
+    const place = weatherDefinition.needs?.find(({ id }) => id === 'place')
+    expect(place?.label).toBe('Choose a place')
+    expect(place?.action).toEqual({ kind: 'option', option: 'place' })
+    // The option it opens at is one the Weather has.
+    expect(weatherDefinition.options.some(({ id }) => id === 'place')).toBe(true)
+  })
+
+  it('leaves the location agreement without words or an action until it can be asked from the button', () => {
+    const consent = weatherDefinition.needs?.find(({ id }) => id === 'locationConsent')
+    expect(consent?.label).toBeUndefined()
+    expect(consent?.action).toBeUndefined()
+  })
+
   it('has the location agreement at once on browsers that do not ask for it', () => {
     const consent = weatherDefinition.needs?.find(({ id }) => id === 'locationConsent')
     expect(consent?.met(defaultOptions(weatherDefinition))).toBe(true)

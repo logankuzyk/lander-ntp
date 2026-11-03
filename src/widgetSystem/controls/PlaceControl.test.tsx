@@ -304,6 +304,61 @@ describe('PlaceControl', () => {
     })
   })
 
+  describe('focus', () => {
+    it('gives the search focus when asked to, with its suggestions closed', () => {
+      render(<PlaceControl focusOnMount label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+      expect(document.activeElement).toBe(search())
+      expect(search().getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(search())
+      expect(search().getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('leaves focus alone otherwise, and suggests when the box is focused', () => {
+      render(<PlaceControl label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+      expect(document.activeElement).not.toBe(search())
+      fireEvent.focus(search())
+      expect(search().getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('does not move focus to Change later if the pick was never kept', async () => {
+      answering({ results: [{ id: 1, latitude: 48.44, longitude: -123.35, name: 'Victoria' }] })
+      // A parent that ignores the change (the options were not saved): the search stays.
+      const { rerender } = draw(EMPTY)
+
+      fireEvent.input(search(), { target: { value: 'Victoria' } })
+      fireEvent.click(await screen.findByRole('option', { name: 'Victoria' }))
+      // Let the page draw once with the pick unkept, then:
+      // the place arrives later, from another tab, and focus is somewhere else by then.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const elsewhere = document.createElement('button')
+      document.body.append(elsewhere)
+      elsewhere.focus()
+      rerender({ followDevice: false, place: VICTORIA })
+
+      await screen.findByRole('button', { name: 'Change' })
+      expect(document.activeElement).toBe(elsewhere)
+      elsewhere.remove()
+    })
+
+    it('moves focus to Change when a place is picked and the row replaces the search', async () => {
+      answering({ results: [{ id: 1, latitude: 48.44, longitude: -123.35, name: 'Victoria' }] })
+      function Kept() {
+        const [value, setValue] = useState<PlaceValue>(EMPTY)
+        return <PlaceControl label="Place" onChange={setValue} value={value} />
+      }
+      render(<Kept />)
+
+      fireEvent.input(search(), { target: { value: 'Victoria' } })
+      fireEvent.click(await screen.findByRole('option', { name: 'Victoria' }))
+
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change' })),
+      )
+    })
+  })
+
   describe('disabled', () => {
     it('shows the place, with a Change button that does nothing', () => {
       const onChange = vi.fn()

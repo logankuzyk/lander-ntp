@@ -12,8 +12,9 @@ import type {
   WidgetViewProps,
 } from './definition'
 import { accessibleName } from './name'
-import { CHECKING, useUnmetNeed } from './needs'
+import { CHECKING, useRecheck, useUnmetNeed } from './needs'
 import { readOptions } from './options'
+import { hasSetup, SetupButton, type SetupNeed } from './SetupButton'
 import { useSourceState } from './source'
 import { useOptionsPopover } from './useOptionsPopover'
 import { WidgetState } from './WidgetState'
@@ -232,8 +233,9 @@ function SourcedView<O, R, C>({
 /**
  * Draws a Widget in its box on the Grid: its View, with its options read from what is stored
  * and the page's values. The box is always there, because it is the Widget's place; what is
- * in it is nothing while its needs are first checked or one is unmet. Once drawn, a Widget
- * stays drawn while they are checked again for new options. A Widget with a source has it run
+ * in it is nothing while its needs are first checked, and while one is unmet that has no words
+ * or action; if it has them, the setup button (see `SetupButton`), in and out of edit mode. Once
+ * drawn, a Widget or its button stays drawn while the needs are checked again. A Widget with a source has it run
  * once every need is met, and its View is drawn only with a reading; without one the box says
  * why (loading, failed or switched off: see `SourcedView`), in the same place and size.
  */
@@ -252,26 +254,69 @@ export function WidgetBox<O, R, C>({
       rect={rect}
       widget={definition.type}
     >
-      <Contents definition={definition} options={options} page={page} />
+      <Contents definition={definition} id={id} options={options} page={page} />
     </Box>
   )
 }
 
+/** What the box last drew from its needs: the View, a setup button for a need, or nothing. */
+type Drawn<O> = 'nothing' | 'view' | SetupNeed<O>
+
 /** What goes in the box. A component of its own, so that the box does not wait for its hooks. */
 function Contents<O, R, C>({
   definition,
+  id,
   options,
   page,
-}: Omit<WidgetBoxProps<O, R, C>, 'id' | 'rect'>) {
+}: Omit<WidgetBoxProps<O, R, C>, 'rect'>) {
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
-  const unmet = useUnmetNeed(definition.needs, read)
-  // A Widget already drawn stays drawn while its needs are checked again for new options, so an
-  // edit does not make it vanish and start over. Only an unmet need, or a first check, hides it.
-  const drawn = useRef(false)
-  const draw = unmet === null || (unmet === CHECKING && drawn.current)
-  drawn.current = draw
-  if (!draw) return null
+  // The needs are asked again, with the options unchanged, when a setup button has asked the
+  // browser for something (and whenever something else calls `recheck`).
+  const [rechecks, recheck] = useRecheck()
+  const unmet = useUnmetNeed(definition.needs, read, rechecks)
+  const popover = useOptionsPopover()
+
+  // What was drawn stays while the needs are checked again, so an edit does not make a Widget
+  // vanish and start over, and a setup button asked about does not blink or lose focus. Only an
+  // answer, or a first check, changes it.
+  const last = useRef<Drawn<O>>('nothing')
+  const drawn: Drawn<O> =
+    unmet === CHECKING
+      ? last.current
+      : unmet === null
+        ? 'view'
+        : hasSetup(unmet)
+          ? unmet
+          : 'nothing'
+  last.current = drawn
+
+  // When what a button asked the browser for is given and the next need is an option, the options
+  // open at it at once, rather than leaving a second press for it.
+  const [asked, setAsked] = useState<string | null>(null)
+  const { open } = popover
+  useEffect(() => {
+    if (asked === null || unmet === CHECKING) return
+    setAsked(null)
+    if (unmet !== null && unmet.id !== asked && unmet.action?.kind === 'option' && id) {
+      open(id, unmet.action.option)
+    }
+  }, [asked, id, open, unmet])
+
+  if (drawn === 'nothing') return null
+  if (drawn !== 'view') {
+    return (
+      <SetupButton
+        id={id}
+        name={name}
+        need={drawn}
+        onAsked={() => {
+          setAsked(drawn.id)
+          recheck()
+        }}
+      />
+    )
+  }
   if (source) {
     return (
       <SourcedView

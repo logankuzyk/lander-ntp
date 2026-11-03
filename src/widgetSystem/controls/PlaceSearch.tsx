@@ -13,6 +13,12 @@ const MIN_LENGTH = 2
 type PlaceSearchProps = {
   /** The box cannot be typed in, and suggests nothing. */
   disabled?: boolean
+  /**
+   * Takes focus when it appears, with the suggestions left closed until the box is clicked,
+   * typed in or moved through with the arrow keys: so Escape, pressed first, closes whatever the
+   * search sits in and not just a list nobody asked for.
+   */
+  focusOnMount?: boolean
   locateFailed: boolean
   /** Follow the device instead of a place searched for. */
   onLocate: () => void
@@ -27,6 +33,7 @@ type PlaceSearchProps = {
  */
 export function PlaceSearch({
   disabled = false,
+  focusOnMount = false,
   locateFailed,
   onLocate,
   onSelect,
@@ -43,8 +50,20 @@ export function PlaceSearch({
   /** Counts the searches, to tell an answer for text since typed over from the latest. */
   const request = useRef(0)
   const list = useRef<HTMLUListElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  /** Set while the box is given focus by `focusOnMount`, which is not a reason to suggest. */
+  const quiet = useRef(false)
 
   usePlacement(open, anchor, list, 'fill', results)
+
+  useEffect(() => {
+    if (!focusOnMount || !input.current) return
+    quiet.current = true
+    input.current.focus()
+    quiet.current = false
+    // Only as it appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const name = query.trim()
   useEffect(() => {
@@ -113,7 +132,9 @@ export function PlaceSearch({
             disabled={disabled}
             onBlur={close}
             onClick={() => setOpen(true)}
-            onFocus={() => setOpen(true)}
+            onFocus={() => {
+              if (!quiet.current) setOpen(true)
+            }}
             onInput={(event) => {
               setQuery(event.currentTarget.value)
               setActive(null)
@@ -121,6 +142,7 @@ export function PlaceSearch({
             }}
             onKeyDown={onKeyDown}
             placeholder="City or town"
+            ref={input}
             role="combobox"
             type="search"
             value={chosen ? chosen.label : query}

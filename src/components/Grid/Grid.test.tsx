@@ -202,10 +202,14 @@ describe('Grid', () => {
     expect(grid.querySelector('.clock__time')?.textContent).toMatch(/^\d{1,2}:\d{2}:\d{2}$/)
   })
 
-  it('draws no Weather reading by itself: a box with no place holds nothing', () => {
+  it('draws no Weather reading by itself: a box with no place holds only its setup button', () => {
     const grid = drawnGrid(layoutOf(stored('aaaaaaaa', 'weather', [11, 1, 2, 2])))
     expect(boxes(grid)).toEqual([['weather', '11 / span 2', '1 / span 2']])
-    expect(grid.querySelector('.widget-box')?.children).toHaveLength(0)
+    expect(grid.querySelector('.widget-box')?.children).toHaveLength(1)
+    expect(grid.querySelector('.widget-box > .widget-setup')?.textContent).toBe(
+      'WeatherChoose a place',
+    )
+    expect(grid.querySelector('.weather')).toBeNull()
   })
 
   it("keeps a Widget's element when another is drawn before it in reading order", () => {

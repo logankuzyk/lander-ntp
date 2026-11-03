@@ -141,6 +141,8 @@ export function OptionsForm({
         return (
           <PlaceControl
             disabled={disabled}
+            // The search is the field the form puts focus on; it does so without suggesting.
+            focusOnMount={option.id === focusOption}
             label={option.label}
             onChange={({ followDevice, place }) => change({ followDevice, place })}
             value={{ followDevice: read.followDevice, place: read.place } as PlaceValue}

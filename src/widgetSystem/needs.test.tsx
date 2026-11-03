@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
-import { CHECKING, checkNeeds, type Need, useUnmetNeed } from './needs'
+import { CHECKING, checkNeeds, type Need, useRecheck, useUnmetNeed } from './needs'
 
 type Options = { place: string | null }
 
@@ -347,6 +347,101 @@ describe('useUnmetNeed', () => {
 
     it('tells a key set to undefined from a key that is missing', () => {
       expect(asked({ a: undefined }, { b: undefined })).toBe(2)
+    })
+  })
+
+  describe('checking again on request', () => {
+    // A need is met by something outside the options (a permission just granted), so a check
+    // can be asked for without the options changing.
+    function again(needs: readonly Need<Options>[]) {
+      const seen: string[] = []
+      function Probe({ recheck }: { recheck: number }) {
+        const result = useUnmetNeed(needs, { place: null }, recheck)
+        const text = result === CHECKING ? CHECKING : result === null ? 'none' : result.id
+        seen.push(text)
+        return <output>{text}</output>
+      }
+      const view = render(<Probe recheck={0} />)
+      return { again: (n: number) => view.rerender(<Probe recheck={n} />), seen, view }
+    }
+
+    it('asks the needs again when the count it is given changes, and not when it stays', () => {
+      let granted = false
+      const met = vi.fn(() => granted)
+      const probe = again([need('a', met)])
+      expect(probe.view.container.textContent).toBe('a')
+
+      granted = true
+      probe.again(0)
+      expect(met).toHaveBeenCalledTimes(1)
+      probe.again(1)
+
+      expect(met).toHaveBeenCalledTimes(2)
+      expect(probe.view.container.textContent).toBe('none')
+    })
+
+    it('gives "checking" while a late answer is awaited, then the answer', async () => {
+      const a = lateNeed('a')
+      const probe = again([a.need])
+      await answer(() => a.answers[0]!.resolve(false))
+      expect(probe.view.container.textContent).toBe('a')
+
+      probe.again(1)
+      expect(probe.view.container.textContent).toBe(CHECKING)
+      await answer(() => a.answers[1]!.resolve(true))
+
+      expect(probe.view.container.textContent).toBe('none')
+    })
+  })
+
+  describe('useRecheck', () => {
+    it('counts from zero, and each call to its function is one more, whichever render it is called in', () => {
+      const seen: number[] = []
+      let recheck!: () => void
+      function Probe() {
+        const [count, again] = useRecheck()
+        recheck = again
+        seen.push(count)
+        return null
+      }
+      render(<Probe />)
+
+      act(() => recheck())
+      act(() => recheck())
+
+      expect(seen[0]).toBe(0)
+      expect(seen.at(-1)).toBe(2)
+    })
+
+    it('gives the same function on every render, so a listener can hold it', () => {
+      const functions = new Set<() => void>()
+      function Probe() {
+        const [, again] = useRecheck()
+        functions.add(again)
+        return null
+      }
+      const view = render(<Probe />)
+      view.rerender(<Probe />)
+      expect(functions.size).toBe(1)
+    })
+
+    it('makes useUnmetNeed ask again, with no change of options', () => {
+      let granted = false
+      const met = vi.fn(() => granted)
+      let recheck!: () => void
+      function Probe() {
+        const [count, again] = useRecheck()
+        recheck = again
+        const result = useUnmetNeed([need('a', met)], { place: null }, count)
+        return <output>{result === null ? 'none' : 'unmet'}</output>
+      }
+      const view = render(<Probe />)
+      expect(view.container.textContent).toBe('unmet')
+
+      granted = true
+      act(() => recheck())
+
+      expect(view.container.textContent).toBe('none')
     })
   })
 
