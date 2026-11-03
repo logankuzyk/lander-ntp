@@ -1,6 +1,8 @@
-import { useEffect } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 
+import { AddMenu } from '@/components/AddMenu/AddMenu'
 import { useEditMode } from '@/components/EditMode/useEditMode'
+import type { Layout } from '@/layout/types'
 
 const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -11,12 +13,18 @@ const isEditable = (target: EventTarget | null) =>
  * the welcome, which is a modal: nothing behind it should answer.
  */
 const inPopover = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('.popover, dialog') !== null
+  target instanceof Element && target.closest('.popover, dialog, [role="menu"]') !== null
 
 type ControlsProps = {
   /** True while the photo being faded in is still loading. */
   busy?: boolean
   infoOpen?: boolean
+  /** The Layout, which the Add menu adds to. */
+  layout: Layout
+  /** Whether the stored Layout has arrived: until it has, nothing can be added. */
+  layoutLoaded: boolean
+  /** Saves the whole Layout (`useLayout`'s `commit`). */
+  onCommit: (next: Layout) => void
   onNext: () => void
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
@@ -25,19 +33,28 @@ type ControlsProps = {
 }
 
 /**
- * Bottom-right controls. The → and i keys do the same as the buttons, and E does what the Edit
- * button does. Escape leaves edit mode, but not when something else used it first: a popover or
+ * Bottom-right controls. The → and i keys do the same as the buttons, E does what the Edit
+ * button does, and A opens the Add menu while editing. Escape leaves edit mode, but not when something else used it first: a popover or
  * a dropdown closes on its Escape, ahead of this listener, so the innermost thing goes first.
  */
 export function Controls({
   busy,
   infoOpen,
+  layout,
+  layoutLoaded,
+  onCommit,
   onNext,
   onToggleInfo,
   onToggleSettings,
   settingsOpen,
 }: ControlsProps) {
   const { editing, enter, leave } = useEditMode()
+  const [addOpen, setAddOpen] = useState(false)
+
+  // Edit mode ending takes the menu with it, so the next time it starts the menu is shut.
+  useEffect(() => {
+    if (!editing) setAddOpen(false)
+  }, [editing])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -63,6 +80,9 @@ export function Controls({
         event.preventDefault()
         if (editing) leave()
         else enter()
+      } else if (event.key === 'a' && editing && !event.repeat) {
+        event.preventDefault()
+        setAddOpen(true)
       } else if (event.key === 'Escape' && editing) {
         event.preventDefault()
         leave()
@@ -75,8 +95,20 @@ export function Controls({
   return (
     <div class="controls">
       {/*
-        First, so that the buttons that were already here stay put when this one reads Done and
-        gets wider. It is one button throughout, so focus stays on it when it changes. The name
+        Add comes first while editing, beside Done and to its left, so that Done keeps the place
+        Edit had and the buttons that were already here stay put. */}
+      {editing && (
+        <AddMenu
+          layout={layout}
+          loaded={layoutLoaded}
+          onCommit={onCommit}
+          onOpenChange={setAddOpen}
+          open={addOpen}
+        />
+      )}
+      {/*
+        Before the buttons that were already here, so that they stay put when this one reads Done
+        and gets wider. It is one button throughout, so focus stays on it when it changes. The name
         changes with the words, so that what is said is what is seen; aria-pressed says it is on.
       */}
       <button

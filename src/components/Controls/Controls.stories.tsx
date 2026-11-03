@@ -3,6 +3,8 @@ import { fn } from 'storybook/test'
 
 import { EditModeProvider } from '@/components/EditMode/useEditMode'
 import { PhotoCredit } from '@/components/PhotoCredit/PhotoCredit'
+import { deriveLayout } from '@/layout/derive'
+import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { STORY_PHOTOS } from '@/test/fixtures'
 
 import { startEditing } from '../../../.storybook/startEditing'
@@ -28,6 +30,10 @@ const withBottomBar: Decorator = (Story) => (
 // to look at, and a narrow one is a custom size.
 const meta = {
   args: {
+    // A new install's Layout, the Clock alone: the Add menu's own stories are in AddMenu.
+    layout: deriveLayout(DEFAULT_SETTINGS),
+    layoutLoaded: true,
+    onCommit: fn(),
     onNext: fn(),
     onToggleInfo: fn(),
     onToggleSettings: fn(),
@@ -43,7 +49,7 @@ type Story = StoryObj<typeof meta>
 /** Browsing: the Edit button beside the page's own, first, a pencil like theirs. */
 export const Browsing: Story = {}
 
-/** Editing, after pressing Edit: the first button reads Done and is pressed; the rest stay put. */
+/** Editing, after pressing Edit: Add joins Done, which is pressed; the rest stay put. */
 export const Editing: Story = {
   play: async ({ canvasElement }) => {
     await startEditing(canvasElement)

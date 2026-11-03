@@ -224,6 +224,9 @@ export function App() {
         <Controls
           busy={photoLoading}
           infoOpen={popover === 'info'}
+          layout={layout}
+          layoutLoaded={settingsLoaded && layoutLoaded}
+          onCommit={commit}
           onNext={showNext}
           onToggleInfo={photo ? () => toggle('info') : undefined}
           onToggleSettings={() => {
