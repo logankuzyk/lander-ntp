@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import { EditModeProvider } from '@/components/EditMode/useEditMode'
+
 import { Controls } from './Controls'
 
 const renderControls = ({ busy = false, withInfo = true } = {}) => {
@@ -8,14 +10,16 @@ const renderControls = ({ busy = false, withInfo = true } = {}) => {
   const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
-    <Controls
-      busy={busy}
-      infoOpen={false}
-      onNext={onNext}
-      onToggleInfo={withInfo ? onToggleInfo : undefined}
-      onToggleSettings={onToggleSettings}
-      settingsOpen={false}
-    />,
+    <EditModeProvider>
+      <Controls
+        busy={busy}
+        infoOpen={false}
+        onNext={onNext}
+        onToggleInfo={withInfo ? onToggleInfo : undefined}
+        onToggleSettings={onToggleSettings}
+        settingsOpen={false}
+      />
+    </EditModeProvider>,
   )
   return { onNext, onToggleInfo, onToggleSettings }
 }
@@ -144,5 +148,123 @@ describe('Controls', () => {
 
     expect(button.getAttribute('aria-busy')).toBe('false')
     expect(button.classList.contains('control--busy')).toBe(false)
+  })
+
+  describe('edit mode', () => {
+    const editButton = () => screen.getByRole('button', { name: 'Edit' })
+    const doneButton = () => screen.getByRole('button', { name: 'Done' })
+
+    it('has an Edit button that is not pressed', () => {
+      renderControls()
+
+      expect(editButton().getAttribute('aria-pressed')).toBe('false')
+      expect(editButton().getAttribute('title')).toBe('Edit (E)')
+    })
+
+    it('sits first, so the page’s own buttons stay where they are when it reads Done', () => {
+      renderControls()
+
+      const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+      expect(names).toEqual(['Edit', 'Next photo', 'Photo details', 'Settings'])
+    })
+
+    it('reads Done and is pressed while editing, and Edit again once it is pressed', () => {
+      renderControls()
+
+      fireEvent.click(editButton())
+      expect(doneButton().getAttribute('aria-pressed')).toBe('true')
+      expect(doneButton().getAttribute('title')).toBe('Done (E)')
+      expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+
+      fireEvent.click(doneButton())
+      expect(editButton().getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('keeps focus on the button when it changes from Edit to Done', () => {
+      renderControls()
+      editButton().focus()
+
+      fireEvent.click(editButton())
+
+      expect(document.activeElement).toBe(doneButton())
+    })
+
+    it('is toggled by the E key', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(doneButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(editButton()).toBeTruthy()
+    })
+
+    it('is left with Escape, and Escape does nothing otherwise', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(editButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(editButton()).toBeTruthy()
+    })
+
+    it('ignores E and Escape with modifiers, in a field, in a popover and in the welcome', () => {
+      renderControls()
+      render(<input aria-label="Search" />)
+      render(
+        <aside aria-label="Settings" class="popover" role="dialog">
+          <button type="button">Beach</button>
+        </aside>,
+      )
+      render(
+        <dialog open>
+          <button type="button">Skip</button>
+        </dialog>,
+      )
+
+      fireEvent.keyDown(window, { key: 'e', metaKey: true })
+      fireEvent.keyDown(window, { ctrlKey: true, key: 'e' })
+      fireEvent.keyDown(window, { altKey: true, key: 'e' })
+      fireEvent.keyDown(window, { key: 'E', shiftKey: true })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Beach' }), { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Skip' }), { key: 'e' })
+      expect(editButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Escape' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Beach' }), { key: 'Escape' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Skip' }), { key: 'Escape' })
+      expect(doneButton()).toBeTruthy()
+    })
+
+    it('leaves Escape to whatever already used it, such as a popover that closes first', () => {
+      renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+      // The popover's own listener is on the document, ahead of the window's.
+      document.addEventListener('keydown', (event) => event.preventDefault(), { once: true })
+
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+
+      expect(doneButton()).toBeTruthy()
+    })
+
+    it('keeps the other buttons and the → key working while editing', () => {
+      const { onNext, onToggleInfo, onToggleSettings } = renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Photo details' }))
+      fireEvent.keyDown(window, { key: 'i' })
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+      expect(onNext).toHaveBeenCalledTimes(2)
+      expect(onToggleInfo).toHaveBeenCalledTimes(2)
+      expect(onToggleSettings).toHaveBeenCalledOnce()
+      expect(doneButton()).toBeTruthy()
+    })
   })
 })

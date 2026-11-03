@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/preact'
+import { fireEvent, render, screen } from '@testing-library/preact'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
+import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
 import type { Layout } from '@/layout/types'
@@ -212,6 +213,163 @@ describe('Grid', () => {
     const grid = drawnGrid(layoutOf()) as HTMLElement
     expect(grid.style.getPropertyValue('--cols')).toBe('12')
     expect(grid.style.getPropertyValue('--rows')).toBe('8')
+  })
+})
+
+/** The Grid in edit mode, entered and left with these two buttons. */
+function EditToggles() {
+  const { enter, leave } = useEditMode()
+  return (
+    <>
+      <button onClick={enter} type="button">
+        enter
+      </button>
+      <button onClick={leave} type="button">
+        leave
+      </button>
+    </>
+  )
+}
+
+const renderEditable = (layout: Layout) => {
+  const view = render(
+    <EditModeProvider>
+      <EditToggles />
+      <Grid layout={layout} page={PAGE} />
+    </EditModeProvider>,
+  )
+  const grid = view.container.querySelector('.grid')
+  if (!grid) throw new Error('no Grid was drawn')
+  return { ...view, grid }
+}
+
+const edit = () => fireEvent.click(screen.getByText('enter'))
+
+describe('Grid in edit mode', () => {
+  const THREE_OUT_OF_ORDER = layoutOf(
+    stored('zzzzzzzz', 'clock', [1, 6, 3, 2]),
+    stored('aaaaaaaa', 'clock', [7, 2, 3, 2]),
+    stored('yyyyyyyy', 'weather', [11, 1, 2, 2]),
+  )
+
+  it('is drawn as it was before outside edit mode: no frames, dots, tab stops or words', () => {
+    const { grid } = renderEditable(THREE_OUT_OF_ORDER)
+
+    expect(grid.classList.contains('grid--editing')).toBe(false)
+    expect(grid.querySelector('.grid__dots')).toBeNull()
+    expect(grid.querySelectorAll('[tabindex]')).toHaveLength(0)
+    expect(grid.querySelectorAll('.widget-box__name')).toHaveLength(0)
+    expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('draws a dot at every cell corner: 13 by 9, from edge to edge of the Grid', () => {
+    const { grid } = renderEditable(layoutOf())
+    edit()
+
+    expect(grid.classList.contains('grid--editing')).toBe(true)
+    const dots = grid.querySelector('.grid__dots')
+    expect(dots?.getAttribute('aria-hidden')).toBe('true')
+    const corners = [...(dots?.querySelectorAll('circle') ?? [])].map((dot) => [
+      dot.getAttribute('cx'),
+      dot.getAttribute('cy'),
+    ])
+    expect(corners).toHaveLength(13 * 9)
+    const columns = new Set(corners.map(([cx]) => cx))
+    const rows = new Set(corners.map(([, cy]) => cy))
+    expect(columns.size).toBe(13)
+    expect(rows.size).toBe(9)
+    // The outermost corners are the Grid's own edges.
+    expect(columns).toContain('0%')
+    expect(columns).toContain('100%')
+    expect(rows).toContain('0%')
+    expect(rows).toContain('100%')
+  })
+
+  it('takes the dots away again on leaving', () => {
+    const { grid } = renderEditable(layoutOf())
+    edit()
+    fireEvent.click(screen.getByText('leave'))
+
+    expect(grid.classList.contains('grid--editing')).toBe(false)
+    expect(grid.querySelector('.grid__dots')).toBeNull()
+  })
+
+  it('gives each Widget a frame with its name, as a tab stop in a group of that name', () => {
+    const { grid } = renderEditable(THREE_OUT_OF_ORDER)
+    edit()
+
+    const groups = screen.getAllByRole('group')
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Weather',
+      'Clock',
+      'Clock',
+    ])
+    for (const group of groups) {
+      expect(group.getAttribute('tabindex')).toBe('0')
+      expect(group.classList.contains('widget-box')).toBe(true)
+    }
+    // The name is drawn as well, but not read twice.
+    const names = [...grid.querySelectorAll('.widget-box__name')]
+    expect(names.map((name) => name.textContent)).toEqual(['Weather', 'Clock', 'Clock'])
+    expect(names.every((name) => name.getAttribute('aria-hidden') === 'true')).toBe(true)
+  })
+
+  it('goes row by row, left to right, for Tab: three Widgets stored out of order', () => {
+    const { grid } = renderEditable(THREE_OUT_OF_ORDER)
+    edit()
+
+    // Tab visits tab stops in document order (none has a positive tabindex), and the boxes are
+    // in the document in reading order.
+    const stops = [...grid.querySelectorAll<HTMLElement>('[tabindex]')]
+    expect(stops.every((stop) => stop.tabIndex === 0)).toBe(true)
+    expect(
+      stops.map((stop) => [stop.dataset.widget, stop.style.gridColumn, stop.style.gridRow]),
+    ).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '7 / span 3', '2 / span 2'],
+      ['clock', '1 / span 3', '6 / span 2'],
+    ])
+  })
+
+  it('frames a Widget it does not know too, so it can be reached', () => {
+    renderEditable(layoutOf(stored('aaaaaaaa', 'bookmarks', [1, 3, 3, 4])))
+    edit()
+
+    const group = screen.getByRole('group', { name: 'Unknown widget' })
+    expect(group.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+  })
+
+  it('says how to move between Widgets, politely, when edit mode starts', () => {
+    renderEditable(THREE_OUT_OF_ORDER)
+    const status = document.querySelector('[aria-live="polite"]')
+    if (!status) throw new Error('no live region')
+    // The region is on the page before there is anything to say, so the words are announced.
+    expect(status.textContent).toBe('')
+    expect(status.classList.contains('visually-hidden')).toBe(true)
+
+    edit()
+    expect(status.textContent).toBe('Editing widgets. Tab moves between widgets.')
+
+    fireEvent.click(screen.getByText('leave'))
+    expect(status.textContent).toBe('')
+  })
+
+  it('keeps a Widget element when edit mode starts, so its state is not lost', () => {
+    const { grid } = renderEditable(THREE_OUT_OF_ORDER)
+    const before = grid.querySelector('[data-widget="weather"]')
+
+    edit()
+
+    expect(grid.querySelector('[data-widget="weather"]')).toBe(before)
+  })
+
+  it('draws an empty Grid with the dots and nothing to reach', () => {
+    const { grid } = renderEditable(layoutOf())
+    edit()
+
+    expect(grid.querySelector('.grid__dots')).not.toBeNull()
+    expect(screen.queryByRole('group')).toBeNull()
   })
 })
 

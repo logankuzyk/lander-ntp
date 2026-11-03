@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
+import { startEditing } from '../../../.storybook/startEditing'
+
 // The whole page, as `App` stories are: no `withPage`. Each story seeds the storage it needs, and
 // makes no request. They fill the window; the toolbar's Viewport menu has the two sizes to look
 // at, 1440 by 900 and 1366 by 768 (a story that sets `globals.viewport` would lock the menu, so
@@ -59,5 +61,42 @@ export const EightWidgets: Story = {
   beforeEach: async () => {
     await seedPage(PAGE_SEEDS.gridEightWidgets)
     return sendNothing()
+  },
+}
+
+/**
+ * Edit mode, entered by pressing Edit as a person would (it is page state, so nothing is
+ * seeded for it): the dots over the Grid, and a frame with its name on each Widget. Here the
+ * Weather in the top right corner and the Clock in the middle.
+ */
+export const EditingTwoWidgets: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await startEditing(canvasElement)
+  },
+}
+
+/** Edit mode with no Widgets: the dots alone. */
+export const EditingEmpty: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.gridEmpty),
+  play: async ({ canvasElement }) => {
+    await startEditing(canvasElement)
+  },
+}
+
+/** Edit mode with the first Widget reached by Tab: the focus ring on its frame. */
+export const EditingFocused: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    // Where Tab goes first: the frames come before the Bottom bar in the page.
+    const [first] = await canvas.findAllByRole('group')
+    first?.focus()
   },
 }

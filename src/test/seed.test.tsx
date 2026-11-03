@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '@/entrypoints/newtab/App'
@@ -140,5 +140,50 @@ describe('the Grid stories', () => {
     expect(boxes(container)).toHaveLength(8)
     expect(container.querySelectorAll('.clock')).toHaveLength(4)
     expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('the Grid editing stories', () => {
+  /** What each story's play does: wait for the page, then press Edit. */
+  const startEditing = async () => {
+    // The Edit button is there at once; the Grid waits for the stored settings and Layout.
+    await waitFor(() => expect(document.querySelector('.grid')).not.toBeNull())
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+  }
+
+  it('give two Widgets, each in a frame with its name, under the dots', async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    const { container } = render(<App />)
+
+    await startEditing()
+
+    expect(screen.getByRole('button', { name: 'Done' }).getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
+    expect(
+      (await screen.findAllByRole('group')).map((frame) => frame.getAttribute('aria-label')),
+    ).toEqual(['Weather', 'Clock'])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the dots alone when there is no Widget', async () => {
+    await seedPage(PAGE_SEEDS.gridEmpty)
+    const { container } = render(<App />)
+
+    await startEditing()
+
+    expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
+    expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('can put focus on the first frame, which is a tab stop', async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    render(<App />)
+    await startEditing()
+
+    const [first] = await screen.findAllByRole('group')
+    first?.focus()
+
+    expect(document.activeElement).toBe(first)
+    expect(first?.getAttribute('aria-label')).toBe('Weather')
   })
 })
