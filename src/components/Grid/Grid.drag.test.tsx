@@ -62,7 +62,13 @@ function setup(layout: Layout = LAYOUT, { canChange = true, commit, editing = tr
     <EditModeProvider canChange={canChange}>
       <Editing />
       <Grid commit={onCommit} layout={layout} page={PAGE} />
-      <Controls onNext={() => {}} onToggleSettings={() => {}} />
+      <Controls
+        layout={layout}
+        layoutLoaded
+        onCommit={() => {}}
+        onNext={() => {}}
+        onToggleSettings={() => {}}
+      />
     </EditModeProvider>,
   )
   if (editing) fireEvent.click(screen.getByText('start'))
