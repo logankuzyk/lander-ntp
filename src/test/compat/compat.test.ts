@@ -136,12 +136,6 @@ type PhaseTwoWrite = {
    * exactly as they were, and the Layout is stored with `v: 1`.
    */
   layoutOnly?: boolean
-  /**
-   * A write only the settings panel's Clock and Weather tabs make. W17 deletes those tabs, and
-   * deletes these rows with them: from then on nothing may change `clock.*` other than
-   * `hour12`, or `weather.*` at all.
-   */
-  legacyPanel?: boolean
   name: string
   /**
    * The write must leave `v: 1` at the top of the settings, which stored settings from v0.2.3
@@ -218,40 +212,6 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
   {
     name: 'switch the clock to 24-hour time (clock.hour12)',
     write: changeSettings((s) => ({ ...s, clock: { ...s.clock, hour12: !s.clock.hour12 } })),
-  },
-  {
-    legacyPanel: true, // W17 deletes this row
-    name: 'switch the clock off (settings panel until the Clock moves to the page)',
-    write: changeSettings((s) => ({ ...s, clock: { ...s.clock, enabled: false } })),
-  },
-  {
-    legacyPanel: true, // W17 deletes this row
-    name: 'show the date and seconds on the clock (settings panel)',
-    write: changeSettings((s) => ({
-      ...s,
-      clock: { ...s.clock, showDate: true, showSeconds: true },
-    })),
-  },
-  {
-    legacyPanel: true, // W17 deletes this row
-    name: 'switch the weather on at a place (settings panel)',
-    write: changeSettings((s) => ({
-      ...s,
-      weather: { ...s.weather, enabled: true, place: VICTORIA },
-    })),
-  },
-  {
-    legacyPanel: true, // W17 deletes this row
-    name: 'follow the device, and choose the unit and lines (settings panel)',
-    write: changeSettings((s) => ({
-      ...s,
-      weather: {
-        ...s.weather,
-        fields: s.weather.fields.map((field) => ({ ...field, shown: field.id !== 'sun' })),
-        followDevice: true,
-        unit: 'fahrenheit',
-      },
-    })),
   },
   {
     changes: { font: 'instrument-serif' },
@@ -394,7 +354,6 @@ const changedPaths = (before: unknown, after: unknown): string[] => {
 
 /** Everything phase 2 may change in `sync:settings`; see PHASE_2_WRITES. */
 const ALLOWED_PATHS = /^dim$|^font$|^photos\.|^clock\.hour12$|^v$/
-const LEGACY_PANEL_PATHS = /^clock\.|^weather\./
 
 describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
   beforeEach(async () => {
@@ -404,13 +363,13 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
 
   it.each(PHASE_2_WRITES)(
     '$name',
-    async ({ changes, fromNoRecord, layoutOnly, legacyPanel, stampsVersion, write }) => {
+    async ({ changes, fromNoRecord, layoutOnly, stampsVersion, write }) => {
       await write()
       const stored = await fakeBrowser.storage.sync.get(null)
 
       // Only what phase 2 is allowed to change has changed, and `v` is 1 where there is one.
       const disallowed = changedPaths(SEED, stored.settings).filter(
-        (path) => !ALLOWED_PATHS.test(path) && !(legacyPanel && LEGACY_PANEL_PATHS.test(path)),
+        (path) => !ALLOWED_PATHS.test(path),
       )
       expect(disallowed).toEqual([])
       if (isObject(stored.settings) && 'v' in stored.settings) expect(stored.settings.v).toBe(1)
@@ -462,6 +421,72 @@ describe('the options popover’s writes', () => {
     expect(settings.clock).toEqual({ ...SEED.clock, hour12: !SEED.clock.hour12 })
     // And the Layout is there, for the devices that read it.
     expect(stored.layout).toHaveProperty('v', 1)
+  })
+})
+
+describe('the settings panel, now it has no Clock or Weather options (W17)', () => {
+  /** A device whose Clock is off and whose Weather is set up: what v0.2.3 would show, frozen. */
+  const CUSTOM: Settings = {
+    ...SEED,
+    clock: { enabled: false, hour12: false, showDate: true, showSeconds: true },
+    weather: {
+      ...DEFAULT_SETTINGS.weather,
+      enabled: true,
+      fields: DEFAULT_SETTINGS.weather.fields.map((field) => ({
+        ...field,
+        shown: field.id !== 'sun',
+      })),
+      followDevice: false,
+      place: VICTORIA,
+      unit: 'fahrenheit',
+    },
+  }
+
+  it.each([
+    ['Dim the photo', (s: Settings) => ({ ...s, dim: !s.dim })],
+    ['Font', (s: Settings) => ({ ...s, font: 'instrument-serif' as const })],
+    [
+      'Change photo',
+      (s: Settings) => ({
+        ...s,
+        photos: { ...s.photos, frequency: '6h' as const, mode: 'cycle' as const },
+      }),
+    ],
+    ['a pinned photo', (s: Settings) => ({ ...s, photos: { ...s.photos, pinnedId: 'p2' } })],
+  ])('%s leaves the Clock’s and the Weather’s blocks as they were stored', async (_, change) => {
+    await settingsItem.setValue(CUSTOM)
+    await changeSettings(change)()
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    const { fellBack, settings } = await asV023(stored)
+
+    // Not one key of `clock` or `weather` has been written: `enabled`, `showDate`, `showSeconds`
+    // and the whole Weather block are exactly what was there.
+    expect(JSON.stringify((stored.settings as Settings).clock)).toBe(JSON.stringify(CUSTOM.clock))
+    expect(JSON.stringify((stored.settings as Settings).weather)).toBe(
+      JSON.stringify(CUSTOM.weather),
+    )
+    expect(
+      changedPaths(CUSTOM, stored.settings).filter((path) => /^clock\.|^weather\./.test(path)),
+    ).toEqual([])
+    expect(fellBack).toBe(false)
+    expect(settings.clock).toEqual(CUSTOM.clock)
+    expect(settings.weather).toEqual(CUSTOM.weather)
+  })
+
+  it('keeps a top-level key it does not know through a panel save, and v0.2.3 still reads it', async () => {
+    // Something a later version added next to the blocks, that this one does not recognise.
+    await fakeBrowser.storage.sync.set({ settings: { ...CUSTOM, future: { a: 1 } } })
+    await changeSettings((s) => ({ ...s, font: 'instrument-serif' }))()
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    const { fellBack, settings } = await asV023(stored)
+
+    expect(stored.settings).toMatchObject({ font: 'instrument-serif', future: { a: 1 } })
+    expect(fellBack).toBe(false)
+    expect(settings.clock).toEqual(CUSTOM.clock)
+    expect(settings.weather).toEqual(CUSTOM.weather)
+    expect(settings).toMatchObject({ future: { a: 1 } })
   })
 })
 

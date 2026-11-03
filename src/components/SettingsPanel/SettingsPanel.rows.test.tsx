@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
-import { makePlace } from '@/test/fixtures'
 
 import { SettingsPanel } from './SettingsPanel'
 
@@ -12,7 +11,6 @@ import { SettingsPanel } from './SettingsPanel'
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
   photos: { frequency: '1h', mode: 'cycle', pinnedId: null, tags: [] },
-  weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place: makePlace() },
 }
 
 const open = (section: string) => {
@@ -34,19 +32,6 @@ const optionsOf = (menu: string) => {
 }
 
 describe('SettingsPanel rows', () => {
-  it('labels the place row "Place"', () => {
-    open('Weather')
-
-    const row = screen.getByText('Victoria').closest('.settings__row')
-    expect(row?.firstElementChild?.textContent).toBe('Place')
-  })
-
-  it('lists the units Celsius first, then Fahrenheit', () => {
-    open('Weather')
-
-    expect(optionsOf('Units')).toEqual(['Celsius', 'Fahrenheit'])
-  })
-
   it('lists how often the photo changes, every new tab first and Never last', () => {
     open('Photos')
 

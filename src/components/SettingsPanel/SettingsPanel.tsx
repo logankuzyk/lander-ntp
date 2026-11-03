@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
+import { useEditMode } from '@/components/EditMode/useEditMode'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
@@ -10,15 +11,11 @@ import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotati
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
-import type { Settings, WeatherSettings } from '@/settings/schema'
-import { allowLocation } from '@/weather/consent'
-import { weatherDefinition } from '@/widgets/Weather/definition'
+import type { Settings } from '@/settings/schema'
 import { Choice } from '@/widgetSystem/controls/Choice'
-import { PlaceControl } from '@/widgetSystem/controls/PlaceControl'
 import { Switch } from '@/widgetSystem/controls/Switch'
 
 import { Gallery } from './Gallery'
-import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
   '1h': 'Every hour',
@@ -38,10 +35,9 @@ const UPDATE_TO_CHANGE = 'Update Lander to change this.'
 /** The "Change photo" choice that pins the photo on screen. */
 const NEVER = 'never'
 
+/** The Clock and the Weather are set up on their widgets (edit mode), not here. */
 const SECTIONS = [
   ['photos', 'Photos'],
-  ['clock', 'Clock'],
-  ['weather', 'Weather'],
   ['general', 'General'],
 ] as const
 
@@ -129,107 +125,6 @@ type SectionProps = {
   settings: Settings
 }
 
-function ClockSection({ onChange, settings }: SectionProps) {
-  const clock = (changes: Partial<Settings['clock']>) =>
-    onChange({ ...settings, clock: { ...settings.clock, ...changes } })
-
-  return (
-    <section>
-      <Switch
-        checked={settings.clock.enabled}
-        label="Show clock"
-        onChange={(enabled) => clock({ enabled })}
-      />
-      {/* Out of the way of both the eye and Tab while the clock is off. */}
-      {settings.clock.enabled && (
-        <>
-          <Switch
-            checked={!settings.clock.hour12}
-            label="24-hour time"
-            onChange={(h24) => clock({ hour12: !h24 })}
-          />
-          <Switch
-            checked={settings.clock.showDate}
-            label="Show date"
-            onChange={(showDate) => clock({ showDate })}
-          />
-          <Switch
-            checked={settings.clock.showSeconds}
-            label="Show seconds"
-            onChange={(showSeconds) => clock({ showSeconds })}
-          />
-        </>
-      )}
-    </section>
-  )
-}
-
-function WeatherSection({ onChange, settings }: SectionProps) {
-  const current = settings.weather
-  // The line is the Weather's own, which its options show; the panel draws it until they replace it.
-  const { credit } = weatherDefinition
-  const [, setRefused] = useState(0)
-
-  // The place control's following and `enable` wait on the browser's prompts, and the settings
-  // can change meanwhile: a change is laid over the settings as they are when it is made, not as
-  // they were at the click.
-  const latest = useRef(settings)
-  latest.current = settings
-
-  const weather = (changes: Partial<WeatherSettings>) =>
-    onChange({ ...latest.current, weather: { ...latest.current.weather, ...changes } })
-
-  const enable = async (enabled: boolean) => {
-    // Nothing changed, but the checkbox has ticked itself: render again to put it back.
-    if (enabled && !(await allowLocation())) return setRefused((count) => count + 1)
-    weather({ enabled })
-  }
-
-  return (
-    <>
-      <section>
-        <Switch
-          checked={current.enabled}
-          label="Show weather"
-          onChange={(enabled) => void enable(enabled)}
-        />
-        {current.enabled && (
-          <PlaceControl
-            label="Place"
-            onChange={weather}
-            value={{ followDevice: current.followDevice, place: current.place }}
-          />
-        )}
-        {current.enabled && (
-          <>
-            <Choice<WeatherSettings['unit']>
-              choices={[
-                { label: 'Celsius', value: 'celsius' },
-                { label: 'Fahrenheit', value: 'fahrenheit' },
-              ]}
-              label="Units"
-              onChange={(unit) => weather({ unit })}
-              value={current.unit}
-            />
-          </>
-        )}
-      </section>
-
-      {current.enabled && (
-        <section aria-labelledby="weather-show-heading">
-          <h3 id="weather-show-heading">Show</h3>
-          <WeatherFields fields={current.fields} onChange={(fields) => weather({ fields })} />
-        </section>
-      )}
-      {current.enabled && credit && (
-        <p class="settings__note settings__credit">
-          <a href={credit.href}>{credit.text}</a>
-        </p>
-      )}
-    </>
-  )
-}
-
 function GeneralSection({ onChange, settings }: SectionProps) {
   return (
     <section>
@@ -240,6 +135,33 @@ function GeneralSection({ onChange, settings }: SectionProps) {
         value={settings.font}
       />
     </section>
+  )
+}
+
+/**
+ * Where the Clock's and the Weather's options went. The button is the Bottom bar's Edit button
+ * from here: it closes the panel and enters edit mode, where every widget has its Options. It
+ * changes no setting, so it sits outside the fieldset that a newer version's settings turn off.
+ */
+function EditPointer({ onClose }: { onClose: () => void }) {
+  const { enter } = useEditMode()
+
+  return (
+    <p class="settings__note settings__edit">
+      Clock and Weather options are on the widgets now.{' '}
+      <button
+        class="settings__link"
+        onClick={() => {
+          enter()
+          // The panel is about to go, with focus in it; the page's button reads Done now.
+          document.querySelector<HTMLElement>('[data-edit-toggle]')?.focus()
+          onClose()
+        }}
+        type="button"
+      >
+        Edit
+      </button>
+    </p>
   )
 }
 
@@ -423,10 +345,9 @@ export function SettingsPanel({
                 settings={known}
               />
             )}
-            {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
-            {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
             {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
           </fieldset>
+          {section === 'general' && <EditPointer onClose={onClose} />}
         </div>
       </div>
     </aside>

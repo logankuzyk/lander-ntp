@@ -322,7 +322,7 @@ describe('App', () => {
 
       const settings = await screen.findByRole('dialog', { name: 'Settings' })
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
-      expect(within(settings).getByRole('note').textContent).toContain('1 of 4')
+      expect(within(settings).getByRole('note').textContent).toContain('1 of 2')
       expect((await onboardingItem.getValue())?.welcomed).toBe(true)
 
       // Opened again from the gear, it is just the settings.
@@ -331,63 +331,27 @@ describe('App', () => {
       expect(within(await screen.findByRole('dialog')).queryByRole('note')).toBeNull()
     })
 
-    it('tells an updated install about the weather, and opens its settings', async () => {
+    it('has no news for an updated install now: the weather one, which opened a tab that is gone, is removed', async () => {
       await onboardingItem.setValue({ dismissed: [], welcomed: true })
-      render(<App />)
-
-      const note = await screen.findByRole('note')
-      expect(note.textContent).toContain('New: weather')
-      expect(screen.queryByRole('dialog')).toBeNull()
-
-      fireEvent.click(within(note).getByRole('button', { name: 'Set up' }))
-
-      await screen.findByRole('dialog', { name: 'Settings' })
-      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Weather')
-      expect(screen.queryByRole('note')).toBeNull()
-      expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather'])
-    })
-
-    it('keeps the news dismissed', async () => {
-      await onboardingItem.setValue({ dismissed: [], welcomed: true })
-      const { unmount } = render(<App />)
-
-      fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
-
-      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
-      expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather'])
-
-      unmount()
-      const { container } = render(<App />)
-      await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
-      expect(screen.queryByRole('note')).toBeNull()
-    })
-
-    it('has no news of the weather for someone already using it', async () => {
-      await onboardingItem.setValue({ dismissed: [], welcomed: true })
-      await settingsItem.setValue({
-        ...DEFAULT_SETTINGS,
-        weather: { ...DEFAULT_SETTINGS.weather, enabled: true },
-      })
       const { container } = render(<App />)
 
       await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
       // Long enough for the availability check to have answered.
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.queryByRole('dialog')).toBeNull()
+      // Nothing written: no dismissal is made for it either.
+      expect(await onboardingItem.getValue()).toEqual({ dismissed: [], welcomed: true })
     })
 
-    it('has no news of the weather while the manifest has it switched off', async () => {
-      await onboardingItem.setValue({ dismissed: [], welcomed: true })
-      await manifestCache.setValue({
-        data: { ...makeManifest([makePhoto('a')]), weather: { enabled: false } },
-        etag: null,
-        fetchedAt: Date.now(),
-      })
+    it('leaves the weather id in a stored record alone', async () => {
+      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
       const { container } = render(<App />)
 
       await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.queryByRole('note')).toBeNull()
+      expect(await onboardingItem.getValue()).toEqual({ dismissed: ['weather'], welcomed: true })
     })
   })
 })

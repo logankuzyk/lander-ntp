@@ -88,6 +88,12 @@ export function Controls({
         // Where focus goes when edit mode ends with a Widget's frame focused (see useEditMode).
         data-edit-toggle
         onClick={editing ? leave : enter}
+        // The settings panel's Edit button hands focus here while Enter may still be held, and a
+        // browser clicks a button on every Enter keydown, repeats included: edit mode would
+        // flicker. Only an Enter that went down on this button presses it.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && event.repeat) event.preventDefault()
+        }}
         title={editing ? 'Done (E)' : 'Edit (E)'}
         type="button"
       >

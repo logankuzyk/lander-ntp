@@ -242,7 +242,7 @@ describe('App, with news that points at the page', () => {
   })
 
   it('has the news about the settings before the Grid too, where a keyboard comes to it first', async () => {
-    news.current = [{ body: 'See it here.', id: 'at-settings', section: 'weather', title: 'New' }]
+    news.current = [{ body: 'See it here.', id: 'at-settings', section: 'general', title: 'New' }]
     const { container } = render(<App />)
 
     const note = await screen.findByRole('note')
@@ -252,5 +252,17 @@ describe('App, with news that points at the page', () => {
       return found
     })
     expect(note.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('opens the settings at the section named, from the news about the settings, and dismisses it', async () => {
+    news.current = [{ body: 'See it here.', id: 'at-settings', section: 'general', title: 'New' }]
+    render(<App />)
+
+    fireEvent.click(within(await screen.findByRole('note')).getByRole('button', { name: 'Set up' }))
+
+    await screen.findByRole('dialog', { name: 'Settings' })
+    expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
+    expect(screen.queryByRole('note')).toBeNull()
+    expect((await onboardingItem.getValue())?.dismissed).toEqual(['at-settings'])
   })
 })

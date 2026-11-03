@@ -1,6 +1,5 @@
 import type { SectionId } from '@/components/SettingsPanel/SettingsPanel'
 import type { Settings } from '@/settings/schema'
-import { getEndpoints } from '@/weather/endpoints'
 
 import type { CalloutTarget } from './target'
 
@@ -40,25 +39,17 @@ export type PageCallout = CalloutBase & {
 
 export type CalloutInfo = PageCallout | SettingsStop
 
-/** The tour a new install is offered after the welcome: one stop per settings section, in order. */
+/**
+ * The tour a new install is offered after the welcome: one stop per settings section, in order.
+ * The Clock and the Weather have none: their options are on the widgets, and a tour of editing
+ * is a later change.
+ */
 export const TOUR: readonly SettingsStop[] = [
   {
     body: 'Choose how often the photo changes, and which tags to draw from. Or pick one from the gallery to keep.',
     id: 'tour-photos',
     section: 'photos',
     title: 'Photos',
-  },
-  {
-    body: 'Switch to 24-hour time, or choose to show the date and seconds.',
-    id: 'tour-clock',
-    section: 'clock',
-    title: 'Clock',
-  },
-  {
-    body: 'Switch it on and pick a place to see its current conditions in the top corner.',
-    id: 'tour-weather',
-    section: 'weather',
-    title: 'Weather',
   },
   {
     body: 'Set the font for the clock and everything around it.',
@@ -72,15 +63,9 @@ export const TOUR: readonly SettingsStop[] = [
  * Shown once, one at a time and in this order, to people who had the extension before the
  * feature arrived. A new install never sees these: the tour covers the same ground. To
  * announce a feature, add an entry here (and a stop in TOUR if it earns one).
+ *
+ * There are none at the moment. The Weather's, "New: weather", opened a settings tab that is gone
+ * now the Weather's options are on the widget, so it was removed; its id stays in the `dismissed`
+ * list of anyone who saw it, and harms nothing there. Do not reuse `weather` as an id.
  */
-export const NEWS: readonly CalloutInfo[] = [
-  {
-    // The manifest can switch the weather off; see weather/endpoints.
-    available: async () => (await getEndpoints()).enabled,
-    body: 'See the forecast for a place you pick, up here.',
-    id: 'weather',
-    relevant: (settings) => !settings.weather.enabled,
-    section: 'weather',
-    title: 'New: weather',
-  },
-]
+export const NEWS: readonly CalloutInfo[] = []
