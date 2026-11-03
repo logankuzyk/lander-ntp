@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { drop, move, pickUp } from '@/components/EditMode/moveSession'
 import { checkLayout } from '@/layout/check'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
 import { setOptions } from '@/layout/ops'
@@ -300,6 +301,26 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       const changed = setOptions({ layout, readOnly: false }, weather.placed.id, options)
       if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
       return changed.layout
+    }),
+  },
+  {
+    layoutOnly: true,
+    name: 'drag a Widget to a new place (W21: one drop, sync:layout alone, nothing in sync:settings)',
+    write: changeLayout((layout) => {
+      // The Clock, grabbed at its top left corner, one cell left and one down: as a drop makes it.
+      const clock = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+      )
+      if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+      const { col, row } = clock.placed
+      const held = pickUp({ layout, readOnly: false }, clock.placed.id, {
+        col: col - 1,
+        row: row - 1,
+      })
+      if (!held) throw new Error('the Clock could not be picked up')
+      const next = drop(move(held, { col: col - 2, row }), { layout, readOnly: false })
+      if (!next) throw new Error('the drop was refused')
+      return next
     }),
   },
   {

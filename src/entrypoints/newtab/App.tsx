@@ -192,7 +192,9 @@ export function App() {
           otherOpen={popover !== null}
           page={pageValues(settings)}
         >
-          {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+          {settingsLoaded && layoutLoaded && (
+            <Grid commit={commit} layout={layout} page={pageValues(settings)} />
+          )}
         </OptionsPopoverProvider>
         {photo && <PhotoCredit photo={photo} />}
         {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
