@@ -78,18 +78,6 @@ describe('the page stories', () => {
     expect(screen.queryByRole('note')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
-
-  it('give an updated install the weather news', async () => {
-    await seedPage(PAGE_SEEDS.weatherNews)
-    render(<App />)
-
-    const note = await screen.findByRole('note')
-    expect(note.textContent).toContain('New: weather')
-    await expectFirstStoryPhoto()
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByRole('region', { name: 'Weather' })).toBeNull()
-    expect(fetchSpy).not.toHaveBeenCalled()
-  })
 })
 
 /** Each box on the page as [type, column, row]: where CSS grid is told to put it. */

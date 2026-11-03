@@ -4,14 +4,15 @@ import { fn } from 'storybook/test'
 
 import { TOUR } from '@/onboarding/callouts'
 import type { Settings } from '@/settings/schema'
-import { makePlace, STORY_PHOTOS } from '@/test/fixtures'
+import { STORY_PHOTOS } from '@/test/fixtures'
 
 import { withPage } from '../../../.storybook/withPage'
 import { SettingsPanel } from './SettingsPanel'
 
 /**
  * Every setting written out, so neither the browser's locale nor a later change to the defaults
- * moves a story. Photos are cycling, the clock is on and the weather is off.
+ * moves a story. Photos are cycling. The clock and the weather are the page's, not the panel's:
+ * their options are on the widgets, so the panel shows nothing of them whatever they are set to.
  */
 const SETTINGS: Settings = {
   clock: { enabled: true, hour12: false, showDate: false, showSeconds: false },
@@ -33,11 +34,6 @@ const SETTINGS: Settings = {
     unit: 'celsius',
   },
 }
-
-const weather = (changes: Partial<Settings['weather']>): Settings => ({
-  ...SETTINGS,
-  weather: { ...SETTINGS.weather, ...changes },
-})
 
 type Props = Parameters<typeof SettingsPanel>[0]
 
@@ -90,26 +86,7 @@ export const PhotosKept: Story = {
   },
 }
 
-export const ClockOn: Story = { args: { initialSection: 'clock' } }
-
-export const ClockOff: Story = {
-  args: {
-    initialSection: 'clock',
-    settings: { ...SETTINGS, clock: { ...SETTINGS.clock, enabled: false } },
-  },
-}
-
-export const WeatherOff: Story = { args: { initialSection: 'weather' } }
-
-export const WeatherOn: Story = {
-  args: { initialSection: 'weather', settings: weather({ enabled: true, place: makePlace() }) },
-}
-
-/** On, with no place yet: the place search shows. */
-export const WeatherChoosingAPlace: Story = {
-  args: { initialSection: 'weather', settings: weather({ enabled: true, place: null }) },
-}
-
+/** The font, and the line that points to Edit for the Clock's and the Weather's options. */
 export const General: Story = { args: { initialSection: 'general' } }
 
 /**
@@ -126,5 +103,5 @@ export const FromNewerVersion: Story = {
   },
 }
 
-/** As a new install opens it: a note beside the panel for each section in turn. */
+/** As a new install opens it: a note beside the panel for each section in turn, two now. */
 export const WithTheTour: Story = { args: { tour: TOUR } }

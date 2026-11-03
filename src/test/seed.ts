@@ -208,8 +208,6 @@ export const PAGE_SEEDS = {
   },
   /** Someone using it day to day, with the settings as they come. */
   settledInstall: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
-  /** Someone who had the extension before the weather arrived, and is told about it. */
-  weatherNews: { onboarding: { dismissed: [], welcomed: true } },
   /** Weather switched on with a place, showing a reading. */
   weatherOn: {
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },

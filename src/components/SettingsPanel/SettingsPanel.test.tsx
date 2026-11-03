@@ -1,16 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
-import { useState } from 'preact/hooks'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { SettingsStop } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { makePhoto } from '@/test/fixtures'
-import { devicePosition } from '@/weather/deviceLocation'
 
 import { SettingsPanel } from './SettingsPanel'
-import { WeatherFields } from './WeatherFields'
 
 const settings: Settings = {
   ...DEFAULT_SETTINGS,
@@ -70,18 +67,18 @@ describe('SettingsPanel', () => {
   it('stays open for clicks inside it', () => {
     const { onClose } = renderPanel()
 
-    fireEvent.pointerDown(screen.getByRole('tab', { name: 'Clock' }))
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'General' }))
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Tide pools' }))
 
     expect(onClose).not.toHaveBeenCalled()
   })
 
   describe('sections', () => {
-    it('lists photos, clock, weather and general settings, starting on photos', () => {
+    it('lists photos and general settings, starting on photos', () => {
       renderPanel()
 
       const tabs = screen.getAllByRole('tab')
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'Clock', 'Weather', 'General'])
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'General'])
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
       expect(screen.getByRole('tabpanel', { name: 'Photos' })).toBeTruthy()
     })
@@ -89,10 +86,10 @@ describe('SettingsPanel', () => {
     it('switches section from the sidebar', () => {
       renderPanel()
 
-      openSection('Clock')
+      openSection('General')
 
-      expect(screen.getByRole('tabpanel', { name: 'Clock' })).toBeTruthy()
-      expect(screen.getByLabelText('Show clock')).toBeTruthy()
+      expect(screen.getByRole('tabpanel', { name: 'General' })).toBeTruthy()
+      expect(screen.getByRole('combobox', { name: 'Font' })).toBeTruthy()
       expect(screen.queryByLabelText('Change photo')).toBeNull()
     })
 
@@ -101,8 +98,11 @@ describe('SettingsPanel', () => {
       const photos = screen.getByRole('tab', { name: 'Photos' })
 
       fireEvent.keyDown(photos, { key: 'ArrowDown' })
-      expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Clock' }))
-      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Clock')
+      expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'General' }))
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
+
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Home' })
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
 
       fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'End' })
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
@@ -247,13 +247,15 @@ describe('SettingsPanel', () => {
         overrides: withPhotos({ tags: ['water'] }),
         photos: [makePhoto('fallback')],
       })
-      openSection('Clock')
+      openSection('General')
 
-      fireEvent.click(screen.getByLabelText('Show date'))
+      fireEvent.click(screen.getByRole('combobox', { name: 'Font' }))
+      fireEvent.click(screen.getByRole('option', { name: 'Instrument Serif' }))
 
       expect(onChange).toHaveBeenCalledWith({
         ...settings,
-        clock: { ...settings.clock, showDate: true },
+        font: 'instrument-serif',
+        photos: { ...settings.photos, tags: [] },
       })
     })
 
@@ -315,50 +317,9 @@ describe('SettingsPanel', () => {
       expect(grown()).toBe(500)
 
       // Another section starts at rest again.
-      openSection('Clock')
+      openSection('General')
       expect(grown()).toBe(0)
       expect(body.scrollTop).toBe(0)
-    })
-  })
-
-  describe('clock', () => {
-    it('switches to 24-hour time', () => {
-      const { onChange } = renderPanel()
-      openSection('Clock')
-      const toggle = screen.getByLabelText('24-hour time') as HTMLInputElement
-
-      expect(toggle.checked).toBe(false)
-      fireEvent.click(toggle)
-
-      expect(onChange).toHaveBeenCalledWith({
-        ...settings,
-        clock: { ...settings.clock, hour12: false },
-      })
-    })
-
-    it.each([
-      ['Show clock', 'enabled', false],
-      ['Show date', 'showDate', true],
-      ['Show seconds', 'showSeconds', true],
-    ])('toggles %s', (label, key, expected) => {
-      const { onChange } = renderPanel()
-      openSection('Clock')
-
-      fireEvent.click(screen.getByLabelText(label))
-
-      expect(onChange).toHaveBeenCalledWith({
-        ...settings,
-        clock: { ...settings.clock, [key]: expected },
-      })
-    })
-
-    it('hides the clock options while the clock is off', () => {
-      renderPanel({ overrides: { clock: { ...settings.clock, enabled: false } } })
-      openSection('Clock')
-
-      const panel = within(screen.getByRole('tabpanel'))
-      expect(panel.getByLabelText('Show clock')).toBeTruthy()
-      expect(panel.queryByLabelText('Show seconds')).toBeNull()
     })
   })
 
@@ -374,454 +335,9 @@ describe('SettingsPanel', () => {
     })
   })
 
-  describe('weather', () => {
-    const PLACE = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
-    /** Two shown and three hidden, to move between. */
-    const FIELDS: Settings['weather']['fields'] = [
-      { id: 'location', shown: true },
-      { id: 'sun', shown: true },
-      { id: 'condition', shown: false },
-      { id: 'feelsLike', shown: false },
-      { id: 'highLow', shown: false },
-    ]
-
-    const withWeather = (changes: Partial<Settings['weather']>): Settings => ({
-      ...settings,
-      weather: { ...settings.weather, ...changes },
-    })
-
-    const renderWeather = (changes: Partial<Settings['weather']> = {}) => {
-      const rendered = renderPanel({ overrides: withWeather(changes) })
-      openSection('Weather')
-      return rendered
-    }
-
-    afterEach(() => {
-      vi.unstubAllGlobals()
-    })
-
-    it('offers only the switch while the widget is off', () => {
-      const { onChange } = renderWeather()
-
-      expect(screen.queryByRole('combobox', { name: 'Units' })).toBeNull()
-      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
-
-      fireEvent.click(screen.getByLabelText('Show weather'))
-      return waitFor(() => expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true })))
-    })
-
-    it('searches for a place and keeps the one picked', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({
-          json: () =>
-            Promise.resolve({
-              results: [
-                {
-                  admin1: 'British Columbia',
-                  country: 'Canada',
-                  id: 1,
-                  latitude: 48.4359,
-                  longitude: -123.35155,
-                  name: 'Victoria',
-                },
-              ],
-            }),
-          ok: true,
-        }),
-      )
-      const { onChange } = renderWeather({ enabled: true })
-
-      fireEvent.input(screen.getByRole('combobox', { name: 'Search for a place' }), {
-        target: { value: 'Victoria' },
-      })
-      fireEvent.click(
-        await screen.findByRole('option', { name: 'Victoria, British Columbia, Canada' }),
-      )
-
-      expect(onChange).toHaveBeenCalledWith(
-        withWeather({ enabled: true, followDevice: false, place: PLACE }),
-      )
-    })
-
-    describe('suggestions', () => {
-      const found = (...names: string[]) =>
-        vi.stubGlobal(
-          'fetch',
-          vi.fn().mockResolvedValue({
-            json: () =>
-              Promise.resolve({
-                results: names.map((name, id) => ({
-                  country: 'Canada',
-                  id,
-                  latitude: 48.4359,
-                  longitude: -123.35155,
-                  name,
-                })),
-              }),
-            ok: true,
-          }),
-        )
-
-      const searched = async () => {
-        found('Victoria', 'Victoriaville')
-        const rendered = renderWeather({ enabled: true })
-        const box = screen.getByRole<HTMLInputElement>('combobox', { name: 'Search for a place' })
-        fireEvent.focus(box)
-        fireEvent.input(box, { target: { value: 'Vic' } })
-        await screen.findByRole('option', { name: 'Victoria, Canada' })
-        return { ...rendered, box }
-      }
-
-      const active = () =>
-        screen
-          .queryAllByRole('option')
-          .find((option) => option.getAttribute('aria-selected') === 'true')?.textContent
-
-      it('puts each one in the box as the arrow keys reach it, and the typed text between', async () => {
-        const { box } = await searched()
-
-        fireEvent.keyDown(box, { key: 'ArrowDown' })
-        expect(box.value).toBe('Victoria, Canada')
-        expect(active()).toBe('Victoria, Canada')
-        expect(box.getAttribute('aria-activedescendant')).toBe(
-          screen.getByRole('option', { name: 'Victoria, Canada' }).id,
-        )
-
-        fireEvent.keyDown(box, { key: 'ArrowDown' })
-        fireEvent.keyDown(box, { key: 'ArrowDown' })
-        expect(box.value).toBe('Vic')
-        expect(active()).toBeUndefined()
-
-        fireEvent.keyDown(box, { key: 'ArrowUp' })
-        expect(box.value).toBe('Victoriaville, Canada')
-      })
-
-      it('takes the one in the box with Enter', async () => {
-        const { box, onChange } = await searched()
-
-        fireEvent.keyDown(box, { key: 'ArrowDown' })
-        fireEvent.keyDown(box, { key: 'Enter' })
-
-        expect(onChange).toHaveBeenCalledWith(
-          withWeather({ enabled: true, followDevice: false, place: PLACE }),
-        )
-      })
-
-      it('searches once the typing pauses, for the text as it then is', async () => {
-        found('Victoria')
-        renderWeather({ enabled: true })
-        const box = screen.getByRole('combobox', { name: 'Search for a place' })
-
-        fireEvent.focus(box)
-        for (const value of ['V', 'Vi', 'Vic']) fireEvent.input(box, { target: { value } })
-        await screen.findByRole('option', { name: 'Victoria, Canada' })
-
-        expect(fetch).toHaveBeenCalledTimes(1)
-        expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain('name=Vic')
-      })
-
-      it('offers the current location only until there are places to show', async () => {
-        const { box } = await searched()
-        expect(screen.queryByRole('option', { name: 'Current location' })).toBeNull()
-
-        fireEvent.input(box, { target: { value: '' } })
-        expect(screen.getByRole('option', { name: 'Current location' })).toBeTruthy()
-        expect(screen.queryByRole('option', { name: 'Victoria, Canada' })).toBeNull()
-      })
-
-      it('closes with Escape, leaving the typed text and the panel', async () => {
-        const { box, onClose } = await searched()
-
-        fireEvent.keyDown(box, { key: 'ArrowDown' })
-        fireEvent.keyDown(box, { key: 'Escape' })
-
-        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
-        expect(box.value).toBe('Vic')
-        expect(onClose).not.toHaveBeenCalled()
-      })
-    })
-
-    it('says when nothing matches and when the search fails', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true }),
-      )
-      renderWeather({ enabled: true })
-      const search = (value: string) =>
-        fireEvent.input(screen.getByRole('combobox', { name: 'Search for a place' }), {
-          target: { value },
-        })
-
-      search('qqq')
-      expect(await screen.findByText('No places found.')).toBeTruthy()
-
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-      search('qqqq')
-      expect(await screen.findByText('Couldn’t search just now.')).toBeTruthy()
-    })
-
-    it('shows the chosen place, and the search again to change it', () => {
-      renderWeather({ enabled: true, place: PLACE })
-
-      expect(screen.getByText('Victoria')).toBeTruthy()
-      expect(screen.queryByRole('combobox', { name: 'Search for a place' })).toBeNull()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-      expect(screen.getByRole('combobox', { name: 'Search for a place' })).toBeTruthy()
-    })
-
-    describe('using the device location', () => {
-      /** The suggestion under the search box, there once the box is focused. */
-      const currentLocation = () => {
-        fireEvent.focus(screen.getByRole('combobox', { name: 'Search for a place' }))
-        fireEvent.click(screen.getByRole('option', { name: 'Current location' }))
-      }
-
-      it('suggests it only while the search box is focused', () => {
-        renderWeather({ enabled: true })
-        const box = screen.getByRole('combobox', { name: 'Search for a place' })
-        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
-
-        fireEvent.focus(box)
-        expect(screen.getByRole('option', { name: 'Current location' })).toBeTruthy()
-        expect(box.getAttribute('aria-expanded')).toBe('true')
-
-        fireEvent.blur(box)
-        expect(screen.queryByRole('listbox', { name: 'Places' })).toBeNull()
-      })
-
-      const locating = (coords: { latitude: number; longitude: number } | null) =>
-        vi.stubGlobal('navigator', {
-          geolocation: {
-            getCurrentPosition: (done: (position: unknown) => void, fail: () => void) =>
-              coords ? done({ coords }) : fail(),
-          },
-          language: 'en-CA',
-        })
-
-      it('follows the device once the browser gives a position, keeping it off the settings', async () => {
-        locating({ latitude: 48.4359, longitude: -123.35155 })
-        vi.stubGlobal(
-          'fetch',
-          vi
-            .fn()
-            .mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
-        )
-        const { onChange } = renderWeather({ enabled: true })
-
-        currentLocation()
-
-        await waitFor(() =>
-          expect(onChange).toHaveBeenCalledWith(withWeather({ enabled: true, followDevice: true })),
-        )
-        expect(await devicePosition.getValue()).toEqual({
-          latitude: 48.44,
-          longitude: -123.35,
-          name: 'Victoria',
-        })
-      })
-
-      it('keeps a setting changed while the browser was asked, and asks only once', async () => {
-        let found: (position: unknown) => void = () => {}
-        const getCurrentPosition = vi.fn((done: typeof found) => {
-          found = done
-        })
-        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition }, language: 'en-CA' })
-        vi.stubGlobal(
-          'fetch',
-          vi
-            .fn()
-            .mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
-        )
-        const onChange = vi.fn()
-        const panel = (weather: Partial<Settings['weather']>) => (
-          <SettingsPanel
-            currentId="a"
-            onChange={onChange}
-            onClose={vi.fn()}
-            photos={PHOTOS}
-            settings={withWeather(weather)}
-          />
-        )
-        const { rerender } = render(panel({ enabled: true }))
-        openSection('Weather')
-
-        currentLocation()
-        currentLocation()
-        rerender(panel({ enabled: true, unit: 'fahrenheit' }))
-        found({ coords: { latitude: 48.4359, longitude: -123.35155 } })
-
-        await waitFor(() =>
-          expect(onChange).toHaveBeenCalledWith(
-            withWeather({ enabled: true, followDevice: true, unit: 'fahrenheit' }),
-          ),
-        )
-        expect(getCurrentPosition).toHaveBeenCalledTimes(1)
-      })
-
-      it('says so when the position is refused', async () => {
-        locating(null)
-        const { onChange } = renderWeather({ enabled: true })
-
-        currentLocation()
-
-        expect(await screen.findByText(/Couldn’t get your location/)).toBeTruthy()
-        expect(onChange).not.toHaveBeenCalled()
-      })
-
-      it('shows that it follows the device, and stops when a place is searched for', () => {
-        renderWeather({ enabled: true, followDevice: true, place: PLACE })
-
-        expect(screen.getByText('Current location')).toBeTruthy()
-        expect(screen.queryByText('Victoria')).toBeNull()
-
-        fireEvent.click(screen.getByRole('button', { name: 'Change' }))
-        expect(screen.getByRole('combobox', { name: 'Search for a place' })).toBeTruthy()
-      })
-    })
-
-    it('changes the unit', () => {
-      const { onChange } = renderWeather({ enabled: true, place: PLACE })
-      const on = { enabled: true, place: PLACE }
-
-      fireEvent.click(screen.getByRole('combobox', { name: 'Units' }))
-      fireEvent.click(screen.getByRole('option', { name: 'Fahrenheit' }))
-      expect(onChange).toHaveBeenCalledWith(withWeather({ ...on, unit: 'fahrenheit' }))
-    })
-
-    describe('fields', () => {
-      const on = { enabled: true, fields: FIELDS, place: PLACE }
-      const ids = (fields: Settings['weather']['fields']) => fields.map(({ id }) => id)
-      const rows = () =>
-        within(screen.getByRole('list', { name: 'Show' }))
-          .getAllByRole('listitem')
-          .map((row) => row.textContent)
-      const lastFields = (onChange: ReturnType<typeof vi.fn>) =>
-        (onChange.mock.lastCall?.[0] as Settings).weather.fields
-
-      it('lists every field in order, with an eye that is open for the ones shown', () => {
-        renderWeather(on)
-
-        expect(rows()).toEqual([
-          'Location',
-          'Sunrise and sunset',
-          'Conditions',
-          'Feels like',
-          'High and low',
-        ])
-        const pressed = (name: string) =>
-          screen.getByRole('button', { name }).getAttribute('aria-pressed')
-        expect(pressed('Show Location')).toBe('true')
-        expect(pressed('Show High and low')).toBe('false')
-        expect(
-          screen.getByRole('button', { name: 'Show High and low' }).closest('li')?.className,
-        ).toContain('fields__row--hidden')
-      })
-
-      it('moves a field switched on to the end of the shown ones', () => {
-        const { onChange } = renderWeather(on)
-
-        fireEvent.click(screen.getByRole('button', { name: 'Show High and low' }))
-
-        expect(lastFields(onChange)).toEqual([
-          { id: 'location', shown: true },
-          { id: 'sun', shown: true },
-          { id: 'highLow', shown: true },
-          { id: 'condition', shown: false },
-          { id: 'feelsLike', shown: false },
-        ])
-      })
-
-      it('moves a field switched off to just after the last shown one', () => {
-        const { onChange } = renderWeather(on)
-
-        fireEvent.click(screen.getByRole('button', { name: 'Show Location' }))
-
-        expect(lastFields(onChange)).toEqual([
-          { id: 'sun', shown: true },
-          { id: 'location', shown: false },
-          { id: 'condition', shown: false },
-          { id: 'feelsLike', shown: false },
-          { id: 'highLow', shown: false },
-        ])
-      })
-
-      it('reorders by dragging a row onto another, writing only on the drop', () => {
-        const { onChange } = renderWeather(on)
-        const row = (name: string) =>
-          screen.getByRole('button', { name: `Reorder ${name}` }).closest('li') as HTMLElement
-
-        fireEvent.dragStart(row('High and low'))
-        fireEvent.dragOver(row('Location'))
-        expect(rows()[0]).toBe('High and low')
-        expect(onChange).not.toHaveBeenCalled()
-
-        fireEvent.dragEnd(row('High and low'))
-        expect(ids(lastFields(onChange))).toEqual([
-          'highLow',
-          'location',
-          'sun',
-          'condition',
-          'feelsLike',
-        ])
-      })
-
-      it('writes nothing when a row is dropped where it started', () => {
-        const { onChange } = renderWeather(on)
-        const row = screen.getByRole('button', { name: 'Reorder Location' }).closest('li')
-
-        fireEvent.dragStart(row as HTMLElement)
-        fireEvent.dragEnd(row as HTMLElement)
-
-        expect(onChange).not.toHaveBeenCalled()
-      })
-
-      it('reorders with the arrow keys from the handle, stopping at the ends', () => {
-        const { onChange } = renderWeather(on)
-
-        fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Location' }), {
-          key: 'ArrowDown',
-        })
-        expect(ids(lastFields(onChange)).slice(0, 2)).toEqual(['sun', 'location'])
-        expect(screen.getByText('Location moved to be shown after sunrise and sunset')).toBeTruthy()
-
-        onChange.mockClear()
-        fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Location' }), {
-          key: 'ArrowUp',
-        })
-        expect(onChange).not.toHaveBeenCalled()
-      })
-    })
-
-    it('keeps the focus on a handle whose row the arrow keys moved', () => {
-      function Fields() {
-        const [fields, setFields] = useState(FIELDS)
-        return <WeatherFields fields={fields} onChange={setFields} />
-      }
-      render(<Fields />)
-      const handle = screen.getByRole('button', { name: 'Reorder Location' })
-      handle.focus()
-
-      fireEvent.keyDown(handle, { key: 'ArrowDown' })
-      fireEvent.keyDown(handle, { key: 'ArrowDown' })
-
-      expect(document.activeElement).toBe(handle)
-      expect(screen.getAllByRole('listitem')[2]?.contains(handle)).toBe(true)
-    })
-
-    it('credits the weather data', () => {
-      renderWeather({ enabled: true })
-
-      expect(
-        screen.getByRole('link', { name: 'Weather data by Open-Meteo.com' }).getAttribute('href'),
-      ).toBe('https://open-meteo.com/')
-    })
-  })
-
   describe('tour', () => {
     const TOUR: SettingsStop[] = [
-      { body: 'About the clock.', id: 'tour-clock', section: 'clock', title: 'Clock stop' },
+      { body: 'About the font.', id: 'tour-general', section: 'general', title: 'Font stop' },
       { body: 'About the photos.', id: 'tour-photos', section: 'photos', title: 'Photos stop' },
     ]
 
@@ -846,7 +362,7 @@ describe('SettingsPanel', () => {
       render(
         <SettingsPanel
           currentId="a"
-          initialSection="weather"
+          initialSection="general"
           onChange={vi.fn()}
           onClose={vi.fn()}
           photos={PHOTOS}
@@ -854,17 +370,17 @@ describe('SettingsPanel', () => {
         />,
       )
 
-      expect(selectedTab()).toBe('Weather')
+      expect(selectedTab()).toBe('General')
       expect(screen.queryByRole('note')).toBeNull()
     })
 
     it('starts on the first stop and its section', () => {
       renderTour()
 
-      expect(selectedTab()).toBe('Clock')
+      expect(selectedTab()).toBe('General')
       const note = screen.getByRole('note')
-      expect(within(note).getByText('Clock stop')).toBeTruthy()
-      expect(within(note).getByText('About the clock.')).toBeTruthy()
+      expect(within(note).getByText('Font stop')).toBeTruthy()
+      expect(within(note).getByText('About the font.')).toBeTruthy()
       expect(within(note).getByText('1 of 2')).toBeTruthy()
     })
 
@@ -892,7 +408,7 @@ describe('SettingsPanel', () => {
       expect(within(screen.getByRole('note')).getByText('Photos stop')).toBeTruthy()
 
       openSection('General')
-      expect(within(screen.getByRole('note')).getByText('Photos stop')).toBeTruthy()
+      expect(within(screen.getByRole('note')).getByText('Font stop')).toBeTruthy()
     })
 
     it('ends when dismissed, without closing the settings', async () => {
@@ -906,7 +422,7 @@ describe('SettingsPanel', () => {
       expect(onClose).not.toHaveBeenCalled()
 
       // And it doesn't come back with the next section.
-      openSection('Clock')
+      openSection('General')
       expect(screen.queryByRole('note')).toBeNull()
     })
   })
@@ -937,7 +453,10 @@ describe('SettingsPanel, when the settings are from a newer version', () => {
   const controlsInDisabledFieldset = () => {
     const section = screen.getByRole('tabpanel')
     const fieldset = section.querySelector('fieldset[disabled]')
-    const controls = [...section.querySelectorAll('button, input, select')]
+    // The Edit button in General is not one of them: it changes no setting (see below).
+    const controls = [...section.querySelectorAll('button, input, select')].filter(
+      (control) => control.textContent !== 'Edit',
+    )
     return { all: controls, inside: controls.filter((control) => fieldset?.contains(control)) }
   }
 
@@ -948,21 +467,6 @@ describe('SettingsPanel, when the settings are from a newer version', () => {
     const { all, inside } = controlsInDisabledFieldset()
     expect(all.length).toBeGreaterThan(0)
     expect(inside).toEqual(all)
-  })
-
-  it('keeps the weather lines, which are draggable rows and not form controls, under the fieldset', () => {
-    // A disabled fieldset does not stop a draggable row. `.settings__fieldset:disabled
-    // .fields__row` in style.css does (pointer-events: none), which a unit test cannot see: this
-    // checks the markup that rule relies on.
-    renderReadOnly(true, {
-      ...settings,
-      weather: { ...settings.weather, enabled: true, place: null },
-    })
-    openSection('Weather')
-
-    const rows = screen.getByRole('tabpanel').querySelectorAll('fieldset[disabled] .fields__row')
-    expect(rows.length).toBe(settings.weather.fields.length)
-    for (const row of rows) expect(row.getAttribute('draggable')).toBe('true')
   })
 
   it('describes the disabled fieldset with the line, so a screen reader hears why', () => {
@@ -985,7 +489,7 @@ describe('SettingsPanel, when the settings are from a newer version', () => {
   it('does so in every section, and keeps the tabs enabled to look around', () => {
     renderReadOnly(true)
 
-    for (const name of ['Clock', 'Weather', 'General']) {
+    for (const name of ['General', 'Photos']) {
       openSection(name)
       const { all, inside } = controlsInDisabledFieldset()
       expect(all.length).toBeGreaterThan(0)

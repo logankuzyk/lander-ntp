@@ -907,6 +907,11 @@ body {
   pointer-events: none;
 }
 
+/* Under the section, a block clear of it, like the sections from each other. */
+.popover .settings__edit {
+  margin-top: var(--popover-block);
+}
+
 .settings__link {
   padding: 0;
   border: 0;
@@ -1670,12 +1675,6 @@ button.chip:hover {
 .welcome :focus-visible {
   outline: 2px solid var(--color-fg);
   outline-offset: 2px;
-}
-
-/* News of the weather: where the widget will be. */
-.callout--weather {
-  top: 1rem;
-  right: 1.25rem;
 }
 
 /*

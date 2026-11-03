@@ -232,3 +232,55 @@ describe('where focus goes when the options open at the place, on Firefox', () =
     expect(document.activeElement).toBe(search())
   })
 })
+
+describe('the settings panel before the user has agreed to send a place, on Firefox', () => {
+  // Until the Clock and Weather options left the panel, its place search sent whatever was typed
+  // to the geocoder, whether or not this device had agreed to it: the agreement is not synced,
+  // and "Weather on" is. The panel has no place search now, and the options popover, where it
+  // is, holds it back (above). This is the check that no way into one is left in the panel.
+
+  /** The settings of a device where the Weather was turned on, with or without a place. */
+  const syncedOn = (place: unknown) =>
+    settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      v: 1,
+      weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place: place as never },
+    })
+
+  const textBoxes = (root: HTMLElement) =>
+    root.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"]), [role="combobox"]')
+
+  it.each([
+    ['with no place yet', null],
+    ['with a place', { latitude: 48.4284, longitude: -123.3656, name: 'Victoria' }],
+  ])('has no place search and sends nothing, however it is used, %s', async (_, place) => {
+    const { request } = firefox(false)
+    await syncedOn(place)
+    render(<App />)
+    await waitFor(() => expect(document.querySelector('.grid')).not.toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const panel = await screen.findByRole('dialog', { name: 'Settings' })
+
+    // Every section there is, whichever they are.
+    for (const tab of within(panel).getAllByRole('tab')) {
+      fireEvent.click(tab)
+      expect(searchOrNull()).toBeNull()
+      expect(
+        within(panel).queryByRole('button', { name: /current location|change place/i }),
+      ).toBeNull()
+      // Whatever text box or search the panel does have is typed in, and the page waits for any
+      // debounced search to go out.
+      for (const box of textBoxes(panel)) {
+        fireEvent.focus(box)
+        fireEvent.input(box, { target: { value: 'Victoria' } })
+        fireEvent.keyDown(box, { key: 'ArrowDown' })
+      }
+      await wait(400)
+    }
+
+    expect(geocoding(fetch)).toEqual([])
+    expect(here.getCurrentPosition).not.toHaveBeenCalled()
+    // And nothing in the panel asks for the agreement either: that is the widget's button.
+    expect(request).not.toHaveBeenCalled()
+  })
+})

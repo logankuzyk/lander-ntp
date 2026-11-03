@@ -42,7 +42,7 @@ function WeatherView({
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
  * has to ask, so everywhere else this is met at once, in the first render. On Firefox the setup
  * button asks for it: `allowLocation` is called first thing in the click, which is what shows
- * Firefox's prompt. (The settings panel's "Show weather" switch asks too, until it goes.)
+ * Firefox's prompt.
  */
 const locationConsent: Need<WeatherOptions> = {
   action: { kind: 'ask', run: allowLocation },
