@@ -73,4 +73,18 @@ describe('the Clock definition', () => {
   it('has no credit to give', () => {
     expect(clockDefinition.credit).toBeUndefined()
   })
+
+  it('starts at least at its smallest size and at most at its largest, whatever its options', () => {
+    const { largest, smallest, starting } = clockDefinition.sizes
+    for (const showDate of [false, true]) {
+      for (const showSeconds of [false, true]) {
+        const size = starting({ showDate, showSeconds })
+
+        expect(size.w).toBeGreaterThanOrEqual(smallest.w)
+        expect(size.h).toBeGreaterThanOrEqual(smallest.h)
+        expect(size.w).toBeLessThanOrEqual(largest.w)
+        expect(size.h).toBeLessThanOrEqual(largest.h)
+      }
+    }
+  })
 })

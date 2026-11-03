@@ -1,6 +1,7 @@
 import type { Decorator } from '@storybook/preact-vite'
+import type { JSX } from 'preact'
 
-import type { Rect } from '@/layout/geometry'
+import { COLS, type Rect, ROWS } from '@/layout/geometry'
 import { Box } from '@/widgetSystem/WidgetBox'
 
 /** Where a lone Widget goes without a place of its own: the Clock's, in the middle. */
@@ -13,8 +14,9 @@ const MIDDLE: Rect = { col: 5, h: 2, row: 4, w: 4 }
  * which draw their own.
  */
 export const withBox: Decorator = (Story, context) => (
-  <div class="grid">
-    <Box rect={(context.parameters.box as Rect | undefined) ?? MIDDLE} widget="story">
+  // The styles lay the cells out from these, as the Grid does; without them the box fills the lot.
+  <div class="grid" style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}>
+    <Box name="Widget" rect={(context.parameters.box as Rect | undefined) ?? MIDDLE} widget="story">
       <Story />
     </Box>
   </div>

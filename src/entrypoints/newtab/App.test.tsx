@@ -576,6 +576,159 @@ describe('App, on the Grid', () => {
   })
 })
 
+describe('App, in edit mode', () => {
+  const doneButton = () => screen.getByRole('button', { name: 'Done' })
+  const editButton = () => screen.getByRole('button', { name: 'Edit' })
+
+  /** The page, drawn and with its photo, so everything that loads has loaded. */
+  const drawnPage = async () => {
+    await seedPhotos()
+    const view = render(<App />)
+    await waitFor(() => expect(view.container.querySelector('.grid')).not.toBeNull())
+    await currentPhotoSrc()
+    return view
+  }
+
+  it('starts every page out of it, with the Edit button not pressed and no dots', async () => {
+    const { container } = await drawnPage()
+
+    expect(editButton().getAttribute('aria-pressed')).toBe('false')
+    expect(container.querySelector('.grid--editing')).toBeNull()
+    expect(container.querySelector('.grid__dots')).toBeNull()
+  })
+
+  it('is entered with the Edit button and left with Done, which shows the dots over the Grid', async () => {
+    const { container } = await drawnPage()
+
+    fireEvent.click(editButton())
+    expect(doneButton().getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
+    expect(screen.getByRole('group', { name: 'Clock' }).getAttribute('tabindex')).toBe('0')
+
+    fireEvent.click(doneButton())
+    expect(editButton().getAttribute('aria-pressed')).toBe('false')
+    expect(container.querySelector('.grid__dots')).toBeNull()
+    expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('is toggled with the E key and left with Escape', async () => {
+    await drawnPage()
+
+    fireEvent.keyDown(document.body, { key: 'e' })
+    expect(doneButton()).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'e' })
+    expect(editButton()).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'e' })
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(editButton()).toBeTruthy()
+  })
+
+  it('closes the settings panel on the first Escape and leaves on the second', async () => {
+    await drawnPage()
+    fireEvent.keyDown(document.body, { key: 'e' })
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(doneButton()).toBeTruthy()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(editButton()).toBeTruthy()
+  })
+
+  it('closes the photo details on the first Escape and leaves on the second', async () => {
+    await drawnPage()
+    fireEvent.click(editButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: /photo/i })).toBeTruthy()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(doneButton()).toBeTruthy()
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    expect(editButton()).toBeTruthy()
+  })
+
+  it('ignores E pressed inside the settings panel, where it is typed into the place search', async () => {
+    await drawnPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('dialog', { name: 'Settings' })
+
+    fireEvent.keyDown(within(settings).getByRole('tab', { name: 'Photos' }), { key: 'e' })
+
+    expect(editButton()).toBeTruthy()
+  })
+
+  it('keeps the next photo, details and settings buttons and the → key working', async () => {
+    await seedPhotos()
+    render(<App />)
+    const first = await currentPhotoSrc()
+    fireEvent.click(editButton())
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+    await waitFor(async () => expect(await currentPhotoSrc()).not.toBe(first))
+    expect(doneButton()).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    expect(doneButton()).toBeTruthy()
+  })
+
+  it('writes nothing: not entering, tabbing, leaving, or being left', async () => {
+    await drawnPage()
+    const before = {
+      layout: await fakeBrowser.storage.sync.get('layout'),
+      local: await fakeBrowser.storage.local.get(),
+      onboarding: await fakeBrowser.storage.sync.get('onboarding'),
+      settings: await fakeBrowser.storage.sync.get('settings'),
+    }
+    const syncSet = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const localSet = vi.spyOn(fakeBrowser.storage.local, 'set')
+
+    fireEvent.click(editButton())
+    screen.getByRole('group', { name: 'Clock' }).focus()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    fireEvent.keyDown(document.body, { key: 'e' })
+    fireEvent.click(doneButton())
+    await act(async () => {})
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(syncSet).not.toHaveBeenCalled()
+    expect(localSet).not.toHaveBeenCalled()
+    expect({
+      layout: await fakeBrowser.storage.sync.get('layout'),
+      local: await fakeBrowser.storage.local.get(),
+      onboarding: await fakeBrowser.storage.sync.get('onboarding'),
+      settings: await fakeBrowser.storage.sync.get('settings'),
+    }).toEqual(before)
+  })
+
+  it('is not remembered: the next page starts out of it', async () => {
+    const first = await drawnPage()
+    fireEvent.click(editButton())
+    first.unmount()
+
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+
+    expect(editButton().getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('can be entered while the Layout is from a newer version, which it does not save over', async () => {
+    await seedPhotos()
+    await fakeBrowser.storage.sync.set({ layout: { v: 2, widgets: [] } })
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+
+    fireEvent.click(editButton())
+
+    expect(doneButton().getAttribute('aria-pressed')).toBe('true')
+  })
+})
+
 describe('App, when a change cannot be saved', () => {
   const SAVE_FAILED = "Couldn't save that. Try again in a minute."
 

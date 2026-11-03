@@ -40,7 +40,11 @@ export const clockDefinition: WidgetDefinition<ClockOptions> = {
     // Label and value are opposite: checked means hour12 is false, so a form inverts it.
     { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
-  // First guesses (LR-16): W8 fixes the smallest and largest by measuring.
+  // Measured in Storybook (LR-86), in all four fonts at 1440 by 900, 1366 by 768 and 1280 by 720.
+  // The smallest holds seconds and the date: at 1280 by 720, where a cell is about 103 by 79 px,
+  // 3 by 2 gives digits near 64px and a 12px date, even in the widest font. Narrower is under 45px.
+  // The Clock fills any box (it is as big as fits across and down), so nothing past 8 by 4 is
+  // needed to show it well.
   sizes: {
     largest: { h: 4, w: 8 },
     smallest: { h: 2, w: 3 },
