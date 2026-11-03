@@ -273,6 +273,23 @@ export function weatherStateSeed(state: WeatherBoxState, size: WeatherBoxSize): 
 }
 
 /**
+ * A page with one Weather that has no place, at one of its sizes, so the box draws its setup
+ * button ("Choose a place"). Its options are empty, as a Weather's are when added. Nothing is
+ * cached or fetched. The Weather setup stories and the test that checks them draw from this.
+ */
+export function weatherSetupSeed(size: WeatherBoxSize): PageSeed {
+  const { col, h, row, w } = weatherBoxRect(size)
+  return {
+    layout: {
+      v: 1,
+      widgets: [{ col, h, id: 'weather1', options: {}, row, type: 'weather', w }],
+    },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+  }
+}
+
+/**
  * Stands in for the network in a story, so it asks nobody: `hang` never answers, so a
  * Weather is left loading; `fail` fails as if offline. Returns what puts the real one back.
  */

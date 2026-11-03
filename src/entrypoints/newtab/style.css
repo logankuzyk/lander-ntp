@@ -235,6 +235,101 @@ body {
   opacity: 0.85;
 }
 
+/*
+ * The setup button: what a Widget shows in place of its content while it needs something from
+ * the user. The same panel as .widget-state (loading and error), and sized the same way, but a
+ * button: the Widget's name above the need's words, centred in the box, and never bigger than
+ * it. It takes at most the box's width and wraps; its type and padding give way to the box's
+ * smallest size (2 by 2 cells is about 200 by 160px on a laptop) with container units.
+ */
+.widget-setup {
+  box-sizing: border-box;
+  display: grid;
+  gap: 0.125rem;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  /* In ems, so the padding follows the type down on a narrow window. */
+  padding: clamp(0.25em, 7cqmin, 1em) clamp(0.375em, 9cqmin, 1.15em);
+  border: 1px solid rgb(255 255 255 / 25%);
+  color: inherit;
+  font: inherit;
+  /* 0.875rem from about 93px wide up (the Weather's smallest box on a 600px window, or any
+     laptop's), then smaller with the box, so the widest word still fits a 58px box (390px). */
+  font-size: clamp(0.5rem, 15cqw, 0.875rem);
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+
+.widget-setup:hover,
+.widget-setup[aria-expanded='true'] {
+  border-color: rgb(255 255 255 / 55%);
+  background: rgb(0 0 0 / 70%);
+}
+
+.widget-setup:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
+}
+
+.widget-setup:disabled {
+  cursor: default;
+}
+
+/* After its own rule, which sets the transition and would win over a rule above it. */
+@media (prefers-reduced-motion: reduce) {
+  .widget-setup {
+    transition: none;
+  }
+}
+
+.widget-setup__name {
+  font-size: 0.857em; /* 0.75rem at the full size */
+  /* The name is the quieter line, but at this size it still needs to read on a bright photo. */
+  opacity: 0.85;
+}
+
+.widget-setup__label {
+  font-weight: 600;
+}
+
+/*
+ * In edit mode the frame keeps the top left corner for the Options button (to 2rem down) and the
+ * bottom left for the name (from 1.625rem up). At the Weather's smallest box on a short window
+ * (127 by 128px, 800 by 600) the button, centred, ran under the Options button, so it keeps clear
+ * of both: a margin at each end (and, in the shortest, tighter padding). Only where the box is
+ * tall enough to hold that; shorter boxes cannot clear both.
+ */
+@container (min-height: 7.75rem) {
+  .grid--editing .widget-setup {
+    max-height: calc(100% - 4rem);
+    margin-block: 2.25rem 1.75rem;
+  }
+}
+
+/* A short box (the smallest, on a short window) has no room for the full padding as well. */
+@container (min-height: 7.75rem) and (max-height: 9rem) {
+  .grid--editing .widget-setup {
+    padding-block: 0.25em;
+  }
+}
+
+/*
+ * The box takes focus when a popover closes and the setup button has gone (it is given a
+ * tabindex only for that: see OptionsPopover). Outside edit mode it has no frame, and a ring
+ * round the whole box would be a white line round empty photo; in edit mode the frame's own
+ * focus ring above is the more specific rule.
+ */
+.widget-box:focus {
+  outline: none;
+}
+
 /* Clock */
 
 /*
@@ -441,10 +536,11 @@ body {
   white-space: nowrap;
 }
 
-/* The translucent panel the popovers sit on, the welcome, and a Widget's loading and error states. */
+/* The translucent panel the popovers sit on, the welcome, and a Widget's setup button and states. */
 
 .popover,
 .welcome,
+.widget-setup,
 .widget-state {
   border-radius: 0.75rem;
   background: rgb(0 0 0 / 55%);

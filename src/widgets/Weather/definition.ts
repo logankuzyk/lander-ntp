@@ -40,16 +40,23 @@ function WeatherView({
 
 /**
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
- * has to ask, so everywhere else this is met at once, in the first render.
+ * has to ask, so everywhere else this is met at once, in the first render. It has no words or
+ * action yet: asking for it from the setup button is a later change, until which the panel's
+ * "Show weather" switch asks and the box draws nothing while it is unmet.
  */
 const locationConsent: Need<WeatherOptions> = {
   id: 'locationConsent',
   met: () => (import.meta.env.BROWSER === 'firefox' ? locationConsented() : true),
 }
 
-/** A place is picked, or the device's own is followed. */
+/**
+ * A place is picked, or the device's own is followed. The setup button opens the options at the
+ * place search, where either is done.
+ */
 const place: Need<WeatherOptions> = {
+  action: { kind: 'option', option: 'place' },
   id: 'place',
+  label: 'Choose a place',
   met: (options) => options.followDevice || options.place !== null,
 }
 

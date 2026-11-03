@@ -54,7 +54,23 @@ export function OptionsPopover({
   page,
 }: OptionsPopoverProps) {
   const title = `${name} options`
-  const { close, container } = usePopover(onClose, { keepFocus: true, returnTo: box })
+  // Focus goes back to the Widget's setup button if it is still there (it opened this, or there
+  // is something left to set up), and else to the Widget's box.
+  const { close, container } = usePopover(onClose, {
+    keepFocus: true,
+    returnTo: () => {
+      const widget = box()
+      const button = widget?.querySelector<HTMLElement>('.widget-setup')
+      if (button || !widget) return button ?? widget
+      // The box is not a tab stop outside edit mode, so it can only take focus while this gives
+      // it some, and is left as it was when focus moves on.
+      if (!widget.hasAttribute('tabindex')) {
+        widget.tabIndex = -1
+        widget.addEventListener('blur', () => widget.removeAttribute('tabindex'), { once: true })
+      }
+      return widget
+    },
+  })
   const form = useRef<HTMLDivElement>(null)
 
   // Against the Widget's box: measured at its natural size, then put beside it, before it is
