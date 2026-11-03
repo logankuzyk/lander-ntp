@@ -91,7 +91,7 @@ function Line({
 
   return (
     <div
-      class="callout callout--notice"
+      class={action ? 'callout callout--notice callout--has-action' : 'callout callout--notice'}
       onFocusIn={() => setFocused(true)}
       onFocusOut={() => setFocused(false)}
       onMouseEnter={() => setHovered(true)}

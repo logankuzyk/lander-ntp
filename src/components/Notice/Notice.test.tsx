@@ -114,6 +114,23 @@ describe('Notice with an action', () => {
   })
 })
 
+describe('Notice, keeping its words together', () => {
+  it('marks the line that has a button beside it, so its words stay on one line', () => {
+    const { rerender } = render(<Notice message="Clock removed." onDismiss={() => {}} />)
+    expect(document.querySelector('.callout--has-action')).toBeNull()
+
+    rerender(
+      <Notice
+        action={{ label: 'Undo', onClick: () => {} }}
+        message="Clock removed."
+        onDismiss={() => {}}
+      />,
+    )
+
+    expect(document.querySelector('.callout--has-action')).not.toBeNull()
+  })
+})
+
 describe('Notice that goes by itself', () => {
   afterEach(() => {
     vi.useRealTimers()
