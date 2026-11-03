@@ -126,6 +126,9 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
     starting: () => ({ h: 2, w: 2 }),
   },
   source: { source: weatherSource, useQuery: useWeatherQuery },
+  // From the options alone, as following the device is: the name of the place it is at is
+  // looked up later, and a name that changed when it arrived would be announced again.
+  summary: ({ followDevice, place }) => (followDevice ? CURRENT_LOCATION : place?.name),
   type: 'weather',
   View: WeatherView,
 }

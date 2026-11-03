@@ -6,7 +6,7 @@ import { NEWS } from '@/onboarding/callouts'
 import type { Onboarding } from '@/onboarding/storage'
 import { onboardingItem, pendingItem } from '@/onboarding/storage'
 import { manifestCache, photoState } from '@/photos/storage'
-import type { Settings } from '@/settings/schema'
+import type { Place, Settings } from '@/settings/schema'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
@@ -21,6 +21,8 @@ export type PageSeed = {
   layout?: StoredLayout
   /** The photo manifest's say over the weather: `{ enabled: false }` switches it off. */
   manifestWeather?: { enabled: boolean }
+  /** Readings, in degrees Celsius, for other places a stored Layout's Weathers are at. */
+  moreWeather?: readonly { place: Place; weather: Weather }[]
   /** The record synced between devices: what a returning install has. */
   onboarding?: Onboarding
   /** A new install's record, kept on this device until the welcome is answered. */
@@ -41,6 +43,7 @@ const absolute = (url: string) => new URL(url, globalThis.location.href).href
 export async function seedPage({
   layout,
   manifestWeather,
+  moreWeather = [],
   onboarding,
   pending,
   settings = DEFAULT_SETTINGS,
@@ -73,6 +76,12 @@ export async function seedPage({
     if (!place) throw new Error('seedPage: a weather reading needs settings.weather.place')
     await weatherSource.cache.set(cacheKey(place, unit), { data: weather, fetchedAt: Date.now() })
   }
+  for (const more of moreWeather) {
+    await weatherSource.cache.set(cacheKey(more.place, 'celsius'), {
+      data: more.weather,
+      fetchedAt: Date.now(),
+    })
+  }
   if (onboarding) await onboardingItem.setValue(onboarding)
   if (pending) await pendingItem.setValue(pending)
 }
@@ -87,11 +96,11 @@ const GRID_WEATHER_SETTINGS: Settings = {
 }
 
 /** A Weather as the Layout stores it: the Victoria reading seeded above is the one it shows. */
-const weatherAt = (id: string, col: number, row: number) => ({
+const weatherAt = (id: string, col: number, row: number, place: Place = makePlace()) => ({
   col,
   h: 2,
   id,
-  options: { place: makePlace(), unit: 'celsius' },
+  options: { place, unit: 'celsius' },
   row,
   type: 'weather',
   w: 2,
@@ -123,6 +132,14 @@ const EIGHT_WIDGETS: StoredLayout = {
   ],
 }
 
+const VANCOUVER = makePlace({ latitude: 49.28, longitude: -123.12, name: 'Vancouver' })
+
+/** Two Weathers for different places, side by side near the top: they differ only by name. */
+const TWO_WEATHERS: StoredLayout = {
+  v: 1,
+  widgets: [weatherAt('weather1', 4, 3), weatherAt('weather2', 8, 3, VANCOUVER)],
+}
+
 /**
  * The states of the whole page that the `App` stories show. Defined once, so a story and
  * the test that checks it cannot drift apart.
@@ -150,6 +167,14 @@ export const PAGE_SEEDS = {
   },
   /** A new install, past the welcome: the Layout worked out from the defaults, the Clock alone. */
   gridNewInstall: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
+  /** Two Weathers, one for Victoria and one for Vancouver, each with its reading. */
+  gridTwoWeathers: {
+    layout: TWO_WEATHERS,
+    moreWeather: [{ place: VANCOUVER, weather: makeWeather({ temperature: 9.1 }) }],
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
 
   /**
    * Someone who updated with the Clock and the Weather on: the Layout is worked out from their
