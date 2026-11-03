@@ -1673,6 +1673,78 @@ button.chip:hover {
   right: 1.25rem;
 }
 
+/*
+ * A callout beside a thing on the page, with a pointer at it. It needs no rule per place: the
+ * script (components/Callout/useBeside) sets its left and top, the side of the thing it is on
+ * (data-side) and where along its edge the pointer goes (--callout-pointer), when it shows, when
+ * the window or the thing is resized, and when the Layout or edit mode changes. Nothing moves
+ * by animation, so there is nothing to turn off for reduced motion beyond the fade-in every
+ * callout has. No ring is drawn round the thing.
+ *
+ * The pointer is two triangles outside the box, a rim and a fill, which meet the box's edge
+ * facing the thing. data-side is the callout's side of the thing, so on the right (right) it
+ * points left.
+ */
+.callout--beside {
+  top: 0;
+  left: 0;
+}
+
+.callout--beside::before,
+.callout--beside::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.callout--beside::before {
+  --pointer-length: 9px;
+  --pointer-width: 18px;
+  background: rgb(255 255 255 / 12%);
+}
+
+.callout--beside::after {
+  --pointer-length: 8px;
+  --pointer-width: 16px;
+  background: rgb(24 24 24 / 94%);
+}
+
+.callout--beside[data-side='right']::before,
+.callout--beside[data-side='right']::after {
+  top: calc(var(--callout-pointer) - var(--pointer-width) / 2);
+  right: 100%;
+  width: var(--pointer-length);
+  height: var(--pointer-width);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
+.callout--beside[data-side='left']::before,
+.callout--beside[data-side='left']::after {
+  top: calc(var(--callout-pointer) - var(--pointer-width) / 2);
+  left: 100%;
+  width: var(--pointer-length);
+  height: var(--pointer-width);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.callout--beside[data-side='below']::before,
+.callout--beside[data-side='below']::after {
+  bottom: 100%;
+  left: calc(var(--callout-pointer) - var(--pointer-width) / 2);
+  width: var(--pointer-width);
+  height: var(--pointer-length);
+  clip-path: polygon(0 100%, 50% 0, 100% 100%);
+}
+
+.callout--beside[data-side='above']::before,
+.callout--beside[data-side='above']::after {
+  top: 100%;
+  left: calc(var(--callout-pointer) - var(--pointer-width) / 2);
+  width: var(--pointer-width);
+  height: var(--pointer-length);
+  clip-path: polygon(0 0, 50% 100%, 100% 0);
+}
+
 /* A note with nothing to answer, such as a change that could not be saved: above the bottom
    bar, level with the photo credit. The wrapper is the live region and is always there, empty
    when there is no note, so it has no box of its own. */

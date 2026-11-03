@@ -142,6 +142,40 @@ export function App() {
           />
         )}
         {/*
+          News is before the Grid and the Bottom bar in the document, so a keyboard comes to it
+          first; it takes no focus when it appears. One about the settings sits at a fixed spot
+          (`callout--<section>`). One about a thing on the page is placed beside it by script and
+          is not drawn while the thing is not there, so it is placed again when the Layout moves
+          it. Whatever it does, it does not touch the Layout.
+        */}
+        {news?.section !== undefined && (
+          <Callout
+            action={{
+              label: 'Set up',
+              onClick: () => {
+                dismiss(news.id)
+                openSettings({ section: news.section, tour: false })
+              },
+            }}
+            body={news.body}
+            class={`callout--${news.section}`}
+            key={news.id}
+            onDismiss={() => dismiss(news.id)}
+            title={news.title}
+          />
+        )}
+        {news?.target !== undefined && (
+          <Callout
+            action={{ label: 'Got it', onClick: () => dismiss(news.id) }}
+            body={news.body}
+            key={news.id}
+            layout={layout}
+            onDismiss={() => dismiss(news.id)}
+            target={news.target}
+            title={news.title}
+          />
+        )}
+        {/*
           Stored settings and the stored Layout land a beat after the first paint. Drawing the
           defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —
           and the Layout worked out from the defaults would put the wrong Widgets in the wrong
@@ -172,21 +206,6 @@ export function App() {
             readOnly={settingsReadOnly}
             settings={settings}
             tour={entry.tour ? TOUR : undefined}
-          />
-        )}
-        {news && (
-          <Callout
-            action={{
-              label: 'Set up',
-              onClick: () => {
-                dismiss(news.id)
-                openSettings({ section: news.section, tour: false })
-              },
-            }}
-            body={news.body}
-            class={`callout--${news.section}`}
-            onDismiss={() => dismiss(news.id)}
-            title={news.title}
           />
         )}
         {onboarding && !onboarding.welcomed && (

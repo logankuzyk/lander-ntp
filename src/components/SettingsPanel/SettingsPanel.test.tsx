@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/pre
 import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { CalloutInfo } from '@/onboarding/callouts'
+import type { SettingsStop } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
@@ -820,7 +820,7 @@ describe('SettingsPanel', () => {
   })
 
   describe('tour', () => {
-    const TOUR: CalloutInfo[] = [
+    const TOUR: SettingsStop[] = [
       { body: 'About the clock.', id: 'tour-clock', section: 'clock', title: 'Clock stop' },
       { body: 'About the photos.', id: 'tour-photos', section: 'photos', title: 'Photos stop' },
     ]

@@ -5,7 +5,7 @@ import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
-import type { CalloutInfo } from '@/onboarding/callouts'
+import type { SettingsStop } from '@/onboarding/callouts'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
@@ -279,7 +279,7 @@ type SettingsPanelProps = {
   readOnly?: boolean
   settings: Settings
   /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
-  tour?: readonly CalloutInfo[]
+  tour?: readonly SettingsStop[]
 }
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
