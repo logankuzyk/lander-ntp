@@ -1,7 +1,7 @@
 import { render } from '@testing-library/preact'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { css, number, rule } from '@/test/styles'
 
 import { Clock } from './Clock'
 
@@ -10,19 +10,6 @@ import { Clock } from './Clock'
  * (in a real browser, on the built Storybook; the measurements are in the pull request).
  */
 describe('the Clock styles', () => {
-  const css = readFileSync(join(process.cwd(), 'src/entrypoints/newtab/style.css'), 'utf8')
-  const rule = (selector: string) => {
-    const start = css.indexOf(`\n${selector} {`)
-    if (start === -1) throw new Error(`no rule for ${selector}`)
-    return css.slice(start, css.indexOf('}', start))
-  }
-  /** A number a rule gives a custom property. */
-  const number = (selector: string, property: string) => {
-    const match = new RegExp(`${property}:\\s*([\\d.]+)`).exec(rule(selector))
-    if (!match) throw new Error(`${selector} gives no ${property}`)
-    return Number(match[1])
-  }
-
   it("sizes the Clock by its box (container query units), never by the window's width", () => {
     const size = rule('.clock')
     expect(size).toMatch(/font-size:[^;]*cqw/)

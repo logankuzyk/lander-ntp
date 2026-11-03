@@ -25,9 +25,17 @@ describe('the sizes the Widgets declare', () => {
     expect(weatherDefinition.sizes.smallest).toEqual({ h: 2, w: 2 })
   })
 
-  it("are first guesses for the largest and the Clock's smallest, to be measured", () => {
+  it('give the Clock the smallest and largest that were measured for it (LR-86)', () => {
     expect(clockDefinition.sizes.smallest).toEqual({ h: 2, w: 3 })
     expect(clockDefinition.sizes.largest).toEqual({ h: 4, w: 8 })
+  })
+
+  it('give the Weather the largest that was measured for it (LR-87): 4 by 3', () => {
+    // Measured in Storybook in all four fonts at six window sizes (see the pull request). Its
+    // type is as big as fits across and down, and what it draws is almost as wide as it is tall,
+    // so at 1440 by 900 and below the three rows decide and a fourth column only adds room
+    // around it. On a narrow, tall window the width decides, and the fourth column is what lets
+    // it grow. More rows would only make it larger than the window has room for.
     expect(weatherDefinition.sizes.largest).toEqual({ h: 3, w: 4 })
   })
 })
