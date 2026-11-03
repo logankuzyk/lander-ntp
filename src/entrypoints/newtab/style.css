@@ -89,7 +89,12 @@ body {
  * scale together and stay centred as one.
  */
 .clock {
-  --clock-digit: 0.61; /* em: the widest tabular digit of the four fonts (0.599) with letter-spacing */
+  /*
+   * A digit's advance, once the time's -0.02em letter-spacing has taken its share, is 0.58 em
+   * (Geist Mono) to 0.60 em (System). 0.61 is that plus up to 5% of slack, which is why Geist
+   * Mono fills 96% of the box across.
+   */
+  --clock-digit: 0.61;
   --clock-colon: 0.58; /* em: Geist Mono's colon, as wide as a digit */
   --clock-digits: 4;
   --clock-colons: 1;
