@@ -191,7 +191,8 @@ body {
     animation: none;
   }
 
-  .widget-box__options {
+  .widget-box__options,
+  .widget-setup {
     transition: none;
   }
 }
@@ -233,6 +234,70 @@ body {
   font-size: 0.75rem;
   /* The name is the quieter line, but at this size it still needs to read on a bright photo. */
   opacity: 0.85;
+}
+
+/*
+ * The setup button: what a Widget shows in place of its content while it needs something from
+ * the user. The same panel as .widget-state (loading and error), and sized the same way, but a
+ * button: the Widget's name above the need's words, centred in the box, and never bigger than
+ * it. It takes at most the box's width and wraps; its type and padding give way to the box's
+ * smallest size (2 by 2 cells is about 200 by 160px on a laptop) with container units.
+ */
+.widget-setup {
+  box-sizing: border-box;
+  display: grid;
+  gap: 0.125rem;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  /* In ems, so the padding follows the type down on a narrow window. */
+  padding: clamp(0.25em, 7cqmin, 1em) clamp(0.375em, 9cqmin, 1.15em);
+  border: 1px solid rgb(255 255 255 / 25%);
+  color: inherit;
+  font: inherit;
+  /* 0.875rem from about 93px wide up (the Weather's smallest box on a 600px window, or any
+     laptop's), then smaller with the box, so the widest word still fits a 58px box (390px). */
+  font-size: clamp(0.5rem, 15cqw, 0.875rem);
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+
+.widget-setup:hover,
+.widget-setup[aria-expanded='true'] {
+  border-color: rgb(255 255 255 / 55%);
+  background: rgb(0 0 0 / 70%);
+}
+
+.widget-setup:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
+}
+
+.widget-setup:disabled {
+  cursor: default;
+}
+
+.widget-setup__name {
+  font-size: 0.857em; /* 0.75rem at the full size */
+  /* The name is the quieter line, but at this size it still needs to read on a bright photo. */
+  opacity: 0.85;
+}
+
+.widget-setup__label {
+  font-weight: 600;
+}
+
+/* The box takes focus when a popover closes and the button has gone; outside edit mode it has no frame. */
+.widget-box:focus-visible {
+  outline: 2px solid var(--color-fg);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
 
 /* Clock */
@@ -441,10 +506,11 @@ body {
   white-space: nowrap;
 }
 
-/* The translucent panel the popovers sit on, the welcome, and a Widget's loading and error states. */
+/* The translucent panel the popovers sit on, the welcome, and a Widget's setup button and states. */
 
 .popover,
 .welcome,
+.widget-setup,
 .widget-state {
   border-radius: 0.75rem;
   background: rgb(0 0 0 / 55%);

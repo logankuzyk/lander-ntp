@@ -350,6 +350,50 @@ describe('useUnmetNeed', () => {
     })
   })
 
+  describe('checking again on request', () => {
+    // A need is met by something outside the options (a permission just granted), so a check
+    // can be asked for without the options changing.
+    function again(needs: readonly Need<Options>[]) {
+      const seen: string[] = []
+      function Probe({ recheck }: { recheck: number }) {
+        const result = useUnmetNeed(needs, { place: null }, recheck)
+        const text = result === CHECKING ? CHECKING : result === null ? 'none' : result.id
+        seen.push(text)
+        return <output>{text}</output>
+      }
+      const view = render(<Probe recheck={0} />)
+      return { again: (n: number) => view.rerender(<Probe recheck={n} />), seen, view }
+    }
+
+    it('asks the needs again when the count it is given changes, and not when it stays', () => {
+      let granted = false
+      const met = vi.fn(() => granted)
+      const probe = again([need('a', met)])
+      expect(probe.view.container.textContent).toBe('a')
+
+      granted = true
+      probe.again(0)
+      expect(met).toHaveBeenCalledTimes(1)
+      probe.again(1)
+
+      expect(met).toHaveBeenCalledTimes(2)
+      expect(probe.view.container.textContent).toBe('none')
+    })
+
+    it('gives "checking" while a late answer is awaited, then the answer', async () => {
+      const a = lateNeed('a')
+      const probe = again([a.need])
+      await answer(() => a.answers[0]!.resolve(false))
+      expect(probe.view.container.textContent).toBe('a')
+
+      probe.again(1)
+      expect(probe.view.container.textContent).toBe(CHECKING)
+      await answer(() => a.answers[1]!.resolve(true))
+
+      expect(probe.view.container.textContent).toBe('none')
+    })
+  })
+
   describe('with needs that are not stable', () => {
     // The contract is that `needs` is one array, such as the one on a definition. A new array
     // on each render is a new check on each render: the needs are asked again every time.

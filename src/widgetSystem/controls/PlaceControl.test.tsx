@@ -304,6 +304,41 @@ describe('PlaceControl', () => {
     })
   })
 
+  describe('focus', () => {
+    it('gives the search focus when asked to, with its suggestions closed', () => {
+      render(<PlaceControl focusOnMount label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+      expect(document.activeElement).toBe(search())
+      expect(search().getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(search())
+      expect(search().getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('leaves focus alone otherwise, and suggests when the box is focused', () => {
+      render(<PlaceControl label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+      expect(document.activeElement).not.toBe(search())
+      fireEvent.focus(search())
+      expect(search().getAttribute('aria-expanded')).toBe('true')
+    })
+
+    it('moves focus to Change when a place is picked and the row replaces the search', async () => {
+      answering({ results: [{ id: 1, latitude: 48.44, longitude: -123.35, name: 'Victoria' }] })
+      function Kept() {
+        const [value, setValue] = useState<PlaceValue>(EMPTY)
+        return <PlaceControl label="Place" onChange={setValue} value={value} />
+      }
+      render(<Kept />)
+
+      fireEvent.input(search(), { target: { value: 'Victoria' } })
+      fireEvent.click(await screen.findByRole('option', { name: 'Victoria' }))
+
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change' })),
+      )
+    })
+  })
+
   describe('disabled', () => {
     it('shows the place, with a Change button that does nothing', () => {
       const onChange = vi.fn()

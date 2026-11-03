@@ -54,7 +54,12 @@ export function OptionsPopover({
   page,
 }: OptionsPopoverProps) {
   const title = `${name} options`
-  const { close, container } = usePopover(onClose, { keepFocus: true, returnTo: box })
+  // Focus goes back to the Widget's setup button if it is still there (it opened this, or there
+  // is something left to set up), and else to the Widget's box.
+  const { close, container } = usePopover(onClose, {
+    keepFocus: true,
+    returnTo: () => box()?.querySelector<HTMLElement>('.widget-setup') ?? box(),
+  })
   const form = useRef<HTMLDivElement>(null)
 
   // Against the Widget's box: measured at its natural size, then put beside it, before it is

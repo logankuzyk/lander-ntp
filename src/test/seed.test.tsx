@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '@/entrypoints/newtab/App'
 
 import { STORY_PHOTOS } from './fixtures'
-import { PAGE_SEEDS, seedPage, weatherBoxRect, type WeatherBoxSize, weatherStateSeed } from './seed'
+import {
+  PAGE_SEEDS,
+  seedPage,
+  weatherBoxRect,
+  type WeatherBoxSize,
+  weatherSetupSeed,
+  weatherStateSeed,
+} from './seed'
 
 const fetchSpy = vi.fn()
 
@@ -202,6 +209,39 @@ describe('the Grid editing stories', () => {
 
     expect(document.activeElement).toBe(first)
     expect(first?.getAttribute('aria-label')).toBe('Weather, Victoria')
+  })
+})
+
+describe('the Weather setup stories', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+
+  it.each(SIZES)(
+    'give a Weather with no place the setup button at %s, asking nothing',
+    async (size) => {
+      await seedPage(weatherSetupSeed(size))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', { name: 'Weather Choose a place' })
+      expect(button.textContent).toBe('WeatherChoose a place')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(container.querySelector('.widget-box')?.children).toHaveLength(1)
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it('open the options at the place search when the button is pressed, asking nothing', async () => {
+    await seedPage(weatherSetupSeed('starting'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Weather Choose a place' }))
+
+    expect(screen.getByRole('dialog', { name: 'Weather options' })).toBeTruthy()
+    expect(document.activeElement).toBe(
+      screen.getByRole('combobox', { name: 'Search for a place' }),
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
 

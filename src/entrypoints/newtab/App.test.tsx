@@ -608,8 +608,9 @@ describe('App, in edit mode', () => {
     fireEvent.click(doneButton())
     expect(editButton().getAttribute('aria-pressed')).toBe('false')
     expect(container.querySelector('.grid__dots')).toBeNull()
-    // The box keeps its name (W20) but is no longer a tab stop.
-    expect(screen.getByRole('group', { name: 'Clock' }).getAttribute('tabindex')).toBeNull()
+    // The box keeps its name (W20) but is no longer a tab stop
+    // (it can still be given focus, which is what -1 is).
+    expect(screen.getByRole('group', { name: 'Clock' }).getAttribute('tabindex')).toBe('-1')
   })
 
   it('is toggled with the E key and left with Escape', async () => {

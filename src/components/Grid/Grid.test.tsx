@@ -202,10 +202,14 @@ describe('Grid', () => {
     expect(grid.querySelector('.clock__time')?.textContent).toMatch(/^\d{1,2}:\d{2}:\d{2}$/)
   })
 
-  it('draws no Weather reading by itself: a box with no place holds nothing', () => {
+  it('draws no Weather reading by itself: a box with no place holds only its setup button', () => {
     const grid = drawnGrid(layoutOf(stored('aaaaaaaa', 'weather', [11, 1, 2, 2])))
     expect(boxes(grid)).toEqual([['weather', '11 / span 2', '1 / span 2']])
-    expect(grid.querySelector('.widget-box')?.children).toHaveLength(0)
+    expect(grid.querySelector('.widget-box')?.children).toHaveLength(1)
+    expect(grid.querySelector('.widget-box > .widget-setup')?.textContent).toBe(
+      'WeatherChoose a place',
+    )
+    expect(grid.querySelector('.weather')).toBeNull()
   })
 
   it("keeps a Widget's element when another is drawn before it in reading order", () => {
@@ -295,7 +299,8 @@ describe('Grid in edit mode', () => {
 
     expect(grid.classList.contains('grid--editing')).toBe(false)
     expect(grid.querySelector('.grid__dots')).toBeNull()
-    expect(grid.querySelectorAll('[tabindex]')).toHaveLength(0)
+    // Focus can be given to a box (-1), but none is a tab stop.
+    expect(grid.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0)
     expect(grid.querySelectorAll('.widget-box__name')).toHaveLength(0)
     // Changed by W20: each box is a named group outside edit mode too (it has a tab stop and a
     // drawn name only in edit mode).
