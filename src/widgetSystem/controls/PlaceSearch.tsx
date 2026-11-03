@@ -11,10 +11,12 @@ const DEBOUNCE_MS = 300
 const MIN_LENGTH = 2
 
 type PlaceSearchProps = {
+  /** The id of a line that says why the box is held back, which describes it. */
+  describedBy?: string
   /** The box cannot be typed in, and suggests nothing. */
   disabled?: boolean
   /**
-   * Takes focus when it appears, with the suggestions left closed until the box is clicked,
+   * Takes focus when it appears (or, held back at first, when it is first let through), with the suggestions left closed until the box is clicked,
    * typed in or moved through with the arrow keys: so Escape, pressed first, closes whatever the
    * search sits in and not just a list nobody asked for.
    */
@@ -32,6 +34,7 @@ type PlaceSearchProps = {
  * one there.
  */
 export function PlaceSearch({
+  describedBy,
   disabled = false,
   focusOnMount = false,
   locateFailed,
@@ -56,14 +59,18 @@ export function PlaceSearch({
 
   usePlacement(open, anchor, list, 'fill', results)
 
+  // Focus is given once, as soon as the box can take it: when it appears, or, if it was held back
+  // when it appeared (a need is still being looked up), when it is first let through.
+  const focused = useRef(false)
   useEffect(() => {
-    if (!focusOnMount || !input.current) return
+    if (!focusOnMount || disabled || focused.current || !input.current) return
+    focused.current = true
     quiet.current = true
     input.current.focus()
     quiet.current = false
-    // Only as it appears.
+    // Only the first time it is not disabled.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [disabled])
 
   const name = query.trim()
   useEffect(() => {
@@ -127,6 +134,7 @@ export function PlaceSearch({
             aria-activedescendant={open && chosen ? optionId(chosen.id) : undefined}
             aria-autocomplete="list"
             aria-controls={open ? listId : undefined}
+            aria-describedby={describedBy}
             aria-expanded={open}
             aria-label="Search for a place"
             autocomplete="off"

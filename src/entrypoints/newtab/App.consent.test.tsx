@@ -70,6 +70,7 @@ async function withOptionsOpen() {
 
 const search = () =>
   screen.getByRole('combobox', { name: 'Search for a place' }) as HTMLInputElement
+const searchOrNull = () => screen.queryByRole('combobox', { name: 'Search for a place' })
 const geocoding = (fetch: ReturnType<typeof network>) =>
   fetch.mock.calls.filter(([url]) => String(url).includes('geocoding'))
 const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)))
@@ -185,5 +186,49 @@ describe('the options popover on a browser that does not ask for the agreement',
     expect(within(dialog).queryByRole('button', { name: /allow/i })).toBeNull()
     expect(dialog.textContent).not.toContain('Do this first')
     expect(request).not.toHaveBeenCalled()
+  })
+})
+
+describe('where focus goes when the options open at the place, on Firefox', () => {
+  /** Lets the page settle a few ticks at a time (effects run inside `act`), until `done` holds. */
+  async function until(done: () => boolean) {
+    for (let tick = 0; tick < 60 && !done(); tick++) await wait(5)
+  }
+
+  it('is the place search, once the agreement is looked up and the search is let through', async () => {
+    firefox(true)
+    await withOptionsOpen()
+
+    await until(() => !search().disabled)
+
+    expect(search().disabled).toBe(false)
+    expect(document.activeElement).toBe(search())
+  })
+
+  it('is the place search after the Weather’s own "Choose a place" button is pressed', async () => {
+    firefox(true)
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, v: 1 })
+    await fakeBrowser.storage.sync.set({ layout: { v: 1, widgets: [clock, weather] } })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Weather, Choose a place' }))
+    await until(() => document.activeElement === searchOrNull())
+
+    expect(search().disabled).toBe(false)
+    expect(document.activeElement).toBe(search())
+  })
+
+  it('is the place search after "Allow sending your place" is pressed and the place is next', async () => {
+    firefox(false)
+    await settingsItem.setValue({ ...DEFAULT_SETTINGS, v: 1 })
+    await fakeBrowser.storage.sync.set({ layout: { v: 1, widgets: [clock, weather] } })
+    render(<App />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Weather, Allow sending your place' }),
+    )
+    await until(() => document.activeElement === searchOrNull())
+
+    expect(document.activeElement).toBe(search())
   })
 })

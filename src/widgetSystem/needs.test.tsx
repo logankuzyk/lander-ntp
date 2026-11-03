@@ -533,6 +533,31 @@ describe('useUnmetNeed', () => {
       expect(() => status.dispatchEvent(new Event('change'))).not.toThrow()
     })
 
+    it('stops being one of those asked together when the Widget goes', () => {
+      // The set of those watching is the module's own: what is added to a set while the Widget
+      // mounts must be taken out of one when it goes.
+      const realAdd = Set.prototype.add
+      const realDelete = Set.prototype.delete
+      const added: unknown[] = []
+      const removed: unknown[] = []
+      vi.spyOn(Set.prototype, 'add').mockImplementation(function (this: Set<unknown>, value) {
+        added.push(value)
+        return realAdd.call(this, value)
+      })
+      vi.spyOn(Set.prototype, 'delete').mockImplementation(function (this: Set<unknown>, value) {
+        removed.push(value)
+        return realDelete.call(this, value)
+      })
+      added.length = 0
+      const view = render(<Probe watch />)
+      const functions = added.filter((value) => typeof value === 'function')
+
+      view.unmount()
+
+      expect(functions.length).toBeGreaterThan(0)
+      for (const added of functions) expect(removed).toContain(added)
+    })
+
     it('does not listen to a status that arrives after the Widget has gone', async () => {
       permissionEvents()
       const status = new EventTarget() as EventTarget & { state: string }

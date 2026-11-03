@@ -7,6 +7,8 @@ import type { PlaceValue } from '../definition'
 import { PlaceSearch } from './PlaceSearch'
 
 type PlaceControlProps = {
+  /** The id of a line that says why the control is held back, which describes the box and Change. */
+  describedBy?: string
   /** Shows the place, or the search box, but changes nothing. */
   disabled?: boolean
   /** The search takes focus when it appears, without suggesting yet: see `PlaceSearch`. */
@@ -28,6 +30,7 @@ type PlaceControlProps = {
  * records that the device is followed.
  */
 export function PlaceControl({
+  describedBy,
   disabled = false,
   focusOnMount = false,
   label,
@@ -41,6 +44,10 @@ export function PlaceControl({
   // is made from the value as it is when the answer comes, not as it was at the click.
   const latest = useRef(value)
   latest.current = value
+  // And it can be held back meanwhile (the agreement to send a place is taken back): nothing is
+  // sent for an answer that comes after.
+  const held = useRef(disabled)
+  held.current = disabled
   const locating = useRef(false)
 
   // The search that had focus goes when a place is picked; focus goes to Change, in the row that
@@ -66,7 +73,10 @@ export function PlaceControl({
     try {
       const position = await locate()
       if (!position) return setLocateFailed(true)
-      await devicePosition.setValue({ ...position, name: await placeName(position) })
+      if (held.current) return
+      const name = await placeName(position)
+      if (held.current) return
+      await devicePosition.setValue({ ...position, name })
       setChanging(false)
       refocus.current = true
       onChange({ followDevice: true, place: latest.current.place })
@@ -81,6 +91,7 @@ export function PlaceControl({
       <span>
         {value.followDevice ? CURRENT_LOCATION : value.place?.name}{' '}
         <button
+          aria-describedby={describedBy}
           class="settings__link"
           disabled={disabled}
           onClick={() => setChanging(true)}
@@ -93,6 +104,7 @@ export function PlaceControl({
     </div>
   ) : (
     <PlaceSearch
+      describedBy={describedBy}
       disabled={disabled}
       focusOnMount={focusOnMount}
       locateFailed={locateFailed}

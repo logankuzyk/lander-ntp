@@ -164,4 +164,45 @@ describe('an option that depends on a need', () => {
     expect(search().disabled).toBe(true)
     expect(screen.getByRole('button', { name: 'Agree first' })).toBeTruthy()
   })
+
+  it('gives focus to the option’s control when the button goes while it has focus, so the keyboard is not dropped on the page', async () => {
+    const { need } = agreeing()
+    draw([need])
+    const button = screen.getByRole('button', { name: 'Agree first' })
+    button.focus()
+
+    fireEvent.click(button)
+    await settle()
+
+    expect(screen.queryByRole('button', { name: 'Agree first' })).toBeNull()
+    expect(document.activeElement).toBe(search())
+  })
+
+  it('leaves focus where it is when the button goes and it was not on the button', async () => {
+    const { need } = agreeing()
+    draw([need])
+    flag().focus()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agree first' }))
+    await settle()
+
+    expect(document.activeElement).toBe(flag())
+  })
+
+  it('says why through the control: the line describes the box that is held back', () => {
+    const { need } = agreeing()
+    const { container } = draw([need])
+
+    const line = [...container.querySelectorAll('p')].find((p) =>
+      p.textContent?.startsWith('Do this first'),
+    )!
+    expect(line.id).not.toBe('')
+    expect(search().getAttribute('aria-describedby')).toBe(line.id)
+  })
+
+  it('has nothing to describe the box when it is not held back', () => {
+    draw([{ id: 'agreed', met: () => true }])
+
+    expect(search().hasAttribute('aria-describedby')).toBe(false)
+  })
 })

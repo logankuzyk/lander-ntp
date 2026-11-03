@@ -351,6 +351,31 @@ describe('the Weather when a permission changes', () => {
   })
 })
 
+describe('two Weathers on one page', () => {
+  it('both move on from the agreement button when it is pressed on one, with no permission event to say so', async () => {
+    network()
+    firefox(false)
+    render(
+      <>
+        <WidgetBox definition={weatherDefinition} options={PICKED} page={PAGE} rect={RECT} />
+        <WidgetBox definition={weatherDefinition} options={PICKED} page={PAGE} rect={RECT} />
+      </>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('button', { name: 'Weather, Allow sending your place' }),
+      ).toHaveLength(2),
+    )
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Weather, Allow sending your place' })[0]!,
+    )
+
+    await waitFor(() => expect(document.querySelectorAll('.weather')).toHaveLength(2))
+    expect(noButton()).toBe(true)
+  })
+})
+
 describe('the Weather on a browser that does not ask for the agreement', () => {
   it('meets the agreement at once and never asks the browser about it', async () => {
     network()

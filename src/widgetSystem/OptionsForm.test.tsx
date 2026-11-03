@@ -549,10 +549,10 @@ describe('OptionsForm', () => {
         geolocation: { getCurrentPosition: (done: (position: unknown) => void) => (answer = done) },
         language: 'en-CA',
       })
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true }),
-      )
+      const fetch = vi
+        .fn()
+        .mockResolvedValue({ json: () => Promise.resolve({ city: 'Victoria' }), ok: true })
+      vi.stubGlobal('fetch', fetch)
       const { onChange, rerender } = draw({ options: { ...stored, place: null } })
       const search = screen.getByRole('combobox', { name: 'Search for a place' })
       fireEvent.focus(search)
@@ -560,11 +560,12 @@ describe('OptionsForm', () => {
 
       rerender({ disabled: true, options: { ...stored, place: null } })
       answer({ coords: { latitude: 48.4359, longitude: -123.35155 } })
-      // The position is put away just before the change would have been made.
-      await waitFor(async () => expect(await devicePosition.getValue()).not.toBeNull())
       await new Promise((resolve) => setTimeout(resolve, 20))
 
+      // Held back after the question was put: the position is not looked up, put away or used.
       expect(onChange).not.toHaveBeenCalled()
+      expect(await devicePosition.getValue()).toBeNull()
+      expect(fetch).not.toHaveBeenCalled()
     })
 
     it('is enabled again when it is not disabled', () => {

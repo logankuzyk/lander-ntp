@@ -8,7 +8,14 @@
 export function focusBox(box: HTMLElement): HTMLElement {
   if (!box.hasAttribute('tabindex')) {
     box.tabIndex = -1
-    box.addEventListener('blur', () => box.removeAttribute('tabindex'), { once: true })
+    // Only the -1 it gave: by then edit mode may have made the box a tab stop (0), which stays.
+    box.addEventListener(
+      'blur',
+      () => {
+        if (box.getAttribute('tabindex') === '-1') box.removeAttribute('tabindex')
+      },
+      { once: true },
+    )
   }
   return box
 }
