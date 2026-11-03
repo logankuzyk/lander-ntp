@@ -12,7 +12,7 @@ import type {
   WidgetViewProps,
 } from './definition'
 import { accessibleName } from './name'
-import { CHECKING, useRecheck, useUnmetNeed } from './needs'
+import { CHECKING, recheckAll, useRecheck, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { hasSetup, SetupButton, type SetupNeed } from './SetupButton'
 import { useSourceState } from './source'
@@ -272,8 +272,8 @@ function Contents<O, R, C>({
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
   // The needs are asked again, with the options unchanged, when a setup button has asked the
-  // browser for something (and whenever something else calls `recheck`).
-  const [rechecks, recheck] = useRecheck()
+  // browser for something, by any Widget (`recheckAll`), and when the browser says a permission changed.
+  const [rechecks, recheck] = useRecheck(Boolean(definition.needs?.length))
   const unmet = useUnmetNeed(definition.needs, read, rechecks)
   const popover = useOptionsPopover()
 
@@ -312,7 +312,10 @@ function Contents<O, R, C>({
         need={drawn}
         onAsked={() => {
           setAsked(drawn.id)
+          // This Widget for certain, and every other that is watching: what is allowed here
+          // may be what another Widget was waiting on.
           recheck()
+          recheckAll()
         }}
       />
     )

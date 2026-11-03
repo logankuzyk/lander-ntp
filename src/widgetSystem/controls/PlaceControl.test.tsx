@@ -384,5 +384,74 @@ describe('PlaceControl', () => {
 
       expect((search() as HTMLInputElement).disabled).toBe(true)
     })
+
+    it('sends nothing to the place search, and does not offer the device, whatever reaches the box', async () => {
+      vi.useFakeTimers()
+      try {
+        const fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true })
+        vi.stubGlobal('fetch', fetch)
+        const getCurrentPosition = vi.fn()
+        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition }, language: 'en-CA' })
+        render(<PlaceControl disabled label="Place" onChange={vi.fn()} value={EMPTY} />)
+
+        fireEvent.input(search(), { target: { value: 'Victoria' } })
+        fireEvent.click(search())
+        fireEvent.focus(search())
+        fireEvent.keyDown(search(), { key: 'ArrowDown' })
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(fetch).not.toHaveBeenCalled()
+        expect(screen.queryByRole('option')).toBeNull()
+        expect(getCurrentPosition).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('sends nothing for text typed while it was enabled, when it is held back before the pause ends', async () => {
+      vi.useFakeTimers()
+      try {
+        const fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true })
+        vi.stubGlobal('fetch', fetch)
+        const view = render(
+          <PlaceControl disabled={false} label="Place" onChange={vi.fn()} value={EMPTY} />,
+        )
+
+        fireEvent.input(search(), { target: { value: 'Victoria' } })
+        await vi.advanceTimersByTimeAsync(100)
+        view.rerender(<PlaceControl disabled label="Place" onChange={vi.fn()} value={EMPTY} />)
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(fetch).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('sends no position, and changes nothing, when it is held back while the device is still answering', async () => {
+      let answer!: (position: unknown) => void
+      vi.stubGlobal('navigator', {
+        geolocation: {
+          getCurrentPosition: (done: (position: unknown) => void) => (answer = done),
+        },
+        language: 'en-CA',
+      })
+      const fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({}), ok: true })
+      vi.stubGlobal('fetch', fetch)
+      const onChange = vi.fn()
+      const view = render(
+        <PlaceControl disabled={false} label="Place" onChange={onChange} value={EMPTY} />,
+      )
+      currentLocation()
+
+      // The agreement is taken back while the browser is still being asked.
+      view.rerender(<PlaceControl disabled label="Place" onChange={onChange} value={EMPTY} />)
+      answer({ coords: { latitude: 48.43, longitude: -123.37 } })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      expect(fetch).not.toHaveBeenCalled()
+      expect(onChange).not.toHaveBeenCalled()
+      expect(await devicePosition.getValue()).toBeNull()
+    })
   })
 })

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from 'preact/hooks'
+import type { ComponentChildren } from 'preact'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from 'preact/hooks'
 
 import { Choice } from './controls/Choice'
 import { OrderedListControl } from './controls/OrderedListControl'
@@ -12,6 +13,7 @@ import type {
   PageValues,
   PlaceValue,
 } from './definition'
+import { CHECKING, recheckAll, useAsk, useRecheck, useUnmetNeed } from './needs'
 import { readOptions, writeOptions } from './options'
 import type { AnyWidgetDefinition } from './registry'
 
@@ -22,6 +24,103 @@ const PAGE_VALUE_NOTES: Record<PageValueName, string> = {
 
 const isPageValue = (option: OptionDescription): option is PageValueOption =>
   option.control === 'switch' && option.shared !== undefined
+
+type NeedGateProps = {
+  /**
+   * Draws the option's control, `held` while a need it depends on is not met, and with the id of
+   * the line that says why (to describe the control by) when that line is shown.
+   */
+  children: (held: boolean, whyId: string | undefined) => ComponentChildren
+  definition: AnyWidgetDefinition
+  option: OptionDescription
+  /** The Widget's options as they are read, which its needs are asked about. */
+  options: Record<string, unknown>
+}
+
+/**
+ * The button under a held-back option. When it goes while it has focus (it was pressed and the
+ * need is met), `onGone` is told which option it was in, so focus can follow to the control.
+ */
+function NeedButton({
+  label,
+  onClick,
+  onGone,
+}: {
+  label: string
+  onClick: () => void
+  onGone: (option: HTMLElement | null) => void
+}) {
+  const button = useRef<HTMLButtonElement>(null)
+  const gone = useRef(onGone)
+  gone.current = onGone
+  useLayoutEffect(
+    () => () => {
+      const current = button.current
+      if (current && document.activeElement === current) {
+        gone.current(current.closest<HTMLElement>('[data-option]'))
+      }
+    },
+    [],
+  )
+  return (
+    <button class="settings__link" onClick={onClick} ref={button} type="button">
+      {label}
+    </button>
+  )
+}
+
+/**
+ * Holds an option back until the needs it depends on (`needs` on the option) are met, for a
+ * control that would send something somewhere. While one is not it says so under the control,
+ * "Do this first to set the place.", and, if the need has words and a way to ask the browser,
+ * gives the same button the Widget's own setup button has. The control is held back from the
+ * start (until the first answer) and the last answer stands while the needs are asked again, so
+ * the control does not flicker; an option with no such needs is drawn as it is, at once.
+ */
+function NeedGate({ children, definition, option, options }: NeedGateProps) {
+  const needs = useMemo(
+    () => definition.needs?.filter(({ id }) => option.needs?.includes(id)),
+    [definition, option],
+  )
+  const [rechecks] = useRecheck(needs !== undefined && needs.length > 0)
+  const ask = useAsk(recheckAll)
+  const unmet = useUnmetNeed(needs, options, rechecks)
+  // What the last answer was, kept while the next is awaited.
+  const answer = useRef<typeof unmet>(CHECKING)
+  if (unmet !== CHECKING) answer.current = unmet
+  const held = answer.current
+  const whyId = useId()
+  // Whether the line saying why is shown: a need is unmet, as opposed to still being looked up.
+  const why = held !== null && held !== CHECKING
+  const run = held && held !== CHECKING && held.action?.kind === 'ask' ? held.action.run : undefined
+
+  // The button went while it had focus: the option's control takes it, once it is drawn as let
+  // through (after this render, not while the button is being taken away).
+  const gone = useRef<HTMLElement | null>(null)
+  const handOff = useCallback((option: HTMLElement | null) => {
+    gone.current = option
+  }, [])
+  useLayoutEffect(() => {
+    const option = gone.current
+    if (!option) return
+    gone.current = null
+    option.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)')?.focus()
+  })
+
+  return (
+    <>
+      {children(held !== null, why ? whyId : undefined)}
+      {why && (
+        <>
+          <p class="settings__note" id={whyId}>
+            Do this first to set the {option.label.toLowerCase()}.
+          </p>
+          {run && <NeedButton label={held.label ?? ''} onClick={() => ask(run)} onGone={handOff} />}
+        </>
+      )}
+    </>
+  )
+}
 
 type OptionsFormProps = {
   definition: AnyWidgetDefinition
@@ -93,7 +192,9 @@ export function OptionsForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const control = (option: OptionDescription) => {
+  const control = (option: OptionDescription, held: boolean, whyId?: string) => {
+    // The whole form is off, or this option is held back until a need is met.
+    const off = held || disabled
     if (isPageValue(option)) {
       const name = option.shared
       const invert = option.invert ?? false
@@ -101,7 +202,7 @@ export function OptionsForm({
         <>
           <Switch
             checked={page[name] !== invert}
-            disabled={disabled}
+            disabled={off}
             label={option.label}
             onChange={(on) => {
               if (!latest.current.disabled) onPageValueChange(name, on !== invert)
@@ -116,7 +217,7 @@ export function OptionsForm({
         return (
           <Choice<string>
             choices={option.choices}
-            disabled={disabled}
+            disabled={off}
             label={option.label}
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string}
@@ -128,7 +229,7 @@ export function OptionsForm({
           <>
             <h3 id={heading}>{option.label}</h3>
             <OrderedListControl
-              disabled={disabled}
+              disabled={off}
               items={option.items}
               labelledBy={heading}
               onChange={(value) => change({ [option.id]: value })}
@@ -140,7 +241,8 @@ export function OptionsForm({
       case 'place':
         return (
           <PlaceControl
-            disabled={disabled}
+            describedBy={whyId}
+            disabled={off}
             // The search is the field the form puts focus on; it does so without suggesting.
             focusOnMount={option.id === focusOption}
             label={option.label}
@@ -152,7 +254,7 @@ export function OptionsForm({
         return (
           <Switch
             checked={read[option.id] as boolean}
-            disabled={disabled}
+            disabled={off}
             label={option.label}
             onChange={(value) => change({ [option.id]: value })}
           />
@@ -164,7 +266,9 @@ export function OptionsForm({
     <div class={disabled ? 'options-form options-form--disabled' : 'options-form'} ref={form}>
       {definition.options.map((option) => (
         <div class="options-form__option" data-option={option.id} key={option.id}>
-          {control(option)}
+          <NeedGate definition={definition} option={option} options={read}>
+            {(held, whyId) => control(option, held, whyId)}
+          </NeedGate>
         </div>
       ))}
       {definition.credit && (

@@ -20,6 +20,13 @@ type OptionBase = {
   id: string
   /** What people read beside the control. */
   label: string
+  /**
+   * The ids of the Widget's needs (see `needs`) that must be met before the control may be used,
+   * for a control that would send something somewhere: until they are, the form holds it back and
+   * shows the first unmet need's words and action beside it. Left out, the control is always
+   * there. Each id must name one of the Widget's needs.
+   */
+  needs?: readonly string[]
 }
 
 /** On or off. */

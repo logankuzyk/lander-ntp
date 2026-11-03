@@ -32,8 +32,12 @@ export default defineConfig({
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
-          // Firefox requires this. Nothing is collected unless the weather widget is switched
-          // on, which sends the chosen place to the forecast service and asks for this first.
+          // Firefox requires this. Nothing is collected unless the weather widget is on the
+          // page, which sends the chosen place to the forecast service and asks for this first:
+          // its setup button asks (the settings panel's "Show weather" switch does too, until it
+          // goes), and nothing is sent before the user has agreed: not the forecast, and not what
+          // is typed into the place search or the device's position either, which the options
+          // hold back until then.
           data_collection_permissions: { optional: ['locationInfo'], required: ['none'] },
           id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',

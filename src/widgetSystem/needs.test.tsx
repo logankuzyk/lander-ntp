@@ -1,5 +1,7 @@
 import { act, render } from '@testing-library/preact'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { device, permissionEvents } from '@/test/permissions'
 
 import { CHECKING, checkNeeds, type Need, useRecheck, useUnmetNeed } from './needs'
 
@@ -442,6 +444,143 @@ describe('useUnmetNeed', () => {
       act(() => recheck())
 
       expect(view.container.textContent).toBe('none')
+    })
+  })
+
+  describe('useRecheck, watching what can change an answer', () => {
+    /** Draws the count it gives, watching or not. */
+    function Probe({ watch }: { watch?: boolean }) {
+      const [count] = useRecheck(watch)
+      return <output>{count}</output>
+    }
+    const count = (view: { container: Element }) => view.container.textContent
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    })
+
+    it('listens to nothing unless asked to watch', async () => {
+      const events = permissionEvents()
+      const { query } = device()
+      const hide = vi.spyOn(document, 'addEventListener')
+
+      render(<Probe />)
+      await answer(() => {})
+
+      expect(events.listening()).toBe(0)
+      expect(query).not.toHaveBeenCalled()
+      expect(hide).not.toHaveBeenCalledWith('visibilitychange', expect.anything())
+    })
+
+    it('asks again when the tab comes back into view, and not when it goes out of it', () => {
+      permissionEvents()
+      const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+      const view = render(<Probe watch />)
+      expect(count(view)).toBe('0')
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(count(view)).toBe('0')
+
+      hidden.mockReturnValue(false)
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(count(view)).toBe('1')
+    })
+
+    it('asks again when the browser adds or removes a permission', () => {
+      const events = permissionEvents()
+      const view = render(<Probe watch />)
+
+      act(() => events.fire('onAdded'))
+      expect(count(view)).toBe('1')
+
+      act(() => events.fire('onRemoved'))
+      expect(count(view)).toBe('2')
+    })
+
+    it("asks again when the geolocation permission's state changes", async () => {
+      permissionEvents()
+      const { query, status } = device()
+      const view = render(<Probe watch />)
+      await answer(() => {})
+      expect(query).toHaveBeenCalledWith({ name: 'geolocation' })
+
+      act(() => {
+        status.dispatchEvent(new Event('change'))
+      })
+
+      expect(count(view)).toBe('1')
+    })
+
+    it('stops listening to all of it when the Widget goes', async () => {
+      const events = permissionEvents()
+      const { status } = device()
+      const unlisten = vi.spyOn(status, 'removeEventListener')
+      const view = render(<Probe watch />)
+      await answer(() => {})
+      const removed = vi.spyOn(document, 'removeEventListener')
+
+      view.unmount()
+
+      expect(unlisten).toHaveBeenCalledWith('change', expect.any(Function))
+      expect(events.listening()).toBe(0)
+      expect(removed).toHaveBeenCalledWith('visibilitychange', expect.anything())
+      // The status can still say it changed; nothing is listening, and nothing throws.
+      expect(() => status.dispatchEvent(new Event('change'))).not.toThrow()
+    })
+
+    it('stops being one of those asked together when the Widget goes', () => {
+      // The set of those watching is the module's own: what is added to a set while the Widget
+      // mounts must be taken out of one when it goes.
+      const realAdd = Set.prototype.add
+      const realDelete = Set.prototype.delete
+      const added: unknown[] = []
+      const removed: unknown[] = []
+      vi.spyOn(Set.prototype, 'add').mockImplementation(function (this: Set<unknown>, value) {
+        added.push(value)
+        return realAdd.call(this, value)
+      })
+      vi.spyOn(Set.prototype, 'delete').mockImplementation(function (this: Set<unknown>, value) {
+        removed.push(value)
+        return realDelete.call(this, value)
+      })
+      added.length = 0
+      const view = render(<Probe watch />)
+      const functions = added.filter((value) => typeof value === 'function')
+
+      view.unmount()
+
+      expect(functions.length).toBeGreaterThan(0)
+      for (const added of functions) expect(removed).toContain(added)
+    })
+
+    it('does not listen to a status that arrives after the Widget has gone', async () => {
+      permissionEvents()
+      const status = new EventTarget() as EventTarget & { state: string }
+      const add = vi.spyOn(status, 'addEventListener')
+      let arrive!: () => void
+      vi.stubGlobal('navigator', {
+        permissions: { query: () => new Promise((resolve) => (arrive = () => resolve(status))) },
+      })
+      const view = render(<Probe watch />)
+      view.unmount()
+
+      await answer(() => arrive())
+
+      expect(add).not.toHaveBeenCalled()
+    })
+
+    it('copes with a browser that has no such events or no permission query', async () => {
+      // The test browser's permission events throw when listened to, as a browser without them might.
+      vi.stubGlobal('navigator', {})
+      const view = render(<Probe watch />)
+      await answer(() => {})
+
+      expect(count(view)).toBe('0')
     })
   })
 

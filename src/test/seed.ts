@@ -272,17 +272,33 @@ export function weatherStateSeed(state: WeatherBoxState, size: WeatherBoxSize): 
   }
 }
 
+/** What a Weather's setup button asks for: a place, Firefox's agreement, or the device's location. */
+export type WeatherSetupKind = 'consent' | 'location' | 'place'
+
 /**
- * A page with one Weather that has no place, at one of its sizes, so the box draws its setup
- * button ("Choose a place"). Its options are empty, as a Weather's are when added. Nothing is
- * cached or fetched. The Weather setup stories and the test that checks them draw from this.
+ * A page with one Weather at one of its sizes that is waiting for something, so the box draws
+ * its setup button. Nothing is cached or fetched. The Weather setup stories and the test that
+ * checks them draw from this. What the button says depends on the options and on the browser,
+ * which the story sets up as well (see `.storybook/browserStubs`):
+ *
+ * - `place` (the default): the options are empty, as a Weather's are when added, so "Choose a
+ *   place".
+ * - `consent`: a place is picked, but on Firefox without the agreement to send it, so "Allow
+ *   sending your place".
+ * - `location`: it follows the device, which the browser has not allowed this page to read, so
+ *   "Allow location".
  */
-export function weatherSetupSeed(size: WeatherBoxSize): PageSeed {
+export function weatherSetupSeed(size: WeatherBoxSize, kind: WeatherSetupKind = 'place'): PageSeed {
   const { col, h, row, w } = weatherBoxRect(size)
+  const options = {
+    consent: { place: makePlace(), unit: 'celsius' },
+    location: { followDevice: true, unit: 'celsius' },
+    place: {},
+  }[kind]
   return {
     layout: {
       v: 1,
-      widgets: [{ col, h, id: 'weather1', options: {}, row, type: 'weather', w }],
+      widgets: [{ col, h, id: 'weather1', options, row, type: 'weather', w }],
     },
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },
     settings: GRID_WEATHER_SETTINGS,

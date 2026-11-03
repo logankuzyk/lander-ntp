@@ -4,6 +4,7 @@ import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
 
 import type { PageValueName, PageValues } from './definition'
+import { focusBox } from './focusBox'
 import { OptionsForm } from './OptionsForm'
 import { placeBeside } from './placeBeside'
 import type { AnyWidgetDefinition } from './registry'
@@ -62,13 +63,8 @@ export function OptionsPopover({
       const widget = box()
       const button = widget?.querySelector<HTMLElement>('.widget-setup')
       if (button || !widget) return button ?? widget
-      // The box is not a tab stop outside edit mode, so it can only take focus while this gives
-      // it some, and is left as it was when focus moves on.
-      if (!widget.hasAttribute('tabindex')) {
-        widget.tabIndex = -1
-        widget.addEventListener('blur', () => widget.removeAttribute('tabindex'), { once: true })
-      }
-      return widget
+      // Only gives the box focus, and takes that back when focus moves on (see `focusBox`).
+      return focusBox(widget)
     },
   })
   const form = useRef<HTMLDivElement>(null)
