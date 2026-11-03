@@ -19,3 +19,12 @@ export function focusBox(box: HTMLElement): HTMLElement {
   }
   return box
 }
+
+/** The box of the Widget stored under `id`, on the page now, or null if there is none. */
+export function widgetBox(id: string): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>('.widget-box')].find(
+      (box) => box.dataset.widgetId === id,
+    ) ?? null
+  )
+}

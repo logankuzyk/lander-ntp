@@ -7,6 +7,7 @@ import { setOptions, settle } from '@/layout/ops'
 import type { Layout, PlacedWidget } from '@/layout/types'
 
 import type { PageValueName, PageValues } from './definition'
+import { widgetBox } from './focusBox'
 import { accessibleName } from './name'
 import { readOptions } from './options'
 import { OptionsPopover } from './OptionsPopover'
@@ -37,11 +38,8 @@ const OptionsPopoverContext = createContext<OptionsPopoverControls>(NONE)
 
 export const useOptionsPopover = () => useContext(OptionsPopoverContext)
 
-/** The Widget's box on the page, by the id it is stored under. */
-const boxOf = (id: string) => () =>
-  [...document.querySelectorAll<HTMLElement>('.widget-box')].find(
-    (box) => box.dataset.widgetId === id,
-  ) ?? null
+/** The Widget's box on the page, by the id it is stored under: found when it is needed. */
+const boxOf = (id: string) => () => widgetBox(id)
 
 /** The Widget this Layout stores under `id`, if this version can place it. */
 function placedIn(layout: Layout, id: string): PlacedWidget | undefined {
