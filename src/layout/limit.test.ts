@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { checkLayout } from './check'
 import { canAdd, drawnCount, WIDGET_LIMIT } from './limit'
+import { removeWidget } from './ops'
 import type { Layout } from './types'
 
 const clock = (id: string, col: number, row: number) => ({
@@ -85,5 +86,47 @@ describe('the Widget limit', () => {
   it('takes the limit as an argument, so that a different number can be tried', () => {
     expect(canAdd(layoutOf(...clocks(2)), 2)).toBe(false)
     expect(canAdd(layoutOf(...clocks(1)), 2)).toBe(true)
+  })
+})
+
+describe('the Widget limit, when a removal lets undrawn Widgets be drawn', () => {
+  /** A Clock of any size, which the check keeps as stored. */
+  const sized = (id: string, col: number, row: number, w: number, h: number) => ({
+    ...clock(id, col, row),
+    h,
+    w,
+  })
+
+  // Eight 3 by 4 Clocks take every cell. Two 3 by 2 Clocks stored on top of the first have no free
+  // place, so they are kept and not drawn.
+  const full = () =>
+    layoutOf(
+      ...Array.from({ length: 8 }, (_, i) =>
+        sized(`clock${i}000`, 1 + (i % 4) * 3, 1 + Math.floor(i / 4) * 4, 3, 4),
+      ),
+      sized('undrawn1', 1, 1, 3, 2),
+      sized('undrawn2', 1, 1, 3, 2),
+    )
+
+  it('counts the eight that are drawn and not the two that are not', () => {
+    const layout = full()
+    expect(layout.widgets).toHaveLength(10)
+    expect(drawnCount(layout)).toBe(8)
+    expect(canAdd(layout)).toBe(false)
+  })
+
+  it('can go up on a removal: both undrawn Widgets take the freed place, and nothing is hidden', () => {
+    const removed = removeWidget({ layout: full(), readOnly: false }, 'clock7000')
+    if (!removed.ok) throw new Error('refused')
+
+    expect(removed.layout.widgets).toHaveLength(9)
+    expect(drawnCount(removed.layout)).toBe(9)
+    expect(canAdd(removed.layout)).toBe(false)
+
+    // A second removal brings it to eight, and it takes a third to get under.
+    const second = removeWidget({ layout: removed.layout, readOnly: false }, 'clock6000')
+    if (!second.ok) throw new Error('refused')
+    expect(drawnCount(second.layout)).toBe(8)
+    expect(canAdd(second.layout)).toBe(false)
   })
 })

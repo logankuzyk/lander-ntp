@@ -13,10 +13,14 @@ export const WIDGET_LIMIT: number | null = 8
  * has a frame on the page and a × in edit mode.
  *
  * What is kept but not drawn does not count: a Widget that is not well-formed, and one with no
- * free place. Neither has a × and `removeWidget` cannot find a malformed one, so counting them
- * could use up the limit with no way out. Counting them is the stricter rule and the one that
- * cannot be loosened later, so it is left until something can remove them (the Layout is
- * otherwise unchanged by this).
+ * free place. Counting them would be the safer start (LR-17: a rule can be loosened for free,
+ * not tightened), but neither has a × and `removeWidget` cannot find a malformed one, so with no
+ * way to remove them it would strand the user at the limit. So they do not count. Counting them
+ * later needs a way to remove them first (W27).
+ *
+ * Removing a drawn Widget can raise the count: with eight drawn and two undrawn for lack of room,
+ * the freed cells let both be drawn (LR-15), so one removal leaves nine and it takes more to get
+ * under. Nothing is hidden, and Undo may then take the Layout from eight to nine.
  */
 export function drawnCount(layout: Layout): number {
   return drawnRects(layout).length

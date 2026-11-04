@@ -138,7 +138,8 @@ function readingOrder(a: Drawable, b: Drawable): number {
  * - One off the Grid, or on another, is drawn in the free place of its size nearest the middle,
  *   as adding one does. Of two Widgets on the same cells, the first in reading order keeps them.
  *   A Widget that is fine is never moved to make room for one that is not.
- * - One with no free place is not drawn. It stays in the Layout, and still counts as a Widget.
+ * - One with no free place is not drawn. It stays in the Layout; it does not count toward
+ *   the Widget limit (see limit.ts).
  * - A Widget that is not well-formed is not drawn and holds no cells.
  * - A Widget of a type this version does not know is placed like any other.
  *

@@ -14,7 +14,7 @@ import { addWidget, type Editable } from '@/layout/ops'
  * The limit is a parameter so that the line can be tried without one (`null`, a later paid tier).
  */
 export function menuNote({ layout }: Editable, limit: number | null = WIDGET_LIMIT): string | null {
-  if (canAdd(layout, limit) || limit === null) return null
+  if (limit === null || canAdd(layout, limit)) return null
   return `That's all ${limit} widgets. Remove one to add another.`
 }
 
