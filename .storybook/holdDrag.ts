@@ -4,7 +4,8 @@ import { COLS, ROWS } from '@/layout/geometry'
 
 import { startEditing } from './startEditing'
 
-const MOUSE = { button: 0, isPrimary: true, pointerId: 1, pointerType: 'mouse' }
+// A mouse with its button down: the page ends a press whose mouse moves with no button down.
+const MOUSE = { button: 0, buttons: 1, isPrimary: true, pointerId: 1, pointerType: 'mouse' }
 
 /**
  * For a story's `play`: presses Edit, then picks a Widget up as a person would and moves it by

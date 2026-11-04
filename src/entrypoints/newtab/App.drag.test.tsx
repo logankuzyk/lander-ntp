@@ -62,9 +62,9 @@ const box = (type: string) => {
 
 const MOUSE = { button: 0, isPrimary: true, pointerId: 1, pointerType: 'mouse' }
 const press = (el: Element, x: number, y: number) =>
-  fireEvent.pointerDown(el, { ...MOUSE, clientX: x, clientY: y })
+  fireEvent.pointerDown(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y })
 const drag = (el: Element, x: number, y: number) =>
-  fireEvent.pointerMove(el, { ...MOUSE, clientX: x, clientY: y })
+  fireEvent.pointerMove(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y })
 const release = (el: Element, x: number, y: number) =>
   fireEvent.pointerUp(el, { ...MOUSE, clientX: x, clientY: y })
 

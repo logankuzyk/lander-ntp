@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/preact'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/preact'
 import { useState } from 'preact/hooks'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +12,7 @@ import { Grid } from './Grid'
 
 // The Grid is 1200 by 800 pixels at the window's top left in these tests (happy-dom measures
 // nothing), so a cell is 100 by 100: column c is at x = 100 (c - 1), row r at y = 100 (r - 1).
-const GRID = { height: 800, left: 0, top: 0, width: 1200 }
+let GRID = { height: 800, left: 0, top: 0, width: 1200 }
 const PAGE = { hour12: false }
 
 const clock = (id: string, col: number, row: number) => ({
@@ -79,10 +79,12 @@ function setup(layout: Layout = LAYOUT, { canChange = true, commit, editing = tr
 }
 
 const MOUSE = { button: 0, isPrimary: true, pointerId: 1, pointerType: 'mouse' }
+// A pointer that is pressed has its button down, as it does in a browser: `buttons` is 1 on the
+// press and every move, and 0 on the release.
 const press = (el: Element, x: number, y: number, extra = {}) =>
-  fireEvent.pointerDown(el, { ...MOUSE, clientX: x, clientY: y, ...extra })
+  fireEvent.pointerDown(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y, ...extra })
 const drag = (el: Element, x: number, y: number, extra = {}) =>
-  fireEvent.pointerMove(el, { ...MOUSE, clientX: x, clientY: y, ...extra })
+  fireEvent.pointerMove(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y, ...extra })
 const release = (el: Element, x: number, y: number, extra = {}) =>
   fireEvent.pointerUp(el, { ...MOUSE, clientX: x, clientY: y, ...extra })
 
@@ -97,6 +99,7 @@ function placeOf(layout: Layout, id: string) {
 let reduced: { matches: boolean; set: (value: boolean) => void }
 
 beforeEach(() => {
+  GRID = { height: 800, left: 0, top: 0, width: 1200 }
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
     const r = this.classList.contains('grid') ? GRID : { height: 0, left: 0, top: 0, width: 0 }
     return {
@@ -559,6 +562,189 @@ describe('Grid, its Layout is the page', () => {
     expect(stored(next)).toEqual(
       stored(layoutOf(clock('clock0001', 3, 4), weather('wthr0001', 11, 1))),
     )
+  })
+})
+
+describe('Grid, a press that leaves the Grid', () => {
+  const moving = (el: Element) => el.classList.contains('widget-box--moving')
+
+  it('is a drag when the first move past the threshold is outside the Grid, in the margin or the Bottom bar', () => {
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 350)
+    // The Bottom bar: the pointer is on the page, not on the Grid.
+    drag(document.body, 450, 850)
+    expect(moving(clockBox)).toBe(true)
+    expect(document.querySelector('.grid__ghost')).not.toBeNull()
+    release(document.body, 450, 850)
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('is ended by a release outside the Grid: the Widget is not left to follow the pointer', () => {
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    // Released before it was a drag, away from the Grid.
+    press(clockBox, 450, 350)
+    release(document.body, 450, 850)
+    drag(clockBox, 250, 350)
+    expect(moving(clockBox)).toBe(false)
+    expect(document.querySelector('.grid__ghost')).toBeNull()
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('drops at the last place it was held at when a drag is released outside the Grid', () => {
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 350)
+    drag(clockBox, 250, 350)
+    release(document.body, 250, 950)
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('.grid__ghost')).toBeNull()
+    expect(moving(clockBox)).toBe(false)
+    // And it is over: a hover afterwards moves nothing.
+    drag(clockBox, 150, 350, { buttons: 0 })
+    expect(moving(clockBox)).toBe(false)
+  })
+
+  it('is ended by a mouse move with no button down: a release that was never seen', () => {
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 350)
+    drag(clockBox, 250, 350)
+    expect(moving(clockBox)).toBe(true)
+
+    drag(clockBox, 200, 350, { buttons: 0 })
+    expect(moving(clockBox)).toBe(false)
+    expect(clockBox.style.transform).toBe('')
+    expect(document.querySelector('.grid__ghost')).toBeNull()
+    // It does not start again by itself when the button comes back down elsewhere.
+    drag(clockBox, 150, 350)
+    expect(moving(clockBox)).toBe(false)
+    release(clockBox, 150, 350)
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('is not started by a move with no button down, for a mouse or a pen', () => {
+    for (const pointerType of ['mouse', 'pen']) {
+      const { box } = setup()
+      const clockBox = box('clock')
+      press(clockBox, 450, 350, { pointerType })
+      drag(clockBox, 250, 350, { buttons: 0, pointerType })
+      expect(moving(clockBox)).toBe(false)
+      cleanup()
+    }
+  })
+
+  it('still follows a touch, which reports no button', () => {
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 350, { pointerType: 'touch' })
+    drag(clockBox, 250, 350, { buttons: 0, pointerType: 'touch' })
+    expect(moving(clockBox)).toBe(true)
+    release(clockBox, 250, 350, { pointerType: 'touch' })
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts the Widget back when the Grid goes away in the middle of a drag, and stops listening', () => {
+    const { box, commit, view } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 350)
+    drag(clockBox, 250, 350)
+    expect(moving(clockBox)).toBe(true)
+
+    view.unmount()
+    expect(moving(clockBox)).toBe(false)
+    expect(clockBox.style.transform).toBe('')
+    // Nothing is listening for the rest of the press.
+    release(document.body, 250, 350)
+    expect(commit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Grid, how far a press goes before it is a drag', () => {
+  const moving = (el: Element) => el.classList.contains('widget-box--moving')
+  const PRESS_AT = { x: 450, y: 350 }
+
+  // Mouse and pen: 4 pixels. A finger: 10, as it wobbles more while it only means to press.
+  it.each([
+    ['mouse', 3.9, false],
+    ['mouse', 4, true],
+    ['mouse', 4.1, true],
+    ['mouse', 9.9, true],
+    ['pen', 3.9, false],
+    ['pen', 4, true],
+    ['pen', 4.1, true],
+    ['touch', 4.1, false],
+    ['touch', 7, false],
+    ['touch', 9.9, false],
+    ['touch', 10, true],
+    ['touch', 10.1, true],
+  ])('%s moved %d px: a drag is %s', (pointerType, distance, started) => {
+    const { box } = setup()
+    const clockBox = box('clock')
+    press(clockBox, PRESS_AT.x, PRESS_AT.y, { pointerType })
+    drag(clockBox, PRESS_AT.x + distance, PRESS_AT.y, { pointerType })
+    expect(moving(clockBox)).toBe(started)
+  })
+
+  it('counts the distance across and down together', () => {
+    const { box } = setup()
+    const clockBox = box('clock')
+    // 3 across and 3 down is 4.24: a drag for a mouse, though neither is 4 on its own.
+    press(clockBox, PRESS_AT.x, PRESS_AT.y)
+    drag(clockBox, PRESS_AT.x + 3, PRESS_AT.y + 3)
+    expect(moving(clockBox)).toBe(true)
+  })
+})
+
+describe('Grid, which Widgets and cells it drags', () => {
+  it('says a Widget can be dragged, in edit mode, on a Layout that can be changed', () => {
+    const { grid } = setup()
+    expect(grid().classList.contains('grid--movable')).toBe(true)
+    expect(grid().classList.contains('grid--editing')).toBe(true)
+  })
+
+  it('drags a Widget of a type this version does not know', () => {
+    const layout = layoutOf(
+      { ...clock('futr0001', 5, 4), options: { colour: 'teal' }, type: 'bookmarks' },
+      weather('wthr0001', 11, 1),
+    )
+    const { box, commit } = setup(layout)
+    const futureBox = box('bookmarks')
+    expect(futureBox.dataset.widgetId).toBe('futr0001')
+
+    press(futureBox, 450, 350)
+    drag(futureBox, 250, 350)
+    release(futureBox, 250, 350)
+
+    expect(commit).toHaveBeenCalledTimes(1)
+    const [next] = commit.mock.calls[0] as [Layout]
+    expect(placeOf(next, 'futr0001')).toEqual({ col: 3, row: 4 })
+  })
+
+  it('counts a column and a row by their own sizes: cells that are not square', () => {
+    // 1200 by 640: a column is 100 pixels wide and a row is 80 high. The Clock is at y 240 to 400.
+    GRID = { height: 640, left: 0, top: 0, width: 1200 }
+    const { box, commit } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 300)
+    // One column right and one row down.
+    drag(clockBox, 550, 380)
+    expect(clockBox.style.transform).toBe('translate(100px, 80px)')
+    expect(document.querySelector<HTMLElement>('.grid__ghost')?.style.gridRow).toBe('5 / span 2')
+    release(clockBox, 550, 380)
+    const [next] = commit.mock.calls[0] as [Layout]
+    expect(placeOf(next, 'clock0001')).toEqual({ col: 6, row: 5 })
+  })
+
+  it('has the Widget jump by whole columns and rows of their own sizes under reduced motion', () => {
+    GRID = { height: 640, left: 0, top: 0, width: 1200 }
+    reduced.matches = true
+    const { box } = setup()
+    const clockBox = box('clock')
+    press(clockBox, 450, 300)
+    drag(clockBox, 540, 370)
+    expect(clockBox.style.transform).toBe('translate(100px, 80px)')
   })
 })
 

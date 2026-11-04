@@ -73,6 +73,8 @@ export function useGridMove({ commit, grid, layout }: Options) {
   const [ghost, setGhost] = useState<Ghost | null>(null)
 
   const press = useRef<Press | null>(null)
+  // The listeners on the document for as long as there is a press: aborted when it ends.
+  const listening = useRef<AbortController | null>(null)
   const reduced = useRef(false)
   const latest = useRef(layout)
   latest.current = layout
@@ -98,6 +100,13 @@ export function useGridMove({ commit, grid, layout }: Options) {
     held.box.style.transform = ''
     held.box.classList.remove('widget-box--moving')
     setGhost(null)
+  }, [])
+
+  /** The press is over: nothing more is listened for. */
+  const endPress = useCallback(() => {
+    press.current = null
+    listening.current?.abort()
+    listening.current = null
   }, [])
 
   /** Calls the drag off. Its release, when it comes, does nothing but swallow the click. */
@@ -127,7 +136,13 @@ export function useGridMove({ commit, grid, layout }: Options) {
   useEffect(() => {
     if (!movable) cancel()
   }, [movable, cancel])
-  useEffect(() => cancel, [cancel])
+  useEffect(
+    () => () => {
+      cancel()
+      endPress()
+    },
+    [cancel, endPress],
+  )
 
   // The Widget being dragged is gone from the Layout (another tab removed it): nothing to drop.
   useEffect(() => {
@@ -185,11 +200,27 @@ export function useGridMove({ commit, grid, layout }: Options) {
       x: event.clientX,
       y: event.clientY,
     }
+    // The rest of the press is heard on the document, not on the Grid: the pointer goes where
+    // the Grid is not (its margins, the Bottom bar, off the page) before a drag has taken it, and
+    // a release there must still end the press.
+    listening.current?.abort()
+    const { signal } = (listening.current = new AbortController())
+    document.addEventListener('pointermove', (move) => live.current.move(move), { signal })
+    document.addEventListener('pointerup', (up) => live.current.up(up), { signal })
+    document.addEventListener('pointercancel', (stop) => live.current.cancel(stop), { signal })
   }
 
-  const onPointerMove = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
+  const onPointerMove = (event: PointerEvent) => {
     const held = press.current
-    if (!held || held.cancelled || held.pointerId !== event.pointerId || !grid.current) return
+    if (!held || held.pointerId !== event.pointerId || !grid.current) return
+    // A mouse or pen that moves with no button down was released where nothing saw it (outside the
+    // window): the press is over. A touch has no button to look at.
+    if (held.pointerType !== 'touch' && event.buttons === 0) {
+      cancel()
+      endPress()
+      return
+    }
+    if (held.cancelled) return
     if (!held.started) {
       const far = held.pointerType === 'touch' ? TOUCH_DISTANCE : MOUSE_DISTANCE
       if (Math.hypot(event.clientX - held.x, event.clientY - held.y) < far) return
@@ -208,10 +239,10 @@ export function useGridMove({ commit, grid, layout }: Options) {
     show(held, held.session, gridBox)
   }
 
-  const onPointerUp = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
+  const onPointerUp = (event: PointerEvent) => {
     const held = press.current
     if (!held || held.pointerId !== event.pointerId) return
-    press.current = null
+    endPress()
     if (held.started) {
       // The click that follows a drag is not a press of anything under the pointer.
       const swallow = (click: Event) => {
@@ -231,11 +262,15 @@ export function useGridMove({ commit, grid, layout }: Options) {
 
   // The browser took the pointer for something else (a touch became a scroll): there is no
   // release to wait for.
-  const onPointerCancel = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
+  const onPointerCancel = (event: PointerEvent) => {
     if (press.current?.pointerId !== event.pointerId) return
     cancel()
-    press.current = null
+    endPress()
   }
+
+  // What the document's listeners call: the latest render's, which close over nothing but refs.
+  const live = useRef({ cancel: onPointerCancel, move: onPointerMove, up: onPointerUp })
+  live.current = { cancel: onPointerCancel, move: onPointerMove, up: onPointerUp }
 
   // The box lost the pointer while it was down (it was taken out of the page). The release may
   // come somewhere else, or not at all: the next press replaces this one.
@@ -256,10 +291,7 @@ export function useGridMove({ commit, grid, layout }: Options) {
     handlers: {
       onContextMenu,
       onLostPointerCapture,
-      onPointerCancel,
       onPointerDown,
-      onPointerMove,
-      onPointerUp,
     },
     movable,
   }

@@ -4,7 +4,7 @@ import { checkLayout, storedLayout } from '@/layout/check'
 import { COLS, drawnRects, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 
-import { cancel, drop, move, type MoveSession, pickUp, toCells } from './moveSession'
+import { drop, move, type MoveSession, pickUp, toCells } from './moveSession'
 
 const clock = (id: string, col: number, row: number, w = 4, h = 2) => ({
   col,
@@ -272,18 +272,6 @@ describe('moveSession, dropping', () => {
         ),
       ),
     )
-  })
-})
-
-describe('moveSession, cancelling', () => {
-  it('gives nothing to save, and leaves the Layout and the session as they were', () => {
-    const layout = layoutOf(clock('clock0001', 5, 4))
-    const before = stored(layout)
-    const session = move(held(layout, 'clock0001'), { col: 1.2, row: 0.9 })
-    const copy = structuredClone(session)
-    expect(cancel(session)).toBeNull()
-    expect(session).toEqual(copy)
-    expect(stored(layout)).toEqual(before)
   })
 })
 

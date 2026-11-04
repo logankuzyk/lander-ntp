@@ -107,8 +107,3 @@ export function drop(session: MoveSession, editable: Editable): Layout | null {
   if (!result.ok || result.layout === editable.layout) return null
   return result.layout
 }
-
-/** Puts the Widget back. There is nothing to save: the Layout was never changed. */
-export function cancel(_session: MoveSession): null {
-  return null
-}
