@@ -66,6 +66,17 @@ export const EightWidgets: Story = {
 }
 
 /**
+ * A stored Layout of nine Widgets, one over the Widget limit (two devices that each added one, say):
+ * it loads whole and every Widget is drawn. Nothing is removed or hidden; only adding is off.
+ */
+export const NineWidgets: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridNineWidgets)
+    return sendNothing()
+  },
+}
+
+/**
  * Edit mode, entered by pressing Edit as a person would (it is page state, so nothing is
  * seeded for it): the dots over the Grid, and a frame with its name on each Widget. Here the
  * Weather in the top right corner and the Clock in the middle.

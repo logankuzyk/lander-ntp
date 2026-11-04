@@ -1,3 +1,4 @@
+import { canAdd, WIDGET_LIMIT } from '@/layout/limit'
 import { addWidget, type Editable } from '@/layout/ops'
 
 /**
@@ -5,14 +6,16 @@ import { addWidget, type Editable } from '@/layout/ops'
  * the one place the reasons that apply to the whole menu are decided, so that each is added
  * here and nowhere else:
  *
- * - the Widget limit ("That's all 8 widgets. Remove one to add another.") is the next change;
- * - a Layout written by a newer version ("Update Lander to change this.") is the one after.
+ * - the Widget limit, once the Layout holds as many as are allowed (LR-17). Nothing is said
+ *   before then, no count is shown, and no paid tier is mentioned;
+ * - a Layout written by a newer version ("Update Lander to change this.") is the next change.
  *
- * Nothing stops adding in this version except room, and that is per item (see `itemState`).
+ * Nothing else stops adding in this version except room, and that is per item (see `itemState`).
+ * The limit is a parameter so that the line can be tried without one (`null`, a later paid tier).
  */
-
-export function menuNote(_editable: Editable): string | null {
-  return null
+export function menuNote({ layout }: Editable, limit: number | null = WIDGET_LIMIT): string | null {
+  if (canAdd(layout, limit) || limit === null) return null
+  return `That's all ${limit} widgets. Remove one to add another.`
 }
 
 /**

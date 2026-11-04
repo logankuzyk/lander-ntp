@@ -268,6 +268,76 @@ describe('addWidget', () => {
   })
 })
 
+describe('addWidget, at the Widget limit', () => {
+  /** `n` Clocks, three to a row, so that the Grid has room left. */
+  const clocksOf = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      clock(`clock${String(i).padStart(3, '0')}`, 1 + (i % 3) * 4, 1 + Math.floor(i / 3) * 2),
+    )
+
+  it('adds the eighth and refuses the ninth, with nothing changed', () => {
+    const seven = layoutOf(...clocksOf(7))
+    const eighth = accepted(addWidget(editable(seven), 'weather'))
+    expect(eighth.widgets).toHaveLength(8)
+
+    const result = addWidget(editable(eighth), 'weather')
+
+    expect(result).toEqual({ ok: false, reason: 'limit' })
+    expect(eighth.widgets).toHaveLength(8)
+  })
+
+  it('says limit and not no room when the Grid is also full', () => {
+    // Eight Clocks of 3 by 4 take every cell: two rows of four.
+    const full = layoutOf(
+      ...Array.from({ length: 8 }, (_, i) =>
+        clock(`clock${i}`.padEnd(8, '0'), 1 + (i % 4) * 3, 1 + Math.floor(i / 4) * 4, {
+          h: 4,
+          w: 3,
+        }),
+      ),
+    )
+    expect(addWidget(editable(full), 'clock')).toEqual({ ok: false, reason: 'limit' })
+  })
+
+  it('refuses a Layout of nine, which loaded whole, until it is back under', () => {
+    const nine = layoutOf(...clocksOf(9))
+    expect(nine.widgets).toHaveLength(9)
+    expect(refusal(addWidget(editable(nine), 'weather'))).toBe('limit')
+
+    const eight = accepted(removeWidget(editable(nine), 'clock000'))
+    expect(refusal(addWidget(editable(eight), 'weather'))).toBe('limit')
+
+    const seven = accepted(removeWidget(editable(eight), 'clock001'))
+    expect(refusal(addWidget(editable(seven), 'weather'))).toBe('accepted')
+  })
+
+  it('leaves the other reasons as they were: read only and an unknown type come first', () => {
+    const eight = layoutOf(...clocksOf(8))
+    expect(refusal(addWidget({ layout: eight, readOnly: true }, 'clock'))).toBe('read only')
+    expect(refusal(addWidget(editable(eight), 'bookmarks'))).toBe('unknown type')
+  })
+
+  it('adds without a limit when there is none', () => {
+    const nine = layoutOf(...clocksOf(9))
+    expect(refusal(addWidget(editable(nine), 'weather', undefined, null))).toBe('accepted')
+  })
+
+  it('does not stop putting back the Widget that was just removed (Undo, LR-12)', () => {
+    const eight = layoutOf(...clocksOf(8))
+    const removed = removeWidget(editable(eight), 'clock003')
+    if (!removed.ok) throw new Error('refused')
+    const seven = removed.layout
+    // Another is added in its place: the Layout is at the limit again.
+    const refilled = accepted(addWidget(editable(seven), 'weather'))
+    expect(refilled.widgets).toHaveLength(8)
+
+    const restored = restoreWidget(editable(refilled), removed.removed)
+
+    expect(restored.ok).toBe(true)
+    expect(restored.ok && restored.layout.widgets).toHaveLength(9)
+  })
+})
+
 describe('moveWidget', () => {
   const layout = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
 

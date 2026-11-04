@@ -146,6 +146,16 @@ const EIGHT_WIDGETS: StoredLayout = {
 }
 
 /**
+ * Nine Widgets, one more than the Widget limit: the eight above and a Weather below the middle.
+ * A Layout can come to hold more than the limit (two devices that each added one before syncing,
+ * or a lower limit), and it loads whole: nothing is removed or hidden.
+ */
+const NINE_WIDGETS: StoredLayout = {
+  v: 1,
+  widgets: [...EIGHT_WIDGETS.widgets, weatherAt('weather5', 6, 7)],
+}
+
+/**
  * The whole Grid taken by four Clocks of sizes a Clock may have (8 by 4 and 4 by 4): no cell is
  * left, so the Add menu has no room for anything.
  */
@@ -190,6 +200,13 @@ const OPTIONS_WEATHER_BESIDE: StoredLayout = {
  * the test that checks it cannot drift apart.
  */
 export const PAGE_SEEDS = {
+  /** Eight Widgets, the Widget limit, with room left: the Add menu says why it adds nothing. */
+  addMenuAtLimit: {
+    layout: EIGHT_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
   /** No cell is free: the Add menu's items are unavailable, each with its reason. */
   addMenuNoRoom: {
     layout: FULL_OF_CLOCKS,
@@ -225,6 +242,13 @@ export const PAGE_SEEDS = {
   },
   /** A new install, past the welcome: the Layout worked out from the defaults, the Clock alone. */
   gridNewInstall: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
+  /** A stored Layout of nine, over the Widget limit: all nine are drawn. */
+  gridNineWidgets: {
+    layout: NINE_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
   /** Two Weathers, one for Victoria and one for Vancouver, each with its reading. */
   gridTwoWeathers: {
     layout: TWO_WEATHERS,

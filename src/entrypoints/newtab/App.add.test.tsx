@@ -312,3 +312,124 @@ describe('App, adding back what an update from v0.2.3 left off', () => {
     expect(document.querySelectorAll('.widget-box')).toHaveLength(2)
   })
 })
+
+describe('App, at the Widget limit', () => {
+  const LINE = "That's all 8 widgets. Remove one to add another."
+
+  const weatherAt = (n: number, col: number, row: number) => ({
+    col,
+    h: 2,
+    id: `weather${n}`,
+    options: {},
+    row,
+    type: 'weather',
+    w: 2,
+  })
+
+  /** Eight Weathers along the top and bottom edges, the middle free; more when asked. */
+  const storedWidgets = (...extra: unknown[]) => [
+    weatherAt(1, 1, 1),
+    weatherAt(2, 3, 1),
+    weatherAt(3, 9, 1),
+    weatherAt(4, 11, 1),
+    weatherAt(5, 1, 7),
+    weatherAt(6, 3, 7),
+    weatherAt(7, 9, 7),
+    weatherAt(8, 11, 7),
+    ...extra,
+  ]
+
+  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+  const menuLine = () => document.querySelector('.add-menu__note')?.textContent ?? null
+  const clockItem = () => screen.getByRole('menuitem', { name: 'Clock' })
+  const removeWidgetBox = (id: string) => {
+    const box = document.querySelector<HTMLElement>(`[data-widget-id="${id}"]`)
+    if (!box) throw new Error(`no Widget ${id}`)
+    fireEvent.click(within(box).getByRole('button', { name: /^Remove / }))
+  }
+
+  it('adds nothing at eight, says why in the menu, and writes nothing', async () => {
+    await drawn(v023({ clock: true, weather: true }), { v: 1, widgets: storedWidgets() })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    edit()
+
+    openMenu()
+    fireEvent.click(clockItem())
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Weather' }), { key: 'Enter' })
+    await settled()
+
+    expect(menuLine()).toBe(LINE)
+    expect(clockItem().getAttribute('aria-disabled')).toBe('true')
+    expect(set).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('.widget-box')).toHaveLength(8)
+  })
+
+  it('shows nothing before the limit: at seven the menu has no line', async () => {
+    await drawn(v023({ clock: true, weather: true }), {
+      v: 1,
+      widgets: storedWidgets().slice(0, 7),
+    })
+    edit()
+
+    openMenu()
+
+    expect(menuLine()).toBeNull()
+    expect(clockItem().getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('loads nine whole, draws all nine, writes nothing, and keeps adding off', async () => {
+    await drawn(v023({ clock: true, weather: true }), {
+      v: 1,
+      widgets: storedWidgets(weatherAt(9, 5, 7)),
+    })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    edit()
+
+    expect(document.querySelectorAll('.widget-box')).toHaveLength(9)
+    openMenu()
+    expect(menuLine()).toBe(LINE)
+    await settled()
+    expect(set).not.toHaveBeenCalled()
+    expect(((await stored('layout')) as Stored).widgets).toHaveLength(9)
+  })
+
+  it('adds again once one is removed, and stops again at eight', async () => {
+    await drawn(v023({ clock: true, weather: true }), { v: 1, widgets: storedWidgets() })
+    edit()
+    removeWidgetBox('weather5')
+    await settled()
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+    openMenu()
+    expect(menuLine()).toBeNull()
+    fireEvent.click(clockItem())
+    await settled()
+
+    expect(writtenKeys(set)).toEqual(['layout'])
+    expect(((await stored('layout')) as Stored).widgets).toHaveLength(8)
+    openMenu()
+    expect(menuLine()).toBe(LINE)
+  })
+
+  it('does not count a malformed Widget, which nothing on the page can remove', async () => {
+    const malformed = { col: 'x', h: 1, id: 'badbad00', options: {}, row: 1, type: 'clock', w: 1 }
+    // Seven Weathers that are drawn, and one that is not.
+    await drawn(v023({ clock: true, weather: true }), {
+      v: 1,
+      widgets: [...storedWidgets().slice(0, 7), malformed],
+    })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    edit()
+
+    openMenu()
+    expect(menuLine()).toBeNull()
+    fireEvent.click(clockItem())
+    await settled()
+
+    expect(writtenKeys(set)).toEqual(['layout'])
+    // Kept as it was stored, with the new Widget beside it.
+    const { widgets } = (await stored('layout')) as Stored
+    expect(widgets).toContainEqual(malformed)
+    expect(widgets).toHaveLength(9)
+  })
+})

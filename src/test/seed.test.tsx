@@ -138,6 +138,16 @@ describe('the Grid stories', () => {
     expect(container.querySelectorAll('.clock')).toHaveLength(4)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('give nine Widgets from a stored Layout over the Widget limit, every one drawn', async () => {
+    await seedPage(PAGE_SEEDS.gridNineWidgets)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(screen.getAllByRole('region', { name: 'Weather' })).toHaveLength(5))
+    expect(boxes(container)).toHaveLength(9)
+    expect(container.querySelectorAll('.clock')).toHaveLength(4)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('the Grid editing stories', () => {
