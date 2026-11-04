@@ -118,9 +118,9 @@ export const EditingFocused: Story = {
 
 /**
  * A Widget just removed with its × (pressed in the story as a person would): the Clock is gone,
- * the notice says "Clock removed." with Undo above the Bottom bar, and focus has moved to the
- * next Widget, the Weather. The notice goes by itself after 8 seconds, so a story left open
- * long enough shows the Grid without it.
+ * the notice says "Clock removed." with Undo above the Bottom bar. Nothing comes after the Clock
+ * in reading order (the Weather is in row 1, before it), so focus has moved to Done. The notice
+ * goes by itself after 8 seconds, so a story left open long enough shows the Grid without it.
  */
 export const EditingWithUndo: Story = {
   beforeEach: async () => {

@@ -206,6 +206,8 @@ describe('App, removing a Widget', () => {
       fireEvent.keyDown(frameOf('clock0aa'), { key: 'Delete', repeat: true })
       fireEvent.keyDown(frameOf('clock0aa'), { key: 'Delete', metaKey: true })
       fireEvent.keyDown(frameOf('clock0aa'), { key: 'Delete', shiftKey: true })
+      fireEvent.keyDown(frameOf('clock0aa'), { altKey: true, key: 'Delete' })
+      fireEvent.keyDown(frameOf('clock0aa'), { ctrlKey: true, key: 'Delete' })
 
       expect(present('clock0aa')).toBe(true)
     })
@@ -431,6 +433,26 @@ describe('App, removing a Widget', () => {
       expect(set).not.toHaveBeenCalled()
     })
 
+    it('writes nothing for a Widget that came back by itself while Undo was pressed', async () => {
+      await drawn(THREE)
+      edit()
+      remove('clock0aa')
+      await settled()
+      // The Widget comes back (another tab) and Undo is pressed before the page has heard.
+      const button = screen.getByRole('button', { name: 'Undo' })
+      await act(async () => {
+        await fakeBrowser.storage.sync.set({ layout: THREE })
+      })
+      await waitFor(() => expect(present('clock0aa')).toBe(true))
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+      fireEvent.click(button)
+      await settled()
+
+      expect(set).not.toHaveBeenCalled()
+      expect(document.querySelectorAll('[data-widget-id="clock0aa"]')).toHaveLength(1)
+    })
+
     it('stays possible after leaving edit mode, until the notice goes', async () => {
       await drawn(THREE)
       edit()
@@ -460,6 +482,70 @@ describe('App, removing a Widget', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
       expect(screen.queryByText(/removed\./)).toBeNull()
+    })
+
+    it('keeps Undo available when it is the Undo’s own save that is refused', async () => {
+      await drawn(THREE)
+      edit()
+      remove('clock0aa')
+      await settled()
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+      set.mockRejectedValueOnce(new Error('QUOTA_BYTES'))
+
+      undo()
+      await settled()
+
+      // The Widget is still gone, the page says why, and the Undo line waits behind it.
+      expect(present('clock0aa')).toBe(false)
+      expect(screen.getByRole('status').textContent).toContain("Couldn't save that.")
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+      expect(screen.getByRole('status').textContent).toContain('Clock removed.')
+
+      undo()
+      await settled()
+
+      expect(present('clock0aa')).toBe(true)
+      expect((await storedLayout()).widgets.map(({ id }) => id)).toContain('clock0aa')
+      expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    })
+
+    it('shows the refused save over the Undo line, whichever item it was that was refused', async () => {
+      await drawn(THREE)
+      edit()
+      remove('clock0aa')
+      await settled()
+      vi.spyOn(fakeBrowser.storage.sync, 'set').mockRejectedValue(new Error('QUOTA_BYTES'))
+
+      // Something else is saved meanwhile, and refused: Dim, in the settings.
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      fireEvent.click(await screen.findByRole('switch', { name: /dim/i }))
+      await settled()
+
+      const live = screen.getByRole('status')
+      expect(live.textContent).toContain("Couldn't save that.")
+      expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    })
+  })
+
+  describe('after the Layout turned read-only', () => {
+    it('does not put a Widget back once a newer version has written the Layout', async () => {
+      await drawn(THREE)
+      edit()
+      remove('clock0aa')
+      await settled()
+      await act(async () => {
+        await fakeBrowser.storage.sync.set({ layout: { v: 2, widgets: [clock('newer000', 5)] } })
+      })
+      await waitFor(() => expect(present('newer000')).toBe(true))
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+      // The notice may still be up; pressing it changes nothing.
+      const button = screen.queryByRole('button', { name: 'Undo' })
+      if (button) fireEvent.click(button)
+      await settled()
+
+      expect(present('clock0aa')).toBe(false)
+      expect(set).not.toHaveBeenCalled()
     })
   })
 
@@ -501,6 +587,35 @@ describe('App, removing a Widget', () => {
 
       remove(idOfType('clock'))
       await settled()
+
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Done' }))
+    })
+
+    it('moves to the next Widget when the notice is dismissed from the keyboard, not to the body', async () => {
+      await drawn(THREE)
+      edit()
+      remove('clock0bb')
+      await settled()
+      const dismiss = screen.getByRole('button', { name: 'Dismiss' })
+      dismiss.focus()
+
+      fireEvent.keyDown(dismiss, { key: 'Enter' })
+      fireEvent.click(dismiss)
+      await settled()
+
+      expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull()
+      expect(document.activeElement).not.toBe(document.body)
+      expect(document.activeElement).toBe(boxOf('clock0aa'))
+    })
+
+    it('moves to the Edit controls when the notice goes by itself while its button has focus', async () => {
+      await drawn(THREE)
+      edit()
+      vi.useFakeTimers({ toFake: ['clearTimeout', 'Date', 'setTimeout'] })
+      remove('clock0aa')
+      screen.getByRole('button', { name: 'Undo' }).focus()
+      // Focus is in the notice: its time is paused. Pressing Dismiss is how it goes then.
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
 
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Done' }))
     })

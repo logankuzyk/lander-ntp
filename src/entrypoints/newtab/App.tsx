@@ -72,6 +72,7 @@ export function App() {
     layout,
     loaded: settingsLoaded && layoutLoaded,
     readOnly: layoutReadOnly,
+    saveFailures,
   })
   usePruneReadings(layout, {
     loaded: settingsLoaded && layoutLoaded,

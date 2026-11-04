@@ -35,8 +35,13 @@ export type UndoNotice = {
   onDismiss: () => void
 }
 
+/** What to focus once the Layout has changed: a Widget's frame, or the Edit controls. */
+type FocusAfter = 'controls' | { id: string }
+
 /** The Widget taken out last: the notice is about it, and Undo puts it back from this. */
 type Pending = {
+  /** Where focus goes when the notice is dismissed with focus in it, or Undo has no room. */
+  focus: FocusAfter
   /** Tells this notice from the one before it. */
   identity: string
   /** What it is called, as the notice says. */
@@ -56,10 +61,9 @@ type RemovalOptions = {
   loaded: boolean
   /** Whether a newer version wrote the Layout, so that nothing may change it. */
   readOnly: boolean
+  /** How many saves the browser has refused so far, of any item: a refused Undo is told from it. */
+  saveFailures: number
 }
-
-/** What to focus once the Layout has changed: a Widget's frame, or the Edit controls. */
-type FocusAfter = 'controls' | { id: string }
 
 const hasId = (layout: Layout, id: string) =>
   layout.widgets.some((widget) => widget.kind !== 'malformed' && widget.placed.id === id)
@@ -78,16 +82,25 @@ function nameOf(layout: Layout, id: string): string {
  * removing the Clock leaves `clock.enabled` as it was. The Widget, with its options, is held
  * here for Undo, in this tab and in memory only, until the notice goes (it is dismissed, it
  * times out, or another removal takes its place); then its options are discarded. Undo puts it
- * back in its place, or the nearest free one, in one more save, whatever the Widget limit.
+ * back in its place, or the nearest free one, in one more save, whatever the Widget limit. If
+ * the browser refuses that save the Widget is gone again, the page says so, and Undo is offered
+ * again once that line has gone.
  *
  * Focus moves on, as the frame that had it is gone: to the next Widget in reading order, else to
- * the Edit controls; after Undo, to the Widget that is back.
+ * the Edit controls; after Undo, to the Widget that is back; and when the notice is dismissed
+ * with focus in it, to where the removed Widget's neighbour is.
  *
  * `notice` is what `Notice` should say, or null. It is the page's to draw, as the page has the
  * one live region for notices. A removal that the browser then refused (the Widget is back in
  * the Layout) has no notice.
  */
-export function useRemovalController({ commit, layout, loaded, readOnly }: RemovalOptions) {
+export function useRemovalController({
+  commit,
+  layout,
+  loaded,
+  readOnly,
+  saveFailures,
+}: RemovalOptions) {
   const [pending, setPending] = useState<Pending | null>(null)
   const count = useRef(0)
   // What each change starts from: the Layout as of the last change made, so a second change
@@ -95,6 +108,11 @@ export function useRemovalController({ commit, layout, loaded, readOnly }: Remov
   const latest = useRef(layout)
   latest.current = layout
   const focusAfter = useRef<FocusAfter | null>(null)
+  const failuresNow = useRef(saveFailures)
+  failuresNow.current = saveFailures
+  // What Undo last put back, and how many saves had failed then: if a save fails and the Widget
+  // is gone again, it was Undo's own that was refused, and Undo is offered again.
+  const undone = useRef<{ failures: number; pending: Pending } | null>(null)
 
   const available = loaded && !readOnly
 
@@ -106,11 +124,14 @@ export function useRemovalController({ commit, layout, loaded, readOnly }: Remov
       if (!result.ok) return
       // After the Widget it was, in the order of the Layout as it was drawn.
       const next = nextInReadingOrder(settle(base), id)
-      focusAfter.current = next === null ? 'controls' : { id: next }
+      const focus: FocusAfter = next === null ? 'controls' : { id: next }
+      focusAfter.current = focus
+      undone.current = null
       latest.current = result.layout
       commit(result.layout)
       count.current += 1
       setPending({
+        focus,
         identity: `removed ${count.current}`,
         name: nameOf(base, id),
         removed: result.removed,
@@ -124,6 +145,8 @@ export function useRemovalController({ commit, layout, loaded, readOnly }: Remov
     const result = restoreWidget({ layout: latest.current, readOnly: false }, pending.removed)
     if (!result.ok) {
       count.current += 1
+      // The Undo button the person pressed goes: focus goes on with the notice's Dismiss.
+      focusAfter.current = pending.focus
       setPending({ ...pending, identity: `no room ${count.current}`, noRoom: true })
       return
     }
@@ -131,12 +154,18 @@ export function useRemovalController({ commit, layout, loaded, readOnly }: Remov
     if (result.layout !== latest.current) {
       latest.current = result.layout
       commit(result.layout)
+      undone.current = { failures: failuresNow.current, pending }
     }
     focusAfter.current = { id: result.id }
     setPending(null)
   }, [available, commit, pending])
 
-  const dismiss = useCallback(() => setPending(null), [])
+  const dismiss = useCallback(() => {
+    // With focus on the notice, the notice taking itself away drops focus to the page, and the
+    // frame it would have gone back to is the Widget that was removed.
+    if (document.activeElement?.closest('.notice')) focusAfter.current = pending?.focus ?? null
+    setPending(null)
+  }, [pending])
 
   // The Widget is in the Layout again: put back from another tab, or the browser refused the
   // save and the stored Layout came back. There is nothing to undo.
@@ -144,19 +173,30 @@ export function useRemovalController({ commit, layout, loaded, readOnly }: Remov
     if (pending && hasId(layout, pending.removed.id)) setPending(null)
   }, [layout, pending])
 
-  // Once the Layout has changed and been drawn: the frame that had focus is gone.
+  // Undo's own save was refused: a save has failed since, and the Widget is gone again. The
+  // Undo is not spent; the page says why (the refused save outranks it) and offers it again.
+  useEffect(() => {
+    const last = undone.current
+    if (!last || saveFailures === last.failures || hasId(layout, last.pending.removed.id)) return
+    undone.current = null
+    count.current += 1
+    setPending({ ...last.pending, identity: `removed ${count.current}` })
+  }, [layout, saveFailures])
+
+  // Once the Layout has changed and been drawn (or the notice has gone): the frame that had
+  // focus is gone. A Widget that is not there any more is not focused: the Edit controls are.
   useEffect(() => {
     const target = focusAfter.current
     if (!target) return
     focusAfter.current = null
-    const element =
+    const frame =
       target === 'controls'
-        ? document.querySelector<HTMLElement>('[data-edit-toggle]')
+        ? undefined
         : [...document.querySelectorAll<HTMLElement>('.widget-box')].find(
             (box) => box.dataset.widgetId === target.id,
           )
-    element?.focus()
-  }, [layout])
+    ;(frame ?? document.querySelector<HTMLElement>('[data-edit-toggle]'))?.focus()
+  }, [layout, pending])
 
   const controls = useMemo<RemovalControls>(() => ({ available, remove }), [available, remove])
 

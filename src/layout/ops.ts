@@ -280,11 +280,8 @@ export function restoreWidget(
 
   const { col, h, row, w } = removed
   const taken = drawnRects(layout).map(({ rect }) => rect)
-  const was = { col, h, row, w }
-  const place =
-    isOnGrid(was) && !taken.some((other) => collides(was, other))
-      ? was
-      : nearestFreeTo({ h, w }, taken, was)
+  // Its own place when that is free (the nearest place is then no distance away), else the next.
+  const place = nearestFreeTo({ h, w }, taken, { col, h, row, w })
   if (!place) return refused('no room')
 
   const widget = layoutWidget({ ...removed, ...place }, registry)
