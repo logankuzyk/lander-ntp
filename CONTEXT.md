@@ -41,5 +41,5 @@ A setting shared by the whole page that widgets can show as one of their options
 _Avoid_: Global option, shared option
 
 **Widget limit**:
-The number of widgets a user may place on the grid at once.
+The number of widgets a user may place on the grid at once (8). Each widget the page draws counts as one, at any size; one that is kept but never drawn (malformed, or with no free place) does not, since it has no × to remove it by. A layout already over it loads whole; only adding stops.
 _Avoid_: Cap, quota

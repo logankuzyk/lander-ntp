@@ -13,11 +13,13 @@ import {
   type Rect,
 } from './geometry'
 import { newId } from './id'
+import { canAdd, WIDGET_LIMIT } from './limit'
 import type { KnownWidget, Layout, PlacedWidget, WaitingOptions } from './types'
 
 /**
  * Why a change to the Layout was refused:
  *
+ * - `limit`: the Layout already holds as many Widgets as are allowed (see `limit.ts`).
  * - `no room`: there is no free place for the Widget, or it has none to be drawn in.
  * - `not found`: there is no Widget with that id this version can place. A Widget that is not
  *   well-formed is kept as it was and never changed, so it is not found either.
@@ -28,6 +30,7 @@ import type { KnownWidget, Layout, PlacedWidget, WaitingOptions } from './types'
  * - `unknown type`: this version has no definition for the Widget's type.
  */
 export type Refusal =
+  | 'limit'
   | 'no room'
   | 'not found'
   | 'outside'
@@ -124,18 +127,23 @@ function takeWaiting(
  * next smaller size that fits, down to its smallest. Any number of one type may be added.
  *
  * It starts from the options an update kept for its type, if any are waiting, and takes them out
- * of `waiting` in the same Layout; every later one starts from the defaults. The Widget limit is
- * not checked here. The Layout is settled first (see `settle`).
+ * of `waiting` in the same Layout; every later one starts from the defaults. It is refused with
+ * `limit` when the Layout already holds as many Widgets as `limit` allows (`null` allows any
+ * number): the rule lives here, so that no caller (the menu, a key, a tour) can add past it. A
+ * Layout already over the limit is not touched, only added to no further. The Layout is settled
+ * first (see `settle`).
  */
 export function addWidget(
   { layout: given, readOnly }: Editable,
   type: string,
   registry: Registry = widgetDefinition,
+  limit: number | null = WIDGET_LIMIT,
 ): Added | Refused {
   if (readOnly) return refused('read only')
   const definition = registry(type)
   if (!definition) return refused('unknown type')
   const layout = settle(given)
+  if (!canAdd(layout, limit)) return refused('limit')
 
   const { rest, taken: waitingOptions } = takeWaiting(layout, type)
   const options =
@@ -264,10 +272,10 @@ export function removeWidget({ layout: given, readOnly }: Editable, id: string):
 /**
  * Puts back a Widget `removeWidget` took out, with its id and options, in the place it had. When
  * another Widget has taken that, it goes in the free place of its size nearest to it, and when
- * there is none the answer is `no room`. Whether the Widget limit is reached is not a question
- * here: putting back what was just removed is not adding (LR-12). A Widget with that id already
- * in the Layout (put back from another tab) is left, and the Layout given comes back as it was.
- * The Layout is settled first (see `settle`).
+ * there is none the answer is `no room`. The Widget limit is not a question here: putting back
+ * what was just removed is not adding (LR-12), so a Layout may go from eight to nine this way. A
+ * Widget with that id already in the Layout (put back from another tab) is left, and the Layout
+ * given comes back as it was. The Layout is settled first (see `settle`).
  */
 export function restoreWidget(
   { layout: given, readOnly }: Editable,

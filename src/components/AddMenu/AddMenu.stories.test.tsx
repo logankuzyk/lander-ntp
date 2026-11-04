@@ -63,6 +63,40 @@ describe('the Add menu stories', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('AtLimit seeds eight Widgets, so that both items are unavailable under the Widget limit line', async () => {
+    await seed('AtLimit')
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelectorAll('.widget-box')).toHaveLength(8))
+
+    const menu = await openMenu()
+
+    expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
+      "That's all 8 widgets. Remove one to add another.",
+    )
+    for (const name of ['Clock', 'Weather']) {
+      const item = within(menu).getByRole('menuitem', { name })
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      // The line is the menu's, once: not repeated in the item.
+      expect(item.textContent).toBe(name)
+    }
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('OverLimit seeds nine Widgets, so that the Add menu is unavailable until one is removed', async () => {
+    await seed('OverLimit')
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelectorAll('.widget-box')).toHaveLength(9))
+
+    const menu = await openMenu()
+
+    expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
+      "That's all 8 widgets. Remove one to add another.",
+    )
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Clock' }).getAttribute('aria-disabled'),
+    ).toBe('true')
+  })
+
   it('WaitingOptions seeds an update with the Weather off, whose add starts from its kept place', async () => {
     await seed('WaitingOptions')
     render(<App />)

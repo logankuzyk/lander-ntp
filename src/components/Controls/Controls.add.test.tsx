@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import { menuNote } from '@/components/AddMenu/availability'
 import { EditModeProvider } from '@/components/EditMode/useEditMode'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
+import { addWidget } from '@/layout/ops'
 import type { Layout } from '@/layout/types'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 
@@ -38,19 +40,20 @@ const renderControls = ({
   loaded = true,
 }: { canChange?: boolean; layout?: Layout; loaded?: boolean } = {}) => {
   const onCommit = vi.fn()
-  render(
+  const tree = (current: Layout) => (
     <EditModeProvider canChange={canChange}>
       <Controls
-        layout={layout}
+        layout={current}
         layoutLoaded={loaded}
         onCommit={onCommit}
         onNext={vi.fn()}
         onToggleInfo={vi.fn()}
         onToggleSettings={vi.fn()}
       />
-    </EditModeProvider>,
+    </EditModeProvider>
   )
-  return { onCommit }
+  const view = render(tree(layout))
+  return { onCommit, rerender: (next: Layout) => view.rerender(tree(next)) }
 }
 
 const edit = () => fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
@@ -366,6 +369,136 @@ describe('Controls, a Widget with no room', () => {
   })
 })
 
+describe('Controls, at the Widget limit', () => {
+  /** The whole menu: its title and line, and its items. */
+  const popup = () => menu().parentElement as HTMLElement
+
+  const LINE = "That's all 8 widgets. Remove one to add another."
+
+  const weather = (id: string, col: number, row: number) => ({
+    col,
+    h: 2,
+    id,
+    options: {},
+    row,
+    type: 'weather',
+    w: 2,
+  })
+
+  /** `n` Weathers along the top and bottom edges, with the middle free for more. */
+  const weathers = (n: number): Layout =>
+    checkLayout({
+      v: 1,
+      widgets: [
+        weather('weather1', 1, 1),
+        weather('weather2', 3, 1),
+        weather('weather3', 9, 1),
+        weather('weather4', 11, 1),
+        weather('weather5', 1, 7),
+        weather('weather6', 3, 7),
+        weather('weather7', 9, 7),
+        weather('weather8', 11, 7),
+        weather('weather9', 5, 7),
+      ].slice(0, n),
+    })
+
+  it('says nothing before the limit: seven widgets, both items available', () => {
+    renderControls({ layout: weathers(7) })
+    openMenu()
+
+    expect(popup().textContent).not.toContain('widgets')
+    expect(item('Clock').getAttribute('aria-disabled')).toBeNull()
+    expect(item('Weather').getAttribute('aria-disabled')).toBeNull()
+  })
+
+  it('opens the menu from a usable Add button, with the line beside the title', () => {
+    renderControls({ layout: weathers(8) })
+    edit()
+
+    expect(addButton().hasAttribute('disabled')).toBe(false)
+    expect(addButton().getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(addButton())
+
+    const header = popup().querySelector('.add-menu__header')
+    expect(header?.textContent).toBe(`Add a widget${LINE}`)
+    expect(header?.querySelector('.add-menu__note')?.textContent).toBe(LINE)
+  })
+
+  it('makes every item unavailable but focusable, and adds nothing when pressed', () => {
+    const { onCommit } = renderControls({ layout: weathers(8) })
+    openMenu()
+
+    for (const name of ['Clock', 'Weather']) {
+      const el = item(name)
+      expect(el.getAttribute('aria-disabled')).toBe('true')
+      expect(el.hasAttribute('disabled')).toBe(false)
+      el.focus()
+      expect(document.activeElement).toBe(el)
+      fireEvent.click(el)
+      fireEvent.keyDown(el, { key: 'Enter' })
+    }
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).not.toBeNull()
+  })
+
+  it('has room for another at eight, so that the limit is what stops it', () => {
+    const result = addWidget({ layout: weathers(8), readOnly: false }, 'clock', undefined, null)
+    expect(result.ok).toBe(true)
+  })
+
+  it('reads the line once: described by the menu, not again by each item or by a live region', () => {
+    renderControls({ layout: weathers(8) })
+    openMenu()
+
+    const note = menu().getAttribute('aria-describedby')
+    expect(note).not.toBeNull()
+    expect(document.getElementById(note ?? '')?.textContent).toBe(LINE)
+    expect(document.body.textContent?.split(LINE)).toHaveLength(2)
+    for (const el of within(menu()).getAllByRole('menuitem')) {
+      expect(el.getAttribute('aria-describedby')).toBeNull()
+      expect(el.textContent).not.toContain('widgets')
+    }
+    expect(document.querySelector('[aria-live="polite"]')?.textContent).toBe('')
+  })
+
+  it('stays unavailable for a Layout of nine, which loaded whole, and is back at seven', () => {
+    const view = renderControls({ layout: weathers(9) })
+    openMenu()
+    expect(item('Clock').getAttribute('aria-disabled')).toBe('true')
+    view.rerender(weathers(8))
+    expect(item('Clock').getAttribute('aria-disabled')).toBe('true')
+
+    view.rerender(weathers(7))
+
+    expect(item('Clock').getAttribute('aria-disabled')).toBeNull()
+    expect(popup().textContent).not.toContain(LINE)
+    fireEvent.click(item('Clock'))
+    expect(view.onCommit).toHaveBeenCalledOnce()
+  })
+
+  it('says the limit rather than no room when the Grid is full as well', () => {
+    const full = checkLayout({
+      v: 1,
+      widgets: Array.from({ length: 8 }, (_, i) =>
+        clock(`clock${i}`.padEnd(8, '0'), 1 + (i % 4) * 3, 1 + Math.floor(i / 4) * 4, 3),
+      ),
+    })
+    renderControls({ layout: full })
+    openMenu()
+
+    expect(popup().textContent).toContain(LINE)
+    expect(popup().textContent).not.toContain('no room')
+  })
+
+  it('does not apply when the limit is null', () => {
+    const editable = { layout: weathers(9), readOnly: false }
+    expect(menuNote(editable, null)).toBeNull()
+    expect(menuNote(editable)).toBe(LINE)
+    expect(menuNote({ layout: weathers(7), readOnly: false })).toBeNull()
+  })
+})
+
 describe('Controls, when the Layout cannot be changed', () => {
   it('makes every item unavailable while the stored Layout has not arrived', () => {
     const { onCommit } = renderControls({ loaded: false })
@@ -384,40 +517,6 @@ describe('Controls, when the Layout cannot be changed', () => {
     expect(item('Weather').getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(item('Weather'))
     expect(onCommit).not.toHaveBeenCalled()
-  })
-
-  it('still adds at eight widgets: the Widget limit is not this menu’s to check yet', () => {
-    const weather = (id: string, col: number, row: number) => ({
-      col,
-      h: 2,
-      id,
-      options: {},
-      row,
-      type: 'weather',
-      w: 2,
-    })
-    // Eight Weathers along the top and bottom edges, with the middle free.
-    const eight = checkLayout({
-      v: 1,
-      widgets: [
-        weather('weather1', 1, 1),
-        weather('weather2', 3, 1),
-        weather('weather3', 9, 1),
-        weather('weather4', 11, 1),
-        weather('weather5', 1, 7),
-        weather('weather6', 3, 7),
-        weather('weather7', 9, 7),
-        weather('weather8', 11, 7),
-      ],
-    })
-    const { onCommit } = renderControls({ layout: eight })
-    openMenu()
-
-    expect(item('Clock').getAttribute('aria-disabled')).toBeNull()
-    fireEvent.click(item('Clock'))
-
-    const [next] = onCommit.mock.calls[0] as [Layout]
-    expect(next.widgets).toHaveLength(9)
   })
 
   it('offers a Clock on an empty Grid, as an update with the Clock off finds it', () => {

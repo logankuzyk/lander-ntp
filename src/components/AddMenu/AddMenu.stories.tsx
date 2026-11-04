@@ -50,6 +50,36 @@ export const NoRoom: Story = {
 }
 
 /**
+ * Eight Widgets, the Widget limit, with room on the Grid: the menu opens, and both items are
+ * unavailable, with the line beside its title saying why. No count is shown before this.
+ */
+export const AtLimit: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.addMenuAtLimit)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openAddMenu(canvas)
+  },
+}
+
+/**
+ * A stored Layout of nine, one over the limit, loads and draws whole; its menu says the same
+ * until enough are removed.
+ */
+export const OverLimit: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridNineWidgets)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openAddMenu(canvas)
+  },
+}
+
+/**
  * An update that had the Weather off but set up for Victoria: picking Weather from the menu adds
  * one that starts from those kept options, so it shows Victoria's forecast and not a setup button.
  */

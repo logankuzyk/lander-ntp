@@ -1649,6 +1649,16 @@ button.chip:hover {
   opacity: 0.7;
 }
 
+/*
+ * Why nothing in the menu can be added (the Widget limit): visible text, at full strength. It
+ * wraps within 13rem, so that on a narrow window, where the menu opens rightwards from Add, the
+ * line does not widen the menu past the edge of the window.
+ */
+.add-menu__note {
+  max-width: 13rem;
+  white-space: normal;
+}
+
 .add-menu__items {
   display: flex;
   flex-direction: column;

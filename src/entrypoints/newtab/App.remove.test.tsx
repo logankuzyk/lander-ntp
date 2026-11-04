@@ -416,6 +416,53 @@ describe('App, removing a Widget', () => {
       expect(set).not.toHaveBeenCalled()
     })
 
+    it('puts the Widget back even when the Layout is at the Widget limit again (LR-12)', async () => {
+      // Eight Weathers along the top and bottom edges, the middle free.
+      const weatherAt = (n: number, col: number, row: number) => ({
+        col,
+        h: 2,
+        id: `weather${n}`,
+        options: { place: PLACE, unit: 'celsius' },
+        row,
+        type: 'weather',
+        w: 2,
+      })
+      await drawn({
+        v: 1,
+        widgets: [
+          weatherAt(1, 1, 1),
+          weatherAt(2, 3, 1),
+          weatherAt(3, 9, 1),
+          weatherAt(4, 11, 1),
+          weatherAt(5, 1, 7),
+          weatherAt(6, 3, 7),
+          weatherAt(7, 9, 7),
+          weatherAt(8, 11, 7),
+        ],
+      })
+      edit()
+      remove('weather5')
+      await settled()
+      // Seven: a Clock is added, and the Layout is at the limit again, with the notice still up.
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Clock' }))
+      await settled()
+      expect((await storedLayout()).widgets).toHaveLength(8)
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+      undo()
+      await settled()
+
+      expect(present('weather5')).toBe(true)
+      expect(writtenKeys(set)).toEqual(['layout'])
+      expect((await storedLayout()).widgets).toHaveLength(9)
+      // Nine: adding stays off.
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+      expect(document.querySelector('.add-menu__note')?.textContent).toBe(
+        "That's all 8 widgets. Remove one to add another.",
+      )
+    })
+
     it('is nothing to do when the Widget is back already, such as put back from another tab', async () => {
       await drawn(THREE)
       edit()
