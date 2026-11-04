@@ -17,6 +17,7 @@ import { readOptions } from './options'
 import { hasSetup, SetupButton, type SetupNeed } from './SetupButton'
 import { useSourceState } from './source'
 import { useOptionsPopover } from './useOptionsPopover'
+import { useRemoval } from './useRemoval'
 import { WidgetState } from './WidgetState'
 
 type WidgetBoxProps<O, R, C> = {
@@ -39,6 +40,15 @@ const isOptionsKey = (event: KeyboardEvent) =>
   !event.metaKey &&
   !event.shiftKey
 
+/** Delete, or Backspace, which is what a Mac calls the Delete key: not held, not with a modifier. */
+const isRemoveKey = (event: KeyboardEvent) =>
+  (event.key === 'Delete' || event.key === 'Backspace') &&
+  !event.repeat &&
+  !event.altKey &&
+  !event.ctrlKey &&
+  !event.metaKey &&
+  !event.shiftKey
+
 /**
  * The box a Widget sits in, on the Grid: the cells of its place, a size container for the
  * Widget to lay itself out in (see `.widget-box` in the page's styles), its content centred.
@@ -50,7 +60,9 @@ const isOptionsKey = (event: KeyboardEvent) =>
  * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
  * (see Grid), which is the order Tab takes. A box given an `id` also has an Options button at
  * its top left, which opens the Widget's options in a popover beside it (see
- * `OptionsPopoverProvider`), and so does O pressed on the frame.
+ * `OptionsPopoverProvider`), and so does O pressed on the frame. It also has a remove button at
+ * its top right, which takes the Widget out of the Layout (see `useRemovalController`), as does
+ * Delete pressed on the frame.
  */
 export function Box({
   children,
@@ -58,6 +70,7 @@ export function Box({
   name,
   optionsLabel,
   rect,
+  removeLabel,
   widget,
 }: {
   children?: ComponentChildren
@@ -71,27 +84,36 @@ export function Box({
    */
   optionsLabel?: string
   rect: Rect
+  /** What the remove button is called, on the same terms as `optionsLabel`: "Remove Weather". */
+  removeLabel?: string
   widget: string
 }) {
   const { editing } = useEditMode()
   const options = useOptionsPopover()
+  const removal = useRemoval()
   const optionsId = editing && options.available ? id : undefined
+  const removeId = editing && removal.available ? id : undefined
   // Spread rather than written out: only while editing is the box a tab stop, and where O opens
-  // the Widget's options (on the frame or its own button: a key typed into anything else is
-  // that thing's).
+  // the Widget's options and Delete removes it (on the frame or its own buttons: a key typed
+  // into anything else is that thing's).
   const frame = editing
     ? {
         onKeyDown:
-          optionsId === undefined
+          optionsId === undefined && removeId === undefined
             ? undefined
             : (event: KeyboardEvent) => {
                 const own =
                   event.target === event.currentTarget ||
                   (event.target instanceof Element &&
-                    event.target.closest('.widget-box__options') !== null)
-                if (!own || !isOptionsKey(event)) return
-                event.preventDefault()
-                options.toggle(optionsId)
+                    event.target.closest('.widget-box__options, .widget-box__remove') !== null)
+                if (!own) return
+                if (optionsId !== undefined && isOptionsKey(event)) {
+                  event.preventDefault()
+                  options.toggle(optionsId)
+                } else if (removeId !== undefined && isRemoveKey(event)) {
+                  event.preventDefault()
+                  removal.remove(removeId)
+                }
               },
         tabIndex: 0,
       }
@@ -140,6 +162,29 @@ export function Box({
             <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
             <circle cx="16" cy="7" r="2" />
             <circle cx="8" cy="17" r="2" />
+          </svg>
+        </button>
+      )}
+      {removeId !== undefined && (
+        <button
+          aria-label={removeLabel ?? `Remove ${name}`}
+          class="widget-box__remove"
+          onClick={() => removal.remove(removeId)}
+          title="Remove (Delete)"
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="14"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="14"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       )}
@@ -252,6 +297,7 @@ export function WidgetBox<O, R, C>({
       name={accessibleName(definition, readOptions(definition, options))}
       optionsLabel={`${definition.name} options`}
       rect={rect}
+      removeLabel={`Remove ${definition.name}`}
       widget={definition.type}
     >
       <Contents definition={definition} id={id} options={options} page={page} />

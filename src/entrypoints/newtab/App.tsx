@@ -23,6 +23,7 @@ import { usePruneReadings } from '@/widgets/Weather/usePruneReadings'
 import type { PageValueName, PageValues } from '@/widgetSystem/definition'
 import { pageValues } from '@/widgetSystem/fromSettings'
 import { OptionsPopoverProvider } from '@/widgetSystem/useOptionsPopover'
+import { RemovalProvider, useRemovalController } from '@/widgetSystem/useRemoval'
 
 /** The popovers share the corner above the controls, so only one is open at a time. */
 type Popover = 'info' | 'settings' | null
@@ -65,6 +66,14 @@ export function App() {
   // a read-only Layout: with no Layout stored, newer settings are read as the defaults, and a
   // newer device may have a Weather. A local clean-up: it writes nothing to the synced storage,
   // and nothing to the Layout.
+  // Taking a Widget out and putting it back. Its Undo is the page's one notice, below.
+  const removal = useRemovalController({
+    commit,
+    layout,
+    loaded: settingsLoaded && layoutLoaded,
+    readOnly: layoutReadOnly,
+    saveFailures,
+  })
   usePruneReadings(layout, {
     loaded: settingsLoaded && layoutLoaded,
     readOnly: layoutReadOnly || settingsReadOnly,
@@ -192,7 +201,9 @@ export function App() {
           otherOpen={popover !== null}
           page={pageValues(settings)}
         >
-          {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+          <RemovalProvider value={removal.controls}>
+            {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+          </RemovalProvider>
         </OptionsPopoverProvider>
         {photo && <PhotoCredit photo={photo} />}
         {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
@@ -217,9 +228,14 @@ export function App() {
             }}
           />
         )}
+        {/* One notice, one live region: a refused save outranks a Widget that can be put back. */}
         <Notice
-          message={saveFailed ? "Couldn't save that. Try again in a minute." : null}
-          onDismiss={() => setSaveFailed(false)}
+          {...(saveFailed || removal.notice === null
+            ? {
+                message: saveFailed ? "Couldn't save that. Try again in a minute." : null,
+                onDismiss: () => setSaveFailed(false),
+              }
+            : removal.notice)}
         />
         <Controls
           busy={photoLoading}

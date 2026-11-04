@@ -12,7 +12,9 @@ import {
   drawnRects,
   fitNew,
   isOnGrid,
+  nearestFreeTo,
   nearestFreeToMiddle,
+  nextInReadingOrder,
   type Rect,
   ROWS,
 } from './geometry'
@@ -303,5 +305,54 @@ describe('drawnRects', () => {
 
     expect(drawnRects(big).map(({ rect: place }) => place)).toEqual([rect(1, 1, 12, 8)])
     expect(drawnRects(tiny).map(({ rect: place }) => place)).toEqual([rect(2, 2, 1, 1)])
+  })
+})
+
+describe('nearestFreeTo', () => {
+  it('takes the free place nearest the one given, not the middle', () => {
+    // The top right corner is taken: beside it is as near as below it, and the first row wins.
+    expect(nearestFreeTo({ h: 2, w: 2 }, [rect(11, 1, 2, 2)], rect(11, 1, 2, 2))).toEqual(
+      rect(9, 1, 2, 2),
+    )
+  })
+
+  it('takes the place itself when it is free', () => {
+    expect(nearestFreeTo({ h: 1, w: 3 }, [], rect(2, 7, 3, 1))).toEqual(rect(2, 7, 3, 1))
+  })
+
+  it('gives nothing when no place of that size is free', () => {
+    expect(nearestFreeTo({ h: 1, w: 1 }, [rect(1, 1, 12, 8)], rect(1, 1, 1, 1))).toBeNull()
+  })
+})
+
+describe('nextInReadingOrder', () => {
+  const clock = (id: string, col: number, row: number) => ({
+    col,
+    h: 2,
+    id,
+    options: { showDate: false, showSeconds: false },
+    row,
+    type: 'clock',
+    w: 4,
+  })
+  const layoutOf = (...widgets: unknown[]) => checkLayout({ v: 1, widgets })
+  const layout = layoutOf(clock('right', 9, 4), clock('top', 5, 1), clock('left', 1, 4))
+
+  it('is the Widget after this one, row by row from the top and left to right', () => {
+    expect(nextInReadingOrder(layout, 'top')).toBe('left')
+    expect(nextInReadingOrder(layout, 'left')).toBe('right')
+  })
+
+  it('is nothing after the last one, or for a Widget that is not there', () => {
+    expect(nextInReadingOrder(layout, 'right')).toBeNull()
+    expect(nextInReadingOrder(layout, 'nope')).toBeNull()
+  })
+
+  it('goes by where Widgets are drawn, not where they are stored', () => {
+    // 'b' is stored on top of 'a' and drawn above it, in the rows just over the middle.
+    const stacked = layoutOf(clock('a', 5, 4), clock('b', 5, 4), clock('c', 5, 7))
+
+    expect(nextInReadingOrder(stacked, 'b')).toBe('a')
+    expect(nextInReadingOrder(stacked, 'a')).toBe('c')
   })
 })

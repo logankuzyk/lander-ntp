@@ -4,7 +4,7 @@ import { fakeBrowser } from 'wxt/testing/fake-browser'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
-import { addWidget, setOptions } from '@/layout/ops'
+import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
 import { recordInstall } from '@/onboarding/install'
@@ -263,6 +263,39 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
         (widget) => widget.kind === 'known' && widget.placed.type !== 'clock',
       ),
     })),
+  },
+  {
+    layoutOnly: true,
+    name: 'remove the Clock with × or Delete (W24, removeWidget): only sync:layout, never clock.enabled',
+    write: changeLayout((layout) => {
+      const clock = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+      )
+      if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+      const removed = removeWidget({ layout, readOnly: false }, clock.placed.id)
+      if (!removed.ok) throw new Error(`the removal was refused: ${removed.reason}`)
+      return removed.layout
+    }),
+  },
+  {
+    layoutOnly: true,
+    name: 'Undo that removal (W24, restoreWidget): sync:layout alone, and the Clock is back as it was',
+    write: async () => {
+      const layout = await storeExampleLayout()
+      const clock = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+      )
+      if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+      const removed = removeWidget({ layout, readOnly: false }, clock.placed.id)
+      if (!removed.ok) throw new Error(`the removal was refused: ${removed.reason}`)
+      await layoutItem.setValue(removed.layout)
+      const restored = restoreWidget({ layout: removed.layout, readOnly: false }, removed.removed)
+      if (!restored.ok) throw new Error(`the undo was refused: ${restored.reason}`)
+      await layoutItem.setValue(restored.layout)
+      expect(
+        ((await fakeBrowser.storage.sync.get('layout')).layout as { widgets: unknown[] }).widgets,
+      ).toContainEqual(clock.placed)
+    },
   },
   {
     layoutOnly: true,

@@ -42,29 +42,31 @@ export function isOnGrid(place: Rect): boolean {
 }
 
 /**
- * How far a place's centre is from the middle of the Grid, squared, in half cells so that it is
- * a whole number. The middle is the corner between columns 6 and 7 and between rows 4 and 5.
+ * How far one place's centre is from another's, squared, in half cells so that it is a whole
+ * number. The middle of the Grid is the corner between columns 6 and 7 and between rows 4 and 5.
  */
-function distanceFromMiddle(place: Rect): number {
-  const across = 2 * place.col + place.w - (COLS + 2)
-  const down = 2 * place.row + place.h - (ROWS + 2)
+const distanceBetween = (a: Rect, b: Rect): number => {
+  const across = 2 * a.col + a.w - (2 * b.col + b.w)
+  const down = 2 * a.row + a.h - (2 * b.row + b.h)
   return across * across + down * down
 }
 
+/** A place with no size at the middle of the Grid, to measure from. */
+const MIDDLE: Rect = { col: (COLS + 2) / 2, h: 0, row: (ROWS + 2) / 2, w: 0 }
+
 /**
- * The free place of this size nearest the middle of the Grid, or null where there is none (or
- * it is bigger than the Grid). Only a Widget an even number of columns wide and an even number
- * of rows high can be exactly in the middle. Places equally near are taken row by row from the
- * top, then column by column from the left, so the answer is always the same.
+ * The free place of this size nearest `near`, or null where there is none (or it is bigger than
+ * the Grid). Places equally near are taken row by row from the top, then column by column from
+ * the left, so the answer is always the same.
  */
-export function nearestFreeToMiddle(size: Cells, taken: readonly Rect[]): Rect | null {
+export function nearestFreeTo(size: Cells, taken: readonly Rect[], near: Rect): Rect | null {
   let best: Rect | null = null
   let bestDistance = Infinity
   for (let row = 1; row + size.h - 1 <= ROWS; row++) {
     for (let col = 1; col + size.w - 1 <= COLS; col++) {
       const candidate = { col, h: size.h, row, w: size.w }
       if (taken.some((other) => collides(candidate, other))) continue
-      const distance = distanceFromMiddle(candidate)
+      const distance = distanceBetween(candidate, near)
       if (distance < bestDistance) {
         best = candidate
         bestDistance = distance
@@ -73,6 +75,14 @@ export function nearestFreeToMiddle(size: Cells, taken: readonly Rect[]): Rect |
   }
   return best
 }
+
+/**
+ * The free place of this size nearest the middle of the Grid, or null where there is none (or
+ * it is bigger than the Grid). Only a Widget an even number of columns wide and an even number
+ * of rows high can be exactly in the middle. Ties as in `nearestFreeTo`.
+ */
+export const nearestFreeToMiddle = (size: Cells, taken: readonly Rect[]): Rect | null =>
+  nearestFreeTo(size, taken, MIDDLE)
 
 /** `size` kept between the Widget's smallest and largest, one side at a time. */
 export function clampSize<O>(definition: DefinitionOf<O>, size: Cells): Cells {
@@ -168,4 +178,26 @@ export function drawnRects(layout: Layout): DrawnWidget[] {
     const place = where.get(widget)
     return place ? [{ rect: place, widget }] : []
   })
+}
+
+/**
+ * The id of the Widget drawn after this one in reading order (row by row from the top, then
+ * left to right, then by id: the order Tab takes), or null when it is the last or is not drawn.
+ * Where focus goes when a Widget is removed.
+ */
+export function nextInReadingOrder(layout: Layout, id: string): string | null {
+  const ids = drawnRects(layout)
+    .sort(
+      (a, b) =>
+        a.rect.row - b.rect.row ||
+        a.rect.col - b.rect.col ||
+        (a.widget.placed.id < b.widget.placed.id
+          ? -1
+          : a.widget.placed.id > b.widget.placed.id
+            ? 1
+            : 0),
+    )
+    .map(({ widget }) => widget.placed.id)
+  const at = ids.indexOf(id)
+  return at < 0 ? null : (ids[at + 1] ?? null)
 }
