@@ -148,6 +148,30 @@ describe('the Grid stories', () => {
     expect(container.querySelectorAll('.clock')).toHaveLength(4)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('give the resize stories a Clock with room all round it, and the Weather in the corner', async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    const { container } = render(<App />)
+
+    await screen.findByRole('region', { name: 'Weather' })
+    expect(boxes(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '3 / span 4', '3 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the resize stories a Clock and a Weather one column apart, in the same rows', async () => {
+    await seedPage(PAGE_SEEDS.gridResizeBeside)
+    const { container } = render(<App />)
+
+    await screen.findByRole('region', { name: 'Weather' })
+    expect(boxes(container)).toEqual([
+      ['clock', '3 / span 4', '4 / span 2'],
+      ['weather', '8 / span 2', '4 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('the Grid editing stories', () => {

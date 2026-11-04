@@ -5,7 +5,15 @@ import { useEditMode } from '@/components/EditMode/useEditMode'
 import { COLS, drawnRects, type Rect, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 
-import { drop, type GridBox, move, type MoveSession, pickUp, toCells } from './moveSession'
+import {
+  drop,
+  type GridBox,
+  move,
+  pickUp,
+  pickUpResize,
+  type Session,
+  toCells,
+} from './moveSession'
 
 /** How far the pointer goes, in pixels, before a press is a drag: less is a click that wobbled. */
 const MOUSE_DISTANCE = 4
@@ -13,19 +21,25 @@ const MOUSE_DISTANCE = 4
 const TOUCH_DISTANCE = 10
 
 /**
- * A press on one of these is theirs and not a drag's: the Options button (and the remove button
- * to come), links and fields. The setup button is the exception, because it can fill a small
- * Widget's box and the Widget would then have nothing left to take hold of: a press on it that
- * moves is a drag, and one that does not is a press.
+ * A press on one of these is theirs and not a drag's: the Options button and the remove button,
+ * links and fields. The setup button is the exception, because it can fill a small Widget's box
+ * and the Widget would then have nothing left to take hold of: a press on it that moves is a
+ * drag, and one that does not is a press.
  */
 const OWN_PRESS = 'button:not(.widget-setup), a, input, select, textarea, [contenteditable]'
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 
+/** The resize handle at a Widget's bottom right corner: a press on it is a resize, not a move. */
+const HANDLE = '.widget-box__resize'
+
 /** Where a dragged Widget would land, for the outline: drawn in the Grid's cells. */
 export type Ghost = { place: Rect; valid: boolean }
 
-/** A pointer that went down on a Widget, from its press to its release. */
+/**
+ * A pointer that went down on a Widget (a move) or on its handle (a resize), from its press to
+ * its release. Which it is was decided by where the press fell, and does not change after.
+ */
 type Press = {
   /** The Widget's box. */
   box: HTMLElement
@@ -33,7 +47,7 @@ type Press = {
   cancelled: boolean
   pointerId: number
   pointerType: string
-  session: MoveSession
+  session: Session
   /** Whether the pointer has gone far enough for this to be a drag. */
   started: boolean
   x: number
@@ -51,18 +65,22 @@ type Options = {
 const px = (value: number) => Math.round(value * 100) / 100
 
 /**
- * Moving a Widget by dragging it, the pointer's side of `moveSession`: the Grid (on its element,
- * with `handlers`) hears the presses, moves and releases of its Widgets' boxes, and works out
- * the rest in cells.
+ * Moving a Widget by dragging it and resizing it by dragging its handle, the pointer's side of
+ * `moveSession`: the Grid (on its element, with `handlers`) hears the presses, moves and releases
+ * of its Widgets' boxes, and works out the rest in cells. A press on the handle (the bottom right
+ * corner) is a resize and any other press is a move; one never turns into the other.
  *
  * - A press that goes far enough takes the pointer for the Widget's box and starts a drag. The
  *   Widget follows the pointer by a `transform`, which is set on the box itself and not through a
- *   render, so a move redraws nothing else. `ghost` is where it would land, for the Grid to draw.
+ *   render, so a move redraws nothing else; a resize does the same with the box's `width` and
+ *   `height`, from its top left corner, so the Widget lays itself out in the size under the
+ *   pointer. `ghost` is where it would land, for the Grid to draw.
  * - Under reduced motion (watched live, so a change in the middle of a drag counts) the Widget
- *   jumps from cell to cell instead of following.
- * - Release saves once, with `commit`, if the place is allowed and is not where the Widget was.
- *   Anything else puts the Widget back without a word: a refused place, Escape, a pointer the
- *   browser cancelled or took away, edit mode ending, the Widget going from the Layout.
+ *   jumps from cell to cell, or from size to size, instead of following.
+ * - Release saves once, with `commit`, if the place is allowed and is not where the Widget was
+ *   (or the size it had). Anything else puts the Widget back without a word: a refused place,
+ *   Escape, a pointer the browser cancelled or took away, edit mode ending, the Widget going from
+ *   the Layout.
  * - It saves nothing on a Layout that may not be changed, and drags nothing.
  * - The click a browser sends after a drag is swallowed once, so a Widget's own button, pressed to
  *   start one, is not also pressed.
@@ -98,7 +116,9 @@ export function useGridMove({ commit, grid, layout }: Options) {
   /** Puts the box back as the Layout has it, with no outline. Leaves `press` for its release. */
   const putBack = useCallback((held: Press) => {
     held.box.style.transform = ''
-    held.box.classList.remove('widget-box--moving')
+    held.box.style.width = ''
+    held.box.style.height = ''
+    held.box.classList.remove('widget-box--moving', 'widget-box--resizing')
     setGhost(null)
   }, [])
 
@@ -152,19 +172,30 @@ export function useGridMove({ commit, grid, layout }: Options) {
   }, [layout, cancel])
 
   /** Shows the session: the Widget where the pointer has it, and the outline where it lands. */
-  const show = (held: Press, session: MoveSession, gridBox: GridBox) => {
+  const show = (held: Press, session: Session, gridBox: GridBox) => {
     // Cells are not square: the Grid's own width and height are what a column and a row are.
     const cell = { height: gridBox.height / ROWS, width: gridBox.width / COLS }
-    // Under reduced motion it sits at the cell it would land in, and does not follow.
-    const where = reduced.current
-      ? { col: session.place.col - 1, row: session.place.row - 1 }
-      : session.at
-    const x = px((where.col - (session.origin.col - 1)) * cell.width)
-    const y = px((where.row - (session.origin.row - 1)) * cell.height)
-    held.box.style.transform = `translate(${x}px, ${y}px)`
+    if (session.kind === 'resize') {
+      // Under reduced motion it is the whole cells it would be, and does not follow.
+      const size = reduced.current ? session.place : session.size
+      held.box.style.width = `${px(size.w * cell.width)}px`
+      held.box.style.height = `${px(size.h * cell.height)}px`
+    } else {
+      // Under reduced motion it sits at the cell it would land in, and does not follow.
+      const where = reduced.current
+        ? { col: session.place.col - 1, row: session.place.row - 1 }
+        : session.at
+      const x = px((where.col - (session.origin.col - 1)) * cell.width)
+      const y = px((where.row - (session.origin.row - 1)) * cell.height)
+      held.box.style.transform = `translate(${x}px, ${y}px)`
+    }
     const { place, valid } = session
     setGhost((was) =>
-      was?.valid === valid && was.place.col === place.col && was.place.row === place.row
+      was?.valid === valid &&
+      was.place.col === place.col &&
+      was.place.row === place.row &&
+      was.place.w === place.w &&
+      was.place.h === place.h
         ? was
         : { place, valid },
     )
@@ -180,6 +211,8 @@ export function useGridMove({ commit, grid, layout }: Options) {
     // The same pointer pressing again: the release of the last was missed. It is over.
     if (held) cancel()
     if (target.closest(OWN_PRESS)) return
+    // The handle is not a control (a span), so a press on it gets this far, and is a resize.
+    const handle = target.closest(HANDLE)
     const box = target.closest<HTMLElement>('.widget-box')
     const id = box?.dataset.widgetId
     if (!box || !id || !grid.current.contains(box)) return
@@ -188,7 +221,8 @@ export function useGridMove({ commit, grid, layout }: Options) {
       grid.current.getBoundingClientRect(),
     )
     if (!pointer) return
-    const session = pickUp({ layout: latest.current, readOnly: !changeable.current }, id, pointer)
+    const editable = { layout: latest.current, readOnly: !changeable.current }
+    const session = handle ? pickUpResize(editable, id, pointer) : pickUp(editable, id, pointer)
     if (!session) return
     press.current = {
       box,
@@ -230,7 +264,9 @@ export function useGridMove({ commit, grid, layout }: Options) {
       } catch {
         // The pointer is gone already (a touch lifted): its release has nothing to drop.
       }
-      held.box.classList.add('widget-box--moving')
+      held.box.classList.add(
+        held.session.kind === 'resize' ? 'widget-box--resizing' : 'widget-box--moving',
+      )
     }
     const gridBox = grid.current.getBoundingClientRect()
     const pointer = toCells({ x: event.clientX, y: event.clientY }, gridBox)

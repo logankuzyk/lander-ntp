@@ -187,6 +187,24 @@ const TWO_WEATHERS: StoredLayout = {
 }
 
 /**
+ * A Clock with room to grow all round it (columns 3 to 6, rows 3 and 4: its largest, 8 by 4,
+ * fits from there) and the Weather in the top right corner: the resize stories pull its handle.
+ */
+const RESIZE_ROOM: StoredLayout = {
+  v: 1,
+  widgets: [clockAt('clock0aa', 3, 3, 4), weatherAt('weather1', 11, 1)],
+}
+
+/**
+ * A Clock (columns 3 to 6) and a Weather (columns 8 and 9) in the same two rows, with a column
+ * between them: growing the Clock by one column touches the Weather, by two takes its cells.
+ */
+const RESIZE_BESIDE: StoredLayout = {
+  v: 1,
+  widgets: [clockAt('clock0aa', 3, 4, 4), weatherAt('weather1', 8, 4)],
+}
+
+/**
  * A Clock in the middle and a Weather with room on its right (column 2, row 2): the options
  * popover opens to the right of it. Stored, so the page draws it where it says.
  */
@@ -245,6 +263,20 @@ export const PAGE_SEEDS = {
   /** A stored Layout of nine, over the Widget limit: all nine are drawn. */
   gridNineWidgets: {
     layout: NINE_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** A Clock and a Weather one column apart: to pull the handle onto a neighbour. */
+  gridResizeBeside: {
+    layout: RESIZE_BESIDE,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** A Clock with room all round it, and the Weather in the corner: to pull the handle. */
+  gridResizeRoom: {
+    layout: RESIZE_ROOM,
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),

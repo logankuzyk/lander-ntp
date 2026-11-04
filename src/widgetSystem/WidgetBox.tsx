@@ -62,7 +62,8 @@ const isRemoveKey = (event: KeyboardEvent) =>
  * its top left, which opens the Widget's options in a popover beside it (see
  * `OptionsPopoverProvider`), and so does O pressed on the frame. It also has a remove button at
  * its top right, which takes the Widget out of the Layout (see `useRemovalController`), as does
- * Delete pressed on the frame.
+ * Delete pressed on the frame. At its bottom right is the resize handle, which the Grid hears
+ * (see `useGridMove`); the box itself has nothing of a drag in it.
  */
 export function Box({
   children,
@@ -91,11 +92,15 @@ export function Box({
   removeLabel?: string
   widget: string
 }) {
-  const { editing } = useEditMode()
+  const { canChange, editing } = useEditMode()
   const options = useOptionsPopover()
   const removal = useRemoval()
   const optionsId = editing && options.available ? id : undefined
   const removeId = editing && removal.available ? id : undefined
+  // Only a Widget with an id has sizes to resize between (a type this version does not know has
+  // none), and only where the Layout may be changed. Whether it can be pressed is the Grid's say
+  // (`grid--movable`), which also needs somewhere to save the result.
+  const resizable = editing && canChange && id !== undefined
   // Spread rather than written out: only while editing is the box a tab stop, and where O opens
   // the Widget's options and Delete removes it (on the frame or its own buttons: a key typed
   // into anything else is that thing's).
@@ -190,6 +195,25 @@ export function Box({
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
+      )}
+      {resizable && (
+        // Not a button: it is for a pointer, which the Grid hears (see useGridMove), and Tab has
+        // enough stops. The keyboard resizes a Widget that is picked up.
+        <span aria-hidden="true" class="widget-box__resize" title="Drag to resize">
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="14"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="14"
+          >
+            <path d="M20 10L10 20M20 16l-4 4" />
+          </svg>
+        </span>
       )}
       {editing && (
         <span aria-hidden="true" class="widget-box__name">

@@ -60,10 +60,11 @@ function Dots() {
  * In edit mode the dots show over the Grid and each box is a frame (see Box). A polite live
  * region says so; it is on the page from the start, empty, so that what it says is announced.
  *
- * Also in edit mode, a Widget can be dragged to another place (see `useGridMove`): the Grid hears
- * the pointer for all its boxes, so a box has nothing of it in it. Where the Widget would land
- * is outlined, and the Layout is saved once, with `commit`, when it is put down. Nothing else
- * here saves anything.
+ * Also in edit mode, a Widget can be dragged to another place and resized by the handle at its
+ * bottom right corner (see `useGridMove`): the Grid hears the pointer for all its boxes, so a box
+ * has nothing of it in it. Where the Widget would land, or what cells it would have, is
+ * outlined, and the Layout is saved once, with `commit`, when it is put down. Nothing else here
+ * saves anything.
  */
 export function Grid({ commit, layout, page }: GridProps) {
   const { editing } = useEditMode()
