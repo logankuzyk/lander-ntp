@@ -202,7 +202,9 @@ export function App() {
           page={pageValues(settings)}
         >
           <RemovalProvider value={removal.controls}>
-            {settingsLoaded && layoutLoaded && <Grid layout={layout} page={pageValues(settings)} />}
+            {settingsLoaded && layoutLoaded && (
+              <Grid commit={commit} layout={layout} page={pageValues(settings)} />
+            )}
           </RemovalProvider>
         </OptionsPopoverProvider>
         {photo && <PhotoCredit photo={photo} />}

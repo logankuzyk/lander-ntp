@@ -135,6 +135,54 @@ body {
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
 
+/*
+ * Dragging a Widget (see useGridMove). Where it can be dragged (edit mode, on a Layout that can be
+ * changed) a touch is the Widget's and not the page's, or the browser would scroll or zoom
+ * instead, and a press must not start selecting the text inside it. A press that moves takes the
+ * pointer for the box, which the script lifts above the others and moves by a transform, so
+ * nothing about it transitions: it follows the pointer, or jumps a cell under reduced motion.
+ */
+.grid--movable .widget-box {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.widget-box.widget-box--moving {
+  z-index: 2;
+  cursor: grabbing;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 45%),
+    0 0.5rem 1.5rem rgb(0 0 0 / 40%);
+}
+
+/*
+ * Where the Widget being dragged will land: its cells, outlined, under the Widget (it comes
+ * before the boxes, which are positioned, so they paint above it). Red where the place is
+ * refused, and dashed as well, so that it does not depend on seeing red. It never takes a press:
+ * the pointer is the box's.
+ */
+.grid__ghost {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+
+.grid__ghost[data-valid='true'] {
+  border: 2px solid rgb(255 255 255 / 90%);
+  background: rgb(255 255 255 / 14%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 40%);
+}
+
+.grid__ghost[data-valid='false'] {
+  border: 2px dashed rgb(255 99 99);
+  background: rgb(220 38 38 / 30%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 55%);
+}
+
 .widget-box__name {
   position: absolute;
   bottom: 0.375rem;
