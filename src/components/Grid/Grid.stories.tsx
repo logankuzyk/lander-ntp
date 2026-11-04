@@ -4,6 +4,7 @@ import { userEvent } from 'storybook/test'
 import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
+import { holdDrag } from '../../../.storybook/holdDrag'
 import { startEditing } from '../../../.storybook/startEditing'
 
 // The whole page, as `App` stories are: no `withPage`. Each story seeds the storage it needs, and
@@ -141,5 +142,63 @@ export const EditingWithUndo: Story = {
   play: async ({ canvasElement }) => {
     const canvas = await startEditing(canvasElement)
     await userEvent.click(await canvas.findByRole('button', { name: 'Remove Clock' }))
+  },
+}
+
+/**
+ * The Clock picked up and held two columns left and one row down: it follows the pointer, and an
+ * outline shows the cells it will land in (column 3, row 5). The pointer is still down, so nothing
+ * has been saved.
+ */
+export const Dragging: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdDrag(canvasElement, 'Clock', { cols: -2, rows: 1 })
+  },
+}
+
+/**
+ * The Clock held over the Weather in the top right corner: the outline is red and dashed, because
+ * the place is refused. Letting go would put the Clock back, with no error and nothing saved.
+ */
+export const DraggingRefused: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdDrag(canvasElement, 'Clock', { cols: 4, rows: -3 })
+  },
+}
+
+/**
+ * Dragging with the system asking for reduced motion: the Clock does not follow the pointer, it
+ * sits in the cell it will land in. It is held a little off the cell, so following would show.
+ */
+export const DraggingReducedMotion: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    const restoreFetch = sendNothing()
+    const real = window.matchMedia.bind(window)
+    // Only the question about motion is answered differently; its answer never changes here.
+    window.matchMedia = (query: string) =>
+      query.includes('prefers-reduced-motion')
+        ? ({
+            addEventListener: () => {},
+            matches: true,
+            media: query,
+            removeEventListener: () => {},
+          } as unknown as MediaQueryList)
+        : real(query)
+    return () => {
+      window.matchMedia = real
+      restoreFetch()
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await holdDrag(canvasElement, 'Clock', { cols: -2.3, rows: 1 })
   },
 }

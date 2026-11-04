@@ -69,6 +69,7 @@ export function Box({
   id,
   name,
   optionsLabel,
+  placedId,
   rect,
   removeLabel,
   widget,
@@ -83,6 +84,8 @@ export function Box({
    * as the button is read inside the box's group, which has the full name. By default the box's.
    */
   optionsLabel?: string
+  /** The id a box with no `id` of its own is stored under, so that it can be dragged (see Grid). */
+  placedId?: string
   rect: Rect
   /** What the remove button is called, on the same terms as `optionsLabel`: "Remove Weather". */
   removeLabel?: string
@@ -125,7 +128,7 @@ export function Box({
       // What a callout points at (see onboarding/target): a Widget by its type.
       data-callout-target={`widget:${widget}`}
       data-widget={widget}
-      data-widget-id={id}
+      data-widget-id={id ?? placedId}
       role="group"
       style={{
         gridColumn: `${rect.col} / span ${rect.w}`,

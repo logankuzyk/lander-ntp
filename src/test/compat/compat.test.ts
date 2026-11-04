@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { drop, move, pickUp } from '@/components/EditMode/moveSession'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
@@ -361,6 +362,33 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     }),
   },
   {
+    layoutOnly: true,
+    name: 'drag a Widget to a new place (W21: one drop, sync:layout alone, nothing in sync:settings)',
+    write: changeLayout((layout) => {
+      // The Clock, grabbed at its top left corner, one cell left and one down: as a drop makes it.
+      const clock = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+      )
+      if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+      const { col, row } = clock.placed
+      const held = pickUp({ layout, readOnly: false }, clock.placed.id, {
+        col: col - 1,
+        row: row - 1,
+      })
+      if (!held) throw new Error('the Clock could not be picked up')
+      const next = drop(move(held, { col: col - 2, row }), { layout, readOnly: false })
+      if (!next) throw new Error('the drop was refused')
+      // It did move: a row that saved a Layout nothing had changed in would prove nothing.
+      const after = next.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.id === clock.placed.id,
+      )
+      if (after?.kind !== 'known' || after.placed.col !== col - 1 || after.placed.row !== row + 1) {
+        throw new Error('the drop did not move the Clock')
+      }
+      return next
+    }),
+  },
+  {
     name: 'the shared 24-hour switch in a popover, after a first Layout write: clock.hour12 only',
     write: async () => {
       await storeExampleLayout()
@@ -460,6 +488,34 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       expect(onboarding).toEqual(stored.onboarding)
     },
   )
+})
+
+describe('a drop’s write (W21)', () => {
+  it('stores the moved Layout and leaves sync:settings and sync:onboarding byte-equal, readable by v0.2.3', async () => {
+    await settingsItem.setValue(SEED)
+    await onboardingItem.setValue(SEED_ONBOARDING)
+    const before = await storeExampleLayout()
+    const clock = before.widgets.find(
+      (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+    )
+    if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+    const { col, id, row } = clock.placed
+    const held = pickUp({ layout: before, readOnly: false }, id, { col: col - 1, row: row - 1 })
+    if (!held) throw new Error('the Clock could not be picked up')
+    const next = drop(move(held, { col: col - 2, row }), { layout: before, readOnly: false })
+    if (!next) throw new Error('the drop was refused')
+
+    await layoutItem.setValue(next)
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    expect(stored.settings).toEqual(SEED)
+    expect(stored.onboarding).toEqual(SEED_ONBOARDING)
+    const moved = (stored.layout as { widgets: { col: number; id: string; row: number }[] }).widgets
+    expect(moved.find((widget) => widget.id === id)).toMatchObject({ col: col - 1, row: row + 1 })
+    const { fellBack, settings } = await asV023(stored)
+    expect(fellBack).toBe(false)
+    expect(settings).toEqual(stored.settings)
+  })
 })
 
 describe('the options popover’s writes', () => {

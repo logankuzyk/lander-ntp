@@ -1,12 +1,20 @@
 import type { JSX } from 'preact'
+import { useRef } from 'preact/hooks'
 
 import { useEditMode } from '@/components/EditMode/useEditMode'
+import { useGridMove } from '@/components/EditMode/useGridMove'
 import { COLS, drawnRects, type DrawnWidget, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 import type { PageValues } from '@/widgetSystem/definition'
 import { Box, WidgetBox } from '@/widgetSystem/WidgetBox'
 
 type GridProps = {
+  /**
+   * Saves the whole Layout (`useLayout`'s `commit`), once for each Widget put down in a new place.
+   * The Grid is only drawn once the stored Layout has arrived, which is what `commit` waits for.
+   * Without it the Widgets cannot be dragged (a story or a test drawing the Grid alone).
+   */
+  commit?: (next: Layout) => void
   layout: Layout
   page: PageValues
 }
@@ -51,17 +59,37 @@ function Dots() {
  *
  * In edit mode the dots show over the Grid and each box is a frame (see Box). A polite live
  * region says so; it is on the page from the start, empty, so that what it says is announced.
+ *
+ * Also in edit mode, a Widget can be dragged to another place (see `useGridMove`): the Grid hears
+ * the pointer for all its boxes, so a box has nothing of it in it. Where the Widget would land
+ * is outlined, and the Layout is saved once, with `commit`, when it is put down. Nothing else
+ * here saves anything.
  */
-export function Grid({ layout, page }: GridProps) {
+export function Grid({ commit, layout, page }: GridProps) {
   const { editing } = useEditMode()
+  const grid = useRef<HTMLDivElement>(null)
+  const { ghost, handlers, movable } = useGridMove({ commit, grid, layout })
   return (
     <>
       <div
-        class={editing ? 'grid grid--editing' : 'grid'}
+        class={`grid${editing ? ' grid--editing' : ''}${movable ? ' grid--movable' : ''}`}
+        ref={grid}
         // The styles lay the cells out from these, so the Grid's size is geometry.ts's alone.
         style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
+        {...handlers}
       >
         {editing && <Dots />}
+        {ghost && (
+          <div
+            aria-hidden="true"
+            class="grid__ghost"
+            data-valid={String(ghost.valid)}
+            style={{
+              gridColumn: `${ghost.place.col} / span ${ghost.place.w}`,
+              gridRow: `${ghost.place.row} / span ${ghost.place.h}`,
+            }}
+          />
+        )}
         {drawnRects(layout)
           .sort(inReadingOrder)
           .map(({ rect, widget }) =>
@@ -78,6 +106,7 @@ export function Grid({ layout, page }: GridProps) {
               <Box
                 key={widget.placed.id}
                 name="Unknown widget"
+                placedId={widget.placed.id}
                 rect={rect}
                 widget={widget.placed.type}
               >
