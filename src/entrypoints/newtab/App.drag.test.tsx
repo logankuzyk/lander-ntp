@@ -292,3 +292,53 @@ describe('App, dragging with the options popover open', () => {
     expect(box('clock').style.gridColumn).toBe('3 / span 4')
   })
 })
+
+describe('App, dragging and the remove button', () => {
+  const remove = () => screen.getByRole('button', { name: 'Remove Clock' })
+  const widgets = async () =>
+    ((await stored('layout')) as { widgets: { id: string }[] }).widgets.map((w) => w.id)
+
+  it('does not start a drag from the × of a Widget, which still removes it when pressed', async () => {
+    await drawn()
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+    press(remove(), 450, 350)
+    drag(remove(), 250, 350)
+    expect(document.querySelector('.grid__ghost')).toBeNull()
+    expect(document.querySelector('.widget-box--moving')).toBeNull()
+    release(remove(), 250, 350)
+    await settled()
+    // A press that moved and let go is not a click of anything, and a drag was not started.
+    expect(set).not.toHaveBeenCalled()
+    expect(await widgets()).toContain('clock0aa')
+
+    fireEvent.click(remove())
+    await settled()
+    expect(await widgets()).toEqual(['weather1'])
+    expect(writtenKeys(set)).toEqual(['layout'])
+  })
+
+  it('does not remove the Widget when a drag ends over its ×: the click after a drag is swallowed', async () => {
+    await drawn()
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const clock = box('clock')
+
+    press(clock, 450, 350)
+    drag(clock, 250, 350)
+    release(clock, 250, 350)
+    // What a browser sends right after a release over a button.
+    fireEvent.click(remove())
+    await settled()
+
+    // The Clock moved (one write) and was not removed.
+    expect(writtenKeys(set)).toEqual(['layout'])
+    expect(await widgets()).toEqual(['clock0aa', 'weather1'])
+    expect(await placeInStorage('clock0aa')).toEqual({ col: 3, row: 4 })
+
+    // The next click is a click again.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    fireEvent.click(remove())
+    await settled()
+    expect(await widgets()).toEqual(['weather1'])
+  })
+})

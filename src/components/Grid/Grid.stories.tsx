@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
+import { userEvent } from 'storybook/test'
 
 import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
@@ -113,6 +114,23 @@ export const EditingFocused: Story = {
     // Where Tab goes first: the frames come before the Bottom bar in the page.
     const [first] = await canvas.findAllByRole('group')
     first?.focus()
+  },
+}
+
+/**
+ * A Widget just removed with its × (pressed in the story as a person would): the Clock is gone,
+ * the notice says "Clock removed." with Undo above the Bottom bar. Nothing comes after the Clock
+ * in reading order (the Weather is in row 1, before it), so focus has moved to Done. The notice
+ * goes by itself after 8 seconds, so a story left open long enough shows the Grid without it.
+ */
+export const EditingWithUndo: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Remove Clock' }))
   },
 }
 

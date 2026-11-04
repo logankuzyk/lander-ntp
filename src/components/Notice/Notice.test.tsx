@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/preact'
+import { act, fireEvent, render, screen } from '@testing-library/preact'
 import { useState } from 'preact/hooks'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Notice } from './Notice'
 
@@ -81,5 +81,164 @@ describe('Notice', () => {
 
       expect(document.activeElement).toBe(other)
     })
+  })
+})
+
+describe('Notice with an action', () => {
+  it('has the action beside the line, and Dismiss', () => {
+    const onClick = vi.fn()
+    render(
+      <Notice action={{ label: 'Undo', onClick }} message="Clock removed." onDismiss={() => {}} />,
+    )
+
+    expect(
+      screen
+        .getAllByRole('button')
+        .map((button) => button.textContent || button.getAttribute('aria-label')),
+    ).toEqual(['Undo', 'Dismiss'])
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(onClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the line, and not the buttons, in its live region as the first thing', () => {
+    render(
+      <Notice
+        action={{ label: 'Undo', onClick: () => {} }}
+        message="Clock removed."
+        onDismiss={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('status').textContent?.startsWith('Clock removed.')).toBe(true)
+  })
+})
+
+describe('Notice, keeping its words together', () => {
+  it('marks the line that has a button beside it, so its words stay on one line', () => {
+    const { rerender } = render(<Notice message="Clock removed." onDismiss={() => {}} />)
+    expect(document.querySelector('.callout--has-action')).toBeNull()
+
+    rerender(
+      <Notice
+        action={{ label: 'Undo', onClick: () => {} }}
+        message="Clock removed."
+        onDismiss={() => {}}
+      />,
+    )
+
+    expect(document.querySelector('.callout--has-action')).not.toBeNull()
+  })
+})
+
+describe('Notice that goes by itself', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const shown = (onDismiss: () => void, extra: { identity?: string } = {}) => (
+    <Notice
+      action={{ label: 'Undo', onClick: () => {} }}
+      autoDismissMs={8000}
+      message="Clock removed."
+      onDismiss={onDismiss}
+      {...extra}
+    />
+  )
+
+  it('is dismissed after the time given, and not before', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(shown(onDismiss))
+
+    act(() => {
+      vi.advanceTimersByTime(7999)
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits while the pointer is over it, and goes after what was left when the pointer leaves', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(shown(onDismiss))
+    const line = screen.getByRole('button', { name: 'Undo' }).closest('.callout') as HTMLElement
+
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    fireEvent.mouseEnter(line)
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    fireEvent.mouseLeave(line)
+    act(() => {
+      vi.advanceTimersByTime(2999)
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits while a button in it has focus, and goes after what was left when focus leaves', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(shown(onDismiss))
+    const undo = screen.getByRole('button', { name: 'Undo' })
+
+    act(() => {
+      vi.advanceTimersByTime(6000)
+    })
+    act(() => undo.focus())
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    act(() => undo.blur())
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts the time again for a new notice with the same words', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    const { rerender } = render(shown(onDismiss, { identity: 'first' }))
+    act(() => {
+      vi.advanceTimersByTime(7000)
+    })
+
+    rerender(shown(onDismiss, { identity: 'second' }))
+    act(() => {
+      vi.advanceTimersByTime(7000)
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays for as long as the page keeps it when it has no time', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(<Notice message="Stays." onDismiss={onDismiss} />)
+
+    act(() => {
+      vi.advanceTimersByTime(600_000)
+    })
+
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 })

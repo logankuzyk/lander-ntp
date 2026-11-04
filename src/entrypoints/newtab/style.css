@@ -201,10 +201,12 @@ body {
 }
 
 /*
- * The Options button, in the top left corner a frame keeps for it: round, dark enough to read on
- * a bright photo, and bigger to hit than it looks (the ring is 1.75rem, the icon 14px).
+ * The Options button, in the top left corner a frame keeps for it, and the remove button, in the
+ * top right: round, dark enough to read on a bright photo, and bigger to hit than they look (the
+ * ring is 1.75rem, the icon 14px).
  */
-.widget-box__options {
+.widget-box__options,
+.widget-box__remove {
   position: absolute;
   top: 0.375rem;
   left: 0.375rem;
@@ -222,15 +224,44 @@ body {
   transition: background-color 150ms;
 }
 
+.widget-box__remove {
+  right: 0.375rem;
+  left: auto;
+}
+
 .widget-box__options:hover,
-.widget-box__options[aria-expanded='true'] {
+.widget-box__options[aria-expanded='true'],
+.widget-box__remove:hover {
   background: rgb(0 0 0 / 70%);
 }
 
-.widget-box__options:focus-visible {
+.widget-box__options:focus-visible,
+.widget-box__remove:focus-visible {
   outline: 2px solid var(--color-fg);
   outline-offset: 1px;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
+}
+
+/*
+ * A box under 72px wide (the Weather's smallest on a phone: 2 columns of a 390px window) has no
+ * room for both buttons at full size, and they would sit on each other. They shrink to fit, and
+ * keep clear of one another.
+ */
+@container (max-width: 4.5rem) {
+  .widget-box__options,
+  .widget-box__remove {
+    top: 0.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .widget-box__options {
+    left: 0.25rem;
+  }
+
+  .widget-box__remove {
+    right: 0.25rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -239,7 +270,8 @@ body {
     animation: none;
   }
 
-  .widget-box__options {
+  .widget-box__options,
+  .widget-box__remove {
     transition: none;
   }
 }
@@ -1920,6 +1952,20 @@ button.chip:hover {
 
 .callout--notice .callout__header {
   align-items: flex-start;
+}
+
+/*
+ * A notice with a button beside it ("Clock removed.  Undo") keeps its words on one line and is
+ * as wide as they, the button and the Dismiss need (its usual width is a share of its parent,
+ * which has no width of its own).
+ */
+.callout--has-action {
+  width: max-content;
+  max-width: calc(100vw - 3rem);
+}
+
+.callout--has-action .callout__header span {
+  white-space: nowrap;
 }
 
 /* A stop on the tour: to the left of the settings panel, level with its foot. */
