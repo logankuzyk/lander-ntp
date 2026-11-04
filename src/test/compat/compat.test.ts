@@ -8,6 +8,7 @@ import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
 import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
+import { NEWS } from '@/onboarding/callouts'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
@@ -405,6 +406,18 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       ...record,
       dismissed: [...record.dismissed, 'a-later-callout'],
     })),
+  },
+  {
+    name: 'dismiss the update note about the Layout (W30; from a record v0.2.3 stored: one id gained)',
+    write: async () => {
+      const note = NEWS.find(({ id }) => id === 'layout')
+      if (!note) throw new Error('the news has the update note about the Layout')
+      // From the record v0.2.3 stored (SEED_ONBOARDING has its `weather` id).
+      await changeOnboarding((record) => ({
+        ...record,
+        dismissed: [...record.dismissed, note.id],
+      }))()
+    },
   },
   {
     fromNoRecord: true,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
+import { PageNews } from '@/components/Callout/PageNews'
 import { Controls } from '@/components/Controls/Controls'
 import { EditModeProvider } from '@/components/EditMode/useEditMode'
 import { Grid } from '@/components/Grid/Grid'
@@ -174,15 +175,7 @@ export function App() {
           />
         )}
         {news?.target !== undefined && (
-          <Callout
-            action={{ label: 'Got it', onClick: () => dismiss(news.id) }}
-            body={news.body}
-            key={news.id}
-            layout={layout}
-            onDismiss={() => dismiss(news.id)}
-            target={news.target}
-            title={news.title}
-          />
+          <PageNews dismiss={dismiss} key={news.id} layout={layout} news={news} />
         )}
         {/*
           Stored settings and the stored Layout land a beat after the first paint. Drawing the

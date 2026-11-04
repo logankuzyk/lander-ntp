@@ -34,6 +34,11 @@ export type SettingsStop = CalloutBase & {
  */
 export type PageCallout = CalloutBase & {
   section?: undefined
+  /**
+   * Its one button is "Show me" instead of "Got it", and goes into edit mode as it dismisses the
+   * note. Page state only: nothing is stored for it.
+   */
+  showMe?: 'edit'
   target: CalloutTarget
 }
 
@@ -61,11 +66,24 @@ export const TOUR: readonly SettingsStop[] = [
 
 /**
  * Shown once, one at a time and in this order, to people who had the extension before the
- * feature arrived. A new install never sees these: the tour covers the same ground. To
- * announce a feature, add an entry here (and a stop in TOUR if it earns one).
+ * feature arrived. A new install never sees these (`recordInstall` records them as seen): the
+ * tour covers the same ground. To announce a feature, add an entry here (and a stop in TOUR if it
+ * earns one).
  *
- * There are none at the moment. The Weather's, "New: weather", opened a settings tab that is gone
- * now the Weather's options are on the widget, so it was removed; its id stays in the `dismissed`
- * list of anyone who saw it, and harms nothing there. Do not reuse `weather` as an id.
+ * `layout` is the one note for the update that put the page on a Layout. It sits at the Edit
+ * button, which is always on the page once the Bottom bar has drawn, so it is not held back by a
+ * missing target. Its words have to be true of every page that update leaves, down to one with
+ * the Clock and the Weather both off, which is an empty Grid as before. The Weather's old news,
+ * "New: weather", opened a settings tab that is gone now the Weather's options are on the widget,
+ * so it was removed; its id stays in the `dismissed` list of anyone who saw it, and harms nothing
+ * there. Do not reuse `weather` as an id.
  */
-export const NEWS: readonly CalloutInfo[] = []
+export const NEWS: readonly CalloutInfo[] = [
+  {
+    body: 'Move, resize and add widgets in edit mode. Clock and Weather options are on the widgets now, and Add brings back any you had off.',
+    id: 'layout',
+    showMe: 'edit',
+    target: 'edit',
+    title: 'You can edit your page now',
+  },
+]
