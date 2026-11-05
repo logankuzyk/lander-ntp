@@ -44,12 +44,94 @@ export type PageCallout = CalloutBase & {
 
 export type CalloutInfo = PageCallout | SettingsStop
 
+/** What the page is doing while a stop of the tour is up. */
+export type PageState = {
+  /** The Add menu is open. */
+  adding: boolean
+  /** The page is in edit mode. */
+  editing: boolean
+}
+
 /**
- * The tour a new install is offered after the welcome: one stop per settings section, in order.
- * The Clock and the Weather have none: their options are on the widgets, and a tour of editing
- * is a later change.
+ * A stop of the tour on the page itself: placed beside its target like a piece of news. Next
+ * brings the page to the next stop's `show`, so each stop is seen as it is described; nothing on
+ * the Grid changes.
  */
-export const TOUR: readonly SettingsStop[] = [
+export type PageTourStop = CalloutBase & {
+  section?: undefined
+  /** What the page is doing while the stop is up. */
+  show: PageState
+  /**
+   * What it points at: a target, or `'widget'` for the first Widget on the page, whichever type
+   * that is.
+   */
+  target: 'widget' | CalloutTarget
+  /** Said at the end of the body when the tour has no stop of its own for the setup button. */
+  unlessSetup?: string
+  /**
+   * Only in the tour of a page that has this: a Widget (`widget`), or one waiting for the person
+   * to set it up (`setup`). Otherwise the stop has nothing to point at and is left out.
+   */
+  when?: 'setup' | 'widget'
+}
+
+export type TourStop = PageTourStop | SettingsStop
+
+/**
+ * The tour a new install is offered after the welcome, in order: edit mode, moving and resizing
+ * a Widget, a Widget's options, the setup button, the Add menu and Done on the page, then the
+ * settings panel's Photos and Font (its own stops, drawn inside it: the Clock's and the
+ * Weather's options are on their widgets). `planTour` picks the stops a page has. The words are
+ * proposed, for the owner to review (LR-107).
+ */
+export const TOUR: readonly TourStop[] = [
+  {
+    body: 'Press Edit, or E on the keyboard, to move things around and change what is on your page.',
+    id: 'tour-edit',
+    show: { adding: false, editing: false },
+    target: 'edit',
+    title: 'Edit your page',
+  },
+  {
+    body: 'Drag a widget to move it, and drag the handle in its corner to resize it.',
+    id: 'tour-move',
+    show: { adding: false, editing: true },
+    target: 'widget',
+    title: 'Move and resize',
+    when: 'widget',
+  },
+  {
+    body: 'Each widget has its own options. Press the button in its corner to change them.',
+    id: 'tour-options',
+    show: { adding: false, editing: true },
+    target: 'options',
+    title: 'Options',
+    when: 'widget',
+  },
+  {
+    body: 'A widget that needs something from you, like a place for the weather, shows a button for it. Press that button to set it up.',
+    id: 'tour-setup',
+    show: { adding: false, editing: true },
+    target: 'setup',
+    title: 'Set up a widget',
+    when: 'setup',
+  },
+  {
+    body: 'Pick a widget from the Add menu and it goes in the free spot nearest the middle.',
+    id: 'tour-add',
+    show: { adding: true, editing: true },
+    target: 'add',
+    title: 'Add a widget',
+    unlessSetup:
+      'One that needs something from you, like a place for the weather, shows a button to set it up.',
+  },
+  {
+    body: 'Press Done, or E again, to leave edit mode. Each change is saved as you make it.',
+    id: 'tour-done',
+    show: { adding: false, editing: true },
+    target: 'edit',
+    title: 'When you are done',
+  },
   {
     body: 'Choose how often the photo changes, and which tags to draw from. Or pick one from the gallery to keep.',
     id: 'tour-photos',

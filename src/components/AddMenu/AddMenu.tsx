@@ -9,6 +9,11 @@ import { WIDGETS } from '@/widgetSystem/registry'
 import { type ItemState, itemState, menuNote } from './availability'
 
 type AddMenuProps = {
+  /**
+   * Whether opening the menu puts focus on its first item (it does, unless the tour opened it
+   * and its Next button is to keep focus).
+   */
+  focusOnOpen?: boolean
   /** The Layout, as `useLayout` gives it. */
   layout: Layout
   /** Whether the stored Layout has arrived: until it has, nothing is added (see `useLayout`). */
@@ -47,7 +52,14 @@ const ITEM = '[role="menuitem"]'
  * it is read out and does nothing when pressed. Whatever applies to the whole menu is in
  * `menuNote`, beside the title.
  */
-export function AddMenu({ layout, loaded, onCommit, onOpenChange, open }: AddMenuProps) {
+export function AddMenu({
+  focusOnOpen = true,
+  layout,
+  loaded,
+  onCommit,
+  onOpenChange,
+  open,
+}: AddMenuProps) {
   const { canChange } = useEditMode()
   const titleId = useId()
   const noteId = useId()
@@ -62,7 +74,9 @@ export function AddMenu({ layout, loaded, onCommit, onOpenChange, open }: AddMen
 
   // Into the menu on open: the first item, whether it can be picked or not (its reason is read).
   useEffect(() => {
-    if (open) menu.current?.querySelector<HTMLElement>(ITEM)?.focus()
+    if (open && focusOnOpen) menu.current?.querySelector<HTMLElement>(ITEM)?.focus()
+    // Only when it opens: `focusOnOpen` changing under an open menu is not a reason to move focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // A press elsewhere closes it. The button toggles it itself.

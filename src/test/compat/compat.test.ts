@@ -8,6 +8,7 @@ import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
 import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
+import { answerWelcome } from '@/onboarding/answerWelcome'
 import { NEWS } from '@/onboarding/callouts'
 import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
@@ -151,6 +152,12 @@ type PhaseTwoWrite = {
    * (the row starts from those) do not have.
    */
   stampsVersion?: boolean
+  /**
+   * The write is to `sync:onboarding` and nothing else, and the record is the seed's with
+   * `welcomed` turned on: no id gained, none lost. `sync:settings` is exactly as it was and there
+   * is no `sync:layout`.
+   */
+  welcomeOnly?: boolean
   /** The write, made through the real storage items, as the page makes it. */
   write: () => Promise<void>
 }
@@ -437,6 +444,14 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     write: changeOnboarding((record) => ({ ...record, welcomed: true })),
   },
   {
+    // Skip and "Show me around" both write this and nothing else: the guided tour that follows
+    // (W29) is page state and stores nothing (App.tour.test.tsx runs a whole one and checks the
+    // synced storage). The page's own function, on the record v0.2.3 stored.
+    name: 'answer the welcome, then take the guided tour (W29; answerWelcome: welcomed gained, no id, nothing else)',
+    welcomeOnly: true,
+    write: changeOnboarding(answerWelcome),
+  },
+  {
     name: 'dismiss a callout (an id gained in `dismissed`)',
     write: changeOnboarding((record) => ({
       ...record,
@@ -496,7 +511,15 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
 
   it.each(PHASE_2_WRITES)(
     '$name',
-    async ({ changes, fromNoRecord, layoutOnly, onboardingOnly, stampsVersion, write }) => {
+    async ({
+      changes,
+      fromNoRecord,
+      layoutOnly,
+      onboardingOnly,
+      stampsVersion,
+      welcomeOnly,
+      write,
+    }) => {
       await write()
       const stored = await fakeBrowser.storage.sync.get(null)
 
@@ -520,6 +543,11 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
           dismissed: [...SEED_ONBOARDING.dismissed, 'layout'],
           welcomed: SEED_ONBOARDING.welcomed,
         })
+      }
+      if (welcomeOnly) {
+        expect(stored.settings).toEqual(SEED)
+        expect(stored.layout).toBeUndefined()
+        expect(stored.onboarding).toEqual({ dismissed: SEED_ONBOARDING.dismissed, welcomed: true })
       }
       // `dismissed` only gains ids.
       if (!fromNoRecord) {

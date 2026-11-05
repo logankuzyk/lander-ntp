@@ -22,7 +22,7 @@ export const TARGET_ATTRIBUTE = 'data-callout-target'
 /** Anything that may point at the page: a stop of the tour or a piece of news. */
 export type PageStop = { target?: CalloutTarget }
 
-const isShown = (element: Element) => {
+export const isShown = (element: Element) => {
   if (!element.isConnected) return false
   const { height, width } = element.getBoundingClientRect()
   // No box: it is not drawn (`display: none` on it or on something it is in), or not yet.

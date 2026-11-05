@@ -1,19 +1,47 @@
 import { describe, expect, it } from 'vitest'
 
-import { NEWS, TOUR } from './callouts'
+import { NEWS, type PageTourStop, TOUR } from './callouts'
 
-describe('the settings tour', () => {
-  it('has a stop for Photos and one for the font, and none for the Clock or the Weather', () => {
-    expect(TOUR.map(({ id, section }) => [id, section])).toEqual([
-      ['tour-photos', 'photos'],
-      ['tour-general', 'general'],
+describe('the tour', () => {
+  it('goes from Edit to Done on the page, then Photos and the font in the settings panel', () => {
+    expect(TOUR.map(({ id }) => id)).toEqual([
+      'tour-edit',
+      'tour-move',
+      'tour-options',
+      'tour-setup',
+      'tour-add',
+      'tour-done',
+      'tour-photos',
+      'tour-general',
     ])
+  })
+
+  it('has a stop in the panel for Photos and one for the font, and none for the Clock or the Weather', () => {
+    expect(
+      TOUR.filter(({ section }) => section !== undefined).map(({ section }) => section),
+    ).toEqual(['photos', 'general'])
+  })
+
+  it('has a stop on the page only where it points at something', () => {
+    for (const stop of TOUR) {
+      expect(stop.section === undefined).toBe(stop.target !== undefined)
+    }
+  })
+
+  it('opens the Add menu on the Add stop alone, and is in edit mode from the second stop to Done', () => {
+    const pageStops = TOUR.filter((stop): stop is PageTourStop => stop.section === undefined)
+    expect(pageStops.filter(({ show }) => show.adding).map(({ id }) => id)).toEqual(['tour-add'])
+    expect(pageStops.map(({ show }) => show.editing)).toEqual([false, true, true, true, true, true])
   })
 
   it('says nothing of options that are on the widgets now', () => {
     for (const { body, title } of TOUR) {
       expect(`${title} ${body}`).not.toMatch(/24-hour|seconds|forecast|switch it on/i)
     }
+  })
+
+  it('makes no claim about moving or resizing from the keyboard, which is not on the page yet', () => {
+    for (const { body } of TOUR) expect(body).not.toMatch(/arrow|Enter|Shift/i)
   })
 })
 

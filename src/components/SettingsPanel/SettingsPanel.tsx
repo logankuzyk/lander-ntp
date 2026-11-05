@@ -202,6 +202,12 @@ type SettingsPanelProps = {
   settings: Settings
   /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
   tour?: readonly SettingsStop[]
+  /**
+   * Where the tour is on the page before it comes here: the stops already shown, and how many
+   * there are in all, so that the first stop here reads "6 of 7" and not "1 of 2". Without it
+   * the panel's stops are counted alone.
+   */
+  tourProgress?: { before: number; total: number }
 }
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
@@ -214,6 +220,7 @@ export function SettingsPanel({
   readOnly = false,
   settings,
   tour = [],
+  tourProgress,
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
   const readOnlyId = useId()
@@ -278,7 +285,7 @@ export function SettingsPanel({
           body={stop.body}
           class="callout--tour"
           onDismiss={() => setStep(null)}
-          progress={`${step + 1} of ${tour.length}`}
+          progress={`${(tourProgress?.before ?? 0) + step + 1} of ${tourProgress?.total ?? tour.length}`}
           title={stop.title}
         />
       )}
