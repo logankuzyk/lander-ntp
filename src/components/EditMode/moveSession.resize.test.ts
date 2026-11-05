@@ -242,6 +242,40 @@ describe('resizeSession, resizing', () => {
     expect(drop(stuck, editable(edge))).toBeNull()
   })
 
+  it('draws a Widget under its smallest at the right edge in the one column it has: size and outline both', () => {
+    // 1 wide and 2 high, at column 12: the Clock needs 3 columns and has 1.
+    const edge = layoutOf(clock('clock0001', 12, 4, 1, 2))
+    const session = held(edge, 'clock0001')
+    for (const dx of [0, 5, -5]) {
+      const stuck = move(session, corner(session, dx, 0))
+      expect(stuck.place).toEqual({ col: 12, h: 2, row: 4, w: 1 })
+      expect(stuck.size).toEqual({ h: 2, w: 1 })
+      expect(stuck.valid).toBe(false)
+    }
+  })
+
+  it('draws a Widget under its smallest on the last row in the one row it has: size and outline both', () => {
+    // 3 wide and 1 high, at row 8: the Clock needs 2 rows and has 1.
+    const last = layoutOf(clock('clock0001', 5, 8, 3, 1))
+    const session = held(last, 'clock0001')
+    for (const dy of [0, 5, -5]) {
+      const stuck = move(session, corner(session, 0, dy))
+      expect(stuck.place).toEqual({ col: 5, h: 1, row: 8, w: 3 })
+      expect(stuck.size).toEqual({ h: 1, w: 3 })
+      expect(stuck.valid).toBe(false)
+    }
+    expect(drop(move(session, corner(session, 0, 5)), editable(last))).toBeNull()
+  })
+
+  it('draws a Widget under its smallest in the corner cell in the one cell it has', () => {
+    const corner12 = layoutOf(clock('clock0001', 12, 8, 1, 1))
+    const session = held(corner12, 'clock0001')
+    const stuck = move(session, corner(session, 3, 3))
+    expect(stuck.place).toEqual({ col: 12, h: 1, row: 8, w: 1 })
+    expect(stuck.size).toEqual({ h: 1, w: 1 })
+    expect(stuck.valid).toBe(false)
+  })
+
   it('does not change the session it was given, or the Layout', () => {
     const before = stored(layout)
     const session = held(layout, 'clock0001')

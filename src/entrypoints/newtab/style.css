@@ -308,7 +308,10 @@ body {
     height: 1.25rem;
   }
 
-  /* The handle too, and the name goes up above it, as there is no room beside it. */
+  /*
+   * The handle too, and the name goes up above it and its hit ring (the mark is 1.25rem, 0.25rem
+   * up, with a ring 0.5rem round it, so 2rem), as there is no room beside it.
+   */
   .widget-box__resize {
     right: 0.25rem;
     bottom: 0.25rem;
@@ -317,7 +320,7 @@ body {
   }
 
   .widget-box__name {
-    bottom: 1.75rem;
+    bottom: 2.125rem;
     left: 0.25rem;
     max-width: calc(100% - 0.5rem);
   }

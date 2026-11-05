@@ -818,6 +818,22 @@ describe('the styles of a resize', () => {
     expect(narrow).toMatch(/\.widget-box__name/)
   })
 
+  it('keeps the name out of the handle’s whole hit ring in a narrow box, not only its mark', () => {
+    const start = css.indexOf('@container (max-width: 4.5rem) {')
+    const narrow = css.slice(start, css.indexOf('\n}\n', start))
+    const inside = (selector: string, property: string) => {
+      const body = new RegExp(`${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(narrow)?.[1]
+      const value = body && new RegExp(`${property}:\\s*([\\d.]+)rem`).exec(body)?.[1]
+      if (!value) throw new Error(`${selector} gives no ${property} in rem`)
+      return Number(value)
+    }
+    // The ring reaches as far past the mark as `inset` says (in rem, a negative number).
+    const ring = -Number(/inset:\s*(-[\d.]+)rem/.exec(rule('.widget-box__resize::after'))?.[1])
+    const top =
+      inside('.widget-box__resize', 'bottom') + inside('.widget-box__resize', 'height') + ring
+    expect(inside('.widget-box__name', 'bottom')).toBeGreaterThanOrEqual(top)
+  })
+
   it('is a bigger target than it looks, so a finger can find it', () => {
     expect(rule('.widget-box__resize::after')).toMatch(/inset:\s*-/)
   })
