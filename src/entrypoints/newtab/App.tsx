@@ -13,6 +13,7 @@ import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/Settin
 import { Welcome } from '@/components/Welcome/Welcome'
 import { useLayout } from '@/layout/useLayout'
 import { TOUR } from '@/onboarding/callouts'
+import { dismissNews } from '@/onboarding/dismissNews'
 import { onboardingItem } from '@/onboarding/storage'
 import { useNews } from '@/onboarding/useNews'
 import { preloadNext } from '@/photos/image'
@@ -98,9 +99,13 @@ export function App() {
   }
 
   // Out of the way while a popover has the corner, and until the welcome has been answered.
-  const news = useNews(popover === null ? onboarding : null, settingsLoaded ? settings : null)
+  // A note at a thing on the page is placed by the Layout, so it waits for it as the Grid does.
+  const news = useNews(
+    popover === null && layoutLoaded ? onboarding : null,
+    settingsLoaded ? settings : null,
+  )
   const dismiss = (id: string) => {
-    if (onboarding) setOnboarding({ ...onboarding, dismissed: [...onboarding.dismissed, id] })
+    if (onboarding) setOnboarding(dismissNews(onboarding, id))
   }
 
   // While a photo is pinned, → pins the next one instead, so the next tab keeps it too.
@@ -174,9 +179,7 @@ export function App() {
             title={news.title}
           />
         )}
-        {news?.target !== undefined && (
-          <PageNews dismiss={dismiss} key={news.id} layout={layout} news={news} />
-        )}
+        {news?.target !== undefined && <PageNews dismiss={dismiss} layout={layout} news={news} />}
         {/*
           Stored settings and the stored Layout land a beat after the first paint. Drawing the
           defaults and then correcting them is a visible jolt — a clock that jumps fonts, say —

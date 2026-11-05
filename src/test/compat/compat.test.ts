@@ -9,6 +9,7 @@ import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
 import { NEWS } from '@/onboarding/callouts'
+import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
@@ -140,6 +141,11 @@ type PhaseTwoWrite = {
    */
   layoutOnly?: boolean
   name: string
+  /**
+   * The write is to `sync:onboarding` and nothing else: `sync:settings` is exactly as it was and
+   * there is no `sync:layout`, and the record has gained the one id and kept the rest.
+   */
+  onboardingOnly?: boolean
   /**
    * The write must leave `v: 1` at the top of the settings, which stored settings from v0.2.3
    * (the row starts from those) do not have.
@@ -408,15 +414,13 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
-    name: 'dismiss the update note about the Layout (W30; from a record v0.2.3 stored: one id gained)',
+    name: 'dismiss the update note about the Layout (W30; dismissNews, from the record v0.2.3 stored: one id gained)',
+    onboardingOnly: true,
     write: async () => {
       const note = NEWS.find(({ id }) => id === 'layout')
       if (!note) throw new Error('the news has the update note about the Layout')
-      // From the record v0.2.3 stored (SEED_ONBOARDING has its `weather` id).
-      await changeOnboarding((record) => ({
-        ...record,
-        dismissed: [...record.dismissed, note.id],
-      }))()
+      // The page's own function, on the record v0.2.3 stored (SEED_ONBOARDING has its `weather` id).
+      await changeOnboarding((record) => dismissNews(record, note.id))()
     },
   },
   {
@@ -462,7 +466,7 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
 
   it.each(PHASE_2_WRITES)(
     '$name',
-    async ({ changes, fromNoRecord, layoutOnly, stampsVersion, write }) => {
+    async ({ changes, fromNoRecord, layoutOnly, onboardingOnly, stampsVersion, write }) => {
       await write()
       const stored = await fakeBrowser.storage.sync.get(null)
 
@@ -478,6 +482,14 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
         expect(stored.settings).toEqual(SEED)
         expect(stored.onboarding).toEqual(SEED_ONBOARDING)
         expect(stored.layout).toHaveProperty('v', 1)
+      }
+      if (onboardingOnly) {
+        expect(stored.settings).toEqual(SEED)
+        expect(stored.layout).toBeUndefined()
+        expect(stored.onboarding).toEqual({
+          dismissed: [...SEED_ONBOARDING.dismissed, 'layout'],
+          welcomed: SEED_ONBOARDING.welcomed,
+        })
       }
       // `dismissed` only gains ids.
       if (!fromNoRecord) {

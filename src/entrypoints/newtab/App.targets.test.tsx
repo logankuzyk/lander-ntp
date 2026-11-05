@@ -107,6 +107,21 @@ describe('App, with news that points at the page', () => {
     expect(screen.queryByRole('note')).toBeNull()
   })
 
+  it('draws the next one as a new note, so that it fades in like the first', async () => {
+    news.current = [AT_EDIT, { ...AT_EDIT, id: 'at-edit-too', title: 'Edit mode, again' }]
+    render(<App />)
+    const first = await screen.findByRole('note')
+    expect(first.textContent).toContain('Edit mode')
+
+    fireEvent.click(within(first).getByRole('button', { name: 'Got it' }))
+
+    const second = await screen.findByText('Edit mode, again')
+    const secondNote = second.closest('[role="note"]')
+    expect(secondNote).not.toBeNull()
+    expect(secondNote).not.toBe(first)
+    expect(secondNote?.classList.contains('callout--leaving')).toBe(false)
+  })
+
   it('is dismissed with the Dismiss as well, and only adds its id', async () => {
     news.current = [AT_EDIT]
     await onboardingItem.setValue({ dismissed: ['seen-before'], welcomed: true })

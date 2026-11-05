@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/pre
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
@@ -68,6 +69,31 @@ describe('App, with the update note about the Layout', () => {
     expect(note.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(note.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(note.contains(document.activeElement)).toBe(false)
+  })
+
+  it('waits for the stored Layout before it is drawn, as the Grid does', async () => {
+    await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
+    // The Layout arrives after the settings and the record: the note is placed by it.
+    const read = layoutItem.read
+    let arrive: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      arrive = resolve
+    })
+    vi.spyOn(layoutItem, 'read').mockImplementation(async () => {
+      await held
+      return read()
+    })
+    const { container } = render(<App />)
+
+    await screen.findByRole('button', { name: 'Edit' })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('note')).toBeNull()
+    expect(container.querySelector('.grid')).toBeNull()
+
+    arrive()
+
+    await screen.findByRole('note')
+    expect(container.querySelector('.grid')).not.toBeNull()
   })
 
   it('has "Show me" go into edit mode with focus on Done, and be dismissed for good', async () => {
