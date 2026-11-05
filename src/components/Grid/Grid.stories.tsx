@@ -5,6 +5,7 @@ import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 import { holdDrag } from '../../../.storybook/holdDrag'
+import { holdResize } from '../../../.storybook/holdResize'
 import { startEditing } from '../../../.storybook/startEditing'
 
 // The whole page, as `App` stories are: no `withPage`. Each story seeds the storage it needs, and
@@ -200,5 +201,94 @@ export const DraggingReducedMotion: Story = {
   },
   play: async ({ canvasElement }) => {
     await holdDrag(canvasElement, 'Clock', { cols: -2.3, rows: 1 })
+  },
+}
+
+/**
+ * The Clock held by its handle, at its bottom right corner, two columns and a row bigger: the
+ * Clock grows with the pointer, and an outline shows the cells it will have (6 by 3 from column
+ * 3, row 3). The pointer is still down, so nothing has been saved.
+ */
+export const Resizing: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdResize(canvasElement, 'Clock', { cols: 2, rows: 1 })
+  },
+}
+
+/**
+ * The Clock pulled much further than it goes (across and down towards the edge of the Grid): it
+ * stops at its largest size, 8 by 4, and no further, however far the pointer is. The outline is
+ * the allowed one. Pulled back the other way it stops at its smallest, 3 by 2 (see
+ * `ResizeStopsAtSmallest`).
+ */
+export const ResizeStopsAtLimits: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdResize(canvasElement, 'Clock', { cols: 9, rows: 5 })
+  },
+}
+
+/**
+ * The Clock pulled back past its top left corner: it stops at its smallest size, 3 by 2, and
+ * does not get smaller, however far the pointer goes.
+ */
+export const ResizeStopsAtSmallest: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdResize(canvasElement, 'Clock', { cols: -6, rows: -4 })
+  },
+}
+
+/**
+ * The Clock pulled over the Weather beside it: the outline is red and dashed, because the size
+ * is refused. Letting go would put the Clock back at the size it had, with no error and nothing
+ * saved.
+ */
+export const ResizeRefused: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeBeside)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdResize(canvasElement, 'Clock', { cols: 3, rows: 0 })
+  },
+}
+
+/**
+ * Resizing with the system asking for reduced motion: the Clock does not follow the pointer, it
+ * is the whole cells it will have. It is held a little off the cell, so following would show.
+ */
+export const ResizeReducedMotion: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    const restoreFetch = sendNothing()
+    const real = window.matchMedia.bind(window)
+    // Only the question about motion is answered differently; its answer never changes here.
+    window.matchMedia = (query: string) =>
+      query.includes('prefers-reduced-motion')
+        ? ({
+            addEventListener: () => {},
+            matches: true,
+            media: query,
+            removeEventListener: () => {},
+          } as unknown as MediaQueryList)
+        : real(query)
+    return () => {
+      window.matchMedia = real
+      restoreFetch()
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await holdResize(canvasElement, 'Clock', { cols: 1.6, rows: 0.4 })
   },
 }

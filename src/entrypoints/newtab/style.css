@@ -116,8 +116,8 @@ body {
 
 /*
  * A Widget's frame. The corners are kept: the options button goes at the top left, the remove
- * button at the top right and the resize handle at the bottom right (later changes add them),
- * so the Widget's name sits at the bottom left, the one corner left over.
+ * button at the top right and the resize handle at the bottom right, so the Widget's name sits
+ * at the bottom left, the one corner left over.
  */
 .grid--editing .widget-box {
   position: relative;
@@ -159,6 +159,22 @@ body {
 }
 
 /*
+ * Resizing a Widget by its handle: the box is the size the pointer says, from its top left
+ * corner and past the cells it is in (the script sets its width and height), lifted above the
+ * others, and the Widget lays itself out in it as it goes. Nothing about it transitions. The
+ * outline (below) shows the whole cells it will be.
+ */
+.widget-box.widget-box--resizing {
+  z-index: 2;
+  align-self: start;
+  justify-self: start;
+  cursor: nwse-resize;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 45%),
+    0 0.5rem 1.5rem rgb(0 0 0 / 40%);
+}
+
+/*
  * Where the Widget being dragged will land: its cells, outlined, under the Widget (it comes
  * before the boxes, which are positioned, so they paint above it). Red where the place is
  * refused, and dashed as well, so that it does not depend on seeing red. It never takes a press:
@@ -187,7 +203,8 @@ body {
   position: absolute;
   bottom: 0.375rem;
   left: 0.375rem;
-  max-width: calc(100% - 0.75rem);
+  /* Not under the resize handle, which shares the bottom edge. */
+  max-width: calc(100% - 3rem);
   padding: 0 0.5rem;
   overflow: hidden;
   border-radius: 999px;
@@ -243,6 +260,42 @@ body {
 }
 
 /*
+ * The resize handle, in the bottom right corner a frame keeps for it: round like the buttons, but
+ * not one (it is for a pointer, and the Grid hears it: see useGridMove), so it is there only where
+ * a Widget can be dragged. The mark is 1.75rem and the ring round it, which catches a press too,
+ * brings it to 2.75rem: a finger finds it.
+ */
+.widget-box__resize {
+  position: absolute;
+  right: 0.375rem;
+  bottom: 0.375rem;
+  display: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 45%);
+  cursor: nwse-resize;
+  text-shadow: none;
+  transition: background-color 150ms;
+}
+
+.grid--movable .widget-box__resize {
+  display: grid;
+}
+
+.widget-box__resize:hover {
+  background: rgb(0 0 0 / 70%);
+}
+
+.widget-box__resize::after {
+  content: '';
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+}
+
+/*
  * A box under 72px wide (the Weather's smallest on a phone: 2 columns of a 390px window) has no
  * room for both buttons at full size, and they would sit on each other. They shrink to fit, and
  * keep clear of one another.
@@ -253,6 +306,23 @@ body {
     top: 0.25rem;
     width: 1.25rem;
     height: 1.25rem;
+  }
+
+  /*
+   * The handle too, and the name goes up above it and its hit ring (the mark is 1.25rem, 0.25rem
+   * up, with a ring 0.5rem round it, so 2rem), as there is no room beside it.
+   */
+  .widget-box__resize {
+    right: 0.25rem;
+    bottom: 0.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .widget-box__name {
+    bottom: 2.125rem;
+    left: 0.25rem;
+    max-width: calc(100% - 0.5rem);
   }
 
   .widget-box__options {
@@ -271,7 +341,8 @@ body {
   }
 
   .widget-box__options,
-  .widget-box__remove {
+  .widget-box__remove,
+  .widget-box__resize {
     transition: none;
   }
 }

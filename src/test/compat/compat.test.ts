@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
-import { drop, move, pickUp } from '@/components/EditMode/moveSession'
+import { drop, move, pickUp, pickUpResize } from '@/components/EditMode/moveSession'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
@@ -396,6 +396,36 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     }),
   },
   {
+    layoutOnly: true,
+    name: 'resize a Widget by its handle (W22: one drop, sync:layout alone, nothing in sync:settings)',
+    write: changeLayout((layout) => {
+      // The Clock, held by its handle at the bottom right corner, a column and a row bigger.
+      const clock = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+      )
+      if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+      const { col, h, id, row, w } = clock.placed
+      const held = pickUpResize({ layout, readOnly: false }, id, {
+        col: col - 1 + w,
+        row: row - 1 + h,
+      })
+      if (!held) throw new Error('the Clock’s handle could not be picked up')
+      const next = drop(move(held, { col: col - 1 + w + 1, row: row - 1 + h + 1 }), {
+        layout,
+        readOnly: false,
+      })
+      if (!next) throw new Error('the drop was refused')
+      // It did change size: a row that saved a Layout nothing had changed in would prove nothing.
+      const after = next.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.id === id,
+      )
+      if (after?.kind !== 'known' || after.placed.w !== w + 1 || after.placed.h !== h + 1) {
+        throw new Error('the drop did not change the Clock’s size')
+      }
+      return next
+    }),
+  },
+  {
     name: 'the shared 24-hour switch in a popover, after a first Layout write: clock.hour12 only',
     write: async () => {
       await storeExampleLayout()
@@ -537,6 +567,48 @@ describe('a drop’s write (W21)', () => {
     expect(stored.onboarding).toEqual(SEED_ONBOARDING)
     const moved = (stored.layout as { widgets: { col: number; id: string; row: number }[] }).widgets
     expect(moved.find((widget) => widget.id === id)).toMatchObject({ col: col - 1, row: row + 1 })
+    const { fellBack, settings } = await asV023(stored)
+    expect(fellBack).toBe(false)
+    expect(settings).toEqual(stored.settings)
+  })
+})
+
+describe('a resize’s write (W22)', () => {
+  it('stores the resized Layout and leaves sync:settings and sync:onboarding byte-equal, readable by v0.2.3', async () => {
+    await settingsItem.setValue(SEED)
+    await onboardingItem.setValue(SEED_ONBOARDING)
+    const before = await storeExampleLayout()
+    const clock = before.widgets.find(
+      (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+    )
+    if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+    const { col, h, id, row, w } = clock.placed
+    const held = pickUpResize({ layout: before, readOnly: false }, id, {
+      col: col - 1 + w,
+      row: row - 1 + h,
+    })
+    if (!held) throw new Error('the Clock’s handle could not be picked up')
+    const next = drop(move(held, { col: col - 1 + w + 1, row: row - 1 + h + 1 }), {
+      layout: before,
+      readOnly: false,
+    })
+    if (!next) throw new Error('the drop was refused')
+
+    await layoutItem.setValue(next)
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    expect(stored.settings).toEqual(SEED)
+    expect(stored.onboarding).toEqual(SEED_ONBOARDING)
+    const resized = (
+      stored.layout as { widgets: { col: number; h: number; id: string; row: number; w: number }[] }
+    ).widgets
+    // The size changed and the place did not.
+    expect(resized.find((widget) => widget.id === id)).toMatchObject({
+      col,
+      h: h + 1,
+      row,
+      w: w + 1,
+    })
     const { fellBack, settings } = await asV023(stored)
     expect(fellBack).toBe(false)
     expect(settings).toEqual(stored.settings)
