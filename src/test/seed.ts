@@ -267,6 +267,31 @@ export const PAGE_SEEDS = {
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
   },
+  /** The same update with both off: an empty Grid, as before, and the note says Add brings them back. */
+  layoutNewsBothOff: {
+    onboarding: { dismissed: [], welcomed: true },
+    settings: { ...DEFAULT_SETTINGS, clock: { ...DEFAULT_SETTINGS.clock, enabled: false } },
+  },
+  /**
+   * The first tab after updating from v0.2.3 with the Clock and the Weather both on: welcomed
+   * long ago, nothing dismissed, so the note about the Layout is up at the Edit button.
+   */
+  layoutNewsClockAndWeather: {
+    onboarding: { dismissed: [], welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** The same update with the Clock on and the Weather off (the settings as they come). */
+  layoutNewsClockOnly: { onboarding: { dismissed: [], welcomed: true } },
+  /** The same update with the Clock off and the Weather on but with no place: its setup button. */
+  layoutNewsWeatherOnly: {
+    onboarding: { dismissed: [], welcomed: true },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
+      weather: { ...DEFAULT_SETTINGS.weather, enabled: true },
+    },
+  },
   /** The first tab after installing: the welcome, over the photo. */
   newInstall: { pending: { dismissed: SEEN_NEWS, welcomed: false } },
   /**
