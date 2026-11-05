@@ -518,6 +518,45 @@ describe('a callout beside its target', () => {
     })
   })
 
+  describe('beside the Add menu (the tour opens it by itself)', () => {
+    /** The menu as the page draws it: a card with a title, and the list of items under that. */
+    function addAddMenu(card: Edges, items: Edges) {
+      const element = addOpen('add-menu', card)
+      const list = document.createElement('div')
+      list.setAttribute('role', 'menu')
+      drawAt(list, items)
+      element.append(list)
+      return list
+    }
+
+    it('goes above the whole card, its title included, when there is no room beside it', () => {
+      vi.stubGlobal('innerWidth', 390)
+      vi.stubGlobal('innerHeight', 800)
+      // The card is 100 to 290 wide and its title is the top 40 pixels, over the list.
+      const list = addAddMenu([100, 640, 290, 760], [100, 680, 290, 760])
+      addTarget('menu:clock', [110, 700, 280, 730], list)
+
+      draw('menu:clock')
+
+      const { dataset, style } = placed()
+      expect([dataset.side, style.top]).toEqual(['above', `${640 - 12 - 140}px`])
+    })
+
+    it('goes beside the card, level with the item, when there is room', () => {
+      const list = addAddMenu([1000, 640, 1200, 760], [1000, 680, 1200, 760])
+      addTarget('menu:clock', [1010, 700, 1190, 730], list)
+
+      draw('menu:clock')
+
+      const { dataset, style } = placed()
+      expect([dataset.side, style.left, style.top]).toEqual([
+        'left',
+        `${1000 - 12 - 256}px`,
+        `${715 - 70}px`,
+      ])
+    })
+  })
+
   describe('for a person at the keyboard or with a screen reader', () => {
     it('is a note, so it is read where it is and not announced as it arrives', () => {
       addTarget('edit', [1100, 834, 1140, 874])

@@ -65,8 +65,8 @@ export const Options: Story = {
 }
 
 /**
- * Stop 4: the Add menu has opened by itself and the note keeps clear of it, beside the Add
- * button. Focus is still on the note's Next button, not in the menu.
+ * Stop 4: the Add menu has opened by itself and the note is beside it, level with its first
+ * item. Focus is still on the note's Next button, not in the menu.
  */
 export const Add: Story = {
   beforeEach: newInstall,

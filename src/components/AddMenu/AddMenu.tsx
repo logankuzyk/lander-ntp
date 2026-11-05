@@ -86,6 +86,10 @@ export function AddMenu({
       const target = event.target
       if (!(target instanceof Node)) return
       if (menu.current?.contains(target) || button.current?.contains(target)) return
+      // A note beside the menu (the tour's, which opens it) is the page's own: pressing it must
+      // not take the menu away, as the note goes with the thing it is beside, from under the
+      // pointer, before the click arrives.
+      if (target instanceof Element && target.closest('.callout')) return
       onOpenChange(false)
     }
     document.addEventListener('pointerdown', onPointerDown)

@@ -1,3 +1,5 @@
+import { WIDGETS } from '@/widgetSystem/registry'
+
 import { type CalloutTarget, findTarget, isShown, TARGET_ATTRIBUTE } from './target'
 import type { PageFacts } from './tour'
 
@@ -15,5 +17,10 @@ export function pageFacts(root: ParentNode = document): PageFacts {
       break
     }
   }
-  return { setup: findTarget('setup', root) !== null, widget }
+  const first = WIDGETS[0]
+  return {
+    menu: first ? `menu:${first.type}` : null,
+    setup: findTarget('setup', root) !== null,
+    widget,
+  }
 }

@@ -87,7 +87,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect((await onboardingItem.getValue())?.welcomed).toBe(true)
   })
 
-  it('is before the Grid and the Bottom bar in the Tab order, and takes no focus', async () => {
+  it('is before the Grid and the Bottom bar in the Tab order', async () => {
     const { container } = await startTour()
 
     const grid = await waitFor(() => {
@@ -98,7 +98,14 @@ describe('the guided tour, from the welcome of a new install', () => {
     const edit = screen.getByRole('button', { name: 'Edit' })
     expect(note().compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(note().compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(note().contains(document.activeElement)).toBe(false)
+  })
+
+  it('puts focus on its Next button when the welcome closes and leaves focus nowhere', async () => {
+    await startTour()
+
+    // The welcome was a modal: closing it drops focus to the page, and the note is before the
+    // Grid and the Bottom bar, so a keyboard would start after it. Next is where it carries on.
+    expect(document.activeElement).toBe(within(note()).getByRole('button', { name: 'Next' }))
   })
 
   it('goes through every stop in order, doing each thing for the person', async () => {
@@ -125,7 +132,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy()
   })
 
-  it('points the stops at the Clock, its options, the Add button and the Done button', async () => {
+  it('points the stops at the Clock, its options, the Add menu’s first item and the Done button', async () => {
     const { container } = await startTour()
     // Where the note sits is placeBeside's business; which thing it is beside is the question.
     // The test DOM draws everything at one place, so the note is told apart by its pointer's
@@ -139,7 +146,8 @@ describe('the guided tour, from the welcome of a new install', () => {
     await nextUntil('Options')
     expect(has('options')).toBe(true)
     await nextUntil('Add a widget')
-    expect(has('add')).toBe(true)
+    // The menu is open by itself, and the note is beside its first item, not the Add button.
+    expect(has('menu:clock')).toBe(true)
     await nextUntil('When you are done')
     expect(screen.getByRole('button', { name: 'Done' }).getAttribute('data-callout-target')).toBe(
       'edit',
@@ -168,6 +176,26 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(addMenu()).toBeNull()
     expect(editing()).toBe(true)
     expect(document.activeElement).toBe(next)
+  })
+
+  it('keeps its note and the Add menu when the note is pressed with a pointer on the Add stop', async () => {
+    await startTour()
+    await nextUntil('Add a widget')
+    const next = within(note()).getByRole('button', { name: 'Next' })
+
+    // A press goes down before it is a click: it must not take the menu, and the note beside it,
+    // away from under the pointer.
+    fireEvent.pointerDown(next)
+    await act(async () => {})
+
+    expect(addMenu()).not.toBeNull()
+    expect(title()).toBe('Add a widget')
+    expect(next.isConnected).toBe(true)
+
+    fireEvent.click(next)
+    await act(async () => {})
+    expect(title()).toBe('When you are done')
+    expect(addMenu()).toBeNull()
   })
 
   it('keeps focus on the same Next button from stop to stop', async () => {

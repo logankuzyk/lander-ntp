@@ -62,10 +62,12 @@ export type PageTourStop = CalloutBase & {
   /** What the page is doing while the stop is up. */
   show: PageState
   /**
-   * What it points at: a target, or `'widget'` for the first Widget on the page, whichever type
-   * that is.
+   * What it points at: a target, `'widget'` for the first Widget on the page, whichever type that
+   * is, or `'menu-item'` for the first item in the Add menu, which the stop opens (the note then
+   * sits beside the menu: the menu opens upward from the Add button, and a note beside the button
+   * would cover it).
    */
-  target: 'widget' | CalloutTarget
+  target: 'menu-item' | 'widget' | CalloutTarget
   /** Said at the end of the body when the tour has no stop of its own for the setup button. */
   unlessSetup?: string
   /**
@@ -120,7 +122,7 @@ export const TOUR: readonly TourStop[] = [
     body: 'Pick a widget from the Add menu and it goes in the free spot nearest the middle.',
     id: 'tour-add',
     show: { adding: true, editing: true },
-    target: 'add',
+    target: 'menu-item',
     title: 'Add a widget',
     unlessSetup:
       'One that needs something from you, like a place for the weather, shows a button to set it up.',

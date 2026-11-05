@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
@@ -224,7 +224,10 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
   const readOnlyId = useId()
-  const { close, container } = usePopover(onClose)
+  // Carrying on from the tour on the page, focus is on the note's button, where the last stop had
+  // it, and not on Close, which one more Enter would press.
+  const carryingOn = tourProgress !== undefined && tour.length > 0
+  const { close, container } = usePopover(onClose, { keepFocus: carryingOn })
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   const [section, setSection] = useState<SectionId>(tour[0]?.section ?? initialSection)
@@ -232,6 +235,11 @@ export function SettingsPanel({
   const [step, setStep] = useState<number | null>(tour.length > 0 ? 0 : null)
   const stop = step === null ? undefined : tour[step]
   const resetGrowth = useGrowOnScroll(container, body)
+  useEffect(() => {
+    if (carryingOn) container.current?.querySelector<HTMLElement>('.callout__action')?.focus()
+    // Once, as it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Each section starts at rest, from the top. The tour follows along: opening a section it
   // has a stop for moves it there.

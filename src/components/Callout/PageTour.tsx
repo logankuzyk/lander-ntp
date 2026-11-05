@@ -62,6 +62,16 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // The tour starts from the welcome, a modal: closing it leaves focus on nothing, and the note is
+  // before the Grid and the Bottom bar in the document, so Tab would start after it. Focus goes to
+  // the note's button, where it then stays from stop to stop; if it is on something, it is left.
+  useEffect(() => {
+    if (!plan) return
+    const active = document.activeElement
+    if (active && active !== document.body) return
+    document.querySelector<HTMLElement>('.callout--beside .callout__action')?.focus()
+  }, [plan])
+
   /** Brings the page to what a stop describes. */
   const bring = ({ adding, editing: wantEditing }: PageState) => {
     const now = latest.current
@@ -82,8 +92,18 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
       finish(current)
       return
     }
-    bring(stop.show)
-    setIndex(to)
+    // A note whose target is not on the page is not drawn, and its Next button, which has focus,
+    // would be taken off the page and put back as another one. So the page and the note are not
+    // changed together: the note moves on after the page has drawn what the next stop points
+    // into (the Add menu opens first), and before the page takes away what the last one pointed
+    // into (the Add menu shuts after).
+    if (stop.show.adding) {
+      bring(stop.show)
+      queueMicrotask(() => setIndex(to))
+    } else {
+      setIndex(to)
+      queueMicrotask(() => bring(stop.show))
+    }
   }
 
   // The page is put back whenever the tour goes, however it goes.

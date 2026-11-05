@@ -76,6 +76,28 @@ const title = () => screen.getByRole('note').querySelector('strong')?.textConten
 const next = () =>
   fireEvent.click(within(screen.getByRole('note')).getByRole('button', { name: 'Next' }))
 
+describe('focus when the tour starts', () => {
+  it('goes to the Next button when it was dropped to the page', async () => {
+    renderTour()
+    await act(async () => {})
+
+    expect(document.activeElement).toBe(
+      within(screen.getByRole('note')).getByRole('button', { name: 'Next' }),
+    )
+  })
+
+  it('stays where it is when it was on something', async () => {
+    const view = render(<button type="button">a control</button>)
+    const control = view.getByRole('button', { name: 'a control' })
+    control.focus()
+
+    renderTour()
+    await act(async () => {})
+
+    expect(document.activeElement).toBe(control)
+  })
+})
+
 describe('a stop whose target is not on the page', () => {
   it('is planned with the stops that have one: it is left to the page to say it is missing', async () => {
     renderTour()

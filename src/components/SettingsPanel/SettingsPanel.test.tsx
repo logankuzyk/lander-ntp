@@ -411,6 +411,51 @@ describe('SettingsPanel', () => {
       expect(within(screen.getByRole('note')).getByText('Font stop')).toBeTruthy()
     })
 
+    it('counts the stops with the ones on the page when it carries on from them', () => {
+      render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+          tourProgress={{ before: 5, total: 7 }}
+        />,
+      )
+
+      expect(within(screen.getByRole('note')).getByText('6 of 7')).toBeTruthy()
+    })
+
+    it('has focus on the Close button when it is opened alone, and on its Next button when it carries on from the page', () => {
+      const { unmount } = render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+        />,
+      )
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
+      unmount()
+
+      render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+          tourProgress={{ before: 5, total: 7 }}
+        />,
+      )
+      // Where the page's Next button had it: the next press goes on with the tour.
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
+    })
+
     it('ends when dismissed, without closing the settings', async () => {
       const { onClose } = renderTour()
 

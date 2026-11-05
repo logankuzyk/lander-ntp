@@ -106,4 +106,24 @@ describe('the Add menu handle', () => {
     expect(menu()).toBeNull()
     expect(handle?.open).toBe(false)
   })
+
+  it('stays open when a note is pressed, as the tour’s Next is, and shuts for a press anywhere else', () => {
+    renderPage()
+    act(() => edit?.enter())
+    const note = document.createElement('div')
+    note.className = 'callout'
+    const next = document.createElement('button')
+    note.append(next)
+    document.body.append(note)
+    act(() => handle?.setOpen(true, { quiet: true }))
+
+    // The note is beside the menu, and goes if the menu does: a press that took the menu away
+    // would take the note from under the pointer before the click arrived.
+    fireEvent.pointerDown(next)
+    expect(menu()).not.toBeNull()
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'elsewhere' }))
+    expect(menu()).toBeNull()
+    note.remove()
+  })
 })

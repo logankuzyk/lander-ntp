@@ -3,6 +3,8 @@ import type { CalloutTarget } from './target'
 
 /** What the page has, which decides the stops of its tour. */
 export type PageFacts = {
+  /** The target of the first item in the Add menu, such as `menu:clock`; null if it has none. */
+  menu: CalloutTarget | null
   /** Whether a Widget is waiting for the person to set it up (it shows a setup button). */
   setup: boolean
   /** The target of the first Widget on the page, such as `widget:clock`; null for an empty Grid. */
@@ -45,7 +47,12 @@ export function planTour(facts: PageFacts, stops: readonly TourStop[] = TOUR): T
     if (isSettingsStop(stop)) continue
     if (stop.when === 'widget' && facts.widget === null) continue
     if (stop.when === 'setup' && !facts.setup) continue
-    const target = stop.target === 'widget' ? facts.widget : stop.target
+    const target =
+      stop.target === 'widget'
+        ? facts.widget
+        : stop.target === 'menu-item'
+          ? facts.menu
+          : stop.target
     if (target === null) continue
     page.push({
       body: !facts.setup && stop.unlessSetup ? `${stop.body} ${stop.unlessSetup}` : stop.body,
