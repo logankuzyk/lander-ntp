@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks'
 
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
 
@@ -29,6 +30,10 @@ type OptionsPopoverProps = {
   /** What is stored for the Widget. */
   options: unknown
   page: PageValues
+  /** Whether the settings that own page-wide values may be changed. */
+  pageValuesDisabled?: boolean
+  /** Shows the reason the Widget's options cannot be changed. */
+  readOnly?: boolean
 }
 
 /**
@@ -53,6 +58,8 @@ export function OptionsPopover({
   onPageValueChange,
   options,
   page,
+  pageValuesDisabled = disabled,
+  readOnly = false,
 }: OptionsPopoverProps) {
   const title = `${name} options`
   // Focus goes back to the Widget's setup button if it is still there (it opened this, or there
@@ -124,6 +131,9 @@ export function OptionsPopover({
         </button>
       </header>
       <div class="options-popover__body" ref={form}>
+        {readOnly && (
+          <p class="settings__note options-popover__readonly">{READ_ONLY_UPDATE_NOTE}</p>
+        )}
         <OptionsForm
           definition={definition}
           disabled={disabled}
@@ -132,6 +142,7 @@ export function OptionsPopover({
           onPageValueChange={onPageValueChange}
           options={options}
           page={page}
+          pageValuesDisabled={pageValuesDisabled}
         />
       </div>
     </aside>

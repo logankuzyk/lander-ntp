@@ -385,3 +385,16 @@ export const KeyboardGridEdge: Story = {
     await holdKeys(canvasElement, 'Clock', arrows('Left', 5))
   },
 }
+
+/** A stored unknown Widget: its place is held for a newer Lander to understand. */
+export const UnknownType: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
+}
+
+/** A newer Layout in edit mode: what this version understands stays visible and read-only. */
+export const NewerLayoutEditing: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
+  play: async ({ canvasElement }) => {
+    await startEditing(canvasElement)
+  },
+}
