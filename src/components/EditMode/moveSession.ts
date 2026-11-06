@@ -1,5 +1,5 @@
 import { clampSize, collides, COLS, drawnRects, type Rect, ROWS } from '@/layout/geometry'
-import { type Editable, moveWidget, resizeWidget } from '@/layout/ops'
+import { type Editable, moveWidget, placeWidget, resizeWidget } from '@/layout/ops'
 import type { Layout } from '@/layout/types'
 import type { Cells } from '@/widgetSystem/definition'
 import type { AnyWidgetDefinition } from '@/widgetSystem/registry'
@@ -222,6 +222,144 @@ function dropResize(session: ResizeSession, editable: Editable): Layout | null {
   const { h, w } = session.place
   if (w === session.origin.w && h === session.origin.h) return null
   const result = resizeWidget(editable, session.id, { h, w })
+  if (!result.ok || result.layout === editable.layout) return null
+  return result.layout
+}
+
+/**
+ * Why a key's step did not go all the way, when it did not:
+ *
+ * - `edge`: the Grid ends there.
+ * - `largest` / `smallest`: the Widget is as big or as small as its definition allows.
+ * - `unresizable`: it is of a type this version does not know, which has no sizes to resize between.
+ */
+export type KeyLimit = 'edge' | 'largest' | 'smallest' | 'unresizable'
+
+/**
+ * A Widget picked up from the keyboard, from the pick-up to the put-down. It is a value, as
+ * `Session` is: every step gives the next, and none changes the one it was given or the Layout.
+ *
+ * It is the pointer's machine driven in whole cells: a step is the pointer moving by one cell,
+ * handed to `move` as a move or as a resize, so the clamping to the Grid and to the Widget's
+ * sizes, and the refusal over a neighbour, are the same code. What differs is that one pick-up
+ * can be both, so `place` holds the place and the size together, from `origin`, where the Widget
+ * was drawn at the pick-up and goes back to.
+ */
+export type KeySession = {
+  /** The Widget's definition, which its sizes are read from; null for a type not known. */
+  readonly definition: AnyWidgetDefinition | null
+  readonly id: string
+  readonly kind: 'keys'
+  /** Why the last step stopped short, or null when it went through (or there was none yet). */
+  readonly limit: KeyLimit | null
+  /** Where the Widget was drawn when it was picked up. */
+  readonly origin: Rect
+  /** Where every other Widget is drawn, which the Widget may not take cells of. */
+  readonly others: readonly Rect[]
+  /** Where it would land if put down now: whole cells, wholly on the Grid. */
+  readonly place: Rect
+  /** Whether it may land there. False over another Widget. */
+  readonly valid: boolean
+}
+
+/** One arrow key's step, in cells: the sign says which way. */
+export type Step = { cols: number; rows: number }
+
+/**
+ * Picks up the Widget with this id from the keyboard, where it is drawn. Nothing where the Layout
+ * may not be changed, or there is no such Widget, or it has no place to be drawn. A Widget of a
+ * type this version does not know can be picked up, and moved, but not resized.
+ */
+export function pickUpKeys({ layout, readOnly }: Editable, id: string): KeySession | null {
+  if (readOnly) return null
+  const drawn = drawnRects(layout)
+  const mine = drawn.find(({ widget }) => widget.placed.id === id)
+  if (!mine) return null
+  return {
+    definition: mine.widget.kind === 'known' ? mine.widget.definition : null,
+    id,
+    kind: 'keys',
+    limit: null,
+    origin: mine.rect,
+    others: drawn.filter((other) => other !== mine).map((other) => other.rect),
+    place: mine.rect,
+    valid: true,
+  }
+}
+
+/** Moves it by `step` cells: the pointer carrying the Widget by that much, from where it is. */
+export function nudge(session: KeySession, step: Step): KeySession {
+  const { place } = session
+  const at = { col: place.col - 1, row: place.row - 1 }
+  const carried: MoveSession = {
+    at,
+    grab: { col: 0, row: 0 },
+    id: session.id,
+    kind: 'move',
+    origin: place,
+    others: session.others,
+    place,
+    valid: true,
+  }
+  const moved = move(carried, { col: at.col + step.cols, row: at.row + step.rows })
+  const stayed = moved.place.col === place.col && moved.place.row === place.row
+  return { ...session, limit: stayed ? 'edge' : null, place: moved.place, valid: moved.valid }
+}
+
+/**
+ * Makes it `step` cells bigger (smaller where the step is negative), from its top left corner:
+ * the pointer pulling the handle by that much. Kept between its smallest and largest and on the
+ * Grid, as the handle is, and `limit` says which stopped it when it did not go all the way.
+ */
+export function stretch(session: KeySession, step: Step): KeySession {
+  const { definition, place } = session
+  if (!definition) return { ...session, limit: 'unresizable' }
+  const pulled: ResizeSession = {
+    definition,
+    grab: { col: 0, row: 0 },
+    id: session.id,
+    kind: 'resize',
+    origin: place,
+    others: session.others,
+    place,
+    size: { h: place.h, w: place.w },
+    valid: true,
+  }
+  const resized = move(pulled, {
+    col: place.col - 1 + place.w + step.cols,
+    row: place.row - 1 + place.h + step.rows,
+  })
+  const { largest, smallest } = definition.sizes
+  const wanted = { h: place.h + step.rows, w: place.w + step.cols }
+  const same = resized.place.w === place.w && resized.place.h === place.h
+  const limit: KeyLimit | null = !same
+    ? null
+    : wanted.w > largest.w || wanted.h > largest.h
+      ? 'largest'
+      : wanted.w < smallest.w || wanted.h < smallest.h
+        ? 'smallest'
+        : 'edge'
+  return { ...session, limit, place: resized.place, valid: resized.valid }
+}
+
+/**
+ * Puts the Widget down where `session` has it. The next Layout, to save in one write, or null
+ * where there is nothing to save: the place is refused, or it is where the Widget was at the
+ * size it had, or the Layout may not be changed. As for the pointer it is checked again against
+ * `editable`, the Layout as it is now, by `placeWidget`.
+ */
+export function dropKeys(session: KeySession, editable: Editable): Layout | null {
+  if (!session.valid) return null
+  const { origin, place } = session
+  if (
+    place.col === origin.col &&
+    place.row === origin.row &&
+    place.w === origin.w &&
+    place.h === origin.h
+  ) {
+    return null
+  }
+  const result = placeWidget(editable, session.id, place)
   if (!result.ok || result.layout === editable.layout) return null
   return result.layout
 }
