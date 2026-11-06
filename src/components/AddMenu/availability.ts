@@ -1,7 +1,6 @@
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { canAdd, WIDGET_LIMIT } from '@/layout/limit'
 import { addWidget, type Editable } from '@/layout/ops'
-
-export const READ_ONLY_NOTE = 'Update Lander to change this.'
 
 /**
  * What the Add menu says beside its title, if anything: why nothing in it can be added. It is
@@ -19,7 +18,7 @@ export function menuNote(
   { layout, readOnly }: Editable,
   limit: number | null = WIDGET_LIMIT,
 ): string | null {
-  if (readOnly) return READ_ONLY_NOTE
+  if (readOnly) return READ_ONLY_UPDATE_NOTE
   if (limit === null || canAdd(layout, limit)) return null
   return `That's all ${limit} widgets. Remove one to add another.`
 }

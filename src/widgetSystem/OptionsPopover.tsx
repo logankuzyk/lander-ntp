@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks'
 
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
 
@@ -131,7 +132,7 @@ export function OptionsPopover({
       </header>
       <div class="options-popover__body" ref={form}>
         {readOnly && (
-          <p class="settings__note options-popover__readonly">Update Lander to change this.</p>
+          <p class="settings__note options-popover__readonly">{READ_ONLY_UPDATE_NOTE}</p>
         )}
         <OptionsForm
           definition={definition}

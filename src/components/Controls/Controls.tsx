@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import { AddMenu } from '@/components/AddMenu/AddMenu'
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import type { Layout } from '@/layout/types'
 
@@ -149,9 +150,7 @@ export function Controls({
           </svg>
         )}
       </button>
-      {editing && !canChange && (
-        <span class="controls__readonly">Update Lander to change this.</span>
-      )}
+      {editing && !canChange && <span class="controls__readonly">{READ_ONLY_UPDATE_NOTE}</span>}
       <button
         aria-busy={busy === true}
         aria-label="Next photo"
