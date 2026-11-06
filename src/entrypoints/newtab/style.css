@@ -1202,6 +1202,10 @@ body {
   scrollbar-color: rgb(255 255 255 / 30%) transparent;
 }
 
+.options-popover__readonly {
+  margin: 0 0 var(--popover-block);
+}
+
 /* A list of rows to drag into order, each with an eye to show or hide it. */
 
 .fields {
@@ -1603,6 +1607,13 @@ button.chip:hover {
   bottom: 1rem;
   display: flex;
   gap: 0.5rem;
+}
+
+.controls__readonly {
+  align-self: center;
+  max-width: 13rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
 }
 
 .control {

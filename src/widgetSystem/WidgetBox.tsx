@@ -60,9 +60,9 @@ const isRemoveKey = (event: KeyboardEvent) =>
  * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
  * (see Grid), which is the order Tab takes. A box given an `id` also has an Options button at
  * its top left, which opens the Widget's options in a popover beside it (see
- * `OptionsPopoverProvider`), and so does O pressed on the frame. It also has a remove button at
- * its top right, which takes the Widget out of the Layout (see `useRemovalController`), as does
- * Delete pressed on the frame. At its bottom right is the resize handle, which the Grid hears
+ * `OptionsPopoverProvider`), and so does O pressed on the frame. A box with an id or a stored
+ * place id also has a remove button at its top right, which takes it out of the Layout (see
+ * `useRemovalController`), as does Delete pressed on the frame. At its bottom right is the resize handle, which the Grid hears
  * (see `useGridMove`); the box itself has nothing of a drag in it.
  */
 export function Box({
@@ -96,7 +96,7 @@ export function Box({
   const options = useOptionsPopover()
   const removal = useRemoval()
   const optionsId = editing && options.available ? id : undefined
-  const removeId = editing && removal.available ? id : undefined
+  const removeId = editing && removal.available ? (id ?? placedId) : undefined
   // Only a Widget with an id has sizes to resize between (a type this version does not know has
   // none), and only where the Layout may be changed. Whether it can be pressed is the Grid's say
   // (`grid--movable`), which also needs somewhere to save the result.

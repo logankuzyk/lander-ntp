@@ -1,3 +1,5 @@
+import { browser } from 'wxt/browser'
+
 import { checkLayout } from '@/layout/check'
 import { COLS, type Rect } from '@/layout/geometry'
 import { layoutItem } from '@/layout/storage'
@@ -18,7 +20,7 @@ import { makeManifest, makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
 
 export type PageSeed = {
   /** What `sync:layout` holds. Without it the page works the Layout out from `settings`. */
-  layout?: StoredLayout
+  layout?: unknown
   /** The photo manifest's say over the weather: `{ enabled: false }` switches it off. */
   manifestWeather?: { enabled: boolean }
   /** Readings, in degrees Celsius, for other places a stored Layout's Weathers are at. */
@@ -27,6 +29,8 @@ export type PageSeed = {
   onboarding?: Onboarding
   /** A new install's record, kept on this device until the welcome is answered. */
   pending?: Onboarding
+  /** A raw sync value, including a version this code cannot write. */
+  rawLayout?: unknown
   settings?: Settings
   /** A reading for the place in `settings.weather`, so the Weather shows without asking the forecast. */
   weather?: Weather
@@ -59,6 +63,7 @@ export async function seedPage({
   moreWeather = [],
   onboarding,
   pending,
+  rawLayout,
   settings = DEFAULT_SETTINGS,
   weather,
 }: PageSeed = {}) {
@@ -84,6 +89,7 @@ export async function seedPage({
   })
   await settingsItem.setValue(settings)
   if (layout) await layoutItem.setValue(checkLayout(layout))
+  if (rawLayout) await browser.storage.sync.set({ layout: rawLayout })
   if (weather) {
     const { place, unit } = settings.weather
     if (!place) throw new Error('seedPage: a weather reading needs settings.weather.place')
@@ -289,7 +295,6 @@ export const PAGE_SEEDS = {
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
   },
-
   /**
    * Someone who updated with the Clock and the Weather on: the Layout is worked out from their
    * settings, and nothing is stored in `sync:layout`.
@@ -299,6 +304,7 @@ export const PAGE_SEEDS = {
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
   },
+
   /** The same update with both off: an empty Grid, as before, and the note says Add brings them back. */
   layoutNewsBothOff: {
     onboarding: { dismissed: [], welcomed: true },
@@ -322,6 +328,25 @@ export const PAGE_SEEDS = {
       ...DEFAULT_SETTINGS,
       clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
       weather: { ...DEFAULT_SETTINGS.weather, enabled: true },
+    },
+  },
+  /** A Layout saved by a newer version, with one known and one unknown Widget. */
+  newerLayout: {
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    rawLayout: {
+      v: 2,
+      widgets: [
+        clockAt('clocknew1', 5, 4, 4),
+        {
+          col: 1,
+          h: 2,
+          id: 'future01',
+          options: { colour: 'teal' },
+          row: 1,
+          type: 'bookmarks',
+          w: 2,
+        },
+      ],
     },
   },
   /** The first tab after installing: the welcome, over the photo. */

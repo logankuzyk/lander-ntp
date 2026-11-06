@@ -49,7 +49,7 @@ export function Controls({
   onToggleSettings,
   settingsOpen,
 }: ControlsProps) {
-  const { editing, enter, leave } = useEditMode()
+  const { canChange, editing, enter, leave } = useEditMode()
   const [addOpen, setAddOpen] = useState(false)
 
   // Edit mode ending takes the menu with it, so the next time it starts the menu is shut.
@@ -149,6 +149,9 @@ export function Controls({
           </svg>
         )}
       </button>
+      {editing && !canChange && (
+        <span class="controls__readonly">Update Lander to change this.</span>
+      )}
       <button
         aria-busy={busy === true}
         aria-label="Next photo"

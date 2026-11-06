@@ -121,3 +121,12 @@ export const EmptyGrid: Story = {
     await addFromMenu(canvas, 'Clock')
   },
 }
+
+/** A newer Layout: both Add choices are unavailable with the update note. */
+export const NewerLayout: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openAddMenu(canvas)
+  },
+}
