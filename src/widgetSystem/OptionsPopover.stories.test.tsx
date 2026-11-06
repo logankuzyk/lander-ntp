@@ -11,6 +11,7 @@ type StoryName = Exclude<keyof typeof stories, 'default'>
 const OPENS: Record<StoryName, string> = {
   ClockBeside: 'Clock',
   NarrowWindow: 'Weather',
+  NewerLayout: 'Clock',
   ShortWindow: 'Weather',
   WeatherBeside: 'Weather',
   WeatherFlipped: 'Weather',
@@ -41,7 +42,7 @@ describe('the options popover stories', () => {
       // The story's own `beforeEach` stands in for the network (see its `sendNothing`), so the
       // test's spy is put back over it: what is asked for is what reaches `fetch`.
       const restore = await story.beforeEach()
-      restore()
+      restore?.()
       vi.stubGlobal('fetch', fetchSpy)
       render(<App />)
 

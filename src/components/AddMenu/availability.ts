@@ -1,3 +1,4 @@
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { canAdd, WIDGET_LIMIT } from '@/layout/limit'
 import { addWidget, type Editable } from '@/layout/ops'
 
@@ -13,7 +14,11 @@ import { addWidget, type Editable } from '@/layout/ops'
  * Nothing else stops adding in this version except room, and that is per item (see `itemState`).
  * The limit is a parameter so that the line can be tried without one (`null`, a later paid tier).
  */
-export function menuNote({ layout }: Editable, limit: number | null = WIDGET_LIMIT): string | null {
+export function menuNote(
+  { layout, readOnly }: Editable,
+  limit: number | null = WIDGET_LIMIT,
+): string | null {
+  if (readOnly) return READ_ONLY_UPDATE_NOTE
   if (limit === null || canAdd(layout, limit)) return null
   return `That's all ${limit} widgets. Remove one to add another.`
 }

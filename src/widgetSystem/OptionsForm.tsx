@@ -125,10 +125,8 @@ function NeedGate({ children, definition, option, options }: NeedGateProps) {
 type OptionsFormProps = {
   definition: AnyWidgetDefinition
   /**
-   * Draws every control as it is, and passes no change on, not even one a control was waiting on
-   * the browser for: for options that may not be changed. It disables the shared 24-hour switch
-   * too. That switch is the page's, so W27 may need an additive `pageValuesDisabled`, to follow
-   * the settings' own state rather than the Layout's.
+   * Draws each Widget option as it is and passes no change on, not even one a control was waiting
+   * on the browser for: for options that may not be changed.
    */
   disabled?: boolean
   /**
@@ -148,6 +146,8 @@ type OptionsFormProps = {
    */
   options: unknown
   page: PageValues
+  /** Whether page-wide values may change, which follows the settings' own read-only state. */
+  pageValuesDisabled?: boolean
 }
 
 /**
@@ -165,6 +165,7 @@ export function OptionsForm({
   onPageValueChange,
   options,
   page,
+  pageValuesDisabled = disabled,
 }: OptionsFormProps) {
   const form = useRef<HTMLDivElement>(null)
   const headings = useId()
@@ -173,8 +174,8 @@ export function OptionsForm({
   // A change from a control that waited on the browser (the place, following the device) is made
   // on the options as they are when it comes, not as they were at the click, and not at all if
   // the form has been disabled since.
-  const latest = useRef({ disabled, options })
-  latest.current = { disabled, options }
+  const latest = useRef({ disabled, options, pageValuesDisabled })
+  latest.current = { disabled, options, pageValuesDisabled }
 
   const change = (changes: Record<string, unknown>) => {
     if (latest.current.disabled) return
@@ -196,16 +197,17 @@ export function OptionsForm({
     // The whole form is off, or this option is held back until a need is met.
     const off = held || disabled
     if (isPageValue(option)) {
+      const pageValueOff = held || pageValuesDisabled
       const name = option.shared
       const invert = option.invert ?? false
       return (
         <>
           <Switch
             checked={page[name] !== invert}
-            disabled={off}
+            disabled={pageValueOff}
             label={option.label}
             onChange={(on) => {
-              if (!latest.current.disabled) onPageValueChange(name, on !== invert)
+              if (!latest.current.pageValuesDisabled) onPageValueChange(name, on !== invert)
             }}
           />
           <p class="settings__note">{PAGE_VALUE_NOTES[name]}</p>

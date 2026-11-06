@@ -358,6 +358,27 @@ describe('moveWidget', () => {
     expect(JSON.stringify(stored(layout))).toBe(snapshot)
   })
 
+  it('keeps an unknown Widget’s stored data when it moves and another Widget is removed', () => {
+    const future = {
+      col: 1,
+      h: 2,
+      id: 'future01',
+      later: { badge: 'new' },
+      options: { colour: 'teal' },
+      row: 1,
+      type: 'bookmarks',
+      w: 2,
+    }
+    const before = layoutOf(future, clock('clock001', 5, 4))
+
+    const moved = accepted(moveWidget(editable(before), 'future01', { col: 10, row: 6 }))
+    const movedFuture = { ...future, col: 10, row: 6 }
+    expect(JSON.stringify(stored(moved).widgets[0])).toBe(JSON.stringify(movedFuture))
+
+    const withoutClock = accepted(removeWidget(editable(moved), 'clock001'))
+    expect(JSON.stringify(stored(withoutClock).widgets)).toBe(JSON.stringify([movedFuture]))
+  })
+
   it('keeps what a Widget has that this version does not know', () => {
     const odd = layoutOf(clock('a', 5, 4, { note: 'kept' } as Partial<PlacedWidget>))
 

@@ -70,7 +70,9 @@ export function AddMenu({
   const added = useRef<{ id: string; seen: boolean } | null>(null)
 
   const editable = { layout, readOnly: !canChange || !loaded }
-  const note = menuNote(editable)
+  // Only a known newer Layout gets the update message; before it loads, the items stay off but
+  // the page must not claim that an update is needed.
+  const note = menuNote({ layout, readOnly: !canChange })
 
   // Into the menu on open: the first item, whether it can be picked or not (its reason is read).
   useEffect(() => {

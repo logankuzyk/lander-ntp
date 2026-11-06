@@ -10,6 +10,7 @@ import { makeWeather } from '@/test/fixtures'
 import { css, rule } from '@/test/styles'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
+import { RemovalProvider } from '@/widgetSystem/useRemoval'
 
 import { Grid } from './Grid'
 
@@ -404,6 +405,29 @@ describe('Grid in edit mode', () => {
     const group = screen.getByRole('group', { name: 'Unknown widget' })
     expect(group.getAttribute('tabindex')).toBe('0')
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+  })
+
+  it('lets a person remove an unknown Widget, but has no options or resize handle for it', () => {
+    const remove = vi.fn()
+    const layout = layoutOf(stored('future01', 'bookmarks', [1, 3, 3, 4]))
+    render(
+      <EditModeProvider>
+        <EditToggles />
+        <RemovalProvider value={{ available: true, remove }}>
+          <Grid layout={layout} page={PAGE} />
+        </RemovalProvider>
+      </EditModeProvider>,
+    )
+    edit()
+
+    expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Remove Unknown widget' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Unknown widget options' })).toBeNull()
+    expect(document.querySelector('.widget-box__resize')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Unknown widget' }))
+
+    expect(remove).toHaveBeenCalledWith('future01')
   })
 
   it('says how to move between Widgets, politely, when edit mode starts', () => {
