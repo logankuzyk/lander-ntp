@@ -287,6 +287,106 @@ describe('App, picking up with the options popover open', () => {
   })
 })
 
+describe('App, a drag with the mouse while a Widget is picked up from the keyboard', () => {
+  const MOUSE = { button: 0, isPrimary: true, pointerId: 1, pointerType: 'mouse' }
+  const press = (el: Element, x: number, y: number) =>
+    fireEvent.pointerDown(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y })
+  const drag = (el: Element, x: number, y: number) =>
+    fireEvent.pointerMove(el, { ...MOUSE, buttons: 1, clientX: x, clientY: y })
+  const release = (el: Element, x: number, y: number) =>
+    fireEvent.pointerUp(el, { ...MOUSE, clientX: x, clientY: y })
+
+  it('writes the drag once and not the keyboard’s place, and the next Enter writes nothing', async () => {
+    await drawn()
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const clock = box('clock')
+    clock.focus()
+    key(clock, 'Enter')
+    key(clock, 'ArrowDown')
+    key(clock, 'ArrowDown')
+
+    // The Clock is stored at columns 5 to 8, rows 4 and 5: x 400 to 800, y 300 to 500.
+    press(clock, 600, 400)
+    drag(clock, 590, 380)
+    drag(clock, 500, 300)
+    release(clock, 500, 300)
+    await settled()
+
+    expect(writtenKeys(set)).toEqual(['layout'])
+    expect(await inStorage('clock0aa')).toMatchObject({ col: 4, h: 2, row: 3, w: 4 })
+    expect(box('clock').classList.contains('widget-box--held')).toBe(false)
+    expect(box('clock').style.gridColumn).toBe('4 / span 4')
+    expect(box('clock').style.gridRow).toBe('3 / span 2')
+
+    // A fresh pick-up, which is put down where it is: nothing to write.
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'Enter')
+    await settled()
+    expect(writtenKeys(set)).toEqual(['layout'])
+    expect(await inStorage('clock0aa')).toMatchObject({ col: 4, row: 3 })
+  })
+
+  it('writes the handle’s resize once, and the keyboard session is gone', async () => {
+    await drawn()
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+    const clock = box('clock')
+    clock.focus()
+    key(clock, 'Enter')
+    key(clock, 'ArrowRight', { shiftKey: true })
+    const handle = clock.querySelector<HTMLElement>('.widget-box__resize')!
+
+    press(handle, 790, 490)
+    drag(handle, 890, 590)
+    release(handle, 890, 590)
+    await settled()
+
+    expect(writtenKeys(set)).toEqual(['layout'])
+    expect(await inStorage('clock0aa')).toMatchObject({ col: 5, h: 3, row: 4, w: 5 })
+    expect(box('clock').classList.contains('widget-box--held')).toBe(false)
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'Enter')
+    await settled()
+    expect(writtenKeys(set)).toEqual(['layout'])
+  })
+})
+
+describe('App, the Widget’s own keys while it is picked up', () => {
+  it.each(['Delete', 'Backspace'])(
+    'does not remove a Widget in the air with %s, and writes nothing',
+    async (name) => {
+      await drawn()
+      const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+      const clock = box('clock')
+      clock.focus()
+      key(clock, 'Enter')
+
+      key(clock, name)
+      await settled()
+
+      expect(box('clock').classList.contains('widget-box--held')).toBe(true)
+      expect(screen.queryByText(/Clock removed/)).toBeNull()
+      expect(set).not.toHaveBeenCalled()
+      // And it removes the Widget when it is not in the air, so the test is not vacuous.
+      key(clock, 'Escape')
+      key(clock, name)
+      await settled()
+      expect(screen.queryByText(/Clock removed/)).not.toBeNull()
+    },
+  )
+
+  it('does not open the options with O while it is up', async () => {
+    await drawn()
+    const clock = box('clock')
+    clock.focus()
+    key(clock, 'Enter')
+    key(clock, 'o')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    key(clock, 'Escape')
+    key(clock, 'o')
+    expect(screen.queryByRole('dialog')).not.toBeNull()
+  })
+})
+
 describe('App, the keys on a Widget’s own buttons', () => {
   it('leaves Enter on the Options button to the button, which opens the popover', async () => {
     await drawn()

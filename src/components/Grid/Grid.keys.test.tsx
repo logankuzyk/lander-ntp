@@ -577,3 +577,226 @@ describe('Grid, how a picked-up Widget looks', () => {
     expect(rule('.widget-box.widget-box--held')).toMatch(/z-index:\s*2/)
   })
 })
+
+/**
+ * The Grid with a Layout and an edit mode that something outside can change, as another tab
+ * can: `control` is filled in with what changes them.
+ */
+type Control = {
+  setCanChange: (value: boolean) => void
+  setLayout: (layout: Layout) => void
+}
+
+function Outside({ commit, control }: { commit: (next: Layout) => void; control: Control }) {
+  const [layout, setLayout] = useState(LAYOUT)
+  const [canChange, setCanChange] = useState(true)
+  control.setLayout = setLayout
+  control.setCanChange = setCanChange
+  return (
+    <EditModeProvider canChange={canChange}>
+      <Editing />
+      <Grid commit={commit} layout={layout} page={PAGE} />
+    </EditModeProvider>
+  )
+}
+
+function setupOutside() {
+  const commit = vi.fn()
+  const control: Control = { setCanChange: () => {}, setLayout: () => {} }
+  const view = render(<Outside commit={commit} control={control} />)
+  fireEvent.click(screen.getByText('start'))
+  const box = () => view.container.querySelector<HTMLElement>('.widget-box[data-widget="clock"]')!
+  const said = () => view.container.querySelector('.grid + [aria-live="polite"]')?.textContent ?? ''
+  return { box, commit, control, said, view }
+}
+
+describe('Grid, a Widget picked up from the keyboard while the Layout changes under it', () => {
+  it('says nothing is put back when the Widget is removed by another tab: it is gone', () => {
+    const { box, commit, control, said, view } = setupOutside()
+    box().focus()
+    key(box(), 'Enter')
+    key(box(), 'ArrowRight')
+
+    // A browser sends focusout as it takes the focused box out of the page: here, before it goes.
+    const remove = Node.prototype.removeChild
+    vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(
+      this: Node,
+      child: T,
+    ) {
+      if (child instanceof HTMLElement && child.classList.contains('widget-box')) {
+        child.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+      }
+      return remove.call(this, child) as T
+    })
+    act(() => control.setLayout(layoutOf(weather('wthr0001', 11, 1))))
+
+    expect(view.container.querySelector('.widget-box[data-widget="clock"]')).toBeNull()
+    expect(said()).not.toMatch(/put back/)
+    expect(view.container.querySelector('.grid__ghost')).toBeNull()
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('says it could not be put down, and puts it back, when the place was taken meanwhile', () => {
+    const { box, commit, control, said } = setupOutside()
+    box().focus()
+    key(box(), 'Enter')
+    key(box(), 'ArrowRight')
+    expect(box().style.gridColumn).toBe('6 / span 4')
+
+    // Another tab put the Weather where the Clock is going (columns 9 and 10, rows 4 and 5).
+    act(() => control.setLayout(layoutOf(clock('clock0001', 5, 4), weather('wthr0001', 9, 4))))
+    key(box(), 'Enter')
+
+    expect(commit).not.toHaveBeenCalled()
+    expect(said()).toBe("Clock couldn't be put down there. It went back.")
+    expect(box().classList.contains('widget-box--held')).toBe(false)
+    expect(box().style.gridColumn).toBe('5 / span 4')
+  })
+
+  it('is put back, and Enter puts nothing down, once the Layout may not be changed', () => {
+    const { box, commit, control } = setupOutside()
+    box().focus()
+    key(box(), 'Enter')
+    key(box(), 'ArrowRight')
+
+    act(() => control.setCanChange(false))
+    expect(box().classList.contains('widget-box--held')).toBe(false)
+    key(box(), 'Enter')
+
+    expect(commit).not.toHaveBeenCalled()
+    expect(box().classList.contains('widget-box--held')).toBe(false)
+    expect(box().style.gridColumn).toBe('5 / span 4')
+  })
+})
+
+describe('Grid, what starts a pick-up', () => {
+  it.each([
+    ['Shift', { shiftKey: true }],
+    ['Ctrl', { ctrlKey: true }],
+    ['Alt', { altKey: true }],
+    ['Command', { metaKey: true }],
+  ])('is not Enter or Space with %s held', (_name, modifier) => {
+    const { box } = setup()
+    box('clock').focus()
+    // Each on its own: a second press with the modifier would put down what the first picked up.
+    key(box('clock'), 'Enter', modifier)
+    expect(held(box('clock'))).toBe(false)
+    key(box('clock'), ' ', modifier)
+    expect(held(box('clock'))).toBe(false)
+    key(box('clock'), 'Enter')
+    expect(held(box('clock'))).toBe(true)
+  })
+})
+
+describe('Grid, resizing only the height of a picked-up Widget', () => {
+  it('is put down: Shift and Down, then Enter, saves the taller Widget', () => {
+    const { box, commit, said } = setup()
+    box('clock').focus()
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'ArrowDown', { shiftKey: true })
+
+    key(box('clock'), 'Enter')
+
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(placesIn(commit.mock.calls[0]?.[0] as Layout).clock0001).toEqual({
+      col: 5,
+      h: 3,
+      row: 4,
+      w: 4,
+    })
+    expect(said()).toBe('Clock put down at column 5, row 4, 4 columns by 3 rows.')
+  })
+
+  it('is not saved when it is made taller and shorter again', () => {
+    const { box, commit } = setup()
+    box('clock').focus()
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'ArrowDown', { shiftKey: true })
+    key(box('clock'), 'ArrowUp', { shiftKey: true })
+    key(box('clock'), 'Enter')
+    expect(commit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Grid, the keys a picked-up Widget keeps from the page', () => {
+  it.each(['Delete', 'Backspace', 'o', 'i'])(
+    'does not let %s reach the page while it is up, and does when it is not',
+    (name) => {
+      const { box } = setup()
+      const heard: string[] = []
+      const listener = (event: KeyboardEvent) => heard.push(event.key)
+      window.addEventListener('keydown', listener)
+      box('clock').focus()
+
+      key(box('clock'), name)
+      expect(heard).toEqual([name])
+
+      key(box('clock'), 'Enter')
+      key(box('clock'), name)
+      expect(heard).toEqual([name])
+      expect(held(box('clock'))).toBe(true)
+      window.removeEventListener('keydown', listener)
+    },
+  )
+
+  it('leaves the keys it does not use, such as F5, to the browser', () => {
+    const { box } = setup()
+    const heard: string[] = []
+    const listener = (event: KeyboardEvent) => heard.push(event.key)
+    window.addEventListener('keydown', listener)
+    box('clock').focus()
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'F5')
+    key(box('clock'), 'Tab')
+    expect(heard).toEqual(['F5', 'Tab'])
+    window.removeEventListener('keydown', listener)
+  })
+})
+
+describe('Grid, saying a refusal again', () => {
+  /** A Clock held over the Weather: columns 8 to 11, row 1. */
+  function refused() {
+    const rig = setup()
+    rig.box('clock').focus()
+    key(rig.box('clock'), 'Enter')
+    for (let i = 0; i < 3; i++) key(rig.box('clock'), 'ArrowUp')
+    for (let i = 0; i < 3; i++) key(rig.box('clock'), 'ArrowRight')
+    return rig
+  }
+
+  it('changes the live region each time Enter is pressed on a refused place, so it is read again', () => {
+    const { box, said } = refused()
+    key(box('clock'), 'Enter')
+    const first = said()
+    key(box('clock'), 'Enter')
+    const second = said()
+    key(box('clock'), 'Enter')
+    const third = said()
+
+    expect(first).toBe("Clock can't be put down at column 8, row 1. Another widget is there.")
+    // The same words (to the eye and the ear), a different string (to the live region).
+    expect(second.trim()).toBe(first)
+    expect(second).not.toBe(first)
+    expect(third).not.toBe(second)
+    expect(third.trim()).toBe(first)
+  })
+
+  it('does not change it for identical moves: the same step twice is the same words, said once', () => {
+    const { box, said } = setup()
+    box('clock').focus()
+    key(box('clock'), 'Enter')
+    for (let i = 0; i < 6; i++) key(box('clock'), 'ArrowLeft')
+    const first = said()
+    key(box('clock'), 'ArrowLeft')
+    expect(said()).toBe(first)
+    expect(first).toBe('Column 1, row 4. Edge of the grid.')
+  })
+
+  it('has the ordinary words again after the refusal is left behind', () => {
+    const { box, said } = refused()
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'Enter')
+    key(box('clock'), 'ArrowLeft')
+    expect(said()).toBe('Column 7, row 1.')
+  })
+})

@@ -51,8 +51,10 @@ const hasShortcutModifier = (event: KeyboardEvent) => event.altKey || event.ctrl
  *   its top left corner, between its smallest and largest size. It can be taken over a neighbour,
  *   where the outline goes red and it cannot be put down, so that it can be walked past one.
  * - Enter or Space puts it down: one `commit`, none for any step before it. Escape puts it back.
- *   So does focus leaving the frame (Tab, a click), edit mode ending, the Layout becoming one that
- *   may not be changed, and the Widget going from the Layout.
+ *   So does focus leaving the frame (Tab, a click), a pointer pressed anywhere on the Grid (the
+ *   pointer's drag then goes on from the place the Widget went back to), edit mode ending, the
+ *   Layout becoming one that may not be changed, and the Widget going from the Layout (which says
+ *   nothing: it is gone, not put back).
  * - While it is up the keys it uses never reach the page: the arrows do not change the photo, and
  *   Escape does not also leave edit mode. Every other key a page shortcut might use (letters,
  *   Delete) is swallowed too, so that nothing acts behind a Widget in the air, and Tab and the
@@ -69,7 +71,7 @@ export function useGridKeys({ commit, grid, layout }: Options) {
   const movable = commit !== undefined && editing && canChange
 
   const [held, setHeld] = useState<Held | null>(null)
-  const [announcement, setAnnouncement] = useState('')
+  const [said, setSaid] = useState({ odd: false, text: '' })
   const current = useRef<Held | null>(null)
   const latest = useRef(layout)
   latest.current = layout
@@ -85,15 +87,25 @@ export function useGridKeys({ commit, grid, layout }: Options) {
     setHeld(next)
   }, [])
 
+  /**
+   * Says `text` in the live region. A live region is read when its text changes, so the same
+   * words twice in a row are said once; `again` is for a refusal that is pressed for again, which
+   * changes the text by a trailing no-break space, which is not heard, so that it is read again.
+   * Identical moves are not given it: they are not a new thing to say.
+   */
+  const say = useCallback((text: string, again = false) => {
+    setSaid((was) => ({ odd: again && was.text === text ? !was.odd : false, text }))
+  }, [])
+
   /** Puts the Widget back where it was picked up. With `say`, says so. */
   const cancel = useCallback(
-    (say: boolean) => {
+    (tell: boolean) => {
       const was = current.current
       if (!was) return
       hold(null)
-      if (say) setAnnouncement(putBack(was.name, was.session))
+      if (tell) say(putBack(was.name, was.session))
     },
-    [hold],
+    [hold, say],
   )
 
   // Edit mode ending, or the Layout becoming unchangeable, puts a Widget in the air back.
@@ -102,8 +114,8 @@ export function useGridKeys({ commit, grid, layout }: Options) {
   }, [movable, cancel])
   // Anything said belongs to the edit mode it was said in.
   useEffect(() => {
-    if (!editing) setAnnouncement('')
-  }, [editing])
+    if (!editing) say('')
+  }, [editing, say])
   // The Widget in the air is gone from the Layout (another tab removed it): nothing to put down.
   useEffect(() => {
     const was = current.current
@@ -132,14 +144,14 @@ export function useGridKeys({ commit, grid, layout }: Options) {
     closeOptions.current()
     const name = frame.getAttribute('aria-label') ?? 'Widget'
     hold({ name, session })
-    setAnnouncement(pickedUp(name, session))
+    say(pickedUp(name, session))
   }
 
   const putDownNow = (was: Held) => {
     const { name, session } = was
     if (!session.valid) {
       // It stays in the air: it can be moved on, or put back.
-      setAnnouncement(cannotPutDown(name, session))
+      say(cannotPutDown(name, session), true)
       return
     }
     const next = dropKeys(session, { layout: latest.current, readOnly: !changeable.current })
@@ -149,7 +161,7 @@ export function useGridKeys({ commit, grid, layout }: Options) {
       session.place.row === session.origin.row &&
       session.place.w === session.origin.w &&
       session.place.h === session.origin.h
-    setAnnouncement(next || unchanged ? putDown(name, session) : couldNotPutDown(name))
+    say(next || unchanged ? putDown(name, session) : couldNotPutDown(name))
     if (next) committing.current?.(next)
   }
 
@@ -181,7 +193,7 @@ export function useGridKeys({ commit, grid, layout }: Options) {
       const { name, session } = was
       const next = event.shiftKey ? stretch(session, step) : nudge(session, step)
       hold({ name, session: next })
-      setAnnouncement(
+      say(
         event.shiftKey
           ? next.limit === 'unresizable'
             ? cannotResize(name)
@@ -194,17 +206,31 @@ export function useGridKeys({ commit, grid, layout }: Options) {
   // Focus going anywhere else (Tab, a click on something) is the Widget put back.
   const onFocusOut = (event: JSX.TargetedFocusEvent<HTMLElement>) => {
     const was = current.current
-    if (was && frameOf(event.target)?.dataset.widgetId === was.session.id) cancel(true)
+    if (!was || frameOf(event.target)?.dataset.widgetId !== was.session.id) return
+    // A browser sends focusout as it takes a focused box out of the page, and that is a Widget
+    // gone (another tab removed it): there is nothing to say was put back.
+    const there = drawnRects(latest.current).some(
+      ({ widget }) => widget.placed.id === was.session.id,
+    )
+    cancel(there)
   }
+
+  // A pointer pressed anywhere on the Grid ends the pick-up, and a frame that already has focus
+  // does not lose it to a press, so nothing else would: without this the drag and the pick-up
+  // would both be in the air, and the next Enter would put the keyboard's place down over the
+  // drag's. Heard on the way down, ahead of the pointer's own handler (see `useGridMove`), which
+  // then drags from the place the Widget went back to.
+  const onPointerDownCapture = () => cancel(true)
 
   const ghost: KeyGhost | null = held
     ? { place: held.session.place, valid: held.session.valid }
     : null
 
   return {
-    announcement,
+    // The trailing no-break space is `say`'s, to make the same refusal read again.
+    announcement: said.odd ? `${said.text}\u00a0` : said.text,
     ghost,
-    handlers: { onFocusOut, onKeyDownCapture },
+    handlers: { onFocusOut, onKeyDownCapture, onPointerDownCapture },
     held: held
       ? { id: held.session.id, place: held.session.place, valid: held.session.valid }
       : null,
