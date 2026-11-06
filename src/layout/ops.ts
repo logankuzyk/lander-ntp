@@ -252,6 +252,46 @@ export function resizeWidget(
 }
 
 /**
+ * Moves and resizes a Widget in one change: its new place is `to`, whole cells wholly on the Grid
+ * and clear of the others as they are drawn. It is what putting down a Widget picked up from the
+ * keyboard needs, as that can have been moved and resized before it is put down, and the place it
+ * ends in can be allowed where neither the move nor the resize alone would be. The rules are
+ * those of `moveWidget` and `resizeWidget`: a new size must be between the Widget's smallest and
+ * largest (a size it is stored at is kept while only moved), and a Widget of a type this version
+ * does not know can be moved but has no new size. The Layout is settled first (see `settle`).
+ * Placing a Widget where it is stored and drawn gives back the Layout it was given.
+ */
+export function placeWidget(
+  { layout: given, readOnly }: Editable,
+  id: string,
+  to: Rect,
+): Changed | Refused {
+  if (readOnly) return refused('read only')
+  const layout = settle(given)
+  const widget = find(layout, id)
+  if (!widget) return refused('not found')
+  const current = drawnPlace(layout, widget)
+  if (!current) return refused('no room')
+
+  if (to.w !== current.w || to.h !== current.h) {
+    if (widget.kind === 'unknown') return refused('unknown type')
+    const { largest, smallest } = widget.definition.sizes
+    if (to.w < smallest.w || to.h < smallest.h) return refused('too small')
+    if (to.w > largest.w || to.h > largest.h) return refused('too large')
+  }
+  const place = { col: to.col, h: to.h, row: to.row, w: to.w }
+  const reason = checkPlace(layout, widget, place)
+  if (reason) return refused(reason)
+  const before = find(given, id)
+  if (before && sameCells(before.placed, place) && sameCells(current, place)) {
+    return { layout: given, ok: true }
+  }
+
+  const next = { ...widget, placed: { ...widget.placed, ...place } }
+  return { layout: replace(layout, widget, next), ok: true }
+}
+
+/**
  * Takes a Widget out of the Layout, along with its options. It can be a Widget of a type this
  * version does not know, or one with no place to be drawn. The Layout is settled first (see
  * `settle`), so the Widgets left stay where they were drawn. The Widget comes back as it was

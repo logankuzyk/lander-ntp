@@ -5,6 +5,7 @@ import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 import { holdDrag } from '../../../.storybook/holdDrag'
+import { arrows, holdKeys } from '../../../.storybook/holdKeys'
 import { holdResize } from '../../../.storybook/holdResize'
 import { startEditing } from '../../../.storybook/startEditing'
 
@@ -290,6 +291,98 @@ export const ResizeReducedMotion: Story = {
   },
   play: async ({ canvasElement }) => {
     await holdResize(canvasElement, 'Clock', { cols: 1.6, rows: 0.4 })
+  },
+}
+
+/**
+ * The Clock picked up from the keyboard (Enter on its frame): lifted above the others, with an
+ * outline of where it would be put down, which is where it is. Arrow keys move it, Shift and the
+ * arrows resize it, Enter puts it down and Escape puts it back. A screen reader hears "Clock
+ * picked up at column 5, row 4" and the keys. Nothing is saved until it is put down.
+ */
+export const KeyboardPickedUp: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock')
+  },
+}
+
+/**
+ * The Clock picked up and moved two columns right and a row down with the arrow keys (it was at
+ * column 3, row 3): it is drawn in the cells it would be put down in, one step at a time.
+ */
+export const KeyboardMoved: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock', [...arrows('Right', 2), ...arrows('Down', 1)])
+  },
+}
+
+/**
+ * The Clock picked up and made two columns wider and a row taller with Shift and the arrow keys:
+ * 6 by 3 from column 3, row 3. It lays itself out in the size it will be as each key is pressed.
+ */
+export const KeyboardResizing: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock', [
+      ...arrows('Right', 2, true),
+      ...arrows('Down', 1, true),
+    ])
+  },
+}
+
+/**
+ * Shift and the right arrow pressed more times than the Clock has room for: it stops at its
+ * largest width, 8 columns, and says "Largest size". Shift and the left arrow stops it at its
+ * smallest, 3 columns, the same way.
+ */
+export const KeyboardResizeStopsAtLimits: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock', arrows('Right', 6, true))
+  },
+}
+
+/**
+ * The Clock walked with the arrow keys over the Weather in the top right corner: the outline is
+ * red and dashed, because the place is refused, and a screen reader hears "Another widget is
+ * there". Enter would not put it down; the arrows carry it on past the Weather, or Escape puts it
+ * back.
+ */
+export const KeyboardRefused: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock', [...arrows('Up', 3), ...arrows('Right', 3)])
+  },
+}
+
+/**
+ * The Clock pushed left past the Grid's edge: it stops at column 1 and says "Edge of the grid"
+ * instead of going off it.
+ */
+export const KeyboardGridEdge: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await holdKeys(canvasElement, 'Clock', arrows('Left', 5))
   },
 }
 
