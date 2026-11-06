@@ -80,6 +80,50 @@ describe('the page stories', () => {
   })
 })
 
+describe('the tour stories’ seeds', () => {
+  /** Each Widget on the page as [type, column, row], the test DOM drawing them at once. */
+  const widgets = (container: ParentNode) =>
+    [...container.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [
+      box.dataset.widget,
+      box.style.gridColumn,
+      box.style.gridRow,
+    ])
+
+  it('give a new install the Clock and a Weather for Victoria, and no setup button', async () => {
+    await seedPage(PAGE_SEEDS.tourClockAndWeather)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    expect((await screen.findByRole('region', { name: 'Weather' })).textContent).toContain('13°')
+    expect(widgets(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '5 / span 4', '4 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give a new install a Weather waiting for a place: its setup button, and no Clock', async () => {
+    await seedPage(PAGE_SEEDS.tourWeatherWaiting)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    await waitFor(() =>
+      expect(container.querySelector('[data-callout-target="setup"]')).not.toBeNull(),
+    )
+    expect(widgets(container)).toEqual([['weather', '11 / span 2', '1 / span 2']])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give a new install an empty Grid when the Clock and the Weather are off', async () => {
+    await seedPage(PAGE_SEEDS.tourEmptyGrid)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    expect(widgets(container)).toEqual([])
+  })
+})
+
 /** Each box on the page as [type, column, row]: where CSS grid is told to put it. */
 const boxes = (container: ParentNode) =>
   [...container.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [

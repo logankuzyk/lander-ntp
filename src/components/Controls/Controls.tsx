@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import { AddMenu } from '@/components/AddMenu/AddMenu'
+import { useAddMenuControl } from '@/components/AddMenu/useAddMenuControl'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import type { Layout } from '@/layout/types'
 
@@ -50,12 +51,17 @@ export function Controls({
   settingsOpen,
 }: ControlsProps) {
   const { editing, enter, leave } = useEditMode()
-  const [addOpen, setAddOpen] = useState(false)
+  // The menu's state is the page's when there is a handle on it (the tour opens the menu), else
+  // this component's own.
+  const shared = useAddMenuControl()
+  const [ownOpen, setOwnOpen] = useState(false)
+  const addOpen = shared ? shared.open : ownOpen
+  const setAddOpen = shared?.setOpen ?? setOwnOpen
 
   // Edit mode ending takes the menu with it, so the next time it starts the menu is shut.
   useEffect(() => {
     if (!editing) setAddOpen(false)
-  }, [editing])
+  }, [editing, setAddOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -91,7 +97,7 @@ export function Controls({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onNext, busy, onToggleInfo, editing, enter, leave])
+  }, [onNext, busy, onToggleInfo, editing, enter, leave, setAddOpen])
 
   return (
     <div class="controls">
@@ -100,6 +106,7 @@ export function Controls({
         Edit had and the buttons that were already here stay put. */}
       {editing && (
         <AddMenu
+          focusOnOpen={!shared?.quiet}
           layout={layout}
           loaded={layoutLoaded}
           onCommit={onCommit}

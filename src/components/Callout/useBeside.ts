@@ -7,9 +7,10 @@ import { type CalloutTarget, findTarget, preferredSides } from '@/onboarding/tar
 /**
  * What a callout keeps clear of: the popovers (settings, details, a Widget's options), menus and
  * lists of choices, and the note above the Bottom bar ("Couldn't save that"), which comes and
- * goes. The note's wrapper has no box while it is empty.
+ * goes. The note's wrapper has no box while it is empty. The Add menu is its whole card, whose
+ * title is above the list of items (the `menu` role is the list's).
  */
-const OPEN = '.popover, [role="menu"], [role="listbox"], .notice'
+const OPEN = '.popover, .add-menu, [role="menu"], [role="listbox"], .notice'
 
 /** Left between the callout and what is open, so they do not touch. */
 const MARGIN = 8

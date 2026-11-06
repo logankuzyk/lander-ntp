@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { useEffect, useState } from 'preact/hooks'
 import { fn } from 'storybook/test'
 
-import { TOUR } from '@/onboarding/callouts'
+import { SETTINGS_TOUR } from '@/onboarding/tour'
 import type { Settings } from '@/settings/schema'
 import { STORY_PHOTOS } from '@/test/fixtures'
 
@@ -103,5 +103,8 @@ export const FromNewerVersion: Story = {
   },
 }
 
-/** As a new install opens it: a note beside the panel for each section in turn, two now. */
-export const WithTheTour: Story = { args: { tour: TOUR } }
+/**
+ * The panel's own stops, counted alone. As the tour of a new install reaches them, after the
+ * stops on the page, they are counted with those (see `Tour/Photos`).
+ */
+export const WithTheTour: Story = { args: { tour: SETTINGS_TOUR } }
