@@ -96,3 +96,12 @@ export const NarrowWindow: Story = {
     await openOptions(canvas, 'Weather')
   },
 }
+
+/** A newer Layout: Widget options are disabled while the page-wide setting stays available. */
+export const NewerLayout: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openOptions(canvas, 'Clock')
+  },
+}

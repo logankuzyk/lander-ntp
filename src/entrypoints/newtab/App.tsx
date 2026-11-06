@@ -231,6 +231,7 @@ export function App() {
             // The corner above the controls is for one popover at a time; this one sits by its Widget.
             otherOpen={popover !== null}
             page={pageValues(settings)}
+            pageValuesDisabled={!settingsLoaded || settingsReadOnly}
           >
             <RemovalProvider value={removal.controls}>
               {settingsLoaded && layoutLoaded && (

@@ -20,8 +20,16 @@ import { useOptionsPopover } from './useOptionsPopover'
 import { useRemoval } from './useRemoval'
 import { WidgetState } from './WidgetState'
 
+/**
+ * A Widget picked up from the keyboard (see `useGridKeys`), in the place it is held at: `allowed`
+ * where it could be put down, `refused` where it could not (over another Widget).
+ */
+export type HeldState = 'allowed' | 'refused'
+
 type WidgetBoxProps<O, R, C> = {
   definition: WidgetDefinition<O, R, C>
+  /** Picked up from the keyboard: see `Box`. */
+  held?: HeldState
   /** The id it is stored under, which its Options button opens its options by. */
   id?: string
   /** What is stored for this Widget, which may be missing or wrong; the definition reads it. */
@@ -60,13 +68,14 @@ const isRemoveKey = (event: KeyboardEvent) =>
  * frame, a tab stop with the name drawn in it. The boxes are in reading order in the document
  * (see Grid), which is the order Tab takes. A box given an `id` also has an Options button at
  * its top left, which opens the Widget's options in a popover beside it (see
- * `OptionsPopoverProvider`), and so does O pressed on the frame. It also has a remove button at
- * its top right, which takes the Widget out of the Layout (see `useRemovalController`), as does
- * Delete pressed on the frame. At its bottom right is the resize handle, which the Grid hears
+ * `OptionsPopoverProvider`), and so does O pressed on the frame. A box with an id or a stored
+ * place id also has a remove button at its top right, which takes it out of the Layout (see
+ * `useRemovalController`), as does Delete pressed on the frame. At its bottom right is the resize handle, which the Grid hears
  * (see `useGridMove`); the box itself has nothing of a drag in it.
  */
 export function Box({
   children,
+  held,
   id,
   name,
   optionsLabel,
@@ -76,6 +85,8 @@ export function Box({
   widget,
 }: {
   children?: ComponentChildren
+  /** The Widget is picked up from the keyboard (see `useGridKeys`): lifted above the others. */
+  held?: HeldState
   /** Gives the box an Options button. Not for a Widget that has no options to open. */
   id?: string
   /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
@@ -96,7 +107,7 @@ export function Box({
   const options = useOptionsPopover()
   const removal = useRemoval()
   const optionsId = editing && options.available ? id : undefined
-  const removeId = editing && removal.available ? id : undefined
+  const removeId = editing && removal.available ? (id ?? placedId) : undefined
   // Only a Widget with an id has sizes to resize between (a type this version does not know has
   // none), and only where the Layout may be changed. Whether it can be pressed is the Grid's say
   // (`grid--movable`), which also needs somewhere to save the result.
@@ -129,9 +140,10 @@ export function Box({
   return (
     <div
       aria-label={name}
-      class="widget-box"
+      class={held ? 'widget-box widget-box--held' : 'widget-box'}
       // What a callout points at (see onboarding/target): a Widget by its type.
       data-callout-target={`widget:${widget}`}
+      data-refused={held === 'refused' ? 'true' : undefined}
       data-widget={widget}
       data-widget-id={id ?? placedId}
       role="group"
@@ -313,6 +325,7 @@ function SourcedView<O, R, C>({
  */
 export function WidgetBox<O, R, C>({
   definition,
+  held,
   id,
   options,
   page,
@@ -320,6 +333,7 @@ export function WidgetBox<O, R, C>({
 }: WidgetBoxProps<O, R, C>) {
   return (
     <Box
+      held={held}
       id={id}
       name={accessibleName(definition, readOptions(definition, options))}
       optionsLabel={`${definition.name} options`}
@@ -341,7 +355,7 @@ function Contents<O, R, C>({
   id,
   options,
   page,
-}: Omit<WidgetBoxProps<O, R, C>, 'rect'>) {
+}: Omit<WidgetBoxProps<O, R, C>, 'held' | 'rect'>) {
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
   // The needs are asked again, with the options unchanged, when a setup button has asked the

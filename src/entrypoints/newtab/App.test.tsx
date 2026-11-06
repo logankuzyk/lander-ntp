@@ -860,6 +860,85 @@ describe('App, when a change cannot be saved', () => {
   })
 })
 
+describe('App, when the Layout is from a newer version', () => {
+  const UPDATE_TO_CHANGE = 'Update Lander to change this.'
+  const NEWER_LAYOUT = {
+    v: 2,
+    widgets: [
+      {
+        col: 5,
+        h: 2,
+        id: 'clock0001',
+        options: { showDate: true, showSeconds: false },
+        row: 4,
+        type: 'clock',
+        w: 4,
+      },
+      {
+        col: 1,
+        future: { colour: 'blue' },
+        h: 2,
+        id: 'future01',
+        options: { future: true },
+        row: 1,
+        type: 'calendar',
+        w: 2,
+      },
+    ],
+  }
+
+  afterEach(() => vi.restoreAllMocks())
+
+  it('draws what it knows and explains that layout changes need an update', async () => {
+    await seedPhotos()
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      clock: { ...DEFAULT_SETTINGS.clock, hour12: false },
+    })
+    await fakeBrowser.storage.sync.set({ layout: NEWER_LAYOUT })
+    const saveLayout = vi.spyOn(layoutItem, 'setValue')
+    const saveSettings = vi.spyOn(settingsItem, 'setValue')
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('group', { name: 'Unknown widget' })).toBeTruthy()
+    expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+    expect(container.querySelector('time')).not.toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    const done = screen.getByRole('button', { name: 'Done' })
+    expect(done.parentElement?.textContent).toContain(UPDATE_TO_CHANGE)
+    expect(container.querySelector('.grid--movable')).toBeNull()
+    expect(container.querySelector('.widget-box__resize')).toBeNull()
+    expect(container.querySelector('.widget-box__remove')).toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
+    const menu = screen.getByRole('menu', { name: 'Add a widget' })
+    expect(menu.parentElement?.textContent).toContain(UPDATE_TO_CHANGE)
+    for (const name of ['Clock', 'Weather']) {
+      expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBe(
+        'true',
+      )
+    }
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Clock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clock options' }))
+    const popover = await screen.findByRole('dialog', { name: 'Clock options' })
+    expect(within(popover).getByText(UPDATE_TO_CHANGE)).toBeTruthy()
+    expect(within(popover).getByRole('switch', { name: 'Show date' }).matches(':disabled')).toBe(
+      true,
+    )
+    const twentyFourHour = within(popover).getByRole('switch', { name: '24-hour time' })
+    expect(twentyFourHour.matches(':disabled')).toBe(false)
+    fireEvent.click(twentyFourHour)
+
+    await waitFor(async () => expect((await settingsItem.getValue()).clock.hour12).toBe(true))
+    expect(saveLayout).not.toHaveBeenCalled()
+    expect(saveSettings).toHaveBeenCalledOnce()
+    expect(await fakeBrowser.storage.sync.get('layout')).toEqual({ layout: NEWER_LAYOUT })
+  })
+})
+
 describe('App, when the settings are from a newer version', () => {
   const UPDATE_TO_CHANGE = 'Update Lander to change this.'
 

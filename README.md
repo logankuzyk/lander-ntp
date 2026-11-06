@@ -1,6 +1,6 @@
 # lander-ntp
 
-A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a clock, an optional weather widget, photo details, and a gallery in settings for picking a photo or a tag to cycle through.
+A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a Grid of Widgets you choose, such as a clock or the weather. Use Edit mode to add, move, resize, and remove Widgets. Explore the page and its Widgets in Storybook.
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 

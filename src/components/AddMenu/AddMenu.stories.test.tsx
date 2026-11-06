@@ -134,3 +134,15 @@ describe('the Add menu stories', () => {
     await waitFor(() => expect(container.querySelector('[data-widget="clock"]')).not.toBeNull())
   })
 })
+
+it('NewerLayout shows the update note and disables each Add choice', async () => {
+  await seed('NewerLayout')
+  render(<App />)
+  const menu = await openMenu()
+  expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
+    'Update Lander to change this.',
+  )
+  for (const name of ['Clock', 'Weather']) {
+    expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBe('true')
+  }
+})

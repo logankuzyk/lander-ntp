@@ -88,6 +88,8 @@ type OptionsPopoverProviderProps = {
   /** Something else that shares the corner (photo details, settings) is open: this closes. */
   otherOpen: boolean
   page: PageValues
+  /** Whether the settings that own page-wide values may be changed. */
+  pageValuesDisabled?: boolean
 }
 
 /**
@@ -117,8 +119,10 @@ export function OptionsPopoverProvider({
   onPageValueChange,
   otherOpen,
   page,
+  pageValuesDisabled: pageValuesDisabledProp,
 }: OptionsPopoverProviderProps) {
   const { canChange, editing } = useEditMode()
+  const pageValuesDisabled = pageValuesDisabledProp ?? (!canChange || !loaded)
   const [opened, setOpened] = useState<OpenOptions | null>(null)
 
   const close = useCallback(() => setOpened(null), [])
@@ -198,6 +202,8 @@ export function OptionsPopoverProvider({
           onPageValueChange={onPageValueChange}
           options={target.placed.options}
           page={page}
+          pageValuesDisabled={pageValuesDisabled}
+          readOnly={!canChange}
         />
       )}
     </OptionsPopoverContext.Provider>
