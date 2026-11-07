@@ -518,6 +518,75 @@ describe('a callout beside its target', () => {
     })
   })
 
+  describe('keeping clear of the photo credit and the Bottom bar', () => {
+    /** The credit, wrapped to three lines at the foot of a narrow window, and the Bottom bar. */
+    function addFoot() {
+      const credit = addOpen('credit', [24, 715, 138, 732])
+      const controls = addOpen('controls', [150, 744, 390, 784])
+      return { controls, credit }
+    }
+
+    it('lifts a note above the Edit button clear of the credit instead of covering it', () => {
+      vi.stubGlobal('innerWidth', 390)
+      vi.stubGlobal('innerHeight', 800)
+      const { controls } = addFoot()
+      addTarget('edit', [200, 744, 240, 784], controls)
+
+      draw('edit')
+
+      const { dataset, style } = placed()
+      expect([dataset.side, style.left, style.top]).toEqual(['above', '92px', `${715 - 8 - 140}px`])
+    })
+
+    it('is where it was without a credit, when there is none on the page', () => {
+      vi.stubGlobal('innerWidth', 390)
+      vi.stubGlobal('innerHeight', 800)
+      const controls = addOpen('controls', [150, 744, 390, 784])
+      addTarget('edit', [200, 744, 240, 784], controls)
+
+      draw('edit')
+
+      expect(placed().style.top).toBe(`${744 - 12 - 140}px`)
+    })
+
+    it('keeps a note for something else clear of the Bottom bar, not only the credit', () => {
+      vi.stubGlobal('innerWidth', 390)
+      vi.stubGlobal('innerHeight', 800)
+      addOpen('controls', [150, 744, 390, 784])
+      // A widget near the foot of the window, with its note going below it, over the Bottom bar.
+      addTarget('widget:clock', [100, 560, 160, 700])
+
+      draw('widget:clock')
+
+      const box = placed().style
+      const top = Number.parseFloat(box.top)
+      expect(top + 140 <= 744 - 8 || top >= 784 + 8).toBe(true)
+    })
+
+    it('does not treat the Bottom bar as in the way of a note for one of its own buttons', () => {
+      vi.stubGlobal('innerWidth', 1440)
+      vi.stubGlobal('innerHeight', 900)
+      const controls = addOpen('controls', [1100, 844, 1440, 884])
+      addTarget('edit', [1100, 844, 1140, 884], controls)
+
+      draw('edit')
+
+      expect(placed().style.top).toBe(`${844 - 12 - 140}px`)
+    })
+  })
+
+  describe('beside a setup button, which is inside its widget', () => {
+    it('goes beside the widget’s frame, not over the frame with the button', () => {
+      const frame = addOpen('widget-box', [200, 100, 400, 300])
+      addTarget('setup', [260, 180, 340, 220], frame)
+
+      draw('setup')
+
+      const { dataset, style } = placed()
+      expect([dataset.side, style.left, style.top]).toEqual(['right', `${400 + 12}px`, '130px'])
+    })
+  })
+
   describe('beside the Add menu (the tour opens it by itself)', () => {
     /** The menu as the page draws it: a card with a title, and the list of items under that. */
     function addAddMenu(card: Edges, items: Edges) {

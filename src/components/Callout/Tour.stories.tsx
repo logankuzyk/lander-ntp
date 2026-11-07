@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { expect, userEvent, waitFor, within } from 'storybook/test'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { App } from '@/entrypoints/newtab/App'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
@@ -161,5 +162,35 @@ export const EmptyGrid: Story = {
   },
   play: async ({ canvasElement }) => {
     await takeTour(canvasElement, 'Add a widget')
+  },
+}
+
+/**
+ * A Layout that a newer version of the page wrote, which this one cannot change: the tour has
+ * the Edit and Done stops and the panel's two (1 of 4), and the Edit stop says to update.
+ */
+export const NewerLayout: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.newInstall)
+    await fakeBrowser.storage.sync.set({
+      layout: {
+        v: 2,
+        widgets: [
+          {
+            col: 5,
+            h: 2,
+            id: 'clock0aa',
+            options: { showDate: false, showSeconds: false },
+            row: 4,
+            type: 'clock',
+            w: 4,
+          },
+        ],
+      },
+    })
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    await takeTour(canvasElement)
   },
 }

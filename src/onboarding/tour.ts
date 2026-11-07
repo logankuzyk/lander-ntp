@@ -1,8 +1,16 @@
-import { type PageState, type SettingsStop, TOUR, type TourStop } from './callouts'
+import {
+  type PageState,
+  type PageTourStop,
+  type SettingsStop,
+  TOUR,
+  type TourStop,
+} from './callouts'
 import type { CalloutTarget } from './target'
 
 /** What the page has, which decides the stops of its tour. */
 export type PageFacts = {
+  /** Whether the Layout may be changed here: false while a newer version of the page wrote it. */
+  canChange: boolean
   /** The target of the first item in the Add menu, such as `menu:clock`; null if it has none. */
   menu: CalloutTarget | null
   /** Whether a Widget is waiting for the person to set it up (it shows a setup button). */
@@ -36,15 +44,22 @@ const isSettingsStop = (stop: TourStop): stop is SettingsStop => stop.section !=
 /** The stops the settings panel draws, in order: the last of the tour. */
 export const SETTINGS_TOUR: readonly SettingsStop[] = TOUR.filter(isSettingsStop)
 
+const bodyOf = (stop: PageTourStop, facts: PageFacts) => {
+  if (!facts.canChange && stop.readOnlyBody) return stop.readOnlyBody
+  return !facts.setup && stop.unlessSetup ? `${stop.body} ${stop.unlessSetup}` : stop.body
+}
+
 /**
  * The tour for a page that has `facts`. The stops about a Widget are left out of an empty Grid,
  * and the setup button has a stop only when a Widget is waiting for setup; otherwise the Add
- * stop says it in a sentence. Pure: it reads nothing from the page.
+ * stop says it in a sentence. A Layout that cannot be changed has none of the stops that tell the
+ * person to change something. Pure: it reads nothing from the page.
  */
 export function planTour(facts: PageFacts, stops: readonly TourStop[] = TOUR): TourPlan {
   const page: PlannedStop[] = []
   for (const stop of stops) {
     if (isSettingsStop(stop)) continue
+    if (stop.changes && !facts.canChange) continue
     if (stop.when === 'widget' && facts.widget === null) continue
     if (stop.when === 'setup' && !facts.setup) continue
     const target =
@@ -55,7 +70,7 @@ export function planTour(facts: PageFacts, stops: readonly TourStop[] = TOUR): T
           : stop.target
     if (target === null) continue
     page.push({
-      body: !facts.setup && stop.unlessSetup ? `${stop.body} ${stop.unlessSetup}` : stop.body,
+      body: bodyOf(stop, facts),
       id: stop.id,
       number: page.length + 1,
       show: stop.show,

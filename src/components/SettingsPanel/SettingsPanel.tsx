@@ -250,6 +250,13 @@ export function SettingsPanel({
     if (index !== -1) setStep((at) => (at === null ? null : index))
   }
 
+  // The tour ends with Done, or Dismiss: focus was on the note's button, which goes, so it goes to
+  // the panel's Close button and not the page behind it.
+  const endTour = () => {
+    if (document.activeElement?.closest('.callout')) close.current?.focus()
+    setStep(null)
+  }
+
   const nextStop = step === null ? undefined : tour[step + 1]
   // "Next" acts after its note has faded: not if a section was opened by hand meanwhile.
   const latestSection = useRef(section)
@@ -288,11 +295,11 @@ export function SettingsPanel({
                     if (latestSection.current === section) show(nextStop.section)
                   },
                 }
-              : { label: 'Done', onClick: () => setStep(null) }
+              : { label: 'Done', onClick: endTour }
           }
           body={stop.body}
           class="callout--tour"
-          onDismiss={() => setStep(null)}
+          onDismiss={endTour}
           progress={`${(tourProgress?.before ?? 0) + step + 1} of ${tourProgress?.total ?? tour.length}`}
           title={stop.title}
         />

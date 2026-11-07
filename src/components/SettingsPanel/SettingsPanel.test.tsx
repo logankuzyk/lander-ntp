@@ -456,6 +456,30 @@ describe('SettingsPanel', () => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
     })
 
+    it('puts focus on the Close button when the last stop is done, or the note dismissed', async () => {
+      renderTour()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await waitFor(() => expect(selectedTab()).toBe('Photos'))
+      const done = screen.getByRole('button', { name: 'Done' })
+      done.focus()
+
+      fireEvent.click(done)
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
+    })
+
+    it('leaves focus alone when the tour ends with it on something else', async () => {
+      renderTour()
+      const tab = screen.getByRole('tab', { name: 'Photos' })
+      tab.focus()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(document.activeElement).toBe(tab)
+    })
+
     it('ends when dismissed, without closing the settings', async () => {
       const { onClose } = renderTour()
 

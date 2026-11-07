@@ -121,6 +121,24 @@ describe('a stop whose target is not on the page', () => {
     expect(title()).toBe('Third')
   })
 
+  it('waits one and a half seconds for a target, and no more: not a second less, not ten seconds more', async () => {
+    renderTour()
+    await act(async () => {})
+    next()
+    await act(async () => {})
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_400)
+    })
+    // Still waiting: no note, and the tour has not moved.
+    expect(screen.queryByRole('note')).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    expect(title()).toBe('Third')
+  })
+
   it('keeps its stop when the target arrives in time', async () => {
     const { container } = renderTour()
     await act(async () => {})

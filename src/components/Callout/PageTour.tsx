@@ -43,7 +43,7 @@ type PageTourProps = {
  * Drawn inside the edit mode provider and the Add menu's, as `PageNews` is.
  */
 export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProps) {
-  const { editing, enter, leave } = useEditMode()
+  const { canChange, editing, enter, leave } = useEditMode()
   const menu = useAddMenuControl()
   // Worked out once the page has drawn, from what it has: see `pageFacts`.
   const [plan, setPlan] = useState<TourPlan | null>(null)
@@ -57,7 +57,7 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
   latest.current = { editing, enter, leave, menu, onEnd, onFinish, plan }
 
   useLayoutEffect(() => {
-    setPlan(planTour(pageFacts(), stops))
+    setPlan(planTour(pageFacts(canChange), stops))
     // Once: a tour does not change its stops as the page does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -112,6 +112,13 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
       const now = latest.current
       if (entered.current) now.leave()
       now.menu?.setOpen(false)
+      // Focus on the note, or on nothing because the note has gone (Escape, E and Done end the
+      // run from the keyboard with it on Next): to the Edit button, so that a keyboard is not
+      // dropped at the top of the page. On anything else, it is the person's and is left.
+      const focused = document.activeElement
+      if (!focused || focused === document.body || focused.closest('.callout')) {
+        document.querySelector<HTMLElement>('[data-edit-toggle]')?.focus()
+      }
     },
     [],
   )
