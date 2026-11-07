@@ -1,13 +1,16 @@
 import type { JSX } from 'preact'
 import { useRef } from 'preact/hooks'
 
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import { useGridKeys } from '@/components/EditMode/useGridKeys'
 import { useGridMove } from '@/components/EditMode/useGridMove'
 import { COLS, drawnRects, type DrawnWidget, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 import type { PageValues } from '@/widgetSystem/definition'
+import { unknownWidgetName } from '@/widgetSystem/name'
 import { Box, type HeldState, WidgetBox } from '@/widgetSystem/WidgetBox'
+import { WidgetState } from '@/widgetSystem/WidgetState'
 
 type GridProps = {
   /**
@@ -28,6 +31,10 @@ const inReadingOrder = (a: DrawnWidget, b: DrawnWidget) =>
 
 /** Said when edit mode starts, to people who cannot see the frames. */
 const EDITING_HELP = 'Editing widgets. Tab moves between widgets.'
+
+/** What a Widget this version does not know says in its box, in the shared error state's panel. */
+const UNKNOWN_NAME = 'Unknown widget'
+const UNKNOWN_MESSAGE = 'Needs a newer version of Lander'
 
 /** Where the lines between cells are, from 0 to 100 percent of the Grid: one more than cells. */
 const lines = (cells: number) =>
@@ -70,7 +77,7 @@ function Dots() {
  * same outline, the same one save. Nothing else here saves anything.
  */
 export function Grid({ commit, layout, page }: GridProps) {
-  const { editing } = useEditMode()
+  const { canChange, editing } = useEditMode()
   const grid = useRef<HTMLDivElement>(null)
   const pointer = useGridMove({ commit, grid, layout })
   const keys = useGridKeys({ commit, grid, layout })
@@ -121,12 +128,19 @@ export function Grid({ commit, layout, page }: GridProps) {
               <Box
                 held={state}
                 key={widget.placed.id}
-                name="Unknown widget"
+                // Its panel says what it is, so no second name is drawn in edit mode.
+                label={null}
+                name={unknownWidgetName(layout, widget.placed.id)}
                 placedId={widget.placed.id}
                 rect={rect}
                 widget={widget.placed.type}
               >
-                <p class="widget-box__unknown">Needs a newer version of Lander</p>
+                <WidgetState
+                  messages={{ failed: UNKNOWN_MESSAGE }}
+                  name={UNKNOWN_NAME}
+                  state="failed"
+                  unknown
+                />
               </Box>
             )
           })}
@@ -137,7 +151,8 @@ export function Grid({ commit, layout, page }: GridProps) {
         after that (see useGridKeys), so a screen reader reads each as it changes.
       */}
       <p aria-live="polite" class="visually-hidden">
-        {keys.announcement || (editing ? EDITING_HELP : '')}
+        {keys.announcement ||
+          (editing ? (canChange ? EDITING_HELP : `${EDITING_HELP} ${READ_ONLY_UPDATE_NOTE}`) : '')}
       </p>
     </>
   )

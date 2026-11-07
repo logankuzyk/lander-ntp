@@ -77,6 +77,7 @@ export function Box({
   children,
   held,
   id,
+  label,
   name,
   optionsLabel,
   placedId,
@@ -89,6 +90,11 @@ export function Box({
   held?: HeldState
   /** Gives the box an Options button. Not for a Widget that has no options to open. */
   id?: string
+  /**
+   * What the frame draws in edit mode, if not `name`; null for none, for a box whose content
+   * says what it is already.
+   */
+  label?: string | null
   /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
   name: string
   /**
@@ -227,9 +233,9 @@ export function Box({
           </svg>
         </span>
       )}
-      {editing && (
+      {editing && label !== null && (
         <span aria-hidden="true" class="widget-box__name">
-          {name}
+          {label ?? name}
         </span>
       )}
     </div>

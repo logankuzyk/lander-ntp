@@ -900,7 +900,7 @@ describe('App, when the Layout is from a newer version', () => {
     const saveSettings = vi.spyOn(settingsItem, 'setValue')
     const { container } = render(<App />)
 
-    expect(await screen.findByRole('group', { name: 'Unknown widget' })).toBeTruthy()
+    expect(await screen.findByRole('group', { name: 'Unknown widget, calendar' })).toBeTruthy()
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
     expect(container.querySelector('time')).not.toBeNull()
 

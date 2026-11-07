@@ -379,6 +379,38 @@ describe('moveWidget', () => {
     expect(JSON.stringify(stored(withoutClock).widgets)).toBe(JSON.stringify([movedFuture]))
   })
 
+  it('keeps an unknown Widget’s options and other stored data when settling puts it somewhere else', () => {
+    // On the Clock's cells, after it: the Clock is drawn there and this one is drawn elsewhere.
+    const future = {
+      col: 5,
+      h: 2,
+      id: 'future01',
+      later: { badge: 'new', nested: [1, 2, { three: 3 }] },
+      options: { colour: 'teal', rows: ['a', 'b'] },
+      row: 4,
+      type: 'bookmarks',
+      w: 4,
+    }
+    const before = layoutOf(clock('clock001', 5, 4), future)
+    const drawnAt = drawnRects(before).find(({ widget }) => widget.kind !== 'known')?.rect
+    expect(drawnAt).toBeDefined()
+    expect(drawnAt).not.toMatchObject({ col: 5, row: 4 })
+
+    // Moving the Clock settles first, so the unknown Widget is saved where it was drawn.
+    const moved = accepted(moveWidget(editable(before), 'clock001', { col: 1, row: 1 }))
+
+    const [, after] = stored(moved).widgets as Record<string, unknown>[]
+    expect(after).toMatchObject({ col: drawnAt?.col, id: 'future01', row: drawnAt?.row })
+    // Everything but the cells is as it was stored, in the order it was stored.
+    const without = (widget: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(widget).filter(([key]) => !['col', 'h', 'row', 'w'].includes(key)),
+      )
+    const rest = without(after as Record<string, unknown>)
+    const original = without(future)
+    expect(JSON.stringify(rest)).toBe(JSON.stringify(original))
+  })
+
   it('keeps what a Widget has that this version does not know', () => {
     const odd = layoutOf(clock('a', 5, 4, { note: 'kept' } as Partial<PlacedWidget>))
 

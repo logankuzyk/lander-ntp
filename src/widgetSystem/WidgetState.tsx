@@ -16,6 +16,11 @@ type WidgetStateProps = {
   /** The Widget's name, as people read it. */
   name: string
   state: BoxState
+  /**
+   * A Widget this version does not know: the same panel, which gives way to a narrow box by
+   * dropping its name line and cutting its words short (see `.widget-state--unknown`).
+   */
+  unknown?: boolean
 }
 
 /**
@@ -24,9 +29,13 @@ type WidgetStateProps = {
  * for every Widget (see `.widget-state` in the page's styles); the box it sits in keeps its
  * size, and the panel is centred in it like any other content.
  */
-export function WidgetState({ messages, name, state }: WidgetStateProps) {
+export function WidgetState({ messages, name, state, unknown = false }: WidgetStateProps) {
   return (
-    <div class="widget-state" data-state={state} role="status">
+    <div
+      class={unknown ? 'widget-state widget-state--unknown' : 'widget-state'}
+      data-state={state}
+      role="status"
+    >
       <p class="widget-state__name">{name}</p>
       <p class="widget-state__message">{messages?.[state] ?? DEFAULT_MESSAGES[state]}</p>
     </div>
