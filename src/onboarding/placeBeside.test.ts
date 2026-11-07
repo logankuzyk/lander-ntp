@@ -335,3 +335,76 @@ describe('placeBeside', () => {
     }
   })
 })
+
+describe('placeBeside, keeping clear of what stays on the page', () => {
+  const PHONE = { height: 800, width: 390 }
+  // The Edit button in the Bottom bar, and the photo credit, wrapped to three lines, at the left.
+  const edit = edges(200, 744, 240, 784)
+  const credit = edges(24, 715, 138, 732)
+
+  it('puts a note above its target on the page, as it would be, when nothing is in the way', () => {
+    const placed = placeBeside(edit, CALLOUT, PHONE, { prefer: ['above'] })
+
+    expect(placed).toMatchObject({ left: 92, side: 'above', top: 592 })
+    expect(overlaps(boxOf(placed), credit)).toBe(true)
+  })
+
+  it('lifts a note above its target clear of the credit, 8 pixels clear, and keeps it in line', () => {
+    const placed = placeBeside(edit, CALLOUT, PHONE, { keepClear: [credit], prefer: ['above'] })
+
+    expect(placed.side).toBe('above')
+    expect(placed.left).toBe(92)
+    expect(placed.top).toBe(715 - 8 - 140)
+    expect(overlaps(boxOf(placed), credit)).toBe(false)
+    // The pointer still faces the middle of the target, along the note's lower edge.
+    expect(placed.pointer).toBe(220 - 92)
+  })
+
+  it('lowers a note below its target clear of what is under it', () => {
+    const target = edges(100, 100, 140, 140)
+    const bar = edges(0, 160, 390, 180)
+
+    const placed = placeBeside(target, CALLOUT, PHONE, { keepClear: [bar], prefer: ['below'] })
+
+    expect(placed.side).toBe('below')
+    expect(placed.top).toBe(180 + 8)
+    expect(overlaps(boxOf(placed), bar)).toBe(false)
+  })
+
+  it('does not move a note that is not over what stays', () => {
+    const far = edges(300, 10, 380, 30)
+
+    expect(placeBeside(edit, CALLOUT, PHONE, { keepClear: [far], prefer: ['above'] })).toEqual(
+      placeBeside(edit, CALLOUT, PHONE, { prefer: ['above'] }),
+    )
+  })
+
+  it('does not lift it further than it is worth, which would leave it with nothing near the target', () => {
+    const tall = edges(24, 600, 138, 732)
+
+    const placed = placeBeside(edit, CALLOUT, PHONE, { keepClear: [tall], prefer: ['above'] })
+
+    // 592 is where it would go; clearing 600 would take it 140 pixels higher.
+    expect(placed.top).toBe(592)
+  })
+
+  it('stays inside the window', () => {
+    const target = edges(100, 30, 140, 60)
+    const above = edges(0, 0, 390, 20)
+
+    const placed = placeBeside(target, CALLOUT, PHONE, { keepClear: [above], prefer: ['below'] })
+
+    expect(placed.top).toBeGreaterThanOrEqual(8)
+    expect(boxOf(placed).bottom).toBeLessThanOrEqual(PHONE.height - 8)
+  })
+
+  it('takes a side that is clear in preference to one that is not, before it moves anything', () => {
+    const middle = edges(600, 200, 800, 400)
+    // Covers where the callout goes to the right of the target.
+    const over = edges(812, 220, 1068, 380)
+
+    const placed = placeBeside(middle, CALLOUT, LAPTOP, { keepClear: [over] })
+
+    expect(placed.side).toBe('left')
+  })
+})

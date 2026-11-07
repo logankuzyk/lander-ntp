@@ -58,6 +58,14 @@ export type PageState = {
  * the Grid changes.
  */
 export type PageTourStop = CalloutBase & {
+  /**
+   * Tells the person to change something on the page, so it is left out when the Layout cannot be
+   * changed (a newer version of the page wrote it): the tour does not instruct what the page will
+   * not do.
+   */
+  changes?: true
+  /** The body for a Layout that cannot be changed, where the usual one says to change it. */
+  readOnlyBody?: string
   section?: undefined
   /** What the page is doing while the stop is up. */
   show: PageState
@@ -90,12 +98,15 @@ export const TOUR: readonly TourStop[] = [
   {
     body: 'Press Edit, or E on the keyboard, to move things around and change what is on your page.',
     id: 'tour-edit',
+    readOnlyBody:
+      'Press Edit, or E on the keyboard, to look at your page in edit mode. Update Lander to change it.',
     show: { adding: false, editing: false },
     target: 'edit',
     title: 'Edit your page',
   },
   {
-    body: 'Drag a widget to move it, and drag the handle in its corner to resize it.',
+    body: 'Drag a widget to move it, and drag the handle in its corner to resize it. From the keyboard, Tab to a widget, press Enter to pick it up, move it with the arrow keys (resize it with Shift and the arrows) and press Enter to put it down.',
+    changes: true,
     id: 'tour-move',
     show: { adding: false, editing: true },
     target: 'widget',
@@ -104,6 +115,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     body: 'Each widget has its own options. Press the button in its corner to change them.',
+    changes: true,
     id: 'tour-options',
     show: { adding: false, editing: true },
     target: 'options',
@@ -112,6 +124,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     body: 'A widget that needs something from you, like a place for the weather, shows a button for it. Press that button to set it up.',
+    changes: true,
     id: 'tour-setup',
     show: { adding: false, editing: true },
     target: 'setup',
@@ -120,6 +133,7 @@ export const TOUR: readonly TourStop[] = [
   },
   {
     body: 'Pick a widget from the Add menu and it goes in the free spot nearest the middle.',
+    changes: true,
     id: 'tour-add',
     show: { adding: true, editing: true },
     target: 'menu-item',

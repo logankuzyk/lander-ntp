@@ -369,12 +369,30 @@ body {
   }
 }
 
-/* A Widget of a type this version does not know, which it keeps and cannot draw. */
-.widget-box__unknown {
-  margin: 0;
-  font-size: 0.875rem;
-  text-align: center;
-  opacity: 0.8;
+/*
+ * A Widget of a type this version does not know, which it keeps and cannot draw, draws the shared panel below (.widget-state). Its words
+ * are cut to four lines, and in a narrow box (a phone's two columns are about 56px) the panel
+ * also drops its name line and takes less room, so that nothing is clipped to a word's first
+ * letters or wrapped over the whole box. The box's name, read out, has the type.
+ */
+.widget-state--unknown .widget-state__message {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+@container (max-width: 8rem) {
+  /* Twice the class: .widget-state, which comes after this, has the type and padding to beat. */
+  .widget-state.widget-state--unknown {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.6875rem;
+  }
+
+  .widget-state--unknown .widget-state__name {
+    display: none;
+  }
 }
 
 /*

@@ -40,8 +40,19 @@ describe('the tour', () => {
     }
   })
 
-  it('makes no claim about moving or resizing from the keyboard, which is not on the page yet', () => {
-    for (const { body } of TOUR) expect(body).not.toMatch(/arrow|Enter|Shift/i)
+  it('says in one sentence how to move and resize from the keyboard, as the page does it', () => {
+    const move = TOUR.find(({ id }) => id === 'tour-move')
+    // Enter picks a widget up and puts it down, the arrows move it and Shift with them resizes it
+    // (Grid.keys.test.tsx); the pointer way comes first, in the sentence before.
+    expect(move?.body).toMatch(/Drag a widget to move it/)
+    expect(move?.body).toMatch(/keyboard.*Enter.*arrow keys.*Shift.*Enter/)
+    expect(move?.body.split(/(?<=\.)\s/)).toHaveLength(2)
+  })
+
+  it('says nothing about arrow keys, Enter or Shift anywhere else', () => {
+    for (const { body, id } of TOUR) {
+      if (id !== 'tour-move') expect(body).not.toMatch(/arrow|Enter|Shift/i)
+    }
   })
 })
 

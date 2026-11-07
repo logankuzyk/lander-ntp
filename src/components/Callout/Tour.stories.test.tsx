@@ -62,6 +62,7 @@ const STOPS = [
   ['Setup', 'Set up a widget', '4 of 8'],
   ['ClockAndWeather', 'Move and resize', '2 of 7'],
   ['EmptyGrid', 'Add a widget', '2 of 5'],
+  ['NewerLayout', 'Edit your page', '1 of 4'],
 ] as const
 
 describe('the tour stories', () => {

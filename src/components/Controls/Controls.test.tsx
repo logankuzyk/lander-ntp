@@ -9,12 +9,12 @@ import { Controls } from './Controls'
 
 const LAYOUT = deriveLayout(DEFAULT_SETTINGS)
 
-const renderControls = ({ busy = false, withInfo = true } = {}) => {
+const renderControls = ({ busy = false, canChange = true, withInfo = true } = {}) => {
   const onNext = vi.fn()
   const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
-    <EditModeProvider>
+    <EditModeProvider canChange={canChange}>
       <Controls
         busy={busy}
         infoOpen={false}
@@ -345,5 +345,35 @@ describe('Controls, the Edit button and a held key', () => {
     expect(fireEvent.keyDown(button, { key: 'Enter' })).toBe(true)
     expect(fireEvent.keyDown(button, { key: ' ' })).toBe(true)
     expect(fireEvent.keyDown(button, { key: ' ', repeat: true })).toBe(true)
+  })
+
+  describe('while the Layout cannot be changed', () => {
+    it('says why beside Done, and ties the words to the button so that a reader says them with it', () => {
+      renderControls({ canChange: false })
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+      const done = screen.getByRole('button', { name: 'Done' })
+      const id = done.getAttribute('aria-describedby')
+      expect(id).toBeTruthy()
+      expect(document.getElementById(id ?? '')?.textContent).toBe('Update Lander to change this.')
+    })
+
+    it('has nothing to say outside edit mode, and does not describe the Edit button', () => {
+      renderControls({ canChange: false })
+
+      expect(
+        screen.getByRole('button', { name: 'Edit' }).getAttribute('aria-describedby'),
+      ).toBeNull()
+      expect(screen.queryByText('Update Lander to change this.')).toBeNull()
+    })
+
+    it('does not describe Done when the Layout can be changed', () => {
+      renderControls()
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+      expect(
+        screen.getByRole('button', { name: 'Done' }).getAttribute('aria-describedby'),
+      ).toBeNull()
+    })
   })
 })

@@ -1,8 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { onboardingItem } from '@/onboarding/storage'
+import { DEFAULT_SETTINGS } from '@/settings/schema'
+import { device } from '@/test/permissions'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 import { App } from './App'
@@ -53,8 +56,12 @@ const addMenu = () => screen.queryByRole('menu', { name: 'Add a widget' })
 let seeded: Record<string, unknown> = {}
 
 /** Renders the page for a seed and starts the tour from the welcome. */
-async function startTour(seed: Parameters<typeof seedPage>[0] = NEW_INSTALL) {
+async function startTour(
+  seed: Parameters<typeof seedPage>[0] = NEW_INSTALL,
+  also?: () => Promise<void>,
+) {
   await seedPage(seed)
+  await also?.()
   seeded = await fakeBrowser.storage.sync.get(null)
   const view = render(<App />)
   fireEvent.click(await screen.findByRole('button', { name: 'Show me around' }))
@@ -310,6 +317,21 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
   })
 
+  it('is over when edit mode is left by hand: going back into it does not bring the tour back', async () => {
+    await startTour()
+    await nextUntil('Options')
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await act(async () => {})
+
+    // E enters edit mode again, as it would for anyone: the tour is not in it.
+    fireEvent.keyDown(window, { key: 'e' })
+    await act(async () => {})
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    expect(editing()).toBe(true)
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+
   it('ends when Escape leaves edit mode, with the Add menu shut', async () => {
     await startTour()
     await nextUntil('Add a widget')
@@ -333,6 +355,110 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(screen.queryAllByRole('note')).toHaveLength(0)
     expect(within(settings).queryByRole('note')).toBeNull()
     expect(editing()).toBe(false)
+  })
+
+  it('does not start again from the first stop when the settings that ended it are closed', async () => {
+    await startTour()
+    await nextUntil('Options')
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    await screen.findByRole('dialog', { name: 'Settings' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull())
+    await act(async () => {})
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    expect(screen.queryByRole('note')).toBeNull()
+    expect(editing()).toBe(false)
+  })
+
+  describe('where focus goes when the run ends, so that a keyboard is not dropped on the page', () => {
+    const editButton = () => screen.getByRole('button', { name: 'Edit' })
+
+    it('is the Edit button after Escape', async () => {
+      await startTour()
+      await nextUntil('Options')
+      expect(note().contains(document.activeElement)).toBe(true)
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      await act(async () => {})
+
+      expect(screen.queryByRole('note')).toBeNull()
+      expect(document.activeElement).toBe(editButton())
+    })
+
+    it('is the Edit button after E', async () => {
+      await startTour()
+      await nextUntil('Add a widget')
+
+      fireEvent.keyDown(window, { key: 'e' })
+      await act(async () => {})
+
+      expect(document.activeElement).toBe(editButton())
+    })
+
+    it('is the Edit button after Done is pressed with focus still in the note', async () => {
+      await startTour()
+      await nextUntil('Options')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+      await act(async () => {})
+
+      expect(document.activeElement).toBe(editButton())
+    })
+
+    it('is the settings panel when the gear opened it: its Close button, as for any settings', async () => {
+      await startTour()
+      await nextUntil('Options')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      await act(async () => {})
+
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
+    })
+
+    it('is left alone when it was on something else, such as the gear', async () => {
+      await startTour()
+      await nextUntil('Options')
+      const photo = screen.getByRole('button', { name: 'Next photo' })
+      photo.focus()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      await act(async () => {})
+
+      expect(document.activeElement).toBe(photo)
+    })
+
+    it('is the Next button of the settings panel as the page’s stops end, then its Close button once the panel’s stops end', async () => {
+      await startTour()
+      await nextUntil('Photos')
+      const panel = screen.getByRole('dialog', { name: 'Settings' })
+      expect(document.activeElement).toBe(within(panel).getByRole('button', { name: 'Next' }))
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Next' }))
+      await act(async () => {})
+      expect(title()).toBe('Font')
+      fireEvent.click(within(panel).getByRole('button', { name: 'Done' }))
+      await act(async () => {})
+
+      expect(within(panel).queryByRole('note')).toBeNull()
+      expect(document.activeElement).toBe(
+        within(panel).getByRole('button', { name: 'Close settings' }),
+      )
+    })
+
+    it('is the Close button of the settings panel when its stops are dismissed', async () => {
+      await startTour()
+      await nextUntil('Photos')
+      const panel = screen.getByRole('dialog', { name: 'Settings' })
+
+      fireEvent.click(within(panel).getByRole('button', { name: 'Dismiss' }))
+      await act(async () => {})
+
+      expect(document.activeElement).toBe(
+        within(panel).getByRole('button', { name: 'Close settings' }),
+      )
+    })
   })
 
   it('moves on to the next stop when Edit is pressed by hand on the first', async () => {
@@ -376,6 +502,41 @@ describe('the guided tour, from the welcome of a new install', () => {
   })
 })
 
+describe('the tour after the person pressed Edit themselves on the first stop', () => {
+  /** Edit pressed by hand moves the tour on to the second stop: that edit mode is theirs. */
+  async function startAfterEdit() {
+    await startTour()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    await act(async () => {})
+    expect(title()).toBe('Move and resize')
+  }
+
+  it('still shuts the Add menu when it is dismissed on the Add stop, and leaves their edit mode on', async () => {
+    await startAfterEdit()
+    await nextUntil('Add a widget')
+    expect(addMenu()).not.toBeNull()
+
+    fireEvent.click(within(note()).getByRole('button', { name: 'Dismiss' }))
+    await act(async () => {})
+
+    expect(screen.queryByRole('note')).toBeNull()
+    expect(addMenu()).toBeNull()
+    expect(editing()).toBe(true)
+  })
+
+  it('still leaves edit mode on Next at Done, as pressing Done would', async () => {
+    await startAfterEdit()
+    await nextUntil('When you are done')
+
+    press('Next')
+    await act(async () => {})
+
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    expect(title()).toBe('Photos')
+    expect(editing()).toBe(false)
+  })
+})
+
 describe('the tour for a page that has a widget waiting for setup', () => {
   it('has a stop of its own for the setup button, and the Add stop does not repeat it', async () => {
     await startTour(PAGE_SEEDS.tourWeatherWaiting)
@@ -391,17 +552,61 @@ describe('the tour for a page that has a widget waiting for setup', () => {
     expect(note().textContent).not.toContain('needs something from you')
   })
 
-  it('does not press the setup button for the person: nothing is asked of the browser or sent', async () => {
-    await startTour(PAGE_SEEDS.tourWeatherWaiting)
+  /**
+   * Everything a setup button could do if the tour pressed it: ask the browser for a permission
+   * (Firefox's consent), ask the device for its position, send a request, or open the Weather's
+   * options at the place search. A tour through every page stop, then the settings panel's.
+   */
+  async function tourWithoutPressing(
+    seed: Parameters<typeof seedPage>[0],
+    position: PermissionState,
+  ) {
+    const phone = device(position)
+    const permission = vi
+      .spyOn(browser.permissions, 'request')
+      .mockImplementation(() => Promise.resolve(false) as never)
+    await startTour(seed)
+    const optionsOpen = () => document.querySelector('.options-popover') !== null
 
-    await nextUntil('Photos')
+    const asked: string[] = []
+    for (let step = 0; step < 10 && title() !== 'Photos'; step += 1) {
+      // The setup button is on the page, waiting, at every stop.
+      expect(document.querySelector('[data-callout-target="setup"]')).not.toBeNull()
+      expect(optionsOpen()).toBe(false)
+      asked.push(title() ?? '')
+      press('Next')
+      await act(async () => {})
+    }
 
+    expect(asked).toContain('Set up a widget')
+    expect(title()).toBe('Photos')
+    expect(optionsOpen()).toBe(false)
+    expect(permission).not.toHaveBeenCalled()
+    expect(phone.getCurrentPosition).not.toHaveBeenCalled()
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
     const stored = await fakeBrowser.storage.sync.get(null)
     expect(stored.settings).toEqual(seeded.settings)
     expect(stored.layout).toBeUndefined()
-    // The setup button is still there, unpressed.
+    // Still unpressed once the tour is over.
     expect(document.querySelector('[data-callout-target="setup"]')).not.toBeNull()
+  }
+
+  it('does not press the setup button of a Weather waiting for a place: no options open, nothing asked or sent', async () => {
+    await tourWithoutPressing(PAGE_SEEDS.tourWeatherWaiting, 'prompt')
+  })
+
+  it('does not press the setup button of a Weather waiting for the location: no prompt, no position, nothing sent', async () => {
+    await tourWithoutPressing(
+      {
+        ...PAGE_SEEDS.tourWeatherWaiting,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
+          weather: { ...DEFAULT_SETTINGS.weather, enabled: true, followDevice: true },
+        },
+      },
+      'prompt',
+    )
   })
 })
 
@@ -415,6 +620,51 @@ describe('the tour for a page with the Clock and a Weather', () => {
     expect(document.querySelector('[data-callout-target="setup"]')).toBeNull()
     await nextUntil('Photos')
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+})
+
+describe('the tour for a Layout that a newer version wrote, which cannot be changed', () => {
+  const NEWER = {
+    layout: {
+      v: 2,
+      widgets: [
+        {
+          col: 5,
+          h: 2,
+          id: 'clock0aa',
+          options: { showDate: false, showSeconds: false },
+          row: 4,
+          type: 'clock',
+          w: 4,
+        },
+      ],
+    },
+  }
+  const startNewer = () =>
+    startTour(NEW_INSTALL, async () => {
+      await fakeBrowser.storage.sync.set(NEWER)
+    })
+
+  it('has only the stops that do not tell the person to change anything, and says to update', async () => {
+    await startNewer()
+
+    expect(progress()).toBe('1 of 4')
+    expect(note().textContent).toContain('Update Lander to change it.')
+
+    press('Next')
+    await act(async () => {})
+    expect(title()).toBe('When you are done')
+    expect(progress()).toBe('2 of 4')
+    expect(editing()).toBe(true)
+    // There is no Add stop to open the menu, and no Add menu.
+    expect(addMenu()).toBeNull()
+
+    press('Next')
+    await act(async () => {})
+    expect(progress()).toBe('3 of 4')
+    expect(title()).toBe('Photos')
+    expect(editing()).toBe(false)
+    expect((await fakeBrowser.storage.sync.get('layout')).layout).toEqual(NEWER.layout)
   })
 })
 

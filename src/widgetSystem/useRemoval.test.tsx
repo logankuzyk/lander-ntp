@@ -18,6 +18,26 @@ const clock = {
 }
 const LAYOUT = checkLayout({ v: 1, widgets: [clock] })
 
+/** A Widget of a type this version does not know, and another of that type, and a third kind. */
+const future = (id: string, type: string, col: number) => ({
+  col,
+  h: 2,
+  id,
+  options: { colour: 'teal' },
+  row: 1,
+  type,
+  w: 2,
+})
+const WITH_UNKNOWN = checkLayout({
+  v: 1,
+  widgets: [
+    clock,
+    future('futr0001', 'bookmarks', 1),
+    future('futr0002', 'bookmarks', 3),
+    future('futr0003', 'calendar', 7),
+  ],
+})
+
 /** Draws what the controller says, with a button for each thing it can do. */
 function Probe({
   commit,
@@ -46,9 +66,15 @@ function Probe({
     <>
       <p data-testid="available">{String(controls.available)}</p>
       <p data-testid="notice">{notice?.message ?? ''}</p>
+      <p data-testid="undo-offered">{String(notice?.action !== undefined)}</p>
       <button onClick={() => controls.remove('clock0aa')} type="button">
         remove
       </button>
+      {['futr0001', 'futr0002', 'futr0003'].map((id) => (
+        <button key={id} onClick={() => controls.remove(id)} type="button">
+          remove {id}
+        </button>
+      ))}
       <button onClick={() => notice?.action?.onClick()} type="button">
         undo
       </button>
@@ -94,6 +120,22 @@ describe('useRemovalController', () => {
     expect(commit).toHaveBeenCalledTimes(1)
   })
 
+  it('takes the notice away, and the Widget it held, when the Layout may not be changed any more', () => {
+    const commit = vi.fn()
+    const { rerender } = render(<Probe commit={commit} layout={LAYOUT} loaded readOnly={false} />)
+    pressRemove()
+    expect(screen.getByTestId('notice').textContent).toBe('Clock removed.')
+
+    // A newer version wrote the Layout meanwhile: an Undo that does nothing is not left up.
+    rerender(<Probe commit={commit} layout={LAYOUT} loaded readOnly />)
+
+    expect(screen.getByTestId('notice').textContent).toBe('')
+    expect(screen.getByTestId('undo-offered').textContent).toBe('false')
+    // And it does not come back when the Layout may be changed again: that Undo is gone.
+    rerender(<Probe commit={commit} layout={LAYOUT} loaded readOnly={false} />)
+    expect(screen.getByTestId('notice').textContent).toBe('')
+  })
+
   it('removes nothing from a Layout that may not be changed', () => {
     const commit = vi.fn()
     render(<Probe commit={commit} layout={LAYOUT} loaded readOnly />)
@@ -102,5 +144,17 @@ describe('useRemovalController', () => {
 
     expect(screen.getByTestId('available').textContent).toBe('false')
     expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('says which unknown Widget was removed, by the name its box has, and which could not be put back', () => {
+    const commit = vi.fn()
+    render(<Probe commit={commit} layout={WITH_UNKNOWN} loaded readOnly={false} />)
+
+    act(() => screen.getByRole('button', { name: 'remove futr0003' }).click())
+    expect(screen.getByTestId('notice').textContent).toBe('Unknown widget, calendar removed.')
+
+    // Two of a type are told apart as they are on the page, by their order in the Layout.
+    act(() => screen.getByRole('button', { name: 'remove futr0002' }).click())
+    expect(screen.getByTestId('notice').textContent).toBe('Unknown widget, bookmarks 2 removed.')
   })
 })

@@ -576,4 +576,52 @@ describe('OptionsForm', () => {
       expect(screen.getByRole('switch', { name: 'Flag' }).matches(':disabled')).toBe(false)
     })
   })
+
+  describe('pageValuesDisabled', () => {
+    it('turns the page-wide switch off alone, and leaves the Widget’s own controls on', () => {
+      draw({ pageValuesDisabled: true })
+
+      expect(screen.getByRole('switch', { name: 'Twelve-hour time' }).matches(':disabled')).toBe(
+        true,
+      )
+      for (const control of [
+        screen.getByRole('switch', { name: 'Flag' }),
+        screen.getByRole('combobox', { name: 'Size' }),
+        screen.getByRole('button', { name: 'Show Alpha' }),
+      ]) {
+        expect(control.matches(':disabled')).toBe(false)
+      }
+    })
+
+    it('passes no page-wide change on, even for a change that reaches the switch anyway, but passes the Widget’s own', () => {
+      const { onChange, onPageValueChange } = draw({ pageValuesDisabled: true })
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Twelve-hour time' }))
+      fireEvent.change(screen.getByRole('switch', { name: 'Twelve-hour time' }))
+      fireEvent.click(screen.getByRole('switch', { name: 'Flag' }))
+
+      expect(onPageValueChange).not.toHaveBeenCalled()
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves the page-wide switch on when only the Widget’s options are disabled, as it follows the settings', () => {
+      const { onPageValueChange } = draw({ disabled: true, pageValuesDisabled: false })
+
+      expect(screen.getByRole('switch', { name: 'Twelve-hour time' }).matches(':disabled')).toBe(
+        false,
+      )
+      expect(screen.getByRole('switch', { name: 'Flag' }).matches(':disabled')).toBe(true)
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Twelve-hour time' }))
+      expect(onPageValueChange).toHaveBeenCalledWith('hour12', true)
+    })
+
+    it('follows `disabled` when it is not given', () => {
+      draw({ disabled: true })
+
+      expect(screen.getByRole('switch', { name: 'Twelve-hour time' }).matches(':disabled')).toBe(
+        true,
+      )
+    })
+  })
 })

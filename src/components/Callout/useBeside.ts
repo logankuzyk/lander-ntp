@@ -12,6 +12,14 @@ import { type CalloutTarget, findTarget, preferredSides } from '@/onboarding/tar
  */
 const OPEN = '.popover, .add-menu, [role="menu"], [role="listbox"], .notice'
 
+/**
+ * What stays on the page and is not to be covered, though it is not open and does not come and go:
+ * the photo credit at the foot of the window and the Bottom bar. A callout that would cover one
+ * is moved clear of it (see `keepClear` in `placeBeside`), unless the Bottom bar is where its
+ * target is.
+ */
+const KEEP_CLEAR = '.credit, .controls'
+
 /** Left between the callout and what is open, so they do not touch. */
 const MARGIN = 8
 
@@ -35,6 +43,15 @@ function openThings(callout: HTMLElement): HTMLElement[] {
     if (element === callout || element.contains(callout)) return false
     const { height, width } = element.getBoundingClientRect()
     return width > 0 || height > 0
+  })
+}
+
+/** What is kept clear, drawn, and not the target or something it is in or has in it. */
+function keptClear(callout: HTMLElement, point: HTMLElement): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>(KEEP_CLEAR)].filter((element) => {
+    if (element === callout || element.contains(callout) || element.contains(point)) return false
+    const { height, width } = element.getBoundingClientRect()
+    return width > 0 && height > 0
   })
 }
 
@@ -112,11 +129,31 @@ export function useBeside(target: CalloutTarget | undefined, watch: unknown) {
         within = edges
       }
     }
+    // A setup button is in the middle of its Widget, and the note goes beside the Widget, not
+    // over its frame with the button.
+    const frame = target === 'setup' ? point.closest<HTMLElement>('.widget-box') : null
+    if (frame) {
+      const edges = edgesOf(frame.getBoundingClientRect())
+      within = within
+        ? {
+            bottom: Math.max(within.bottom, edges.bottom),
+            left: Math.min(within.left, edges.left),
+            right: Math.max(within.right, edges.right),
+            top: Math.min(within.top, edges.top),
+          }
+        : edges
+    }
+    const kept = keptClear(callout, point)
     const placement = placeBeside(
       edgesOf(point.getBoundingClientRect()),
       { height: callout.offsetHeight, width: callout.offsetWidth },
       { height: window.innerHeight, width: window.innerWidth },
-      { avoid, prefer: preferredSides(target), within },
+      {
+        avoid,
+        keepClear: kept.map((element) => edgesOf(element.getBoundingClientRect())),
+        prefer: preferredSides(target),
+        within,
+      },
     )
     callout.style.left = `${placement.left}px`
     callout.style.top = `${placement.top}px`
@@ -126,7 +163,7 @@ export function useBeside(target: CalloutTarget | undefined, watch: unknown) {
     // What is watched for a change of size, and the sizes it is measured at.
     const sizes = new Map<Element, string>()
     observer.current?.disconnect()
-    for (const element of [point, ...open]) {
+    for (const element of [point, ...open, ...kept]) {
       sizes.set(element, sizeOf(element))
       observer.current?.observe(element)
     }
