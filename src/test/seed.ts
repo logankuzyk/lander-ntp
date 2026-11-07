@@ -363,6 +363,33 @@ export const PAGE_SEEDS = {
   },
   /** Someone using it day to day, with the settings as they come. */
   settledInstall: { onboarding: { dismissed: SEEN_NEWS, welcomed: true } },
+  /**
+   * The first tab after installing, with the Clock and a Weather for Victoria both on (the
+   * settings an install might have by now): the welcome, then a tour of two widgets and no
+   * setup button. A new install on its defaults has the Clock alone (`newInstall`).
+   */
+  tourClockAndWeather: {
+    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** The first tab after installing, with both off: the welcome over an empty Grid. */
+  tourEmptyGrid: {
+    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    settings: { ...DEFAULT_SETTINGS, clock: { ...DEFAULT_SETTINGS.clock, enabled: false } },
+  },
+  /**
+   * The first tab after installing, with the Clock off and a Weather on that has no place: its
+   * setup button is on the page, so the tour has a stop for it.
+   */
+  tourWeatherWaiting: {
+    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
+      weather: { ...DEFAULT_SETTINGS.weather, enabled: true },
+    },
+  },
   /** Weather switched on with a place, showing a reading. */
   weatherOn: {
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },

@@ -411,6 +411,75 @@ describe('SettingsPanel', () => {
       expect(within(screen.getByRole('note')).getByText('Font stop')).toBeTruthy()
     })
 
+    it('counts the stops with the ones on the page when it carries on from them', () => {
+      render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+          tourProgress={{ before: 5, total: 7 }}
+        />,
+      )
+
+      expect(within(screen.getByRole('note')).getByText('6 of 7')).toBeTruthy()
+    })
+
+    it('has focus on the Close button when it is opened alone, and on its Next button when it carries on from the page', () => {
+      const { unmount } = render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+        />,
+      )
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
+      unmount()
+
+      render(
+        <SettingsPanel
+          currentId="a"
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+          tour={TOUR}
+          tourProgress={{ before: 5, total: 7 }}
+        />,
+      )
+      // Where the page's Next button had it: the next press goes on with the tour.
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
+    })
+
+    it('puts focus on the Close button when the last stop is done, or the note dismissed', async () => {
+      renderTour()
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+      await waitFor(() => expect(selectedTab()).toBe('Photos'))
+      const done = screen.getByRole('button', { name: 'Done' })
+      done.focus()
+
+      fireEvent.click(done)
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close settings' }))
+    })
+
+    it('leaves focus alone when the tour ends with it on something else', async () => {
+      renderTour()
+      const tab = screen.getByRole('tab', { name: 'Photos' })
+      tab.focus()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      expect(document.activeElement).toBe(tab)
+    })
+
     it('ends when dismissed, without closing the settings', async () => {
       const { onClose } = renderTour()
 
