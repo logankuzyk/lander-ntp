@@ -528,6 +528,22 @@ describe('App, the options popover', () => {
       // Nor was there any reading of them to build a write from: the page is read-only.
       expect(getValue).not.toHaveBeenCalled()
     })
+
+    it('has the 24-hour switch off in the popover of a Layout that can be changed, and the Widget’s own controls on', async () => {
+      await drawn(THREE)
+      await fakeBrowser.storage.sync.set({ settings: { ...SETTINGS, v: 2 } })
+      await settled()
+      edit()
+      openById('clock0aa')
+
+      const popover = within(screen.getByRole('dialog'))
+      expect(
+        (popover.getByRole('switch', { name: '24-hour time' }) as HTMLInputElement).disabled,
+      ).toBe(true)
+      expect(
+        (popover.getByRole('switch', { name: 'Show date' }) as HTMLInputElement).disabled,
+      ).toBe(false)
+    })
   })
 
   describe('when the Layout is from a newer version', () => {
@@ -545,6 +561,20 @@ describe('App, the options popover', () => {
       await settled()
 
       expect(set).not.toHaveBeenCalled()
+    })
+
+    it('leaves the 24-hour switch on, as it is the settings’, which can be changed', async () => {
+      await drawn({ v: 2, widgets: [clock('clock0aa', 5)] })
+      edit()
+      openById('clock0aa')
+
+      const popover = within(screen.getByRole('dialog'))
+      expect(
+        (popover.getByRole('switch', { name: '24-hour time' }) as HTMLInputElement).disabled,
+      ).toBe(false)
+      expect(
+        (popover.getByRole('switch', { name: 'Show date' }) as HTMLInputElement).disabled,
+      ).toBe(true)
     })
   })
 })

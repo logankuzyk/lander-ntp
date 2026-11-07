@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useId, useState } from 'preact/hooks'
 
 import { AddMenu } from '@/components/AddMenu/AddMenu'
 import { useAddMenuControl } from '@/components/AddMenu/useAddMenuControl'
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import type { Layout } from '@/layout/types'
 
@@ -50,7 +51,8 @@ export function Controls({
   onToggleSettings,
   settingsOpen,
 }: ControlsProps) {
-  const { editing, enter, leave } = useEditMode()
+  const { canChange, editing, enter, leave } = useEditMode()
+  const readOnlyId = useId()
   // The menu's state is the page's when there is a handle on it (the tour opens the menu), else
   // this component's own.
   const shared = useAddMenuControl()
@@ -120,6 +122,8 @@ export function Controls({
         changes with the words, so that what is said is what is seen; aria-pressed says it is on.
       */}
       <button
+        // Beside it while the Layout cannot be changed: read with the button, not only found.
+        aria-describedby={editing && !canChange ? readOnlyId : undefined}
         aria-label={editing ? 'Done' : 'Edit'}
         aria-pressed={editing}
         class={editing ? 'control control--done' : 'control'}
@@ -156,6 +160,11 @@ export function Controls({
           </svg>
         )}
       </button>
+      {editing && !canChange && (
+        <span class="controls__readonly" id={readOnlyId}>
+          {READ_ONLY_UPDATE_NOTE}
+        </span>
+      )}
       <button
         aria-busy={busy === true}
         aria-label="Next photo"

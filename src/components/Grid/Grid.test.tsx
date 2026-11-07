@@ -10,6 +10,7 @@ import { makeWeather } from '@/test/fixtures'
 import { css, rule } from '@/test/styles'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
+import { RemovalProvider } from '@/widgetSystem/useRemoval'
 
 import { Grid } from './Grid'
 
@@ -82,11 +83,63 @@ describe('Grid, the names of the boxes', () => {
     ])
   })
 
-  it('calls a Widget this version does not know by the name edit mode gives it', () => {
+  it('calls a Widget this version does not know by the name edit mode gives it, and its type', () => {
     const grid = drawnGrid(layoutOf(stored('what0001', 'tomorrow', [1, 1, 2, 2])))
     const box = grid.querySelector('.widget-box')
-    expect(box?.getAttribute('aria-label')).toBe('Unknown widget')
+    expect(box?.getAttribute('aria-label')).toBe('Unknown widget, tomorrow')
     expect(box?.getAttribute('role')).toBe('group')
+  })
+
+  it('tells Widgets of different unknown types apart by their types', () => {
+    const grid = drawnGrid(
+      layoutOf(
+        stored('what0001', 'tomorrow', [1, 1, 2, 2]),
+        stored('what0002', 'calendar', [4, 1, 2, 2]),
+      ),
+    )
+
+    expect(
+      [...grid.querySelectorAll('.widget-box')].map((box) => box.getAttribute('aria-label')),
+    ).toEqual(['Unknown widget, tomorrow', 'Unknown widget, calendar'])
+  })
+
+  it('tells two Widgets of one unknown type apart by their order in the Layout, and no other', () => {
+    const grid = drawnGrid(
+      layoutOf(
+        stored('what0001', 'tomorrow', [1, 1, 2, 2]),
+        stored('clock001', 'clock', [5, 4, 4, 2]),
+        stored('what0002', 'tomorrow', [4, 1, 2, 2]),
+        stored('what0003', 'calendar', [9, 1, 2, 2]),
+      ),
+    )
+
+    const names = new Map(
+      [...grid.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [
+        box.dataset.widgetId,
+        box.getAttribute('aria-label'),
+      ]),
+    )
+    expect([...names]).toEqual(
+      expect.arrayContaining([
+        ['what0001', 'Unknown widget, tomorrow 1'],
+        ['what0002', 'Unknown widget, tomorrow 2'],
+        ['what0003', 'Unknown widget, calendar'],
+        ['clock001', 'Clock'],
+      ]),
+    )
+  })
+
+  it('draws the shared error state in a Widget it does not know: its panel, with the name and what to do', () => {
+    const grid = drawnGrid(layoutOf(stored('what0001', 'tomorrow', [1, 1, 2, 2])))
+    const box = grid.querySelector('.widget-box')
+
+    const panel = box?.querySelector('.widget-state')
+    expect(panel?.getAttribute('data-state')).toBe('failed')
+    expect(panel?.querySelector('.widget-state__name')?.textContent).toBe('Unknown widget')
+    expect(panel?.querySelector('.widget-state__message')?.textContent).toBe(
+      'Needs a newer version of Lander',
+    )
+    expect(box?.querySelector('.widget-box__unknown')).toBeNull()
   })
 })
 
@@ -401,9 +454,32 @@ describe('Grid in edit mode', () => {
     renderEditable(layoutOf(stored('aaaaaaaa', 'bookmarks', [1, 3, 3, 4])))
     edit()
 
-    const group = screen.getByRole('group', { name: 'Unknown widget' })
+    const group = screen.getByRole('group', { name: 'Unknown widget, bookmarks' })
     expect(group.getAttribute('tabindex')).toBe('0')
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+  })
+
+  it('lets a person remove an unknown Widget, but has no options or resize handle for it', () => {
+    const remove = vi.fn()
+    const layout = layoutOf(stored('future01', 'bookmarks', [1, 3, 3, 4]))
+    render(
+      <EditModeProvider>
+        <EditToggles />
+        <RemovalProvider value={{ available: true, remove }}>
+          <Grid layout={layout} page={PAGE} />
+        </RemovalProvider>
+      </EditModeProvider>,
+    )
+    edit()
+
+    expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Remove Unknown widget, bookmarks' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Unknown widget, bookmarks options' })).toBeNull()
+    expect(document.querySelector('.widget-box__resize')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Unknown widget, bookmarks' }))
+
+    expect(remove).toHaveBeenCalledWith('future01')
   })
 
   it('says how to move between Widgets, politely, when edit mode starts', () => {
@@ -419,6 +495,39 @@ describe('Grid in edit mode', () => {
 
     fireEvent.click(screen.getByText('leave'))
     expect(status.textContent).toBe('')
+  })
+
+  it('does not draw the name of a Widget it does not know a second time in edit mode: its panel has it', () => {
+    const { grid } = renderEditable(
+      layoutOf(
+        stored('what0001', 'tomorrow', [1, 1, 3, 2]),
+        stored('clock001', 'clock', [5, 4, 4, 2]),
+      ),
+    )
+    edit()
+
+    const labelled = [...grid.querySelectorAll<HTMLElement>('.widget-box')]
+      .filter((box) => box.querySelector('.widget-box__name'))
+      .map((box) => box.dataset.widget)
+    expect(labelled).toEqual(['clock'])
+  })
+
+  it('adds the reason to the words said when edit mode starts, while the Layout cannot be changed', () => {
+    render(
+      <EditModeProvider canChange={false}>
+        <EditToggles />
+        <Grid layout={layoutOf(stored('clock001', 'clock', [5, 4, 4, 2]))} page={PAGE} />
+      </EditModeProvider>,
+    )
+    const status = document.querySelector('[aria-live="polite"]')
+    if (!status) throw new Error('no live region')
+    expect(status.textContent).toBe('')
+
+    edit()
+
+    expect(status.textContent).toBe(
+      'Editing widgets. Tab moves between widgets. Update Lander to change this.',
+    )
   })
 
   it('keeps a Widget element when edit mode starts, so its state is not lost', () => {
@@ -449,6 +558,15 @@ describe('the Grid styles', () => {
     // left edge, so overflow runs only right. The tracks have to be centred too.
     expect(rule('.widget-box')).toMatch(/justify-content:\s*center/)
     expect(rule('.widget-box')).toMatch(/align-content:\s*center/)
+  })
+
+  it('cuts the words of a Widget it does not know to four lines, and drops its name in a narrow box', () => {
+    expect(rule('.widget-state--unknown .widget-state__message')).toMatch(/-webkit-line-clamp:\s*4/)
+    const narrow = css.slice(css.indexOf('@container (max-width: 8rem) {'))
+    const body = narrow.slice(0, narrow.indexOf('\n}\n'))
+    expect(body).toMatch(/\.widget-state--unknown \.widget-state__name\s*{\s*display:\s*none/)
+    // Beats `.widget-state` (below it in the file, one class) for the smaller type and padding.
+    expect(body).toMatch(/\.widget-state\.widget-state--unknown\s*{[^}]*font-size/)
   })
 
   it('fades the dots and the wash in, and not under reduced motion', () => {

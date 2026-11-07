@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
@@ -30,7 +31,7 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
 }
 
 /** What the panel says while the settings are from a newer version. */
-const UPDATE_TO_CHANGE = 'Update Lander to change this.'
+const UPDATE_TO_CHANGE = READ_ONLY_UPDATE_NOTE
 
 /** The "Change photo" choice that pins the photo on screen. */
 const NEVER = 'never'

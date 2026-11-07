@@ -5,7 +5,7 @@ import { nextInReadingOrder } from '@/layout/geometry'
 import { removeWidget, restoreWidget, settle } from '@/layout/ops'
 import type { Layout, PlacedWidget } from '@/layout/types'
 
-import { accessibleName } from './name'
+import { accessibleName, unknownWidgetName } from './name'
 
 /** What a Widget's box needs of removal: whether there is any, and how to ask for it. */
 export type RemovalControls = {
@@ -73,7 +73,9 @@ function nameOf(layout: Layout, id: string): string {
   const widget = layout.widgets.find(
     (candidate) => candidate.kind !== 'malformed' && candidate.placed.id === id,
   )
-  return widget?.kind === 'known' ? accessibleName(widget.definition, widget.options) : 'Widget'
+  if (widget?.kind === 'known') return accessibleName(widget.definition, widget.options)
+  // A type this version does not know: by the name its box has, so that the line says which.
+  return widget?.kind === 'unknown' ? unknownWidgetName(layout, id) : 'Widget'
 }
 
 /**
@@ -166,6 +168,12 @@ export function useRemovalController({
     if (document.activeElement?.closest('.notice')) focusAfter.current = pending?.focus ?? null
     setPending(null)
   }, [pending])
+
+  // A newer version wrote the Layout while the notice was up: nothing may be put back, so the
+  // notice, and the Widget it holds, go rather than leave an Undo that does nothing.
+  useEffect(() => {
+    if (pending && readOnly) setPending(null)
+  }, [pending, readOnly])
 
   // The Widget is in the Layout again: put back from another tab, or the browser refused the
   // save and the stored Layout came back. There is nothing to undo.
