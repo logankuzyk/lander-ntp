@@ -2,11 +2,12 @@ import type { JSX } from 'preact'
 import { useRef } from 'preact/hooks'
 
 import { useEditMode } from '@/components/EditMode/useEditMode'
+import { useGridKeys } from '@/components/EditMode/useGridKeys'
 import { useGridMove } from '@/components/EditMode/useGridMove'
 import { COLS, drawnRects, type DrawnWidget, ROWS } from '@/layout/geometry'
 import type { Layout } from '@/layout/types'
 import type { PageValues } from '@/widgetSystem/definition'
-import { Box, WidgetBox } from '@/widgetSystem/WidgetBox'
+import { Box, type HeldState, WidgetBox } from '@/widgetSystem/WidgetBox'
 
 type GridProps = {
   /**
@@ -63,21 +64,28 @@ function Dots() {
  * Also in edit mode, a Widget can be dragged to another place and resized by the handle at its
  * bottom right corner (see `useGridMove`): the Grid hears the pointer for all its boxes, so a box
  * has nothing of it in it. Where the Widget would land, or what cells it would have, is
- * outlined, and the Layout is saved once, with `commit`, when it is put down. Nothing else here
- * saves anything.
+ * outlined, and the Layout is saved once, with `commit`, when it is put down. A focused frame can
+ * also be picked up with Enter or Space, moved with the arrow keys and resized with Shift and
+ * them, and put down with Enter or back with Escape (see `useGridKeys`): the same machine, the
+ * same outline, the same one save. Nothing else here saves anything.
  */
 export function Grid({ commit, layout, page }: GridProps) {
   const { editing } = useEditMode()
   const grid = useRef<HTMLDivElement>(null)
-  const { ghost, handlers, movable } = useGridMove({ commit, grid, layout })
+  const pointer = useGridMove({ commit, grid, layout })
+  const keys = useGridKeys({ commit, grid, layout })
+  // One Widget is in the air at a time, by a pointer or by keys: whichever has an outline.
+  const ghost = pointer.ghost ?? keys.ghost
+  const { held } = keys
   return (
     <>
       <div
-        class={`grid${editing ? ' grid--editing' : ''}${movable ? ' grid--movable' : ''}`}
+        class={`grid${editing ? ' grid--editing' : ''}${pointer.movable ? ' grid--movable' : ''}`}
         ref={grid}
         // The styles lay the cells out from these, so the Grid's size is geometry.ts's alone.
         style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
-        {...handlers}
+        {...pointer.handlers}
+        {...keys.handlers}
       >
         {editing && <Dots />}
         {ghost && (
@@ -93,10 +101,16 @@ export function Grid({ commit, layout, page }: GridProps) {
         )}
         {drawnRects(layout)
           .sort(inReadingOrder)
-          .map(({ rect, widget }) =>
-            widget.kind === 'known' ? (
+          .map(({ rect: stored, widget }) => {
+            // A Widget picked up from the keyboard is drawn at the place it would land, so that
+            // it lays itself out at the size it will be.
+            const up = held?.id === widget.placed.id ? held : null
+            const rect = up ? up.place : stored
+            const state: HeldState | undefined = up ? (up.valid ? 'allowed' : 'refused') : undefined
+            return widget.kind === 'known' ? (
               <WidgetBox
                 definition={widget.definition}
+                held={state}
                 id={widget.placed.id}
                 key={widget.placed.id}
                 options={widget.placed.options}
@@ -105,6 +119,7 @@ export function Grid({ commit, layout, page }: GridProps) {
               />
             ) : (
               <Box
+                held={state}
                 key={widget.placed.id}
                 name="Unknown widget"
                 placedId={widget.placed.id}
@@ -113,12 +128,16 @@ export function Grid({ commit, layout, page }: GridProps) {
               >
                 <p class="widget-box__unknown">Needs a newer version of Lander</p>
               </Box>
-            ),
-          )}
+            )
+          })}
       </div>
-      {/* Not role="status": the Notice has that one, and a page has the one live region of it. */}
+      {/*
+        Not role="status": the Notice has that one, and a page has the one live region of it. It
+        says the help when editing starts, and what a Widget picked up from the keyboard is doing
+        after that (see useGridKeys), so a screen reader reads each as it changes.
+      */}
       <p aria-live="polite" class="visually-hidden">
-        {editing ? EDITING_HELP : ''}
+        {keys.announcement || (editing ? EDITING_HELP : '')}
       </p>
     </>
   )

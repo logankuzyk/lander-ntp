@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
-import { drop, move, pickUp, pickUpResize } from '@/components/EditMode/moveSession'
+import {
+  drop,
+  dropKeys,
+  move,
+  nudge,
+  pickUp,
+  pickUpKeys,
+  pickUpResize,
+  stretch,
+} from '@/components/EditMode/moveSession'
 import { checkLayout } from '@/layout/check'
 import { deriveLayout } from '@/layout/derive'
 import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
@@ -121,6 +130,39 @@ const storeExampleLayout = async (): Promise<Layout> => {
 /** The Layout the real item reads back, with `change` made to it, stored through the item. */
 const changeLayout = (change: (layout: Layout) => Layout) => async () => {
   await layoutItem.setValue(change(await storeExampleLayout()))
+}
+
+const LEFT = { cols: -1, rows: 0 }
+const RIGHT = { cols: 1, rows: 0 }
+const DOWN = { cols: 0, rows: 1 }
+
+/** The Clock of the example Layout. */
+function clockOf(layout: Layout) {
+  const clock = layout.widgets.find(
+    (widget) => widget.kind === 'known' && widget.placed.type === 'clock',
+  )
+  if (clock?.kind !== 'known') throw new Error('the example Layout has a Clock')
+  return clock.placed
+}
+
+/**
+ * What a person does at the keyboard, with the real session the page uses: picks the Clock up,
+ * presses these keys (an arrow moves it, Shift and an arrow resizes it), and puts it down. The
+ * Layout the put-down hands to `commit`.
+ */
+function putDownFromKeyboard(
+  layout: Layout,
+  keys: { by: { cols: number; rows: number }; resize?: boolean }[],
+): Layout {
+  const held = pickUpKeys({ layout, readOnly: false }, clockOf(layout).id)
+  if (!held) throw new Error('the Clock could not be picked up')
+  const moved = keys.reduce(
+    (session, { by, resize }) => (resize ? stretch : nudge)(session, by),
+    held,
+  )
+  const next = dropKeys(moved, { layout, readOnly: false })
+  if (!next) throw new Error('the put-down was refused')
+  return next
 }
 
 const changeOnboarding = (change: (record: Onboarding) => Onboarding) => async () =>
@@ -433,6 +475,36 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     }),
   },
   {
+    layoutOnly: true,
+    name: 'move a Widget from the keyboard (W23: pick up, arrows, put down is one write to sync:layout alone)',
+    write: changeLayout((layout) => {
+      const next = putDownFromKeyboard(layout, [{ by: LEFT }, { by: DOWN }, { by: DOWN }])
+      // It did move: a row that saved a Layout nothing had changed in would prove nothing.
+      const after = clockOf(next)
+      const before = clockOf(layout)
+      if (after.col !== before.col - 1 || after.row !== before.row + 2) {
+        throw new Error('the put-down did not move the Clock')
+      }
+      return next
+    }),
+  },
+  {
+    layoutOnly: true,
+    name: 'resize a Widget from the keyboard (W23: pick up, Shift and arrows, put down is one write to sync:layout alone)',
+    write: changeLayout((layout) => {
+      const next = putDownFromKeyboard(layout, [
+        { by: RIGHT, resize: true },
+        { by: DOWN, resize: true },
+      ])
+      const after = clockOf(next)
+      const before = clockOf(layout)
+      if (after.w !== before.w + 1 || after.h !== before.h + 1 || after.col !== before.col) {
+        throw new Error('the put-down did not resize the Clock')
+      }
+      return next
+    }),
+  },
+  {
     name: 'the shared 24-hour switch in a popover, after a first Layout write: clock.hour12 only',
     write: async () => {
       await storeExampleLayout()
@@ -635,6 +707,40 @@ describe('a resize’s write (W22)', () => {
       col,
       h: h + 1,
       row,
+      w: w + 1,
+    })
+    const { fellBack, settings } = await asV023(stored)
+    expect(fellBack).toBe(false)
+    expect(settings).toEqual(stored.settings)
+  })
+})
+
+describe('a keyboard put-down’s write (W23)', () => {
+  it('stores a Widget moved and resized in one pick-up, leaves sync:settings and sync:onboarding byte-equal, readable by v0.2.3', async () => {
+    await settingsItem.setValue(SEED)
+    await onboardingItem.setValue(SEED_ONBOARDING)
+    const before = await storeExampleLayout()
+    const { col, h, id, row, w } = clockOf(before)
+    const next = putDownFromKeyboard(before, [
+      { by: LEFT },
+      { by: RIGHT, resize: true },
+      { by: DOWN },
+      { by: DOWN, resize: true },
+    ])
+
+    await layoutItem.setValue(next)
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    expect(stored.settings).toEqual(SEED)
+    expect(stored.onboarding).toEqual(SEED_ONBOARDING)
+    const placed = (
+      stored.layout as { widgets: { col: number; h: number; id: string; row: number; w: number }[] }
+    ).widgets
+    // Both the place and the size changed, and in one write.
+    expect(placed.find((widget) => widget.id === id)).toMatchObject({
+      col: col - 1,
+      h: h + 1,
+      row: row + 1,
       w: w + 1,
     })
     const { fellBack, settings } = await asV023(stored)
