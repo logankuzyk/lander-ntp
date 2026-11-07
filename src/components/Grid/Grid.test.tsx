@@ -565,6 +565,8 @@ describe('the Grid styles', () => {
     const narrow = css.slice(css.indexOf('@container (max-width: 8rem) {'))
     const body = narrow.slice(0, narrow.indexOf('\n}\n'))
     expect(body).toMatch(/\.widget-state--unknown \.widget-state__name\s*{\s*display:\s*none/)
+    // Beats `.widget-state` (below it in the file, one class) for the smaller type and padding.
+    expect(body).toMatch(/\.widget-state\.widget-state--unknown\s*{[^}]*font-size/)
   })
 
   it('fades the dots and the wash in, and not under reduced motion', () => {
