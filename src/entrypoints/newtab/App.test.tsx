@@ -314,19 +314,25 @@ describe('App', () => {
       expect(await onboardingItem.getValue()).toEqual({ dismissed: ['weather'], welcomed: true })
     })
 
-    it('opens the settings on the tour from the welcome', async () => {
+    it('starts the tour on the page from the welcome, at the Edit button', async () => {
       await onboardingItem.setValue({ dismissed: ['weather'], welcomed: false })
+      // The test DOM has no layout: everything is drawn at one place, enough to be found.
+      const drawn = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(() => new DOMRect(1100, 834, 40, 40))
       render(<App />)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Show me around' }))
 
-      const settings = await screen.findByRole('dialog', { name: 'Settings' })
+      const note = await screen.findByRole('note')
+      drawn.mockRestore()
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
-      expect(within(settings).getByRole('note').textContent).toContain('1 of 2')
+      expect(note.textContent).toContain('Edit your page')
+      expect(note.textContent).toContain('1 of 7')
+      // The settings come at the end of the tour, and the tour is not offered again from the gear.
+      expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
       expect((await onboardingItem.getValue())?.welcomed).toBe(true)
 
-      // Opened again from the gear, it is just the settings.
-      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
       expect(within(await screen.findByRole('dialog')).queryByRole('note')).toBeNull()
     })
