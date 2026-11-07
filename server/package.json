@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "better-auth": "1.7.7",
     "hono": "^4.11.4",
     "valibot": "^1.2.0"
   },

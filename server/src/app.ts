@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import type { DatabaseSync } from 'node:sqlite'
 
+import { createAuth, type Mailer } from './auth.js'
 import type { ServerConfig } from './config.js'
 
 const maximumBodyBytes = 16 * 1024
@@ -11,14 +12,16 @@ export type AppDependencies = {
   clock: { now: () => Date }
   config: ServerConfig
   db: DatabaseSync
-  mailer: { send: (message: unknown) => Promise<void> }
+  mailer: Mailer
   objectStore: {
     get: (key: string) => Promise<Uint8Array | undefined>
     put: (key: string, value: Uint8Array) => Promise<void>
   }
 }
 
-export function createApp({ db }: AppDependencies) {
+export async function createApp(dependencies: AppDependencies) {
+  const auth = await createAuth(dependencies)
+  const { db } = dependencies
   const app = new Hono()
 
   app.use(
@@ -59,6 +62,25 @@ export function createApp({ db }: AppDependencies) {
     } catch {
       return context.json({ error: 'unavailable' }, 503)
     }
+  })
+
+  app.on(['GET', 'POST'], '/api/auth/*', (context) => auth.handler(context.req.raw))
+
+  app.use('/v1/*', async (context, next) => {
+    const session = await auth.api.getSession({ headers: context.req.raw.headers })
+    if (!session) return context.json({ error: 'signed_out' }, 401)
+    await next()
+  })
+
+  app.get('/v1/me', async (context) => {
+    const session = await auth.api.getSession({ headers: context.req.raw.headers })
+    if (!session) return context.json({ error: 'signed_out' }, 401)
+    return context.json({
+      deviceId: session.session.id,
+      email: session.user.email,
+      limit: 3,
+      pending: false,
+    })
   })
 
   app.notFound((context) => context.json({ error: 'not_found' }, 404))

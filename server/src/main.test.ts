@@ -10,13 +10,14 @@ describe('startServer shutdown', () => {
     'force-closes a stalled connection and closes the database after %s',
     async (signal) => {
       const db = new DatabaseSync(':memory:')
-      const server = startServer({
+      const server = await startServer({
         config: {
           authSecret: 'a'.repeat(32),
           databasePath: ':memory:',
           nodeEnv: 'test',
           port: 0,
           trustAnyExtensionOrigin: false,
+          trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
         },
         db,
         shutdownTimeoutMs: 25,
