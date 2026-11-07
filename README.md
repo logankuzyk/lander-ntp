@@ -1,6 +1,6 @@
 # lander-ntp
 
-A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a Grid of Widgets you choose, such as a clock or the weather. Use Edit mode to add, move, resize, and remove Widgets. Explore the page and its Widgets in Storybook.
+A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a Grid of Widgets you choose, such as a clock or the weather, photo details, and a gallery in settings for picking a photo or a tag to cycle through. Use Edit mode to add, move, resize, and remove Widgets. Explore the page and its Widgets in Storybook.
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
@@ -55,11 +55,12 @@ The weather widget asks [Open-Meteo](https://open-meteo.com/) directly. If that 
 "weather": {
   "enabled": true,
   "forecastUrl": "https://example.com/v1/forecast",
+  "placeNameUrl": "https://example.com/data/reverse-geocode-client",
   "searchUrl": "https://example.com/v1/search"
 }
 ```
 
-Each key is optional. A replacement address must be https, answer the same query parameters in Open-Meteo's response shape, and send `Access-Control-Allow-Origin: *`. `"enabled": false` hides the widget and stops its requests.
+Each key is optional. A replacement address must be https, answer the same query parameters in Open-Meteo's response shape, and send `Access-Control-Allow-Origin: *`. `placeNameUrl` is where the name of the town at the device's position is looked up (it defaults to BigDataCloud's). `"enabled": false` stops the weather's requests; a Weather already on the page stays, and its box says "Switched off for now".
 
 ## Privacy
 

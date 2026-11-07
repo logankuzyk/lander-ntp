@@ -49,7 +49,7 @@ A setting shared by the whole page that widgets can show as one of their options
 _Avoid_: Global option, shared option
 
 **Waiting options**:
-Options kept from an older version for the first Clock or Weather Widget the user adds after updating. That Widget gets them, then they are removed from the waiting options.
+Options carried over from the settings (or the defaults) for a Widget type that was off, used for the first one added. That Widget gets them, then they are removed from the waiting options.
 _Avoid_: Pending options
 
 **Widget limit**:
