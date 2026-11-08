@@ -115,7 +115,7 @@ export function AnalogClock({
           x1="50"
           x2="50"
           y1="50"
-          y2="14"
+          y2="13"
         />
         {showSeconds && (
           <line
@@ -125,7 +125,7 @@ export function AnalogClock({
             x1="50"
             x2="50"
             y1="50"
-            y2="8"
+            y2="7"
           />
         )}
         <circle class="analog-clock__pin" cx="50" cy="50" r="2" />
