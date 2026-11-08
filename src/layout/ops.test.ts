@@ -117,7 +117,15 @@ describe('addWidget', () => {
 
   it('does not change the Layout it was given, and keeps everything else in it as it was', () => {
     const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
-    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+    const future = {
+      col: 1,
+      h: 1,
+      id: 'fut',
+      options: { z: 1 },
+      row: 1,
+      type: 'future-widget',
+      w: 2,
+    }
     const before = checkLayout({
       extra: 'yes',
       v: 1,
@@ -179,7 +187,7 @@ describe('addWidget', () => {
   })
 
   it('refuses a type this version does not know', () => {
-    expect(addWidget(editable(layoutOf()), 'bookmarks')).toEqual({
+    expect(addWidget(editable(layoutOf()), 'future-widget')).toEqual({
       ok: false,
       reason: 'unknown type',
     })
@@ -190,7 +198,7 @@ describe('addWidget', () => {
       ok: false,
       reason: 'read only',
     })
-    expect(addWidget({ layout: layoutOf(), readOnly: true }, 'bookmarks')).toEqual({
+    expect(addWidget({ layout: layoutOf(), readOnly: true }, 'future-widget')).toEqual({
       ok: false,
       reason: 'read only',
     })
@@ -314,7 +322,7 @@ describe('addWidget, at the Widget limit', () => {
   it('leaves the other reasons as they were: read only and an unknown type come first', () => {
     const eight = layoutOf(...clocksOf(8))
     expect(refusal(addWidget({ layout: eight, readOnly: true }, 'clock'))).toBe('read only')
-    expect(refusal(addWidget(editable(eight), 'bookmarks'))).toBe('unknown type')
+    expect(refusal(addWidget(editable(eight), 'future-widget'))).toBe('unknown type')
   })
 
   it('adds without a limit when there is none', () => {
@@ -366,7 +374,7 @@ describe('moveWidget', () => {
       later: { badge: 'new' },
       options: { colour: 'teal' },
       row: 1,
-      type: 'bookmarks',
+      type: 'future-widget',
       w: 2,
     }
     const before = layoutOf(future, clock('clock001', 5, 4))
@@ -388,7 +396,7 @@ describe('moveWidget', () => {
       later: { badge: 'new', nested: [1, 2, { three: 3 }] },
       options: { colour: 'teal', rows: ['a', 'b'] },
       row: 4,
-      type: 'bookmarks',
+      type: 'future-widget',
       w: 4,
     }
     const before = layoutOf(clock('clock001', 5, 4), future)
@@ -459,7 +467,15 @@ describe('moveWidget', () => {
   })
 
   it('moves a Widget of a type this version does not know', () => {
-    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+    const future = {
+      col: 1,
+      h: 1,
+      id: 'fut',
+      options: { z: 1 },
+      row: 1,
+      type: 'future-widget',
+      w: 2,
+    }
 
     const next = accepted(moveWidget(editable(layoutOf(future)), 'fut', { col: 3, row: 3 }))
 
@@ -543,7 +559,7 @@ describe('resizeWidget', () => {
   })
 
   it('does not resize a Widget of a type this version does not know', () => {
-    const future = { col: 1, h: 1, id: 'fut', options: {}, row: 1, type: 'bookmarks', w: 2 }
+    const future = { col: 1, h: 1, id: 'fut', options: {}, row: 1, type: 'future-widget', w: 2 }
     expect(refusal(resizeWidget(editable(layoutOf(future)), 'fut', { h: 2, w: 2 }))).toBe(
       'unknown type',
     )
@@ -564,7 +580,7 @@ describe('resizeWidget', () => {
 })
 
 describe('removeWidget', () => {
-  const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'bookmarks', w: 2 }
+  const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'future-widget', w: 2 }
   const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
   const layout = checkLayout({
     extra: 1,
@@ -657,7 +673,15 @@ describe('restoreWidget', () => {
   })
 
   it('puts a Widget of a type this version does not know back as it was', () => {
-    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'bookmarks', w: 2 }
+    const future = {
+      col: 1,
+      h: 1,
+      id: 'fut',
+      options: { z: 1 },
+      row: 8,
+      type: 'future-widget',
+      w: 2,
+    }
     const { layout: without, removed } = removedFrom(layoutOf(future, clock('a', 5, 4)), 'fut')
 
     const next = accepted(restoreWidget(editable(without), removed))
@@ -786,7 +810,15 @@ describe('setOptions', () => {
   })
 
   it('refuses a Widget of a type this version does not know, one that is not there, or read-only', () => {
-    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+    const future = {
+      col: 1,
+      h: 1,
+      id: 'fut',
+      options: { z: 1 },
+      row: 1,
+      type: 'future-widget',
+      w: 2,
+    }
     expect(refusal(setOptions(editable(layoutOf(future)), 'fut', { z: 2 }))).toBe('unknown type')
     expect(refusal(setOptions(editable(layout), 'nope', {}))).toBe('not found')
     expect(refusal(setOptions({ layout, readOnly: true }, 'a', { showDate: true }))).toBe(
@@ -893,7 +925,7 @@ describe('settle', () => {
   })
 
   it('settles a Widget of a type this version does not know', () => {
-    const future = { col: 5, h: 2, id: 'f', options: { z: 1 }, row: 4, type: 'bookmarks', w: 4 }
+    const future = { col: 5, h: 2, id: 'f', options: { z: 1 }, row: 4, type: 'future-widget', w: 4 }
     const before = layoutOf(future, clock('g', 5, 4))
 
     // "f" keeps the cells; "g" is drawn elsewhere and stored there.

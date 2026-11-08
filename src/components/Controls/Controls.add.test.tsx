@@ -103,12 +103,13 @@ describe('Controls, the Add menu', () => {
       within(menu())
         .getAllByRole('menuitem')
         .map((el) => el.textContent),
-    ).toEqual(['Clock', 'Date', 'Analog clock', 'Weather', 'Quick dial'])
+    ).toEqual(['Clock', 'Date', 'Analog clock', 'Bookmarks', 'Weather', 'Quick dial'])
     expect(document.activeElement).toBe(item('Clock'))
     // Each is something a callout can point at.
     expect(item('Clock').getAttribute('data-callout-target')).toBe('menu:clock')
     expect(item('Date').getAttribute('data-callout-target')).toBe('menu:date')
     expect(item('Analog clock').getAttribute('data-callout-target')).toBe('menu:analog-clock')
+    expect(item('Bookmarks').getAttribute('data-callout-target')).toBe('menu:bookmarks')
     expect(item('Weather').getAttribute('data-callout-target')).toBe('menu:weather')
     expect(item('Quick dial').getAttribute('data-callout-target')).toBe('menu:quick-dial')
   })
@@ -179,6 +180,8 @@ describe('Controls, the Add menu', () => {
     fireEvent.keyDown(item('Date'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Analog clock'))
     fireEvent.keyDown(item('Analog clock'), { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(item('Bookmarks'))
+    fireEvent.keyDown(item('Bookmarks'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Weather'))
     fireEvent.keyDown(item('Weather'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Quick dial'))

@@ -143,7 +143,7 @@ describe('useLayout', () => {
           id: 'zz9y8x7w',
           options: { limit: 5 },
           row: 7,
-          type: 'bookmarks',
+          type: 'future-widget',
           w: 3,
         },
       ],

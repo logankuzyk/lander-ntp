@@ -377,7 +377,7 @@ const changeLayout = (change: (layout: Layout) => Layout) => async () => {
 }
 
 /** Commits a Layout through the same hook the page uses. */
-async function commitThroughPage(next: Layout): Promise<void> {
+async function commitThroughPage(next: Layout, type: string): Promise<void> {
   const page = {} as ReturnType<typeof useLayout>
   function Probe() {
     Object.assign(page, useLayout(DEFAULT_SETTINGS))
@@ -392,7 +392,7 @@ async function commitThroughPage(next: Layout): Promise<void> {
     const { layout } = await fakeBrowser.storage.sync.get('layout')
     expect(
       (layout as { widgets?: { type?: string }[] } | undefined)?.widgets?.some(
-        (widget) => widget.type === 'date',
+        (widget) => widget.type === type,
       ),
     ).toBe(true)
   })
@@ -402,6 +402,8 @@ async function commitThroughPage(next: Layout): Promise<void> {
 const PHASE_3_WRITES = [
   {
     expectedChangedKeys: ['background'],
+    expectedOptions: undefined,
+    expectedType: undefined,
     name: 'choose a background through its page hook; v0.2.3 settings stay byte-equal',
     write: async () => {
       await settingsItem.setValue(SEED)
@@ -431,6 +433,8 @@ const PHASE_3_WRITES = [
   },
   {
     expectedChangedKeys: ['layout'],
+    expectedOptions: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
+    expectedType: 'date',
     name: 'adding a Date writes sync:layout only through the page commit path',
     write: async () => {
       await settingsItem.setValue(SEED)
@@ -439,14 +443,31 @@ const PHASE_3_WRITES = [
       const before = await fakeBrowser.storage.sync.get(null)
       const added = addWidget({ layout, readOnly: false }, 'date')
       if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
-      await commitThroughPage(added.layout)
+      await commitThroughPage(added.layout, 'date')
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: { folder: 'bar', openInNewTab: false, showFolderName: true },
+    expectedType: 'bookmarks',
+    name: 'adding Bookmarks writes sync:layout only through the page commit path',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const layout = await storeExampleLayout()
+      const before = await fakeBrowser.storage.sync.get(null)
+      const added = addWidget({ layout, readOnly: false }, 'bookmarks')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      await commitThroughPage(added.layout, 'bookmarks')
       return { after: await fakeBrowser.storage.sync.get(null), before }
     },
   },
 ]
 
 describe('phase 3 synced writes', () => {
-  it.each(PHASE_3_WRITES)('$name', async ({ expectedChangedKeys, write }) => {
+  it.each(PHASE_3_WRITES)('$name', async (row) => {
+    const { expectedChangedKeys, expectedOptions, expectedType, write } = row
     const { after: rawSync, before } = await write()
 
     const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
@@ -465,18 +486,17 @@ describe('phase 3 synced writes', () => {
     if (expectedChangedKeys.includes('layout')) {
       expect(rawSync.layout).toMatchObject({
         v: 1,
-        widgets: expect.arrayContaining([expect.objectContaining({ type: 'date' })]),
+        widgets: expect.arrayContaining([expect.objectContaining({ type: expectedType })]),
       })
-    }
-
-    if (expectedChangedKeys.includes('layout')) {
       const v030 = await asV030(rawSync)
       expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
       expect(
-        v030.raw.layout.widgets.find((widget) => (widget as { type?: string }).type === 'date'),
+        v030.raw.layout.widgets.find(
+          (widget) => (widget as { type?: string }).type === expectedType,
+        ),
       ).toMatchObject({
-        options: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
-        type: 'date',
+        options: expectedOptions,
+        type: expectedType,
       })
     }
   })
@@ -728,7 +748,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     write: async () => {
       const added = addWidget({ layout: await storeExampleLayout(), readOnly: false }, 'date')
       if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
-      await commitThroughPage(added.layout)
+      await commitThroughPage(added.layout, 'date')
     },
   },
   {

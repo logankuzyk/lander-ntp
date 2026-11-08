@@ -503,16 +503,16 @@ describe('Grid, resizing a picked-up Widget with Shift and the arrow keys', () =
   })
 
   it('cannot resize a Widget of a type this version does not know, and says so', () => {
-    const future = layoutOf({ ...clock('futr0001', 3, 3), type: 'bookmarks' })
+    const future = layoutOf({ ...clock('futr0001', 3, 3), type: 'future-widget' })
     const { box, commit, said } = setup(future)
-    const unknown = box('bookmarks')
+    const unknown = box('future-widget')
     unknown.focus()
     key(unknown, 'Enter')
     expect(said()).toMatch(
-      /^Unknown widget, bookmarks picked up at column 3, row 3\. Arrow keys move it, Enter puts it down, Escape puts it back\.$/,
+      /^Unknown widget, future-widget picked up at column 3, row 3\. Arrow keys move it, Enter puts it down, Escape puts it back\.$/,
     )
     key(unknown, 'ArrowRight', { shiftKey: true })
-    expect(said()).toBe("Unknown widget, bookmarks can't be resized.")
+    expect(said()).toBe("Unknown widget, future-widget can't be resized.")
     key(unknown, 'ArrowRight')
     key(unknown, 'Enter')
     expect(placesIn(commit.mock.calls[0]?.[0] as Layout).futr0001).toMatchObject({ col: 4, w: 4 })

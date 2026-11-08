@@ -88,7 +88,7 @@ describe('placeWidget', () => {
   })
 
   it('moves a Widget of a type this version does not know, but gives it no new size', () => {
-    const future = layoutOf({ ...clock('futr0001', 5, 4), type: 'bookmarks' })
+    const future = layoutOf({ ...clock('futr0001', 5, 4), type: 'future-widget' })
     const moved = placeWidget(editable(future), 'futr0001', { col: 2, h: 2, row: 2, w: 4 })
     expect(moved.ok).toBe(true)
     const resized = placeWidget(editable(future), 'futr0001', { col: 5, h: 3, row: 4, w: 4 })

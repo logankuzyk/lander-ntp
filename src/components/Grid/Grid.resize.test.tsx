@@ -173,9 +173,12 @@ describe('Grid, the resize handle', () => {
   })
 
   it('is not on a Widget of a type this version does not know, which has no sizes', () => {
-    const future = layoutOf({ ...clock('futr0001', 5, 4), type: 'bookmarks' }, weather('w', 11, 1))
+    const future = layoutOf(
+      { ...clock('futr0001', 5, 4), type: 'future-widget' },
+      weather('w', 11, 1),
+    )
     const { box } = setup(future)
-    expect(box('bookmarks').querySelector('.widget-box__resize')).toBeNull()
+    expect(box('future-widget').querySelector('.widget-box__resize')).toBeNull()
     expect(box('weather').querySelector('.widget-box__resize')).not.toBeNull()
   })
 
