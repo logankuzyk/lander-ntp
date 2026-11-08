@@ -1,5 +1,9 @@
+import { useEffect } from 'preact/hooks'
+
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
+import { NewMark } from '@/onboarding/NewMark'
+import { recordSeen, useSeen } from '@/onboarding/useSeen'
 import type { Photo } from '@/photos/schema'
 import { formatDateTaken } from '@/utils/time'
 
@@ -13,6 +17,13 @@ type PhotoInfoProps = {
 /** Camera settings for the current photo. Opened with the ⓘ button or the `i` key. */
 export function PhotoInfo({ locale, onClose, photo }: PhotoInfoProps) {
   const { close, container } = usePopover(onClose)
+  const heartSeen = useSeen('photo-heart')
+
+  // Opening photo details is the first time this mark can be seen. It remains visible for this
+  // open panel and is gone the next time details are opened.
+  useEffect(() => {
+    if (heartSeen.seen === false) void recordSeen(['photo-heart'])
+  }, [heartSeen.seen])
 
   const { exif } = photo
   const rows: [string, string][] = [
@@ -29,6 +40,7 @@ export function PhotoInfo({ locale, onClose, photo }: PhotoInfoProps) {
     <aside aria-label="Photo details" class="popover photo-info" ref={container} role="dialog">
       <header class="popover__header">
         <h2>Photo details</h2>
+        {heartSeen.seen === false && <NewMark />}
         <button
           aria-label="Close photo details"
           class="popover__close"

@@ -185,3 +185,6 @@ export const NEWS: readonly CalloutInfo[] = [
     title: 'You can edit your page now',
   },
 ]
+
+/** IDs for the New marks shown in the current release. Keep these stable once stored. */
+export const MARKS = ['clock', 'weather-widget', 'photos', 'photo-heart'] as const

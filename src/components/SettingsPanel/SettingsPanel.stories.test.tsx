@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { describe, expect, it } from 'vitest'
+
+import { onboardingItem } from '@/onboarding/storage'
 
 import meta, * as stories from './SettingsPanel.stories'
 
@@ -63,5 +65,18 @@ describe('settings panel stories', () => {
     expect(
       (screen.getByRole('switch', { name: 'Dim the photo' }) as HTMLInputElement).checked,
     ).toBe(false)
+  })
+
+  it('marks the Photos tab as new until it is selected', async () => {
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+    renderStory('TabNew')
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeTruthy(),
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Photos' }))
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeNull(),
+    )
   })
 })

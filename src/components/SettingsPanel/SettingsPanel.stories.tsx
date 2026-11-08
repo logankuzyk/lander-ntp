@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { useEffect, useState } from 'preact/hooks'
 import { fn } from 'storybook/test'
 
+import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
 import type { Settings } from '@/settings/schema'
 import { STORY_PHOTOS } from '@/test/fixtures'
@@ -88,6 +89,14 @@ export const PhotosKept: Story = {
 
 /** The font, and the line that points to Edit for the Clock's and the Weather's options. */
 export const General: Story = { args: { initialSection: 'general' } }
+
+/** An unseen Photos tab, with the mark recorded when the tab is opened. */
+export const TabNew: Story = {
+  args: { initialSection: 'general' },
+  beforeEach: async () => {
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+  },
+}
 
 /**
  * Settings that a newer version of Lander wrote: the panel shows them and says to update, with
