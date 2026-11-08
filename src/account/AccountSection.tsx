@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 import { account, useAccount } from './account'
 import type { AccountState } from './account'
@@ -28,6 +28,7 @@ export function AccountSection({
   const currentState = useAccount()
   const state = stateOverride ?? currentState
   const [email, setEmail] = useState('')
+  const latestEmail = useRef('')
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(codeSentInitially)
   const [error, setError] = useState(ERROR_COPY[errorInitially] ?? errorInitially)
@@ -35,7 +36,13 @@ export function AccountSection({
   const sendCode = async (event: Event) => {
     event.preventDefault()
     setError('')
-    const result = await account.sendCode(email.trim())
+    const form = event.currentTarget as HTMLFormElement
+    const submittedEmail = form.querySelector<HTMLInputElement>('input[type="email"]')?.value
+    if (submittedEmail !== undefined) {
+      latestEmail.current = submittedEmail
+      setEmail(submittedEmail)
+    }
+    const result = await account.sendCode((submittedEmail ?? latestEmail.current).trim())
     if (result.ok) setCodeSent(true)
     else setError(ERROR_COPY[result.error] ?? 'Couldn’t send a code. Try again.')
   }
@@ -43,8 +50,15 @@ export function AccountSection({
   const signIn = async (event: Event) => {
     event.preventDefault()
     setError('')
-    const result = await account.verify(email.trim(), code)
+    const result = await account.verify(latestEmail.current.trim(), code)
     if (!result.ok) setError(ERROR_COPY[result.error] ?? 'Couldn’t sign in. Try again.')
+  }
+
+  const resendCode = async () => {
+    setError('')
+    const result = await account.sendCode(latestEmail.current.trim())
+    if (result.ok) setCode('')
+    else setError(ERROR_COPY[result.error] ?? 'Couldn’t send a code. Try again.')
   }
 
   const signOut = async () => {
@@ -85,7 +99,11 @@ export function AccountSection({
                 <span>Email</span>
                 <input
                   autoComplete="email"
-                  onInput={(event) => setEmail(event.currentTarget.value)}
+                  name="email"
+                  onInput={(event) => {
+                    latestEmail.current = event.currentTarget.value
+                    setEmail(latestEmail.current)
+                  }}
                   required
                   type="email"
                   value={email}
@@ -112,6 +130,20 @@ export function AccountSection({
               </label>
               <button class="settings__button" type="submit">
                 Sign in
+              </button>
+              <button
+                class="settings__link"
+                onClick={() => {
+                  setCodeSent(false)
+                  setCode('')
+                  setError('')
+                }}
+                type="button"
+              >
+                Change email
+              </button>
+              <button class="settings__link" onClick={resendCode} type="button">
+                Send a new code
               </button>
             </form>
           )}

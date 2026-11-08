@@ -27,14 +27,23 @@ const PHOTOS = [
 ]
 
 const renderPanel = ({
+  accountPreview,
+  initialSection,
   overrides = {},
   photos = PHOTOS,
-}: { overrides?: Partial<Settings>; photos?: Photo[] } = {}) => {
+}: {
+  accountPreview?: NonNullable<Parameters<typeof SettingsPanel>[0]['accountPreview']>
+  initialSection?: Parameters<typeof SettingsPanel>[0]['initialSection']
+  overrides?: Partial<Settings>
+  photos?: Photo[]
+} = {}) => {
   const onChange = vi.fn()
   const onClose = vi.fn()
   render(
     <SettingsPanel
+      accountPreview={accountPreview}
       currentId="a"
+      initialSection={initialSection}
       onChange={onChange}
       onClose={onClose}
       photos={photos}
@@ -177,6 +186,96 @@ describe('SettingsPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
       expect((await screen.findByRole('alert')).textContent).toContain('wrong or has expired')
+    })
+
+    it('can request a fresh code or change the email after the code step starts', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockImplementation(async () => jsonResponse({ success: true }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByLabelText('Code')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+      expect(fetch.mock.calls[1]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', type: 'sign-in' }),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change email' }))
+      const email = screen.getByLabelText('Email') as HTMLInputElement
+      expect(email.value).toBe('person@example.com')
+      fireEvent.input(email, { target: { value: 'other@example.com' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByLabelText('Code')
+      expect(fetch.mock.calls[2]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'other@example.com', type: 'sign-in' }),
+      )
+    })
+
+    it('sends a trimmed email address for both code requests and verification', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse({ success: true }))
+        .mockResolvedValueOnce(
+          jsonResponse({ token: 'token', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), {
+        target: { value: ' person@example.com ' },
+      })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      const code = await screen.findByLabelText('Code')
+      expect(fetch.mock.calls[0]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', type: 'sign-in' }),
+      )
+
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByText('person@example.com')
+      expect(fetch.mock.calls[1]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', otp: '123456' }),
+      )
+    })
+
+    it('shows the signed-in account while a device is pending', () => {
+      renderPanel({
+        accountPreview: {
+          state: {
+            devices: [],
+            email: 'person@example.com',
+            notice: 'none',
+            status: 'pending-device',
+          },
+        },
+        initialSection: 'account',
+      })
+
+      expect(screen.getByText('person@example.com')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+    })
+
+    it('shows the signed-out-elsewhere notice distinctly from the paused notice', () => {
+      renderPanel({
+        accountPreview: {
+          state: { notice: 'signed-out-elsewhere', status: 'signed-out' },
+        },
+        initialSection: 'account',
+      })
+
+      expect(screen.getByRole('status').textContent).toBe('Signed out on another device')
     })
 
     it('shows too many tries in plain words', async () => {
