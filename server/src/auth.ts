@@ -14,6 +14,8 @@ type AuthDependencies = {
   mailer: Mailer
 }
 
+type CreatedSession = { id: string; userId: string }
+
 export function sendSignInEmail(mailer: Mailer, email: string, code: string) {
   return mailer.send({
     subject: 'Your Lander sign-in code',
@@ -64,7 +66,10 @@ export function createConsoleMailer(nodeEnv: ServerConfig['nodeEnv']): Mailer {
   }
 }
 
-export async function createAuth({ config, db, mailer }: AuthDependencies) {
+export async function createAuth(
+  { config, db, mailer }: AuthDependencies,
+  onSessionCreated: (session: CreatedSession) => Promise<void>,
+) {
   const options = {
     advanced: {
       database: { validateSchema: false },
@@ -77,6 +82,7 @@ export async function createAuth({ config, db, mailer }: AuthDependencies) {
     databaseHooks: {
       session: {
         create: {
+          after: async (session: CreatedSession) => onSessionCreated(session),
           before: async (session: { ipAddress?: string | null }) => ({
             data: { ...session, ipAddress: null },
           }),

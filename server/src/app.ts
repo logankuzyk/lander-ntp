@@ -5,6 +5,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { createAuth, type Mailer } from './auth.js'
 import type { ServerConfig } from './config.js'
+import { Devices } from './devices.js'
 import type { ObjectStore } from './objectStore.js'
 import { SettingsStore } from './settingsStore.js'
 import { pruneExpiredSyncWrites } from './syncWriteLimit.js'
@@ -27,8 +28,23 @@ export type AppDependencies = {
 }
 
 export async function createApp(dependencies: AppDependencies) {
-  const auth = await createAuth(dependencies)
   const { db } = dependencies
+  const devicesRef: { value?: Devices } = {}
+  const auth = await createAuth(dependencies, async (session) => {
+    if (!devicesRef.value) throw new Error('Devices are not initialized')
+    const user = db.prepare('SELECT email FROM user WHERE id = ?').get(session.userId) as
+      { email: string } | undefined
+    devicesRef.value.admit(
+      session.userId,
+      session.id,
+      Boolean(
+        dependencies.config.reviewerCode &&
+        user?.email.toLowerCase() === dependencies.config.reviewerEmail,
+      ),
+    )
+  })
+  const devices = new Devices(db, dependencies.clock)
+  devicesRef.value = devices
   const app = new Hono<{ Variables: { sessionId: string; userId: string } }>()
   const settings = new SettingsStore(db, dependencies.clock)
   const syncWrites = new Map<string, number[]>()
@@ -145,13 +161,37 @@ export async function createApp(dependencies: AppDependencies) {
     }
   })
 
+  app.use('/api/auth/*', async (context, next) => {
+    devices?.pruneExpired()
+    const path = new URL(context.req.url).pathname
+    if (path === '/api/auth/sign-out') {
+      await next()
+      return
+    }
+    const session = await auth.api.getSession({
+      headers: context.req.raw.headers,
+      query: { disableRefresh: true },
+    })
+    if (session && devices?.isPending(session.user.id, session.session.id)) {
+      return context.json({ error: 'device_limit' }, 403)
+    }
+    await next()
+  })
+
   app.on(['GET', 'POST'], '/api/auth/*', (context) => auth.handler(context.req.raw))
 
   app.use('/v1/*', async (context, next) => {
+    devices?.pruneExpired()
     const session = await auth.api.getSession({ headers: context.req.raw.headers })
     if (!session) return context.json({ error: 'signed_out' }, 401)
     context.set('userId', session.user.id)
     context.set('sessionId', session.session.id)
+    const pending = devices?.isPending(session.user.id, session.session.id) ?? false
+    const path = new URL(context.req.url).pathname
+    const allowedForPending =
+      (context.req.method === 'GET' && (path === '/v1/me' || path === '/v1/devices')) ||
+      (context.req.method === 'DELETE' && path.startsWith('/v1/devices/'))
+    if (pending && !allowedForPending) return context.json({ error: 'device_limit' }, 403)
     settings.touch(session.user.id, dependencies.clock.now())
     await next()
   })
@@ -163,8 +203,18 @@ export async function createApp(dependencies: AppDependencies) {
       deviceId: session.session.id,
       email: session.user.email,
       limit: 3,
-      pending: false,
+      pending: devices?.isPending(session.user.id, session.session.id) ?? false,
     })
+  })
+
+  app.get('/v1/devices', (context) => {
+    const result = devices?.list(context.get('userId'), context.get('sessionId'))
+    return context.json({ limit: 3, ...result })
+  })
+
+  app.delete('/v1/devices/:id', (context) => {
+    devices?.remove(context.get('userId'), context.req.param('id'), context.get('sessionId'))
+    return context.body(null, 204)
   })
 
   app.get('/v1/sync', (context) => {

@@ -134,6 +134,37 @@ describe('createApp', () => {
       method: 'POST',
     })
     expect(reviewerSignIn.status).toBe(200)
+    const reviewerTokens = [reviewerSignIn.headers.get('set-auth-token')]
+    for (let index = 0; index < 3; index += 1) {
+      await app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email: 'reviewer@example.com', type: 'sign-in' }),
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-test-client-ip': `203.0.113.${10 + index}`,
+        },
+        method: 'POST',
+      })
+      const response = await app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email: 'reviewer@example.com', otp: '482931' }),
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-test-client-ip': `203.0.113.${10 + index}`,
+        },
+        method: 'POST',
+      })
+      expect(response.status).toBe(200)
+      reviewerTokens.push(response.headers.get('set-auth-token'))
+    }
+    const reviewerDevices = await app.request('/v1/devices', {
+      headers: { authorization: `Bearer ${reviewerTokens.at(-1)}`, origin },
+    })
+    expect(await reviewerDevices.json()).toMatchObject({
+      devices: [{}, {}, {}],
+      limit: 3,
+      pending: false,
+    })
 
     expect((await send('other@example.com')).status).toBe(200)
     const otherSignIn = await app.request('/api/auth/sign-in/email-otp', {
@@ -596,6 +627,77 @@ describe('createApp', () => {
     })
     expect(unknown.status).toBe(404)
     expect(await unknown.json()).toEqual({ error: 'unknown_item' })
+  })
+
+  it('marks a fourth sign-in pending and blocks its sync routes until a device is removed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const signIn = async (index: number) => {
+      const email = 'device-limit@example.com'
+      const host = `http://198.51.100.${index + 1}`
+      await app.request(`${host}/api/auth/email-otp/send-verification-otp`, {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-test-client-ip': `198.51.100.${index + 1}`,
+        },
+        method: 'POST',
+      })
+      const otp = messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0]
+      const response = await app.request(`${host}/api/auth/sign-in/email-otp`, {
+        body: JSON.stringify({ email, otp }),
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-test-client-ip': `198.51.100.${index + 1}`,
+        },
+        method: 'POST',
+      })
+      return response.headers.get('set-auth-token')
+    }
+    const tokens: (string | null)[] = []
+    for (let index = 0; index < 4; index += 1) tokens.push(await signIn(index))
+    const request = (token: string | null, path: string, method = 'GET') =>
+      app.request(path, { headers: { authorization: `Bearer ${token}`, origin }, method })
+
+    const me = await request(tokens[3] ?? null, '/v1/me')
+    expect(await me.json()).toMatchObject({ limit: 3, pending: true })
+    expect((await request(tokens[3] ?? null, '/v1/sync')).status).toBe(403)
+    expect((await request(tokens[3] ?? null, '/v1/devices')).status).toBe(200)
+    expect((await request(tokens[3] ?? null, '/api/auth/get-session')).status).toBe(403)
+
+    const deviceList = (await (await request(tokens[3] ?? null, '/v1/devices')).json()) as {
+      devices: { current: boolean; id: string }[]
+    }
+    const removable = deviceList.devices.find((device) => !device.current)
+    expect(removable).toBeDefined()
+    expect(Object.keys(deviceList.devices[0] ?? {}).sort()).toEqual([
+      'browser',
+      'createdAt',
+      'current',
+      'id',
+      'lastUsedAt',
+      'os',
+    ])
+    expect(
+      (await request(tokens[3] ?? null, `/v1/devices/${removable?.id}`, 'DELETE')).status,
+    ).toBe(204)
+    expect(await (await request(tokens[3] ?? null, '/v1/me')).json()).toMatchObject({
+      pending: false,
+    })
+    expect((await request(tokens[3] ?? null, '/v1/sync')).status).toBe(200)
+
+    expect(
+      (
+        await app.request('/api/auth/sign-out', {
+          headers: { authorization: `Bearer ${tokens[3]}`, origin },
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(200)
   })
 
   it('limits sync writes to sixty per session each minute', async () => {
