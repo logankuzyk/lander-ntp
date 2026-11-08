@@ -74,6 +74,14 @@ export function PageTour({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Apply the first stop after its page controls have mounted. A phase 3 walk starts in edit mode
+  // with Add open, so asking for the menu before Controls has rendered it can lose that request.
+  useEffect(() => {
+    const first = plan?.page[0]
+    if (first && (first.show.adding || first.show.editing || first.show.info)) bring(first.show)
+    // Once: the walk does not change its first stop after it starts.
+  }, [plan])
+
   // The tour starts from the welcome, a modal: closing it leaves focus on nothing, and the note is
   // before the Grid and the Bottom bar in the document, so Tab would start after it. Focus goes to
   // the note's button, where it then stays from stop to stop; if it is on something, it is left.
@@ -90,6 +98,8 @@ export function PageTour({
     if (wantEditing && !now.editing) {
       entered.current = true
       now.enter()
+    } else if (!wantEditing && now.editing) {
+      now.leave()
     }
     now.menu?.setOpen(adding, { quiet: true })
     if (wantInfo) now.openInfo?.()
@@ -143,6 +153,9 @@ export function PageTour({
   useEffect(() => {
     const stop = plan?.page[index]
     if (!stop) return
+    // When the run starts on an Add stop, the menu is requested alongside entering edit mode.
+    // Reopen it after that mode has drawn the Add menu, in case its transition shut the request.
+    if (stop.show.adding && editing) latest.current.menu?.setOpen(true, { quiet: true })
     if (stop.show.editing) {
       if (editing) sawEditing.current = true
       else if (sawEditing.current) latest.current.onEnd()

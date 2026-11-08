@@ -58,6 +58,7 @@ describe('PhotoInfo', () => {
 
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
+    expect(document.querySelector('[data-callout-target="photo-heart"]')).toBeNull()
   })
 
   it('disables the heart when favourites were written by a newer version', async () => {
@@ -77,6 +78,9 @@ describe('PhotoInfo', () => {
     await waitFor(() => expect(screen.getByRole('dialog').querySelector('.new-mark')).toBeTruthy())
     await waitFor(async () =>
       expect((await onboardingItem.getValue())?.dismissed).toContain('photo-heart'),
+    )
+    expect(screen.getByRole('button', { name: 'Favourite' }).dataset.calloutTarget).toBe(
+      'photo-heart',
     )
   })
 

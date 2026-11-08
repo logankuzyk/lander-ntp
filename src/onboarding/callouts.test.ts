@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { NEWS, type PageTourStop, TOUR } from './callouts'
+import { NEWS, type PageCallout, type PageTourStop, TOUR } from './callouts'
 
 describe('the tour', () => {
   it('goes from Edit to Done on the page, then Photos and the font in the settings panel', () => {
@@ -72,8 +72,8 @@ describe('the news', () => {
   describe('the update note about the Layout', () => {
     const note = NEWS.find(({ id }) => id === 'layout')
 
-    it('is the one entry, at the Edit button', () => {
-      expect(NEWS.map(({ id }) => id)).toEqual(['layout'])
+    it('is the first entry, before the note about Widgets and backgrounds', () => {
+      expect(NEWS.map(({ id }) => id)).toEqual(['layout', 'widgets-and-backgrounds'])
       expect(note?.target).toBe('edit')
       expect(note?.section).toBeUndefined()
     })
@@ -111,6 +111,42 @@ describe('the news', () => {
     it('is shown to anyone with it: not held back by the settings', () => {
       expect(note?.relevant).toBeUndefined()
       expect(note?.available).toBeUndefined()
+    })
+  })
+
+  describe('the update note about Widgets and backgrounds', () => {
+    const note = NEWS.find(
+      (entry): entry is PageCallout =>
+        entry.id === 'widgets-and-backgrounds' && entry.target !== undefined,
+    )
+
+    it('follows the Layout note and introduces the new Widgets, Background tab and photo favourites', () => {
+      expect(NEWS.map(({ id }) => id)).toEqual(['layout', 'widgets-and-backgrounds'])
+      expect(note).toMatchObject({
+        actionLabel: 'Show me',
+        body: 'Four new widgets are in Add. Settings has a Background tab with solid colours, and photo details has a heart for favourites.',
+        target: 'edit',
+        title: 'New: widgets and backgrounds',
+      })
+    })
+
+    it('walks through Add, the photo heart, and the Background tab', () => {
+      expect(note?.walk?.map(({ id }) => id)).toEqual([
+        'news-widgets-add',
+        'news-photo-heart',
+        'news-background',
+      ])
+      expect(note?.walk?.map(({ target }) => target)).toEqual([
+        'menu-item',
+        'photo-heart',
+        undefined,
+      ])
+      expect(note?.walk?.map((stop) => ('show' in stop ? stop.show : null))).toEqual([
+        { adding: true, editing: true },
+        { adding: false, editing: false, info: true },
+        null,
+      ])
+      expect(note?.walk?.[2]).toMatchObject({ section: 'photos' })
     })
   })
 })

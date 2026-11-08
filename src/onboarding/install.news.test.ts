@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
-import { MARKS } from './callouts'
+import { MARKS, NEWS } from './callouts'
 import { recordInstall } from './install'
 import { onboardingItem, pendingItem } from './storage'
 
-// With the news as it ships (install.test.ts brings its own): the note about the Layout.
+// With the news as it ships (install.test.ts brings its own): every update note is seen by a new install.
 describe('recordInstall, with the news that ships', () => {
   it('has a new install record the update note as seen: the welcome tour covers it', async () => {
     await recordInstall('install')
 
     expect(await pendingItem.getValue()).toEqual({
-      dismissed: ['layout', ...MARKS],
+      dismissed: [...NEWS.map(({ id }) => id), ...MARKS],
       welcomed: false,
     })
     expect(await onboardingItem.getValue()).toEqual({
-      dismissed: ['layout', ...MARKS],
+      dismissed: [...NEWS.map(({ id }) => id), ...MARKS],
       welcomed: false,
     })
   })

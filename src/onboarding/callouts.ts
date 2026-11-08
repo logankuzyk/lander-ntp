@@ -78,7 +78,7 @@ export type PageTourStop = CalloutBase & {
    * sits beside the menu: the menu opens upward from the Add button, and a note beside the button
    * would cover it).
    */
-  target: 'menu-item' | 'widget' | CalloutTarget
+  target: 'menu-item' | 'photo-heart' | 'widget' | CalloutTarget
   /** Said at the end of the body when the tour has no stop of its own for the setup button. */
   unlessSetup?: string
   /**
@@ -178,13 +178,37 @@ const NEWS_WALK: readonly TourStop[] = [
   ...TOUR.slice(1),
 ]
 
+/** The walk shown with the phase 3 update note. */
+const WIDGETS_AND_BACKGROUNDS_WALK: readonly TourStop[] = [
+  {
+    body: 'Add one wherever it fits.',
+    id: 'news-widgets-add',
+    show: { adding: true, editing: true },
+    target: 'menu-item',
+    title: 'Four new Widgets',
+  },
+  {
+    body: 'The heart keeps a photo as a favourite. Favourites only, in Settings, cycles just those.',
+    id: 'news-photo-heart',
+    show: { adding: false, editing: false, info: true },
+    target: 'photo-heart',
+    title: 'Favourite photos',
+  },
+  {
+    body: 'Photos is now Background. Pick one solid colour instead of a photo.',
+    id: 'news-background',
+    section: 'photos',
+    title: 'Solid colour backgrounds',
+  },
+]
+
 /**
  * Shown once, one at a time and in this order, to people who had the extension before the
  * feature arrived. A new install never sees these (`recordInstall` records them as seen): the
  * tour covers the same ground. To announce a feature, add an entry here (and a stop in TOUR if it
  * earns one).
  *
- * `layout` is the one note for the update that put the page on a Layout. It sits at the Edit
+ * `layout` is the note for the update that put the page on a Layout. It sits at the Edit
  * button, which is always on the page once the Bottom bar has drawn, so it is not held back by a
  * missing target. Its words have to be true of every page that update leaves, down to one with
  * the Clock and the Weather both off, which is an empty Grid as before. The Weather's old news,
@@ -201,7 +225,24 @@ export const NEWS: readonly CalloutInfo[] = [
     title: 'You can edit your page now',
     walk: NEWS_WALK,
   },
+  {
+    actionLabel: 'Show me',
+    body: 'Four new widgets are in Add. Settings has a Background tab with solid colours, and photo details has a heart for favourites.',
+    id: 'widgets-and-backgrounds',
+    target: 'edit',
+    title: 'New: widgets and backgrounds',
+    walk: WIDGETS_AND_BACKGROUNDS_WALK,
+  },
 ]
 
 /** IDs for the New marks shown in the current release. Keep these stable once stored. */
-export const MARKS = ['clock', 'weather-widget', 'photos', 'photo-heart'] as const
+export const MARKS = [
+  'clock',
+  'weather-widget',
+  'photos',
+  'photo-heart',
+  'date',
+  'analog-clock',
+  'bookmarks',
+  'quick-dial',
+] as const

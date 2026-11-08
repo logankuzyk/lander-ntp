@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { layoutItem } from '@/layout/storage'
+import { MARKS, NEWS } from '@/onboarding/callouts'
 import { onboardingItem } from '@/onboarding/storage'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
@@ -115,7 +116,7 @@ describe('App, with the update note about the Layout', () => {
     expect(container.querySelector('.grid')).not.toBeNull()
   })
 
-  it('starts its walk and dismisses it for good', async () => {
+  it('starts its walk, then shows the Widgets and backgrounds note once', async () => {
     await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
     const { unmount } = render(<App />)
     const edit = screen.getByRole('button', { name: 'Edit' })
@@ -128,11 +129,20 @@ describe('App, with the update note about the Layout', () => {
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
     fireEvent.click(within(screen.getByRole('note')).getByRole('button', { name: 'Dismiss' }))
 
-    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+    expect(await screen.findByText('New: widgets and backgrounds')).toBeTruthy()
     await waitFor(async () =>
       expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout']),
     )
     expect(edit.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(within(screen.getByRole('note')).getByRole('button', { name: 'Dismiss' }))
+    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+    await waitFor(async () =>
+      expect((await onboardingItem.getValue())?.dismissed).toEqual([
+        'layout',
+        'widgets-and-backgrounds',
+      ]),
+    )
 
     // Once each: another tab does not show it again.
     unmount()
@@ -147,7 +157,7 @@ describe('App, with the update note about the Layout', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
 
-    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+    expect(await screen.findByText('New: widgets and backgrounds')).toBeTruthy()
     expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout'])
     expect(screen.getByRole('button', { name: 'Edit' }).getAttribute('aria-pressed')).toBe('false')
   })
@@ -187,7 +197,8 @@ describe('App, with the update note about the Layout', () => {
   it('is not shown to a new install, before or after the welcome is answered', async () => {
     await seedPage(PAGE_SEEDS.newInstall)
     // As the background script records it (install.ts): the news already seen.
-    expect(await onboardingItem.getValue()).toEqual({ dismissed: ['layout'], welcomed: false })
+    const installIds = [...NEWS.map(({ id }) => id), ...MARKS]
+    expect(await onboardingItem.getValue()).toEqual({ dismissed: installIds, welcomed: false })
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
@@ -197,7 +208,7 @@ describe('App, with the update note about the Layout', () => {
     )
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(screen.queryByRole('note')).toBeNull()
-    expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout'])
+    expect((await onboardingItem.getValue())?.dismissed).toEqual(installIds)
   })
 
   it('is out of the way while settings are open, as news is', async () => {
