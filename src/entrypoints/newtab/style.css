@@ -1471,6 +1471,69 @@ body {
   max-width: 65%;
 }
 
+.background-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.background-swatch {
+  position: relative;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  cursor: pointer;
+}
+
+.background-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.background-swatch span {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 28%);
+}
+
+.background-swatch input:checked + span {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.background-swatch input:focus-visible + span {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.background-swatch .background-swatch__custom {
+  display: grid;
+  background: conic-gradient(#e63946, #f4a261, #a8dadc, #457b9d, #a855f7, #e63946);
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 500;
+  place-items: center;
+  text-shadow: 0 1px 3px #000;
+}
+
+.background-colour-picker {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .quick-dial {
   display: flex;
   flex-direction: column;

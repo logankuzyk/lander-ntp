@@ -33,7 +33,7 @@ const optionsOf = (menu: string) => {
 
 describe('SettingsPanel rows', () => {
   it('lists how often the photo changes, every new tab first and Never last', () => {
-    open('Photos')
+    open('Background')
 
     expect(optionsOf('Change photo')).toEqual([
       'Every new tab',

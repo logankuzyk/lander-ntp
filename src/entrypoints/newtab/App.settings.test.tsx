@@ -47,10 +47,13 @@ async function openSettings(settings: Settings = SETTINGS) {
 const synced = () => fakeBrowser.storage.sync.get(null)
 
 describe('App, with the settings panel open', () => {
-  it('has two sections, Photos and General, whatever the Clock and the Weather are set to', async () => {
+  it('has two sections, Background and General, whatever the Clock and the Weather are set to', async () => {
     const panel = await openSettings()
 
-    expect(panel.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Photos', 'General'])
+    expect(panel.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Background',
+      'General',
+    ])
     expect(panel.queryByLabelText('Show weather')).toBeNull()
     expect(panel.queryByLabelText('Show clock')).toBeNull()
   })

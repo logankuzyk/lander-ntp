@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import { type Background, DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import type { SettingsStop } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
@@ -22,21 +23,37 @@ const PHOTOS = [
 ]
 
 const renderPanel = ({
+  background = DEFAULT_BACKGROUND,
+  backgroundLoaded = true,
+  backgroundReadOnly = false,
   overrides = {},
   photos = PHOTOS,
-}: { overrides?: Partial<Settings>; photos?: Photo[] } = {}) => {
+}: {
+  background?: Background
+  backgroundLoaded?: boolean
+  backgroundReadOnly?: boolean
+  overrides?: Partial<Settings>
+  photos?: Photo[]
+} = {}) => {
   const onChange = vi.fn()
+  const onBackgroundChange = vi.fn()
+  const onPreviewColour = vi.fn()
   const onClose = vi.fn()
-  render(
+  const view = render(
     <SettingsPanel
+      background={background}
+      backgroundLoaded={backgroundLoaded}
+      backgroundReadOnly={backgroundReadOnly}
       currentId="a"
+      onBackgroundChange={onBackgroundChange}
       onChange={onChange}
       onClose={onClose}
+      onPreviewColour={onPreviewColour}
       photos={photos}
       settings={{ ...settings, ...overrides }}
     />,
   )
-  return { onChange, onClose }
+  return { ...view, onBackgroundChange, onChange, onClose, onPreviewColour }
 }
 
 const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
@@ -78,9 +95,9 @@ describe('SettingsPanel', () => {
       renderPanel()
 
       const tabs = screen.getAllByRole('tab')
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'General'])
-      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
-      expect(screen.getByRole('tabpanel', { name: 'Photos' })).toBeTruthy()
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Background', 'General'])
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Background')
+      expect(screen.getByRole('tabpanel', { name: 'Background' })).toBeTruthy()
     })
 
     it('switches section from the sidebar', () => {
@@ -95,20 +112,20 @@ describe('SettingsPanel', () => {
 
     it('moves between sections with the arrow keys', () => {
       renderPanel()
-      const photos = screen.getByRole('tab', { name: 'Photos' })
+      const photos = screen.getByRole('tab', { name: 'Background' })
 
       fireEvent.keyDown(photos, { key: 'ArrowDown' })
       expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'General' }))
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
 
       fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Home' })
-      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Background')
 
       fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'End' })
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('General')
 
       fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowDown' })
-      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
+      expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Background')
     })
 
     it('has no favourites', () => {
@@ -323,6 +340,174 @@ describe('SettingsPanel', () => {
     })
   })
 
+  describe('background', () => {
+    const choose = (field: string, option: string) => {
+      fireEvent.click(screen.getByRole('combobox', { name: field }))
+      fireEvent.click(screen.getByRole('option', { name: option }))
+    }
+
+    it('switches between Photo and Colour without changing photo settings', () => {
+      const { onBackgroundChange, onChange, unmount } = renderPanel()
+
+      expect(screen.getByRole('combobox', { name: 'Background' }).textContent).toBe('Photo')
+      choose('Background', 'Colour')
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({ ...DEFAULT_BACKGROUND, kind: 'colour' })
+      expect(onChange).not.toHaveBeenCalled()
+      unmount()
+      renderPanel({ background: { ...DEFAULT_BACKGROUND, kind: 'colour' } })
+      expect(screen.getByRole('radiogroup', { name: 'Background colour' })).toBeTruthy()
+      expect(screen.queryByRole('heading', { name: 'Cycling' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Tide pools' })).toBeNull()
+    })
+
+    it('shows today’s photo controls in Photo mode', () => {
+      renderPanel({ background: { ...DEFAULT_BACKGROUND, kind: 'photo' } })
+
+      expect(screen.getByRole('heading', { name: 'Cycling' })).toBeTruthy()
+      expect(screen.getByRole('combobox', { name: 'Tags' })).toBeTruthy()
+      expect(screen.getByLabelText('Dim the photo')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Tide pools' })).toBeTruthy()
+    })
+
+    it('keeps background controls disabled until the stored choice loads', () => {
+      const { onBackgroundChange } = renderPanel({ backgroundLoaded: false })
+
+      expect(
+        screen
+          .getByRole('combobox', { name: 'Background' })
+          .closest('fieldset')
+          ?.hasAttribute('disabled'),
+      ).toBe(true)
+      choose('Background', 'Colour')
+
+      expect(onBackgroundChange).not.toHaveBeenCalled()
+    })
+
+    it('offers eight named presets and opens the native picker from Custom colour', () => {
+      renderPanel({ background: { ...DEFAULT_BACKGROUND, kind: 'colour' } })
+      const radios = screen.getAllByRole('radio')
+      expect(radios).toHaveLength(9)
+      expect(screen.getByRole('radio', { name: 'Colour 1' })).toBeTruthy()
+      expect(screen.getByRole('radio', { name: 'Custom colour' })).toBeTruthy()
+      const picker = screen.getByLabelText('Choose custom colour')
+      const openPicker = vi.spyOn(picker, 'click')
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Custom colour' }))
+
+      expect(openPicker).toHaveBeenCalledOnce()
+      openPicker.mockRestore()
+    })
+
+    it('previews and saves a selected preset', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Colour 2' }))
+
+      expect(onPreviewColour).toHaveBeenNthCalledWith(1, '#f2e8cf')
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#f2e8cf',
+        kind: 'colour',
+      })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('previews a dragged colour, then commits once when the picker changes', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const picker = screen.getByLabelText('Choose custom colour')
+
+      fireEvent.input(picker, { target: { value: '#123456' } })
+      expect(onPreviewColour).toHaveBeenCalledWith('#123456')
+      expect(onBackgroundChange).not.toHaveBeenCalled()
+      fireEvent.change(picker, { target: { value: '#123456' } })
+      expect(onBackgroundChange).toHaveBeenCalledTimes(1)
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#123456',
+        kind: 'colour',
+      })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('clears an uncommitted page preview when the native colour picker is cancelled', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const picker = screen.getByLabelText('Choose custom colour')
+
+      fireEvent.input(picker, { target: { value: '#123456' } })
+      fireEvent(picker, new Event('cancel', { bubbles: true }))
+
+      expect(onBackgroundChange).not.toHaveBeenCalled()
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('clears the preview when changing background modes', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      fireEvent.input(screen.getByLabelText('Choose custom colour'), {
+        target: { value: '#123456' },
+      })
+
+      choose('Background', 'Photo')
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({ ...DEFAULT_BACKGROUND, kind: 'photo' })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('shows the update message and disables background controls when its item is newer', () => {
+      renderPanel({ backgroundReadOnly: true })
+
+      expect(screen.getByText('Update Lander to change this.')).toBeTruthy()
+      expect(
+        screen
+          .getByRole('combobox', { name: 'Background' })
+          .closest('fieldset')
+          ?.hasAttribute('disabled'),
+      ).toBe(true)
+    })
+
+    it('accepts a valid hex value and explains an invalid one', () => {
+      const { onBackgroundChange } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const hex = screen.getByRole('textbox', { name: 'Hex colour' })
+
+      fireEvent.input(hex, { target: { value: '1a2b3c' } })
+      fireEvent.keyDown(hex, { key: 'Enter' })
+      expect(onBackgroundChange).toHaveBeenLastCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#1a2b3c',
+        kind: 'colour',
+      })
+      fireEvent.input(hex, { target: { value: '12345g' } })
+      fireEvent.keyDown(hex, { key: 'Enter' })
+      expect(screen.getByText('Use six digits, like 1a2b3c')).toBeTruthy()
+    })
+
+    it('commits a valid hex value when the field loses focus', () => {
+      const { onBackgroundChange } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const hex = screen.getByRole('textbox', { name: 'Hex colour' })
+
+      fireEvent.input(hex, { target: { value: '#a1b2c3' } })
+      fireEvent.blur(hex)
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#a1b2c3',
+        kind: 'colour',
+      })
+    })
+  })
+
   describe('general', () => {
     it('changes the font', () => {
       const { onChange } = renderPanel()
@@ -391,20 +576,20 @@ describe('SettingsPanel', () => {
 
       // The note fades out first, and comes back as the next stop.
       expect(screen.getByRole('note').classList.contains('callout--leaving')).toBe(true)
-      await waitFor(() => expect(selectedTab()).toBe('Photos'))
+      await waitFor(() => expect(selectedTab()).toBe('Background'))
       expect(within(screen.getByRole('note')).getByText('2 of 2')).toBeTruthy()
       expect(screen.getByRole('note').classList.contains('callout--leaving')).toBe(false)
 
       fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
       await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
-      expect(selectedTab()).toBe('Photos')
+      expect(selectedTab()).toBe('Background')
     })
 
     it('follows a section opened by hand, and stays put on one it has no stop for', () => {
       renderTour()
 
-      openSection('Photos')
+      openSection('Background')
       expect(within(screen.getByRole('note')).getByText('Photos stop')).toBeTruthy()
 
       openSection('General')
@@ -459,7 +644,7 @@ describe('SettingsPanel', () => {
     it('puts focus on the Close button when the last stop is done, or the note dismissed', async () => {
       renderTour()
       fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-      await waitFor(() => expect(selectedTab()).toBe('Photos'))
+      await waitFor(() => expect(selectedTab()).toBe('Background'))
       const done = screen.getByRole('button', { name: 'Done' })
       done.focus()
 
@@ -471,7 +656,7 @@ describe('SettingsPanel', () => {
 
     it('leaves focus alone when the tour ends with it on something else', async () => {
       renderTour()
-      const tab = screen.getByRole('tab', { name: 'Photos' })
+      const tab = screen.getByRole('tab', { name: 'Background' })
       tab.focus()
 
       fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
@@ -558,7 +743,7 @@ describe('SettingsPanel, when the settings are from a newer version', () => {
   it('does so in every section, and keeps the tabs enabled to look around', () => {
     renderReadOnly(true)
 
-    for (const name of ['General', 'Photos']) {
+    for (const name of ['General', 'Background']) {
       openSection(name)
       const { all, inside } = controlsInDisabledFieldset()
       expect(all.length).toBeGreaterThan(0)

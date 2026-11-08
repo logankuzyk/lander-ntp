@@ -1,6 +1,6 @@
 import { act, render, renderHook, waitFor } from '@testing-library/preact'
 import { h } from 'preact'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { DEFAULT_BACKGROUND } from '@/backdrop/storage'
@@ -401,6 +401,38 @@ async function commitThroughPage(next: Layout, type: string): Promise<void> {
 
 const PHASE_3_WRITES = [
   {
+    expectedChangedKeys: ['background'],
+    expectedOptions: undefined,
+    expectedType: undefined,
+    name: 'choose a background through its page hook; v0.2.3 settings stay byte-equal',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      const settingsWrite = vi.spyOn(settingsItem, 'setValue')
+      let commit = (_value: typeof DEFAULT_BACKGROUND) => {}
+      function Commit() {
+        const item = useBackground()
+        commit = item.set
+        return h('output', null, String(item.loaded))
+      }
+      const page = render(h(Commit, null))
+      await waitFor(() => expect(page.container.textContent).toBe('true'))
+      await act(async () => commit({ ...DEFAULT_BACKGROUND, colour: '#123456', kind: 'colour' }))
+      await waitFor(async () =>
+        expect((await fakeBrowser.storage.sync.get('background')).background).toMatchObject({
+          colour: '#123456',
+          kind: 'colour',
+          v: 1,
+        }),
+      )
+      expect(settingsWrite).not.toHaveBeenCalled()
+      settingsWrite.mockRestore()
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
+    expectedChangedKeys: ['layout'],
     expectedOptions: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
     expectedType: 'date',
     name: 'adding a Date writes sync:layout only through the page commit path',
@@ -416,6 +448,7 @@ const PHASE_3_WRITES = [
     },
   },
   {
+    expectedChangedKeys: ['layout'],
     expectedOptions: { folder: 'bar', openInNewTab: false, showFolderName: true },
     expectedType: 'bookmarks',
     name: 'adding Bookmarks writes sync:layout only through the page commit path',
@@ -433,28 +466,39 @@ const PHASE_3_WRITES = [
 ]
 
 describe('phase 3 synced writes', () => {
-  it.each(PHASE_3_WRITES)('$name', async ({ expectedOptions, expectedType, write }) => {
+  it.each(PHASE_3_WRITES)('$name', async (row) => {
+    const { expectedChangedKeys, expectedOptions, expectedType, write } = row
     const { after: rawSync, before } = await write()
 
     const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
       .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(rawSync[key]))
       .sort()
-    expect(changedKeys).toEqual(['layout'])
+    expect(changedKeys).toEqual(expectedChangedKeys)
     expect(rawSync.settings).toEqual(before.settings)
     expect(rawSync.onboarding).toEqual(before.onboarding)
-    expect(rawSync.layout).toMatchObject({
-      v: 1,
-      widgets: expect.arrayContaining([expect.objectContaining({ type: expectedType })]),
-    })
-
-    const v030 = await asV030(rawSync)
-    expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
-    expect(
-      v030.raw.layout.widgets.find((widget) => (widget as { type?: string }).type === expectedType),
-    ).toMatchObject({
-      options: expectedOptions,
-      type: expectedType,
-    })
+    const { fellBack, settings } = await asV023(rawSync)
+    expect(fellBack).toBe(false)
+    expect(settings).toEqual(rawSync.settings)
+    if (expectedChangedKeys.includes('background')) {
+      expect(rawSync.background).toMatchObject({ colour: '#123456', kind: 'colour', v: 1 })
+      expect((await asV030(rawSync)).raw.background).toEqual(rawSync.background)
+    }
+    if (expectedChangedKeys.includes('layout')) {
+      expect(rawSync.layout).toMatchObject({
+        v: 1,
+        widgets: expect.arrayContaining([expect.objectContaining({ type: expectedType })]),
+      })
+      const v030 = await asV030(rawSync)
+      expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+      expect(
+        v030.raw.layout.widgets.find(
+          (widget) => (widget as { type?: string }).type === expectedType,
+        ),
+      ).toMatchObject({
+        options: expectedOptions,
+        type: expectedType,
+      })
+    }
   })
 })
 
