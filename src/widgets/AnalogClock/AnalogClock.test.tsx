@@ -35,6 +35,65 @@ describe('Analog clock', () => {
     expect(container.querySelectorAll('.analog-clock__tick')).toHaveLength(60)
   })
 
+  it('centres each numeral at its clock position at every Widget size', () => {
+    const { container } = render(<AnalogClock face="numerals" showDate={false} showSeconds />)
+    const numerals = [...container.querySelectorAll<SVGTextElement>('.analog-clock__numeral')]
+
+    expect(numerals).toHaveLength(12)
+    for (const [index, numeral] of numerals.entries()) {
+      const angle = (index * Math.PI * 2) / 12
+      const x = Number(numeral.getAttribute('x'))
+      const y = Number(numeral.getAttribute('y'))
+      expect(Math.hypot(x - 50, y - 50)).toBeCloseTo(33, 10)
+      expect(numeral.getAttribute('text-anchor')).toBe('middle')
+      expect(numeral.getAttribute('dominant-baseline')).toBe('central')
+      expect(x).toBeCloseTo(50 + Math.sin(angle) * 33, 10)
+      expect(y).toBeCloseTo(50 - Math.cos(angle) * 33, 10)
+    }
+  })
+
+  it('keeps the second hand pivoted at the dial centre and inside the dial at every size', () => {
+    const { container } = render(<AnalogClock face="minimal" showDate={false} showSeconds />)
+    const dial = container.querySelector('svg')!
+    const hand = container.querySelector<SVGLineElement>('.analog-clock__hand--second')!
+    const [pivotX, pivotY] = hand
+      .getAttribute('transform')!
+      .match(/rotate\([^ ]+ ([^ ]+) ([^)]+)\)/)!
+      .slice(1)
+      .map(Number)
+    const x1 = Number(hand.getAttribute('x1'))
+    const y1 = Number(hand.getAttribute('y1'))
+    const x2 = Number(hand.getAttribute('x2'))
+    const y2 = Number(hand.getAttribute('y2'))
+    const dialRadius = Number(container.querySelector('.analog-clock__rim')?.getAttribute('r'))
+
+    expect(dial.getAttribute('viewBox')).toBe('0 0 100 100')
+    expect([pivotX, pivotY, x1, y1]).toEqual([50, 50, 50, 50])
+    expect(Math.hypot(x2 - 50, y2 - 50)).toBeLessThan(dialRadius)
+  })
+
+  it('keeps all hand origins centred and preserves their lengths at every size', () => {
+    const { container } = render(<AnalogClock face="minimal" showDate={false} showSeconds />)
+    const hands = [...container.querySelectorAll<SVGLineElement>('.analog-clock__hand')]
+    const lengths = [25, 37, 43]
+
+    expect(hands).toHaveLength(lengths.length)
+    for (const [index, hand] of hands.entries()) {
+      const [pivotX, pivotY] = hand
+        .getAttribute('transform')!
+        .match(/rotate\([^ ]+ ([^ ]+) ([^)]+)\)/)!
+        .slice(1)
+        .map(Number)
+      const x1 = Number(hand.getAttribute('x1'))
+      const y1 = Number(hand.getAttribute('y1'))
+      const x2 = Number(hand.getAttribute('x2'))
+      const y2 = Number(hand.getAttribute('y2'))
+
+      expect([pivotX, pivotY, x1, y1]).toEqual([50, 50, 50, 50])
+      expect(Math.hypot(x2 - x1, y2 - y1)).toBe(lengths[index])
+    }
+  })
+
   it('uses the page 12-hour setting in its accessible time label', () => {
     const { container } = render(
       <AnalogClock face="ticks" hour12 showDate={false} showSeconds={false} />,

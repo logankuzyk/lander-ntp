@@ -11,10 +11,18 @@ const options = {
   showFolderName: true,
 }
 
-export function BookmarksOptionsStory() {
+export function BookmarksOptionsStory({ folderMissing = false }: { folderMissing?: boolean }) {
   const port = createFakeBookmarksPort({
     granted: true,
-    tree: [{ children: [], id: 'root', title: '' }],
+    tree: [
+      {
+        children: folderMissing
+          ? []
+          : [{ children: [], id: 'from-another-device', title: 'Reading' }],
+        id: 'root',
+        title: '',
+      },
+    ],
   })
   const definition = createBookmarksDefinition(port)
   const placed: PlacedWidget = {

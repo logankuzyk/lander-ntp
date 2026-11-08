@@ -24,7 +24,7 @@ export const analogClockDefinition: WidgetDefinition<AnalogClockOptions> = {
         { label: 'Numerals', value: 'numerals' },
       ],
       control: 'choice',
-      default: 'ticks',
+      default: 'minimal',
       id: 'face',
       label: 'Face',
     },

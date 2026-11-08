@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from 'preact/hooks'
 
+import { ColourPicker } from '@/components/ColourPicker/ColourPicker'
 import { siteIconUrl as defaultSiteIconUrl } from '@/quickDial/siteIconUrl'
 import { tidyUrl } from '@/quickDial/tidyUrl'
 
@@ -233,6 +234,15 @@ export function OptionsForm({
             value={read[option.id] as string}
           />
         )
+      case 'colour':
+        return (
+          <ColourPicker
+            disabled={off}
+            label={option.label}
+            onChange={(value) => change({ [option.id]: value })}
+            value={read[option.id] as string}
+          />
+        )
       case 'icon':
         return (
           <IconControl
@@ -269,9 +279,11 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             multiple
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string[]}
+            valueLabel={option.valueLabel}
           />
         ) : (
           <PickFromList
@@ -280,8 +292,10 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string}
+            valueLabel={option.valueLabel}
           />
         )
       case 'place':

@@ -11,6 +11,7 @@ type SelectProps<T extends string> = {
   onOpen?: () => void
   options: readonly (readonly [T, string, number?])[]
   value: T
+  valueLabel?: (value: T) => string | undefined
 }
 
 /** Pick one option. The menu closes on a choice. */
@@ -22,8 +23,9 @@ export function Select<T extends string>({
   onOpen,
   options,
   value,
+  valueLabel,
 }: SelectProps<T>) {
-  const current = options.find(([id]) => id === value)?.[1] ?? ''
+  const current = options.find(([id]) => id === value)?.[1] ?? valueLabel?.(value) ?? ''
 
   return (
     <Dropdown disabled={disabled} labelId={labelId} onOpen={onOpen} popup="listbox" value={current}>

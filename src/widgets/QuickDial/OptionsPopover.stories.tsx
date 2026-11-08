@@ -20,9 +20,11 @@ function Form({ uploaded = false }: { uploaded?: boolean }) {
         onChange={() => {}}
         onPageValueChange={() => {}}
         options={{
+          colour: '#f2e8cf',
           icon: uploaded ? 'abcdefgh' : null,
           label: 'Example',
           newTab: false,
+          showIcon: true,
           url: 'example.com',
         }}
         page={{ hour12: false }}
