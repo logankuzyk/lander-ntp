@@ -71,6 +71,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
   const stateRef = useRef(state)
   const visited = useRef(false)
   const unmounted = useRef(false)
+  const pendingSelection = useRef<string | null>(null)
 
   settingsRef.current = settings
   backgroundRef.current = background.value
@@ -100,13 +101,22 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       const current = settingsRef.current ?? first
       const currentBackground = backgroundRef.current
       const currentFavourites = favouritesRef.current
-      const visit = photoForSettings(
+      let visit = photoForSettings(
         current,
         stored,
         idsFor(manifest, current.tags, currentFavourites.ids, currentBackground.favouritesOnly),
         Date.now(),
         true,
       )
+      const selection = pendingSelection.current
+      if (selection !== null) {
+        pendingSelection.current = null
+        const ids = manifest.photos.map((photo) => photo.id)
+        if (ids.includes(selection)) {
+          const chosen = choosePhoto(visit, selection, ids, Date.now())
+          if (chosen) visit = { ...chosen, pickedByUser: true }
+        }
+      }
       if (visit !== stored) await photoState.setValue(visit)
       if (unmounted.current) return
       setManifest(manifest)
@@ -180,7 +190,10 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
 
   const select = useCallback(
     async (id: string) => {
-      if (!manifest) return
+      if (!manifest) {
+        pendingSelection.current = id
+        return
+      }
       const selected = choosePhoto(
         stateRef.current,
         id,
@@ -188,9 +201,10 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
         Date.now(),
       )
       if (!selected) return
-      stateRef.current = selected
-      setState(selected)
-      await photoState.setValue(selected)
+      const picked = { ...selected, pickedByUser: true as const }
+      stateRef.current = picked
+      setState(picked)
+      await photoState.setValue(picked)
     },
     [manifest],
   )

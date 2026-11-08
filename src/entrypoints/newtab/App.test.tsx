@@ -321,6 +321,8 @@ describe('App', () => {
 
   it('resumes a held photo selection so the chosen photo survives a new tab', async () => {
     await seedPhotos()
+    await favouritesItem.setValue({ ids: ['a'], v: 1 })
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, favouritesOnly: true })
     await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
@@ -339,6 +341,9 @@ describe('App', () => {
 
     render(<App />)
     expect(await currentPhotoSrc()).toContain('/photos/b/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+    await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/a/'))
   })
 
   it('pins the next photo when → is pressed while pinned', async () => {
