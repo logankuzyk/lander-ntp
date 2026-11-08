@@ -2,22 +2,24 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { useEffect, useState } from 'preact/hooks'
 import { fn } from 'storybook/test'
 
-import { TOUR } from '@/onboarding/callouts'
+import { SETTINGS_TOUR } from '@/onboarding/tour'
 import type { Settings } from '@/settings/schema'
-import { makePlace, STORY_PHOTOS } from '@/test/fixtures'
+import { STORY_PHOTOS } from '@/test/fixtures'
 
 import { withPage } from '../../../.storybook/withPage'
 import { SettingsPanel } from './SettingsPanel'
 
 /**
  * Every setting written out, so neither the browser's locale nor a later change to the defaults
- * moves a story. Photos are cycling, the clock is on and the weather is off.
+ * moves a story. Photos are cycling. The clock and the weather are the page's, not the panel's:
+ * their options are on the widgets, so the panel shows nothing of them whatever they are set to.
  */
 const SETTINGS: Settings = {
   clock: { enabled: true, hour12: false, showDate: false, showSeconds: false },
   dim: true,
   font: 'system',
   photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
+  v: 1,
   weather: {
     enabled: false,
     fields: [
@@ -32,11 +34,6 @@ const SETTINGS: Settings = {
     unit: 'celsius',
   },
 }
-
-const weather = (changes: Partial<Settings['weather']>): Settings => ({
-  ...SETTINGS,
-  weather: { ...SETTINGS.weather, ...changes },
-})
 
 type Props = Parameters<typeof SettingsPanel>[0]
 
@@ -89,27 +86,25 @@ export const PhotosKept: Story = {
   },
 }
 
-export const ClockOn: Story = { args: { initialSection: 'clock' } }
+/** The font, and the line that points to Edit for the Clock's and the Weather's options. */
+export const General: Story = { args: { initialSection: 'general' } }
 
-export const ClockOff: Story = {
+/**
+ * Settings that a newer version of Lander wrote: the panel shows them and says to update, with
+ * every control in the section off, and nothing is saved.
+ */
+export const FromNewerVersion: Story = {
   args: {
-    initialSection: 'clock',
-    settings: { ...SETTINGS, clock: { ...SETTINGS.clock, enabled: false } },
+    readOnly: true,
+    settings: {
+      ...SETTINGS,
+      photos: { ...SETTINGS.photos, mode: 'pinned', pinnedId: STORY_PHOTOS[0]?.id ?? null },
+    },
   },
 }
 
-export const WeatherOff: Story = { args: { initialSection: 'weather' } }
-
-export const WeatherOn: Story = {
-  args: { initialSection: 'weather', settings: weather({ enabled: true, place: makePlace() }) },
-}
-
-/** On, with no place yet: the place search shows. */
-export const WeatherChoosingAPlace: Story = {
-  args: { initialSection: 'weather', settings: weather({ enabled: true, place: null }) },
-}
-
-export const General: Story = { args: { initialSection: 'general' } }
-
-/** As a new install opens it: a note beside the panel for each section in turn. */
-export const WithTheTour: Story = { args: { tour: TOUR } }
+/**
+ * The panel's own stops, counted alone. As the tour of a new install reaches them, after the
+ * stops on the page, they are counted with those (see `Tour/Photos`).
+ */
+export const WithTheTour: Story = { args: { tour: SETTINGS_TOUR } }

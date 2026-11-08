@@ -7,8 +7,8 @@ import {
   type WeatherField,
   type WeatherSettings,
 } from '@/settings/schema'
-import { locationConsented } from '@/weather/consent'
-import { CURRENT_LOCATION } from '@/weather/deviceLocation'
+import { allowLocation, locationConsented } from '@/weather/consent'
+import { askForLocation, CURRENT_LOCATION, locationAllowed } from '@/weather/deviceLocation'
 import { cacheKey, fetchWeather, type Weather as Reading } from '@/weather/openMeteo'
 import { useDevicePosition } from '@/weather/useDevicePosition'
 import { weatherSource } from '@/weather/weatherSource'
@@ -40,17 +40,39 @@ function WeatherView({
 
 /**
  * Whether a place may be sent anywhere from this device; see weather/consent. Only Firefox
- * has to ask, so everywhere else this is met at once, in the first render.
+ * has to ask, so everywhere else this is met at once, in the first render. On Firefox the setup
+ * button asks for it: `allowLocation` is called first thing in the click, which is what shows
+ * Firefox's prompt.
  */
 const locationConsent: Need<WeatherOptions> = {
+  action: { kind: 'ask', run: allowLocation },
   id: 'locationConsent',
+  label: 'Allow sending your place',
   met: () => (import.meta.env.BROWSER === 'firefox' ? locationConsented() : true),
 }
 
-/** A place is picked, or the device's own is followed. */
+/**
+ * A place is picked, or the device's own is followed. The setup button opens the options at the
+ * place search, where either is done.
+ */
 const place: Need<WeatherOptions> = {
+  action: { kind: 'option', option: 'place' },
   id: 'place',
+  label: 'Choose a place',
   met: (options) => options.followDevice || options.place !== null,
+}
+
+/**
+ * While following the device, the browser lets this page read where it is. Permissions are not
+ * synced, so a Weather told to follow the device on another device has not been allowed there:
+ * without this it would show the last position stored, or nothing. A picked place does not need
+ * it, so that is met at once. The setup button asks the browser for it, from the click.
+ */
+const deviceLocation: Need<WeatherOptions> = {
+  action: { kind: 'ask', run: () => askForLocation() },
+  id: 'deviceLocation',
+  label: 'Allow location',
+  met: ({ followDevice }) => (followDevice ? locationAllowed() : true),
 }
 
 /**
@@ -81,10 +103,13 @@ const LABELS: Record<WeatherField, string> = {
 }
 
 export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceName> = {
+  credit: { href: 'https://open-meteo.com/', text: 'Weather data by Open-Meteo.com' },
+  // Loading and switched off say what the shared words do.
+  messages: { failed: "Can't reach the forecast" },
   name: 'Weather',
-  needs: [locationConsent, place],
-  // The order and wording are copied from the settings panel. Defaults come from today's
-  // settings, so those cannot drift.
+  needs: [locationConsent, place, deviceLocation],
+  // The order and wording are copied from the settings panel (the page-wide switch last).
+  // Defaults come from today's settings, so those cannot drift.
   options: [
     {
       control: 'place',
@@ -94,6 +119,9 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
       },
       id: 'place',
       label: 'Place',
+      // Searching sends what is typed, and "Current location" the device's position, so neither
+      // is allowed before the user has agreed to send a place (on Firefox).
+      needs: ['locationConsent'],
     },
     {
       choices: [
@@ -112,10 +140,25 @@ export const weatherDefinition: WidgetDefinition<WeatherOptions, Reading, PlaceN
       items: WEATHER_FIELDS.map((id) => ({ id, label: LABELS[id] })),
       label: 'Show',
     },
-    // Label and value are opposite: checked means hour12 is false. A form must invert it, as SettingsPanel does with !hour12.
-    { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
+    // Label and value are opposite: checked means hour12 is false, so a form inverts it.
+    { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
+  // The smallest holds every line the options can turn on, and a Weather starts there for
+  // everyone (owner answer 1 on LR-19, over LR-16's 2 by 1). Measured in Storybook (LR-87), in all
+  // four fonts at 1440 by 900, 1366 by 768, 1280 by 720, 800 by 600, 600 by 700 and 390 by 800:
+  // at 2 by 2 all five lines fit across and down, with type of 20px (1440 by 900) to 13px (800 by
+  // 600); below that the Grid's cells are too small to read and the type shrinks to fit. The
+  // Weather fills any box, as big as fits across and down. It is nearly as wide as tall, so 4 by
+  // 3 is as much room as it can use on a desktop window; the fourth column helps on a narrow one.
+  sizes: {
+    largest: { h: 3, w: 4 },
+    smallest: { h: 2, w: 2 },
+    starting: () => ({ h: 2, w: 2 }),
+  },
   source: { source: weatherSource, useQuery: useWeatherQuery },
+  // From the options alone, as following the device is: the name of the place it is at is
+  // looked up later, and a name that changed when it arrived would be announced again.
+  summary: ({ followDevice, place }) => (followDevice ? CURRENT_LOCATION : place?.name),
   type: 'weather',
   View: WeatherView,
 }
