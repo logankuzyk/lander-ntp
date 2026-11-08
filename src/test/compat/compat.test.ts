@@ -34,6 +34,7 @@ import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
+import { useStorageItem } from '@/settings/useStorageItem'
 import { createWriteQueue } from '@/storage/writeQueue'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { weatherDefinition } from '@/widgets/Weather/definition'
@@ -444,13 +445,49 @@ async function commitThroughPage(next: Layout, type: string): Promise<void> {
 
 const PHASE_3_WRITES = [
   {
+    expectedChangedKeys: ['settings'],
+    expectedOptions: undefined,
+    expectedSettings: {
+      ...SEED,
+      photos: { ...SEED.photos, frequency: 'daily', mode: 'cycle' },
+    },
+    expectedType: undefined,
+    name: 'resuming cycling after choosing a photo uses the settings commit path',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue({
+        ...SEED,
+        photos: { ...SEED.photos, frequency: 'daily', mode: 'pinned', pinnedId: 'a' },
+      })
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      let commit: (value: Settings) => Promise<void> = async () => undefined
+      function Probe() {
+        const [, setValue, loaded] = useStorageItem(settingsItem)
+        commit = async (value) => {
+          await setValue(value)
+        }
+        return h('output', null, String(loaded))
+      }
+      const page = render(h(Probe, {}))
+      await waitFor(() => expect(page.container.textContent).toBe('true'))
+      await act(async () =>
+        commit({ ...SEED, photos: { ...SEED.photos, frequency: 'daily', mode: 'cycle' } }),
+      )
+      await waitFor(async () => expect((await settingsItem.getValue()).photos.mode).toBe('cycle'))
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
     expectedChangedKeys: [],
     expectedOptions: undefined,
+    expectedSettings: undefined,
     expectedType: undefined,
     name: 'pick a gallery photo through rotation; only local photo state changes',
     write: async () => {
       await fakeBrowser.storage.sync.clear()
       await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
       await manifestCache.setValue({
         data: makeManifest([makePhoto('a'), makePhoto('b')]),
         etag: null,
@@ -469,6 +506,7 @@ const PHASE_3_WRITES = [
   {
     expectedChangedKeys: ['background'],
     expectedOptions: undefined,
+    expectedSettings: undefined,
     expectedType: undefined,
     name: 'choose a background through its page hook; v0.2.3 settings stay byte-equal',
     write: async () => {
@@ -500,6 +538,7 @@ const PHASE_3_WRITES = [
   {
     expectedChangedKeys: ['layout'],
     expectedOptions: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
+    expectedSettings: undefined,
     expectedType: 'date',
     name: 'adding a Date writes sync:layout only through the page commit path',
     write: async () => {
@@ -516,6 +555,7 @@ const PHASE_3_WRITES = [
   {
     expectedChangedKeys: ['layout'],
     expectedOptions: { folder: 'bar', openInNewTab: false, showFolderName: true },
+    expectedSettings: undefined,
     expectedType: 'bookmarks',
     name: 'adding Bookmarks writes sync:layout only through the page commit path',
     write: async () => {
@@ -533,18 +573,20 @@ const PHASE_3_WRITES = [
 
 describe('phase 3 synced writes', () => {
   it.each(PHASE_3_WRITES)('$name', async (row) => {
-    const { expectedChangedKeys, expectedOptions, expectedType, write } = row
+    const { expectedChangedKeys, expectedOptions, expectedSettings, expectedType, write } = row
     const { after: rawSync, before } = await write()
 
     const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
       .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(rawSync[key]))
       .sort()
     expect(changedKeys).toEqual(expectedChangedKeys)
-    expect(rawSync.settings).toEqual(before.settings)
+    if (expectedSettings) expect(rawSync.settings).toEqual(expectedSettings)
+    else expect(rawSync.settings).toEqual(before.settings)
     expect(rawSync.onboarding).toEqual(before.onboarding)
-    const { fellBack, settings } = await asV023(rawSync)
+    const { fellBack, onboarding, settings } = await asV023(rawSync)
     expect(fellBack).toBe(false)
     expect(settings).toEqual(rawSync.settings)
+    expect(onboarding).toEqual(rawSync.onboarding)
     if (expectedChangedKeys.includes('background')) {
       expect(rawSync.background).toMatchObject({ colour: '#123456', kind: 'colour', v: 1 })
       expect((await asV030(rawSync)).raw.background).toEqual(rawSync.background)

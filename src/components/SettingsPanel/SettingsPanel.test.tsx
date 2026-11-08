@@ -69,6 +69,29 @@ const openSection = (name: string) => fireEvent.click(screen.getByRole('tab', { 
 
 describe('SettingsPanel', () => {
   describe('Favourites only', () => {
+    it('can turn Favourites only on while a photo is held', async () => {
+      await fakeBrowser.storage.sync.clear()
+      const { onBackgroundChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'a' }),
+      })
+
+      const toggle = (await screen.findByRole('switch', {
+        name: 'Favourites only',
+      })) as HTMLInputElement
+      expect(await screen.findByText('Mark photos with the heart to use this.')).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
+      await act(async () => {
+        await favouritesItem.setValue({ ids: ['a'], v: 1 })
+      })
+      await waitFor(() => expect(toggle.disabled).toBe(false))
+      fireEvent.click(toggle)
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        favouritesOnly: true,
+      })
+    })
+
     it('needs an on-site favourite, hides Tags while on, and reports when favourites leave the site', async () => {
       await fakeBrowser.storage.sync.clear()
       const { onBackgroundChange, rerender } = renderPanel()

@@ -319,6 +319,28 @@ describe('App', () => {
     await waitFor(async () => expect((await backgroundItem.getValue()).favouritesOnly).toBe(true))
   })
 
+  it('resumes a held photo selection so the chosen photo survives a new tab', async () => {
+    await seedPhotos()
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily', mode: 'pinned', pinnedId: 'a' },
+    })
+    const firstTab = render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('dialog', { name: 'Settings' })
+    fireEvent.click(await within(settings).findByRole('button', { name: 'Photo b' }))
+
+    await waitFor(async () => expect((await settingsItem.getValue()).photos.mode).toBe('cycle'))
+    expect((await photoState.getValue())?.currentId).toBe('b')
+    firstTab.unmount()
+
+    render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/b/')
+  })
+
   it('pins the next photo when → is pressed while pinned', async () => {
     await seedPhotos()
     await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })

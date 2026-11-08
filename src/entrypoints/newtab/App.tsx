@@ -163,6 +163,19 @@ export function App() {
     })()
   }
 
+  // Picking a photo always returns to cycling. Without this, a photo picked while held would
+  // appear only in this tab and the next tab would restore the held `pinnedId`.
+  const selectPhoto = (id: string) => {
+    void (async () => {
+      await select(id)
+      if (settingsReadOnly) return
+      const latest = await settingsItem.getValue()
+      if (latest.photos.mode === 'pinned') {
+        setSettings({ ...latest, photos: { ...latest.photos, mode: 'cycle' } })
+      }
+    })()
+  }
+
   // The shared 24-hour switch in a Widget's options is the page's `clock.hour12`: the one setting
   // a Widget's options write, and the one phase 2 may write to the settings' Clock block. Laid
   // over the settings as stored now, so what another tab changed meanwhile is not saved over.
@@ -318,7 +331,7 @@ export function App() {
               onChange={setSettings}
               onClose={close}
               onPreviewColour={setPreviewColour}
-              onSelectPhoto={(id) => void select(id)}
+              onSelectPhoto={selectPhoto}
               photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}
