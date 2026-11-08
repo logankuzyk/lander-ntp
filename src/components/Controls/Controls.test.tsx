@@ -32,6 +32,22 @@ const renderControls = ({ busy = false, canChange = true, withInfo = true } = {}
 }
 
 describe('Controls', () => {
+  it('hides photo actions and leaves their keys alone when the page has no photo', () => {
+    render(
+      <EditModeProvider>
+        <Controls layout={LAYOUT} layoutLoaded onCommit={vi.fn()} onToggleSettings={vi.fn()} />
+      </EditModeProvider>,
+    )
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'ArrowRight' })
+    window.dispatchEvent(event)
+    fireEvent.keyDown(window, { key: 'i' })
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Next photo' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Photo details' })).toBeNull()
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   it('shows the next photo from the button', () => {
     const { onNext } = renderControls()
 

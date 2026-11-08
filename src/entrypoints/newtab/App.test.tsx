@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { backgroundItem, DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
@@ -70,6 +71,63 @@ describe('App', () => {
     await waitFor(async () => expect(await currentPhotoSrc()).not.toBe(first))
     const stored = await photoState.getValue()
     expect(await currentPhotoSrc()).toContain(`/photos/${stored?.currentId}/`)
+  })
+
+  it('draws a solid colour without photo controls, credit or photo state changes', async () => {
+    await seedPhotos()
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: 123 })
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'colour' })
+    const before = await photoState.getValue()
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+    expect(container.querySelector('.background')?.getAttribute('style')).toContain('#f2e8cf')
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.credit')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Photo details' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next photo' })).toBeNull()
+    fireEvent.keyDown(window, { key: 'i' })
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(await photoState.getValue()).toEqual(before)
+    expect((await settingsItem.getValue()).photos).toEqual(DEFAULT_SETTINGS.photos)
+  })
+
+  it('shows the same photo after changing to a colour and back', async () => {
+    await seedPhotos()
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    render(<App />)
+    await waitFor(async () =>
+      expect(await currentPhotoSrc()).toContain(
+        `/photos/${(await photoState.getValue())?.currentId}/`,
+      ),
+    )
+    const before = await photoState.getValue()
+    const shown = await currentPhotoSrc()
+
+    await act(async () =>
+      backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'colour' }),
+    )
+    expect(await photoState.getValue()).toEqual(before)
+
+    await act(async () =>
+      backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'photo' }),
+    )
+    expect(await currentPhotoSrc()).toBe(shown)
+    expect(await photoState.getValue()).toEqual(before)
+  })
+
+  it('closes photo details when the page changes to a colour', async () => {
+    await seedPhotos()
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Photo details' }))
+    expect(await screen.findByRole('dialog', { name: 'Photo details' })).toBeTruthy()
+
+    await act(async () =>
+      backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#ffffff', kind: 'colour' }),
+    )
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
   })
 
   it('shows the bundled photo when offline with nothing cached', async () => {

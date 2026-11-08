@@ -88,7 +88,7 @@ type Layer = {
   photo: Photo
 }
 
-type BackgroundProps = {
+type PhotoBackgroundProps = {
   /** Lay a slight wash over the photo, so light text holds up over bright ones. */
   dim?: boolean
   /** Called once the full-resolution image has loaded. */
@@ -109,7 +109,7 @@ type BackgroundProps = {
  *
  * Under prefers-reduced-motion the swap is instant.
  */
-export function Background({ dim, onLoad, onLoadingChange, photo }: BackgroundProps) {
+function PhotoBackground({ dim, onLoad, onLoadingChange, photo }: PhotoBackgroundProps) {
   const [layers, setLayers] = useState<Layer[]>(() => [{ covering: false, key: 0, photo }])
   const [revealedKey, setRevealedKey] = useState(0)
   const nextKey = useRef(0)
@@ -170,4 +170,20 @@ export function Background({ dim, onLoad, onLoadingChange, photo }: BackgroundPr
       ))}
     </div>
   )
+}
+
+/** A colour has no photo layer: it never creates an image request, scrim or dim wash. */
+export function Background(
+  props: { colour: string; dim?: never; photo?: never } | PhotoBackgroundProps,
+) {
+  if ('colour' in props) {
+    return (
+      <div
+        aria-hidden="true"
+        class="background background--colour"
+        style={{ backgroundColor: props.colour }}
+      />
+    )
+  }
+  return <PhotoBackground {...props} />
 }
