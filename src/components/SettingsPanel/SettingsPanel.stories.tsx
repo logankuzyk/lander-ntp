@@ -4,8 +4,7 @@ import { fn } from 'storybook/test'
 
 import { TOUR } from '@/onboarding/callouts'
 import type { Settings } from '@/settings/schema'
-import { makeAccount } from '@/test/fixtures'
-import { makePlace, STORY_PHOTOS } from '@/test/fixtures'
+import { makeAccount, makePlace, STORY_PHOTOS } from '@/test/fixtures'
 import { seedPage } from '@/test/seed'
 
 import { withPage } from '../../../.storybook/withPage'
@@ -130,11 +129,72 @@ export const AccountWrongCode: Story = {
 }
 
 export const AccountSignedIn: Story = {
-  args: { accountPreview: { state: makeAccount() }, initialSection: 'account' },
+  args: {
+    accountPreview: { state: makeAccount({ devices: [storyDevice('one', true)] }) },
+    initialSection: 'account',
+  },
+}
+
+export const AccountTwoDevices: Story = {
+  args: {
+    accountPreview: {
+      state: makeAccount({ devices: [storyDevice('one', true), storyDevice('two')] }),
+    },
+    initialSection: 'account',
+  },
+}
+
+export const AccountThreeDevices: Story = {
+  args: {
+    accountPreview: {
+      state: makeAccount({
+        devices: [storyDevice('one', true), storyDevice('two'), storyDevice('three')],
+      }),
+    },
+    initialSection: 'account',
+  },
+}
+
+export const AccountPendingDevice: Story = {
+  args: {
+    accountPreview: {
+      state: {
+        devices: [storyDevice('one'), storyDevice('two'), storyDevice('three')],
+        email: 'person@example.com',
+        notice: 'none',
+        status: 'pending-device',
+      },
+    },
+    initialSection: 'account',
+  },
+}
+
+export const AccountDeleteConfirm: Story = {
+  args: {
+    accountPreview: {
+      deleteOpen: true,
+      state: makeAccount({ devices: [storyDevice('one', true)] }),
+    },
+    initialSection: 'account',
+  },
+}
+
+export const AccountDeleteFailed: Story = {
+  args: {
+    accountPreview: {
+      deleteOpen: true,
+      error: 'network-error',
+      state: makeAccount({ devices: [storyDevice('one', true)] }),
+    },
+    initialSection: 'account',
+  },
 }
 
 export const AccountNeverSynced: Story = {
-  args: { accountPreview: { state: makeAccount() }, initialSection: 'account' },
+  args: {
+    accountPreview: { state: makeAccount({ devices: [storyDevice('one', true)] }) },
+    initialSection: 'account',
+  },
 }
 
 export const AccountSignedOutElsewhere: Story = {
@@ -153,4 +213,15 @@ export const AccountPaused: Story = {
 
 export const AccountConsentRefused: Story = {
   args: { accountPreview: { error: 'consent-refused' }, initialSection: 'account' },
+}
+
+function storyDevice(id: string, current = false) {
+  return {
+    browser: id === 'one' ? 'Firefox' : 'Chrome',
+    createdAt: '2026-10-01T00:00:00.000Z',
+    current,
+    id,
+    lastUsedAt: '2026-10-17T00:00:00.000Z',
+    os: id === 'one' ? 'Windows' : 'macOS',
+  }
 }
