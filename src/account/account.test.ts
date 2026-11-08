@@ -233,11 +233,11 @@ describe('account', () => {
     })
   })
 
-  it('keeps HTTP errors distinct from network errors', async () => {
+  it('identifies a rate limit separately from other HTTP and network errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(429, { error: 'rate_limited' })))
 
     await expect(account.sendCode('person@example.com')).resolves.toEqual({
-      error: 'http-error',
+      error: 'too-many-tries',
       ok: false,
     })
   })

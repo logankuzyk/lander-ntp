@@ -4,7 +4,9 @@ import { fn } from 'storybook/test'
 
 import { TOUR } from '@/onboarding/callouts'
 import type { Settings } from '@/settings/schema'
+import { makeAccount } from '@/test/fixtures'
 import { makePlace, STORY_PHOTOS } from '@/test/fixtures'
+import { seedPage } from '@/test/seed'
 
 import { withPage } from '../../../.storybook/withPage'
 import { SettingsPanel } from './SettingsPanel'
@@ -70,6 +72,9 @@ const meta = {
     photos: STORY_PHOTOS,
     settings: SETTINGS,
   },
+  beforeEach: async () => {
+    await seedPage({})
+  },
   component: SettingsPanel,
   decorators: [withPage],
   render: (args) => <Stateful {...args} />,
@@ -113,3 +118,39 @@ export const General: Story = { args: { initialSection: 'general' } }
 
 /** As a new install opens it: a note beside the panel for each section in turn. */
 export const WithTheTour: Story = { args: { tour: TOUR } }
+
+export const AccountSignedOut: Story = { args: { initialSection: 'account' } }
+
+export const AccountCodeSent: Story = {
+  args: { accountPreview: { codeSent: true }, initialSection: 'account' },
+}
+
+export const AccountWrongCode: Story = {
+  args: { accountPreview: { codeSent: true, error: 'wrong-code' }, initialSection: 'account' },
+}
+
+export const AccountSignedIn: Story = {
+  args: { accountPreview: { state: makeAccount() }, initialSection: 'account' },
+}
+
+export const AccountNeverSynced: Story = {
+  args: { accountPreview: { state: makeAccount() }, initialSection: 'account' },
+}
+
+export const AccountSignedOutElsewhere: Story = {
+  args: {
+    accountPreview: { state: { notice: 'signed-out-elsewhere', status: 'signed-out' } },
+    initialSection: 'account',
+  },
+}
+
+export const AccountPaused: Story = {
+  args: {
+    accountPreview: { state: { notice: 'paused-no-consent', status: 'signed-out' } },
+    initialSection: 'account',
+  },
+}
+
+export const AccountConsentRefused: Story = {
+  args: { accountPreview: { error: 'consent-refused' }, initialSection: 'account' },
+}

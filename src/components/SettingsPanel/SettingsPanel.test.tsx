@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
+import { account } from '@/account/account'
 import type { CalloutInfo } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
@@ -50,6 +51,9 @@ const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
 
 const openSection = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
 
+const jsonResponse = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' }, status })
+
 describe('SettingsPanel', () => {
   it('opens as a labelled popover with the close button focused', () => {
     renderPanel()
@@ -78,11 +82,17 @@ describe('SettingsPanel', () => {
   })
 
   describe('sections', () => {
-    it('lists photos, clock, weather and general settings, starting on photos', () => {
+    it('lists photos, clock, weather, account and general settings, starting on photos', () => {
       renderPanel()
 
       const tabs = screen.getAllByRole('tab')
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['Photos', 'Clock', 'Weather', 'General'])
+      expect(tabs.map((tab) => tab.textContent)).toEqual([
+        'Photos',
+        'Clock',
+        'Weather',
+        'Account',
+        'General',
+      ])
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Photos')
       expect(screen.getByRole('tabpanel', { name: 'Photos' })).toBeTruthy()
     })
@@ -117,6 +127,112 @@ describe('SettingsPanel', () => {
 
       expect(screen.queryByRole('tab', { name: 'Favourites' })).toBeNull()
       expect(screen.queryByText(/favourite/i)).toBeNull()
+    })
+  })
+
+  describe('account', () => {
+    const openAccount = () => {
+      renderPanel()
+      openSection('Account')
+    }
+
+    beforeEach(async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(true as never)
+      vi.spyOn(browser.permissions, 'request').mockResolvedValue(true as never)
+      await browser.storage.local.clear()
+      await account.initialize()
+    })
+
+    it('shows the disclosure and policy before sending a code, then asks for the six-digit code', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(jsonResponse({ success: true }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+
+      const disclosure = screen.getByText(/your email address.*OVH behind Cloudflare.*Resend/i)
+      const policy = screen.getByRole('link', { name: 'Privacy policy' })
+      expect(
+        disclosure.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+      expect(policy.getAttribute('href')).toContain('PRIVACY.md')
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect(await screen.findByLabelText('Code')).toBeTruthy()
+      expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows a plain error for a wrong or expired code', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse({ success: true }))
+        .mockResolvedValueOnce(jsonResponse({ message: 'invalid otp' }, 400))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+      const code = await screen.findByLabelText('Code')
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('wrong or has expired')
+    })
+
+    it('shows too many tries in plain words', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof globalThis.fetch>().mockResolvedValue(jsonResponse({}, 429)),
+      )
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Too many tries')
+    })
+
+    it('explains when the connection is unavailable', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError('offline')),
+      )
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Check your connection')
+    })
+
+    it('explains when consent is refused', async () => {
+      vi.spyOn(browser.permissions, 'request').mockResolvedValue(false as never)
+      const fetch = vi.fn<typeof globalThis.fetch>()
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Lander needs your OK')
+      expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it('shows the signed-in address and signs out through the account client', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(
+          jsonResponse({ token: 'token', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
+        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
+        .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      vi.stubGlobal('fetch', fetch)
+      await account.verify('person@example.com', '123456')
+      openAccount()
+
+      expect(await screen.findByText('person@example.com')).toBeTruthy()
+      expect(screen.getByText('Not synced yet')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+      await waitFor(() => expect(screen.queryByText('person@example.com')).toBeNull())
+      expect(fetch).toHaveBeenCalledTimes(4)
     })
   })
 
