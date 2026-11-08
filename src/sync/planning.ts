@@ -9,6 +9,11 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {}
 
+const itemVersion = (value: unknown): number => {
+  const version = asRecord(value).v
+  return typeof version === 'number' && Number.isSafeInteger(version) ? version : 1
+}
+
 /** Stable JSON for comparing stored sync values, independent of object key insertion order. */
 export function canon(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canon).join(',')}]`
@@ -60,6 +65,13 @@ export function mergeOnboarding(a: unknown, b: unknown): Record<string, unknown>
 export function planPull(local: SyncItems, remote: SyncItems, lastSynced: SyncItems): SyncItems {
   const pulled: SyncItems = {}
   for (const [key, value] of Object.entries(remote)) {
+    const localVersion = itemVersion(local[key])
+    const remoteVersion = itemVersion(value)
+    if (remoteVersion < localVersion) continue
+    if (remoteVersion > localVersion) {
+      pulled[key] = value
+      continue
+    }
     if (key === 'onboarding') {
       pulled[key] = mergeOnboarding(local[key], value)
       continue

@@ -61,4 +61,56 @@ describe('sync planning', () => {
       settings: { dim: true },
     })
   })
+
+  it('keeps a newer local item when the remote item has an older version', () => {
+    expect(
+      planPull(
+        { settings: { v: 2, value: 'local' } },
+        { settings: { v: 1, value: 'remote' } },
+        { settings: { v: 2, value: 'local' } },
+      ),
+    ).toEqual({})
+  })
+
+  it('pulls a higher-version remote item even when local content changed', () => {
+    expect(
+      planPull(
+        { settings: { v: 1, value: 'local edit' } },
+        { settings: { v: 2, value: 'server' } },
+        { settings: { v: 1, value: 'last synced' } },
+      ),
+    ).toEqual({ settings: { v: 2, value: 'server' } })
+  })
+
+  it('pulls changed content when settings versions are equal', () => {
+    expect(
+      planPull(
+        { settings: { v: 2, value: 'local' } },
+        { settings: { v: 2, value: 'remote' } },
+        { settings: { v: 2, value: 'local' } },
+      ),
+    ).toEqual({ settings: { v: 2, value: 'remote' } })
+  })
+
+  it('treats absent settings and onboarding versions as version 1', () => {
+    expect(
+      planPull(
+        {
+          onboarding: { dismissed: [], welcomed: false },
+          settings: { value: 'local' },
+        },
+        {
+          onboarding: { dismissed: ['weather'], welcomed: true },
+          settings: { value: 'remote' },
+        },
+        {
+          onboarding: { dismissed: [], welcomed: false },
+          settings: { value: 'local' },
+        },
+      ),
+    ).toEqual({
+      onboarding: { dismissed: ['weather'], welcomed: true },
+      settings: { value: 'remote' },
+    })
+  })
 })
