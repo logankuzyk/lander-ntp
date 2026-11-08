@@ -36,6 +36,19 @@ describe('loadConfig', () => {
     expect(config.port).toBe(3000)
   })
 
+  it('includes the store ID and parses additional trusted extension IDs', () => {
+    const config = loadConfig({
+      AUTH_SECRET: 'a'.repeat(32),
+      TRUSTED_EXTENSION_IDS: 'edge-id, chrome-id, edge-id',
+    })
+
+    expect(config.trustedExtensionIds).toEqual([
+      'ocglhjclnhfbgbccffinhioaangigioa',
+      'edge-id',
+      'chrome-id',
+    ])
+  })
+
   it('names invalid environment values and bounds the port', () => {
     const secret = 'a'.repeat(32)
 

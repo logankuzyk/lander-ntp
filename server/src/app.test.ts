@@ -2,10 +2,14 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createApp } from './app.js'
+import { createConsoleMailer } from './auth.js'
+import type { ServerConfig } from './config.js'
 
 const databases: DatabaseSync[] = []
 
-function makeApp() {
+type MailMessage = { html: string; subject: string; text: string; to: string }
+
+async function makeApp() {
   const db = new DatabaseSync(':memory:')
   databases.push(db)
   return createApp({
@@ -16,6 +20,7 @@ function makeApp() {
       nodeEnv: 'test',
       port: 3000,
       trustAnyExtensionOrigin: false,
+      trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
     },
     db,
     mailer: { send: async () => undefined },
@@ -23,7 +28,34 @@ function makeApp() {
   })
 }
 
+async function makeAuthApp(configOverrides: Partial<ServerConfig> = {}) {
+  const messages: MailMessage[] = []
+  const db = new DatabaseSync(':memory:')
+  databases.push(db)
+  const app = await createApp({
+    clock: { now: () => new Date('2026-01-01T00:00:00.000Z') },
+    config: {
+      authSecret: 'a'.repeat(32),
+      databasePath: ':memory:',
+      nodeEnv: 'test',
+      port: 3000,
+      trustAnyExtensionOrigin: false,
+      trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
+      ...configOverrides,
+    },
+    db,
+    mailer: {
+      send: async (message) => {
+        messages.push(message as MailMessage)
+      },
+    },
+    objectStore: { get: async () => undefined, put: async () => undefined },
+  })
+  return { app, db, messages }
+}
+
 afterEach(() => {
+  vi.useRealTimers()
   for (const db of databases.splice(0)) {
     try {
       db.close()
@@ -35,8 +67,269 @@ afterEach(() => {
 })
 
 describe('createApp', () => {
+  it('prints sign-in mail in development and refuses to send it in production', async () => {
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const message = {
+      html: '<p>Your code is 482931</p>',
+      subject: 'Your Lander sign-in code',
+      text: 'Your Lander sign-in code is 482931.',
+      to: 'person@example.com',
+    }
+
+    await createConsoleMailer('development').send(message)
+    expect(log).toHaveBeenCalledWith(
+      '[Lander development email] Your Lander sign-in code is 482931.',
+    )
+    await expect(createConsoleMailer('production').send(message)).rejects.toThrow(
+      /development-only/,
+    )
+  })
+
+  it('signs in with a code from a trusted extension, authenticates /v1/me, and revokes on sign-out', async () => {
+    const { app, messages } = await makeAuthApp()
+    const email = 'person@example.com'
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const send = await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+
+    expect(send.status).toBe(200)
+    expect(await send.json()).toEqual({ success: true })
+    expect(messages).toHaveLength(1)
+    expect(messages[0]?.to).toBe(email)
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    expect(otp).toBeDefined()
+
+    const signIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const signedIn = (await signIn.json()) as { token: string; user: { email: string } }
+
+    expect(signIn.status).toBe(200)
+    const bearerToken = signIn.headers.get('set-auth-token')
+    expect(bearerToken).toBeTruthy()
+    expect(signedIn.user.email).toBe(email)
+
+    const me = await app.request('/v1/me', {
+      headers: { authorization: `Bearer ${bearerToken}`, origin },
+    })
+    expect(me.status).toBe(200)
+    expect(await me.json()).toMatchObject({ email })
+
+    const signOut = await app.request('/api/auth/sign-out', {
+      headers: { authorization: `Bearer ${bearerToken}`, origin },
+      method: 'POST',
+    })
+    expect(signOut.status).toBe(200)
+
+    const afterSignOut = await app.request('/v1/me', {
+      headers: { authorization: `Bearer ${bearerToken}`, origin },
+    })
+    expect(afterSignOut.status).toBe(401)
+    expect(await afterSignOut.json()).toEqual({ error: 'signed_out' })
+  })
+
+  it('accepts an OTP just before expiry and rejects it after expiry', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const sendCode = (email: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+    const signIn = (email: string, otp: string | undefined) =>
+      app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email, otp }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+
+    const beforeExpiryEmail = 'before-expiry@example.com'
+    expect((await sendCode(beforeExpiryEmail)).status).toBe(200)
+    const beforeExpiryOtp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    vi.setSystemTime(new Date('2026-01-01T00:04:59.000Z'))
+    expect((await signIn(beforeExpiryEmail, beforeExpiryOtp)).status).toBe(200)
+
+    const expiredEmail = 'expired@example.com'
+    expect((await sendCode(expiredEmail)).status).toBe(200)
+    const expiredOtp = messages[1]?.text.match(/\b\d{6}\b/)?.[0]
+    vi.setSystemTime(new Date('2026-01-01T00:10:00.000Z'))
+    expect((await signIn(expiredEmail, expiredOtp)).status).not.toBe(200)
+  })
+
+  it('keeps a session until just before 60 days and expires it just after', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    const { app, messages } = await makeAuthApp()
+    const email = 'session-expiry@example.com'
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signIn.headers.get('set-auth-token')
+    expect(signIn.status).toBe(200)
+    expect(token).toBeTruthy()
+
+    const checkSession = () =>
+      app.request('/api/auth/get-session?disableRefresh=true', {
+        headers: { authorization: `Bearer ${token}`, origin },
+      })
+    vi.setSystemTime(new Date('2026-03-01T23:59:59.000Z'))
+    expect((await checkSession()).status).toBe(200)
+    expect(await (await checkSession()).json()).not.toBeNull()
+
+    vi.setSystemTime(new Date('2026-03-02T00:00:01.000Z'))
+    expect(await (await checkSession()).json()).toBeNull()
+  })
+
+  it('rejects untrusted origins and accepts distinct Firefox extension origins', async () => {
+    const { app, messages } = await makeAuthApp()
+    const untrusted = await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email: 'untrusted@example.com', type: 'sign-in' }),
+      headers: {
+        'cf-connecting-ip': '203.0.113.30',
+        'content-type': 'application/json',
+        origin: 'chrome-extension://untrusted',
+      },
+      method: 'POST',
+    })
+    expect(untrusted.status).toBe(403)
+    expect(messages).toHaveLength(0)
+
+    for (const [index, origin] of ['moz-extension://first', 'moz-extension://second'].entries()) {
+      const response = await app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email: `firefox-${index}@example.com`, type: 'sign-in' }),
+        headers: {
+          'cf-connecting-ip': `203.0.113.${31 + index}`,
+          'content-type': 'application/json',
+          origin,
+        },
+        method: 'POST',
+      })
+      expect(response.status).toBe(200)
+    }
+    expect(messages).toHaveLength(2)
+  })
+
+  it('accepts the bare Chrome extension origin only when the development switch is enabled', async () => {
+    const { app, messages } = await makeAuthApp({
+      nodeEnv: 'development',
+      trustAnyExtensionOrigin: true,
+    })
+    const response = await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email: 'local@example.com', type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin: 'chrome-extension://local-id' },
+      method: 'POST',
+    })
+
+    expect(response.status).toBe(200)
+    expect(messages).toHaveLength(1)
+  })
+
+  it('rate limits code sends per client address and does not reveal whether an address exists', async () => {
+    const { app, messages } = await makeAuthApp()
+    const sendCode = (email: string, clientIp: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: {
+          'cf-connecting-ip': clientIp,
+          'content-type': 'application/json',
+          origin: 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa',
+        },
+        method: 'POST',
+      })
+
+    const known = await sendCode('person@example.com', '203.0.113.1')
+    const unknown = await sendCode('nobody@example.com', '203.0.113.2')
+    expect(unknown.status).toBe(known.status)
+    expect(await unknown.json()).toEqual(await known.json())
+
+    await sendCode('person@example.com', '203.0.113.10')
+    await sendCode('person@example.com', '203.0.113.10')
+    await sendCode('person@example.com', '203.0.113.10')
+    const limited = await sendCode('person@example.com', '203.0.113.10')
+    expect(limited.status).toBe(429)
+    expect((await sendCode('person@example.com', '203.0.113.11')).status).toBe(200)
+    expect(messages).toHaveLength(6)
+  })
+
+  it('stores only a hashed verification code and does not store the client address on sessions', async () => {
+    const { app, db, messages } = await makeAuthApp()
+    const email = 'person@example.com'
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'cf-connecting-ip': '203.0.113.20', 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    expect(otp).toBeDefined()
+    const verification = db.prepare('SELECT value FROM verification').get() as
+      { value: string } | undefined
+    expect(verification?.value).toBeDefined()
+    expect(verification?.value).not.toContain(otp)
+
+    await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const session = db.prepare('SELECT ipAddress FROM session').get() as
+      { ipAddress: string | null } | undefined
+    expect(session?.ipAddress).toBeNull()
+  })
+
+  it('rejects a verification code after three failed attempts', async () => {
+    const { app, messages } = await makeAuthApp()
+    const email = 'person@example.com'
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    expect(otp).toBeDefined()
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const invalid = await app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email, otp: otp === '000000' ? '000001' : '000000' }),
+        headers: {
+          'cf-connecting-ip': `203.0.113.${40 + attempt}`,
+          'content-type': 'application/json',
+          origin,
+        },
+        method: 'POST',
+      })
+      expect(invalid.status).toBe(400)
+    }
+
+    const locked = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    expect(locked.status).not.toBe(200)
+  })
+
   it('reports a healthy database and returns JSON', async () => {
-    const response = await makeApp().request('/health')
+    const app = await makeApp()
+    const response = await app.request('/health')
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toMatch(/application\/json/)
@@ -44,7 +337,7 @@ describe('createApp', () => {
   })
 
   it('reports an unavailable database as 503', async () => {
-    const app = makeApp()
+    const app = await makeApp()
     databases.at(-1)?.close()
 
     const response = await app.request('/health')
@@ -54,7 +347,7 @@ describe('createApp', () => {
   })
 
   it('answers extension preflight requests and adds CORS headers to plain responses', async () => {
-    const app = makeApp()
+    const app = await makeApp()
     const preflight = await app.request('/health', {
       headers: {
         'Access-Control-Request-Headers': 'authorization,content-type',
@@ -79,7 +372,8 @@ describe('createApp', () => {
   })
 
   it('refuses a request body larger than 16 KiB with a JSON error', async () => {
-    const response = await makeApp().request('/health', {
+    const app = await makeApp()
+    const response = await app.request('/health', {
       body: JSON.stringify({ value: 'x'.repeat(17 * 1024) }),
       headers: { 'content-length': String(17 * 1024), 'content-type': 'application/json' },
       method: 'POST',
@@ -107,7 +401,7 @@ describe('createApp', () => {
 
     try {
       const response = await Promise.race([
-        makeApp().request(request),
+        makeApp().then((app) => app.request(request)),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 100)),
       ])
 
@@ -120,7 +414,7 @@ describe('createApp', () => {
 
   it('logs request metadata without logging personal data or credentials', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const app = makeApp()
+    const app = await makeApp()
 
     await app.request('/health?email=private@example.com&code=482931', {
       headers: {
@@ -143,7 +437,8 @@ describe('createApp', () => {
 
   it('logs the matched route instead of an unmatched request path', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const response = await makeApp().request('/private@example.com')
+    const app = await makeApp()
+    const response = await app.request('/private@example.com')
 
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'not_found' })
@@ -153,7 +448,7 @@ describe('createApp', () => {
   })
 
   it('returns a sanitized JSON error for an unhandled route error', async () => {
-    const app = makeApp()
+    const app = await makeApp()
     app.get('/crash', () => {
       throw new Error('private@example.com')
     })

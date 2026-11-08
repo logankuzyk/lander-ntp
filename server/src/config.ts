@@ -15,7 +15,10 @@ const environmentSchema = v.object({
   NODE_ENV: v.optional(v.picklist(['development', 'production', 'test']), 'development'),
   PORT: v.optional(v.pipe(v.string(), v.regex(/^\d+$/, 'PORT must contain digits only')), '3000'),
   TRUST_ANY_EXTENSION_ORIGIN: v.optional(v.picklist(['true', 'false']), 'false'),
+  TRUSTED_EXTENSION_IDS: v.optional(v.string(), ''),
 })
+
+const chromeStoreExtensionId = 'ocglhjclnhfbgbccffinhioaangigioa'
 
 export type ServerConfig = {
   authSecret: string
@@ -23,6 +26,7 @@ export type ServerConfig = {
   nodeEnv: 'development' | 'production' | 'test'
   port: number
   trustAnyExtensionOrigin: boolean
+  trustedExtensionIds: string[]
 }
 
 export function loadConfig(
@@ -63,5 +67,13 @@ export function loadConfig(
     nodeEnv: values.NODE_ENV,
     port,
     trustAnyExtensionOrigin,
+    trustedExtensionIds: [
+      ...new Set([
+        chromeStoreExtensionId,
+        ...values.TRUSTED_EXTENSION_IDS.split(',')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ]),
+    ],
   }
 }

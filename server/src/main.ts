@@ -4,6 +4,7 @@ import { type DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
 
 import { createApp } from './app.js'
+import { createConsoleMailer } from './auth.js'
 import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
 
@@ -13,18 +14,14 @@ export type StartServerOptions = {
   shutdownTimeoutMs?: number
 }
 
-export function startServer(options: StartServerOptions = {}) {
+export async function startServer(options: StartServerOptions = {}) {
   const config = options.config ?? loadConfig()
   const db = options.db ?? openDatabase(config.databasePath)
-  const app = createApp({
+  const app = await createApp({
     clock: { now: () => new Date() },
     config,
     db,
-    mailer: {
-      send: async () => {
-        throw new Error('Mailer is not configured')
-      },
-    },
+    mailer: createConsoleMailer(config.nodeEnv),
     objectStore: {
       get: async () => {
         throw new Error('Object store is not configured')
@@ -63,7 +60,7 @@ export function startServer(options: StartServerOptions = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    startServer()
+    await startServer()
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown startup error'
     console.error(`Server failed to start: ${message}`)
