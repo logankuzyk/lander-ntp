@@ -4,6 +4,10 @@ A minimal new tab page showing photography from [logankuzyk.com](https://loganku
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
+## Keyboard editing
+
+In Edit mode, Tab moves between Widgets. Enter picks up the focused Widget; the arrow keys move it, and Shift with the arrows resizes it. Enter puts it down, and Escape puts it back.
+
 ## Install
 
 - [Chrome Web Store](https://chromewebstore.google.com/detail/lander/ocglhjclnhfbgbccffinhioaangigioa)

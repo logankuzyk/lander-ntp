@@ -69,7 +69,7 @@ export const Options: Story = {
  * Stop 4: the Add menu has opened by itself and the note is beside it, level with its first
  * item. Focus is still on the note's Next button, not in the menu.
  */
-export const Add: Story = {
+export const AddStop: Story = {
   beforeEach: newInstall,
   play: async ({ canvasElement }) => {
     const canvas = await takeTour(canvasElement, 'Add a widget')
@@ -89,10 +89,10 @@ export const Done: Story = {
  * Stop 6: Next on Done has left edit mode and opened the settings panel, whose own note carries
  * on the count.
  */
-export const Photos: Story = {
+export const BackgroundStop: Story = {
   beforeEach: newInstall,
   play: async ({ canvasElement }) => {
-    await takeTour(canvasElement, 'Photos')
+    await takeTour(canvasElement, 'Background')
   },
 }
 

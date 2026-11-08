@@ -73,7 +73,11 @@ describe('App, with the settings panel open', () => {
     expect(done.getAttribute('aria-pressed')).toBe('true')
     // Focus is on the button that now reads Done, not dropped on the page.
     expect(document.activeElement).toBe(done)
-    expect(screen.getByText('Editing widgets. Tab moves between widgets.')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Editing widgets. Tab moves between widgets. Enter picks one up; the arrow keys move it, Shift with the arrows resizes it, Enter puts it down, Escape puts it back.',
+      ),
+    ).toBeTruthy()
   })
 
   it('writes nothing when the Edit button is used', async () => {

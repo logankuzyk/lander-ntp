@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { NEWS, type PageTourStop, TOUR } from './callouts'
 
 describe('the tour', () => {
-  it('goes from Edit to Done on the page, then Photos and the font in the settings panel', () => {
+  it('goes from Edit to Done on the page, then Background and the font in the settings panel', () => {
     expect(TOUR.map(({ id }) => id)).toEqual([
       'tour-edit',
       'tour-move',
@@ -16,7 +16,36 @@ describe('the tour', () => {
     ])
   })
 
-  it('has a stop in the panel for Photos and one for the font, and none for the Clock or the Weather', () => {
+  it('mentions the free Widgets in Add and the Background in the existing Photos stop', () => {
+    expect(TOUR.map(({ id }) => id)).toEqual([
+      'tour-edit',
+      'tour-move',
+      'tour-options',
+      'tour-setup',
+      'tour-add',
+      'tour-done',
+      'tour-photos',
+      'tour-general',
+    ])
+    const add = TOUR.find(({ id }) => id === 'tour-add')
+    const background = TOUR.find(({ id }) => id === 'tour-photos')
+    expect(add?.body).toBe(
+      'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
+    )
+    expect(background).toMatchObject({
+      id: 'tour-photos',
+      section: 'photos',
+      title: 'Background',
+    })
+    expect(background?.body).toContain('how often the photo changes')
+    expect(background?.body).toContain('which tags to draw from')
+    expect(background?.body).toContain('solid colour')
+    expect(background?.body).toContain('Pick a photo from the gallery to show it now')
+    expect(background?.body).toContain('The heart in photo details keeps favourites')
+    expect(background?.body).toContain('Favourites only cycles just those')
+  })
+
+  it('has a stop in the panel for Background and one for the font, and none for the Clock or the Weather', () => {
     expect(
       TOUR.filter(({ section }) => section !== undefined).map(({ section }) => section),
     ).toEqual(['photos', 'general'])
@@ -40,19 +69,29 @@ describe('the tour', () => {
     }
   })
 
-  it('says in one sentence how to move and resize from the keyboard, as the page does it', () => {
-    const move = TOUR.find(({ id }) => id === 'tour-move')
-    // Enter picks a widget up and puts it down, the arrows move it and Shift with them resizes it
-    // (Grid.keys.test.tsx); the pointer way comes first, in the sentence before.
-    expect(move?.body).toMatch(/Drag a widget to move it/)
-    expect(move?.body).toMatch(/keyboard.*Enter.*arrow keys.*Shift.*Enter/)
-    expect(move?.body.split(/(?<=\.)\s/)).toHaveLength(2)
+  it('keeps keyboard shortcuts out of the new-install tour and update walk', () => {
+    const textForStop = ({ body, title, ...stop }: (typeof TOUR)[number]) => [
+      title,
+      body,
+      'readOnlyBody' in stop ? stop.readOnlyBody : undefined,
+    ]
+    const onboardingText = [
+      ...TOUR.flatMap(textForStop),
+      ...NEWS.flatMap(({ body, title, ...note }) => [
+        title,
+        body,
+        ...('walk' in note ? (note.walk ?? []).flatMap(textForStop) : []),
+      ]),
+    ]
+    for (const text of onboardingText) {
+      if (text !== undefined) expect(text).not.toMatch(/keyboard|\bE\b|Tab|Enter|arrow|Shift/i)
+    }
   })
 
-  it('says nothing about arrow keys, Enter or Shift anywhere else', () => {
-    for (const { body, id } of TOUR) {
-      if (id !== 'tour-move') expect(body).not.toMatch(/arrow|Enter|Shift/i)
-    }
+  it('keeps the Move and resize stop about dragging', () => {
+    expect(TOUR.find(({ id }) => id === 'tour-move')?.body).toBe(
+      'Drag a widget to move it, and drag the handle in its corner to resize it.',
+    )
   })
 })
 

@@ -30,7 +30,8 @@ const inReadingOrder = (a: DrawnWidget, b: DrawnWidget) =>
   (a.widget.placed.id < b.widget.placed.id ? -1 : a.widget.placed.id > b.widget.placed.id ? 1 : 0)
 
 /** Said when edit mode starts, to people who cannot see the frames. */
-const EDITING_HELP = 'Editing widgets. Tab moves between widgets.'
+const EDITING_HELP =
+  'Editing widgets. Tab moves between widgets. Enter picks one up; the arrow keys move it, Shift with the arrows resizes it, Enter puts it down, Escape puts it back.'
 
 /** What a Widget this version does not know says in its box, in the shared error state's panel. */
 const UNKNOWN_NAME = 'Unknown widget'
