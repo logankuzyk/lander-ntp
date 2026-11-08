@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { vi } from 'vitest'
 
 import { account } from './account'
@@ -52,6 +52,7 @@ describe('AccountSection', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Sign out' })[0]!)
 
     expect(removeDevice).toHaveBeenCalledWith('old-device')
+    await waitFor(() => expect(screen.queryByText('Firefox on Windows, 3 weeks ago')).toBeNull())
     removeDevice.mockRestore()
   })
 
@@ -79,6 +80,8 @@ describe('AccountSection', () => {
 
     expect(screen.getByText('Choose a device to sign out so this one can sync')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+    expect(screen.getByText('Firefox on Windows, 3 weeks ago')).toBeTruthy()
+    expect(screen.queryByText('This device')).toBeNull()
   })
 
   it('cancels the pending device by signing it out', () => {
@@ -111,5 +114,28 @@ describe('AccountSection', () => {
     expect(deleteAccount).toHaveBeenCalledOnce()
     expect(screen.getByRole('dialog', { name: 'Delete account' })).toBeTruthy()
     deleteAccount.mockRestore()
+  })
+
+  it('shows a plain confirmation after account deletion succeeds', async () => {
+    const deleteAccount = vi
+      .spyOn(account, 'deleteAccount')
+      .mockResolvedValue({ ok: true, value: undefined })
+    render(<AccountSection stateOverride={signedIn} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm delete account' }))
+
+    expect((await screen.findByRole('status')).textContent).toBe('Your account has been deleted.')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete account' })).toBeNull())
+    deleteAccount.mockRestore()
+  })
+
+  it('uses day wording through six days ago', () => {
+    const sixDaysAgo: Device = {
+      ...devices[0]!,
+      lastUsedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+    render(<AccountSection stateOverride={{ ...signedIn, devices: [sixDaysAgo] }} />)
+
+    expect(screen.getByText('Firefox on Windows, 6 days ago')).toBeTruthy()
   })
 })
