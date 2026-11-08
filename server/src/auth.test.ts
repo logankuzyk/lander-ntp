@@ -1,6 +1,7 @@
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createResendMailer, createServerMailer, sendSignInEmail } from './auth.js'
+import { createAuth, createResendMailer, createServerMailer, sendSignInEmail } from './auth.js'
 import type { ServerConfig } from './config.js'
 
 const config: ServerConfig = {
@@ -24,6 +25,20 @@ afterEach(() => {
 })
 
 describe('Resend mailer', () => {
+  it('skips Better Auth fresh-session checks when its delete route is used', async () => {
+    const db = new DatabaseSync(':memory:')
+    try {
+      const auth = await createAuth(
+        { config, db, mailer: { send: async () => undefined } },
+        async () => undefined,
+      )
+      const context = await auth.$context
+      expect(context.sessionConfig.freshAge).toBe(0)
+    } finally {
+      db.close()
+    }
+  })
+
   it('uses Resend for production mail without opening a real network connection', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetcher)

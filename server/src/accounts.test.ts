@@ -39,7 +39,7 @@ describe('account deletion', () => {
     `)
 
     expect(deleteAccount(db, 'u1', now)).toBe(true)
-    expect(deleteAccount(db, 'u1', now)).toBe(false)
+    expect(deleteAccount(db, 'u1', new Date(now.getTime() + 60_000))).toBe(false)
     for (const table of ['user', 'session', 'account', 'settings_account', 'settings_item']) {
       expect(db.prepare(`SELECT * FROM ${table}`).all(), table).toEqual([])
     }
@@ -71,6 +71,63 @@ describe('account deletion', () => {
       { id: 'recent' },
       { id: 'reviewer' },
     ])
+  })
+
+  it('keeps accounts without a settings record and accounts exactly at the cutoff', () => {
+    const db = makeDatabase()
+    const cutoff = now.getTime() - 365 * 24 * 60 * 60 * 1000
+    db.prepare('INSERT INTO user VALUES (?, ?)').run('no-settings', 'new@example.test')
+    db.prepare('INSERT INTO user VALUES (?, ?)').run('boundary', 'boundary@example.test')
+    db.prepare('INSERT INTO settings_account VALUES (?, ?)').run('boundary', cutoff)
+
+    expect(deleteInactiveAccounts(db, now)).toBe(0)
+    expect(db.prepare('SELECT id FROM user ORDER BY id').all()).toEqual([
+      { id: 'boundary' },
+      { id: 'no-settings' },
+    ])
+  })
+
+  it('does not delete accounts when the settings table is unavailable', () => {
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    db.exec('CREATE TABLE user (id TEXT PRIMARY KEY, email TEXT NOT NULL)')
+    db.prepare('INSERT INTO user VALUES (?, ?)').run('u1', 'person@example.test')
+
+    expect(deleteInactiveAccounts(db, now)).toBe(0)
+    expect(db.prepare('SELECT id FROM user').all()).toEqual([{ id: 'u1' }])
+  })
+
+  it('cleans never-used settings rows and matches reviewer addresses without case sensitivity', () => {
+    const db = makeDatabase()
+    db.prepare('INSERT INTO user VALUES (?, ?)').run('never-used', 'never@example.test')
+    db.prepare('INSERT INTO settings_account VALUES (?, NULL)').run('never-used')
+    db.prepare('INSERT INTO user VALUES (?, ?)').run('reviewer', 'Reviewer@Example.test')
+    db.prepare('INSERT INTO settings_account VALUES (?, ?)').run(
+      'reviewer',
+      now.getTime() - 13 * 30 * 24 * 60 * 60 * 1000,
+    )
+
+    expect(deleteInactiveAccounts(db, now, 'reviewer@example.test')).toBe(1)
+    expect(db.prepare('SELECT id FROM user').all()).toEqual([{ id: 'reviewer' }])
+  })
+
+  it('exports an account when the requested email uses different casing', () => {
+    const db = makeDatabase()
+    db.exec(`
+      ALTER TABLE user ADD COLUMN name TEXT;
+      ALTER TABLE user ADD COLUMN createdAt TEXT;
+      ALTER TABLE user ADD COLUMN updatedAt TEXT;
+      ALTER TABLE session ADD COLUMN userAgent TEXT;
+      ALTER TABLE session ADD COLUMN createdAt TEXT;
+      ALTER TABLE session ADD COLUMN updatedAt TEXT;
+      ALTER TABLE settings_item ADD COLUMN v INTEGER;
+      ALTER TABLE settings_item ADD COLUMN value TEXT;
+    `)
+    db.prepare(
+      'INSERT INTO user (id, email, name, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
+    ).run('u1', 'person@example.test', 'Person', 'created', 'updated')
+
+    expect(exportAccount(db, 'PERSON@EXAMPLE.TEST')?.user.email).toBe('person@example.test')
   })
 
   it('exports settings and reduced devices without IP addresses or tokens', () => {
