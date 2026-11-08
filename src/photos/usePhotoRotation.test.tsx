@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { favouritesItem } from '@/backdrop/favourites'
-import { backgroundItem } from '@/backdrop/storage'
+import { DEFAULT_FAVOURITES, favouritesItem } from '@/backdrop/favourites'
+import { backgroundItem, DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import type { Frequency, PhotoSettings } from './rotation'
@@ -54,7 +54,16 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
 })
+
+const deferred = <T,>() => {
+  let resolve = (_value: T) => {}
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
 
 describe('usePhotoRotation', () => {
   it.each([cycle('daily'), pinned(null), cycle('1h')])(
@@ -125,6 +134,40 @@ describe('usePhotoRotation', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('waits for both synced Backdrop items before watching or drawing a photo', async () => {
+    await seed('a')
+    const backgroundRead = deferred<Awaited<ReturnType<typeof backgroundItem.read>>>()
+    const favouritesRead = deferred<Awaited<ReturnType<typeof favouritesItem.read>>>()
+    vi.spyOn(backgroundItem, 'read').mockReturnValue(backgroundRead.promise)
+    vi.spyOn(favouritesItem, 'read').mockReturnValue(favouritesRead.promise)
+    const setPhotoState = vi.spyOn(photoState, 'setValue')
+    const watchPhotoState = vi.spyOn(photoState, 'watch')
+    const { result } = renderRotation(pinned('c'))
+
+    await waitFor(() => {
+      expect(backgroundItem.read).toHaveBeenCalled()
+      expect(favouritesItem.read).toHaveBeenCalled()
+    })
+    expect(result.current.photo).toBeNull()
+    expect(setPhotoState).not.toHaveBeenCalled()
+    expect(watchPhotoState).not.toHaveBeenCalled()
+
+    await act(async () => {
+      backgroundRead.resolve({ newer: false, value: DEFAULT_BACKGROUND })
+      await backgroundRead.promise
+    })
+    expect(setPhotoState).not.toHaveBeenCalled()
+    expect(watchPhotoState).not.toHaveBeenCalled()
+
+    await act(async () => {
+      favouritesRead.resolve({ newer: false, value: DEFAULT_FAVOURITES })
+      await favouritesRead.promise
+    })
+    await waitFor(() => expect(result.current.photo?.id).toBe('c'))
+    expect(setPhotoState).toHaveBeenCalledTimes(1)
+    expect(watchPhotoState).toHaveBeenCalledTimes(1)
   })
 
   it('waits for the stored settings before deciding anything', async () => {
@@ -235,25 +278,49 @@ describe('usePhotoRotation', () => {
 
   it('keeps an unmarked current photo on screen and skips it on the next draw', async () => {
     await seed('a')
+    await photoState.setValue({ bag: ['b', 'c'], currentId: 'a', shownAt: Date.now() })
     await backgroundItem.setValue({
       colour: '#ffffff',
       favouritesOnly: true,
       kind: 'photo',
       v: 1,
     })
-    await favouritesItem.setValue({ ids: ['a', 'c'], v: 1 })
+    await favouritesItem.setValue({ ids: ['a', 'b', 'c'], v: 1 })
     const { result } = renderRotation(cycle('daily', ['water']))
     await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+    expect(result.current.upcoming?.id).toBe('b')
 
-    await act(async () => favouritesItem.setValue({ ids: ['c'], v: 1 }))
+    await act(async () => favouritesItem.setValue({ ids: ['a', 'c'], v: 1 }))
 
     expect(result.current.photo?.id).toBe('a')
+    expect(result.current.upcoming?.id).toBe('c')
     let shown: string | null = null
     await act(async () => {
       shown = await result.current.next()
     })
     expect(shown).toBe('c')
     expect(result.current.photo?.id).toBe('c')
+  })
+
+  it('preloads only favourite photos when Favourites only is on', async () => {
+    await seed('c')
+    await photoState.setValue({ bag: ['b', 'a'], currentId: 'c', shownAt: Date.now() })
+    await backgroundItem.setValue({
+      ...DEFAULT_BACKGROUND,
+      favouritesOnly: true,
+    })
+    await favouritesItem.setValue({ ids: ['a', 'c'], v: 1 })
+    const { result } = renderRotation(cycle('daily'))
+
+    await waitFor(() => expect(result.current.photo?.id).toBe('c'))
+    expect(result.current.upcoming?.id).toBe('a')
+  })
+
+  it('does not report gone favourites before the manifest has loaded', () => {
+    const { result } = renderRotation(cycle('daily'))
+
+    expect(result.current.photos).toEqual([])
+    expect(result.current.favouritesGone).toBe(false)
   })
 
   it('moves into the favourites pool when Favourites only is turned on', async () => {

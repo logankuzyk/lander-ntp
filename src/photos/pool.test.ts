@@ -44,7 +44,7 @@ describe('poolFor', () => {
   it('does not judge favourites against the bundled fallback photo', () => {
     expect(
       poolFor({
-        favourites: ['removed'],
+        favourites: ['fallback'],
         favouritesOnly: true,
         photos: [makePhoto('fallback')],
         tags: ['water'],
