@@ -6,7 +6,7 @@ import { Devices, parseUserAgent } from './devices.js'
 const databases: DatabaseSync[] = []
 const now = new Date('2026-01-01T00:00:00.000Z')
 
-function makeDevices() {
+function makeDevices(clock: { now: () => Date } = { now: () => now }) {
   const db = new DatabaseSync(':memory:')
   databases.push(db)
   db.exec(`
@@ -21,10 +21,16 @@ function makeDevices() {
       ipAddress TEXT
     )
   `)
-  return { db, devices: new Devices(db, { now: () => now }) }
+  return { db, devices: new Devices(db, clock) }
 }
 
-function addSession(db: DatabaseSync, id: string, userId = 'user-1') {
+function addSession(
+  db: DatabaseSync,
+  id: string,
+  userId = 'user-1',
+  createdAt = now,
+  expiresAt = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+) {
   db.prepare(
     `
     INSERT INTO session (id, userId, token, expiresAt, createdAt, updatedAt, userAgent, ipAddress)
@@ -34,8 +40,8 @@ function addSession(db: DatabaseSync, id: string, userId = 'user-1') {
     id,
     userId,
     `token-${id}`,
-    new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-    now.toISOString(),
+    expiresAt.toISOString(),
+    createdAt.toISOString(),
     now.toISOString(),
     'Mozilla/5.0 Chrome/120.0.0.0',
   )
@@ -115,6 +121,18 @@ describe('Devices', () => {
     })
   })
 
+  it('keeps a pending session alive beyond fourteen minutes', () => {
+    let currentTime = now
+    const { db, devices } = makeDevices({ now: () => currentTime })
+    for (const id of ['one', 'two', 'three']) addSession(db, id)
+    for (const id of ['one', 'two', 'three']) devices.admit('user-1', id)
+    addSession(db, 'four')
+    devices.admit('user-1', 'four')
+    currentTime = new Date(now.getTime() + 14 * 60 * 1000 + 1)
+
+    expect(devices.list('user-1', 'four').pending).toBe(true)
+  })
+
   it('removing a device from a pending session admits that session', () => {
     const { db, devices } = makeDevices()
     for (const id of ['one', 'two', 'three']) addSession(db, id)
@@ -124,6 +142,33 @@ describe('Devices', () => {
 
     expect(devices.remove('user-1', 'one', 'four')).toBe(true)
     expect(devices.list('user-1', 'four').pending).toBe(false)
+  })
+
+  it('keeps a promoted session active for sixty days from admission', () => {
+    let currentTime = now
+    const { db, devices } = makeDevices({ now: () => currentTime })
+    for (const id of ['one', 'two', 'three']) addSession(db, id)
+    for (const id of ['one', 'two', 'three']) devices.admit('user-1', id)
+    addSession(db, 'four')
+    devices.admit('user-1', 'four')
+    currentTime = new Date(now.getTime() + 60_000)
+    devices.remove('user-1', 'one', 'four')
+    currentTime = new Date(currentTime.getTime() + 30 * 24 * 60 * 60 * 1000 + 1)
+
+    expect(devices.list('user-1', 'four').devices.some(({ id }) => id === 'four')).toBe(true)
+  })
+
+  it('keeps a pending caller pending when another pending device is removed at capacity', () => {
+    const { db, devices } = makeDevices()
+    for (const id of ['one', 'two', 'three']) addSession(db, id)
+    for (const id of ['one', 'two', 'three']) devices.admit('user-1', id)
+    addSession(db, 'four')
+    addSession(db, 'five')
+    devices.admit('user-1', 'four')
+    devices.admit('user-1', 'five')
+
+    expect(devices.remove('user-1', 'four', 'five')).toBe(true)
+    expect(devices.isPending('user-1', 'five')).toBe(true)
   })
 
   it('does not remove a device from another account', () => {
@@ -137,19 +182,43 @@ describe('Devices', () => {
 
   it('keeps the reviewer admitted by removing the oldest session', () => {
     const { db, devices } = makeDevices()
-    for (const id of ['one', 'two', 'three']) addSession(db, id)
-    for (const id of ['one', 'two', 'three']) devices.admit('user-1', id)
+    addSession(db, 'oldest', 'user-1', new Date(now.getTime() - 3_000))
+    addSession(db, 'middle', 'user-1', new Date(now.getTime() - 2_000))
+    addSession(db, 'newest', 'user-1', new Date(now.getTime() - 1_000))
+    for (const id of ['oldest', 'middle', 'newest']) devices.admit('user-1', id)
     addSession(db, 'reviewer')
 
     expect(devices.admit('user-1', 'reviewer', true)).toBe(false)
     expect(devices.list('user-1', 'reviewer')).toMatchObject({
       devices: [
         { current: true, id: 'reviewer' },
-        { current: false, id: 'three' },
-        { current: false, id: 'two' },
+        { current: false, id: 'newest' },
+        { current: false, id: 'middle' },
       ],
       pending: false,
     })
+  })
+
+  it('does not remove an expired device', () => {
+    const { db, devices } = makeDevices()
+    addSession(db, 'current')
+    addExpiredSession(db, 'expired')
+
+    expect(devices.remove('user-1', 'expired', 'current')).toBe(false)
+  })
+
+  it('drops a pending session at the fifteen-minute age boundary', () => {
+    let currentTime = now
+    const { db, devices } = makeDevices({ now: () => currentTime })
+    for (const id of ['one', 'two', 'three']) addSession(db, id)
+    for (const id of ['one', 'two', 'three']) devices.admit('user-1', id)
+    addSession(db, 'four')
+    currentTime = new Date(now.getTime() + 1)
+    devices.admit('user-1', 'four')
+    currentTime = new Date(now.getTime() + 15 * 60 * 1000)
+
+    expect(devices.list('user-1', 'four').pending).toBe(false)
+    expect(devices.list('user-1', 'four').devices.some(({ id }) => id === 'four')).toBe(false)
   })
 
   it.each([

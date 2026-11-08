@@ -137,6 +137,7 @@ export class Devices {
   remove(userId: string, deviceId: string, bySessionId: string): boolean {
     this.db.exec('BEGIN IMMEDIATE')
     try {
+      this.prune(this.clock.now())
       const caller = this.db
         .prepare('SELECT id, userId, pending FROM session WHERE id = ?')
         .get(bySessionId) as { id: string; pending: number; userId: string } | undefined
