@@ -166,6 +166,12 @@ function BackgroundSection({
           <input
             aria-label="Choose custom colour"
             class="background-colour-picker"
+            onCancel={() => {
+              setPickerColour(background.colour)
+              setHex(background.colour.replace('#', ''))
+              setHexError(false)
+              onPreviewColour?.(null)
+            }}
             onChange={(event) => setColour(event.currentTarget.value, true)}
             onInput={(event) => setColour(event.currentTarget.value, false)}
             ref={picker}
@@ -348,6 +354,7 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 
 type SettingsPanelProps = {
   background?: Background
+  backgroundLoaded?: boolean
   backgroundReadOnly?: boolean
   currentId: string | null
   /** The section to open on, when there is no tour to say. */
@@ -378,6 +385,7 @@ type SettingsPanelProps = {
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
   background = DEFAULT_BACKGROUND,
+  backgroundLoaded = true,
   backgroundReadOnly = false,
   currentId,
   initialSection = 'photos',
@@ -540,13 +548,17 @@ export function SettingsPanel({
               readOnly || (section === 'photos' && backgroundReadOnly) ? readOnlyId : undefined
             }
             class="settings__fieldset"
-            disabled={readOnly || (section === 'photos' && backgroundReadOnly)}
+            disabled={
+              readOnly || (section === 'photos' && (backgroundReadOnly || !backgroundLoaded))
+            }
           >
             {section === 'photos' && (
               <BackgroundSection
                 background={background}
                 currentId={currentId}
-                onChange={onBackgroundChange}
+                onChange={(next) => {
+                  if (backgroundLoaded) onBackgroundChange(next)
+                }}
                 onPreviewColour={onPreviewColour}
                 onSettingsChange={onChange}
                 photos={photos}

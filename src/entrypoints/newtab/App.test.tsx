@@ -104,6 +104,42 @@ describe('App', () => {
     expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe(ink)
   })
 
+  it('uses the live background preview to choose page ink', async () => {
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#1d3557', kind: 'colour' })
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+    expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe('light')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.input(await screen.findByLabelText('Choose custom colour'), {
+      target: { value: '#f2e8cf' },
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('.background')?.getAttribute('style')).toContain('#f2e8cf')
+      expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe('dark')
+    })
+    expect((await backgroundItem.getValue()).colour).toBe('#1d3557')
+  })
+
+  it('restores the stored background when the native colour picker is cancelled', async () => {
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#1d3557', kind: 'colour' })
+    const { container } = render(<App />)
+    await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const picker = await screen.findByLabelText('Choose custom colour')
+    fireEvent.input(picker, { target: { value: '#f2e8cf' } })
+    expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe('dark')
+
+    fireEvent(picker, new Event('cancel', { bubbles: true }))
+
+    await waitFor(() => {
+      expect(container.querySelector('.background')?.getAttribute('style')).toContain('#1d3557')
+      expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe('light')
+    })
+    expect((await backgroundItem.getValue()).colour).toBe('#1d3557')
+  })
+
   it('shows the same photo after changing to a colour and back', async () => {
     await seedPhotos()
     await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })

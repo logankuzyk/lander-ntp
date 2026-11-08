@@ -24,11 +24,13 @@ const PHOTOS = [
 
 const renderPanel = ({
   background = DEFAULT_BACKGROUND,
+  backgroundLoaded = true,
   backgroundReadOnly = false,
   overrides = {},
   photos = PHOTOS,
 }: {
   background?: Background
+  backgroundLoaded?: boolean
   backgroundReadOnly?: boolean
   overrides?: Partial<Settings>
   photos?: Photo[]
@@ -40,6 +42,7 @@ const renderPanel = ({
   const view = render(
     <SettingsPanel
       background={background}
+      backgroundLoaded={backgroundLoaded}
       backgroundReadOnly={backgroundReadOnly}
       currentId="a"
       onBackgroundChange={onBackgroundChange}
@@ -367,6 +370,20 @@ describe('SettingsPanel', () => {
       expect(screen.getByRole('button', { name: 'Tide pools' })).toBeTruthy()
     })
 
+    it('keeps background controls disabled until the stored choice loads', () => {
+      const { onBackgroundChange } = renderPanel({ backgroundLoaded: false })
+
+      expect(
+        screen
+          .getByRole('combobox', { name: 'Background' })
+          .closest('fieldset')
+          ?.hasAttribute('disabled'),
+      ).toBe(true)
+      choose('Background', 'Colour')
+
+      expect(onBackgroundChange).not.toHaveBeenCalled()
+    })
+
     it('offers eight named presets and opens the native picker from Custom colour', () => {
       renderPanel({ background: { ...DEFAULT_BACKGROUND, kind: 'colour' } })
       const radios = screen.getAllByRole('radio')
@@ -380,6 +397,22 @@ describe('SettingsPanel', () => {
 
       expect(openPicker).toHaveBeenCalledOnce()
       openPicker.mockRestore()
+    })
+
+    it('previews and saves a selected preset', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Colour 2' }))
+
+      expect(onPreviewColour).toHaveBeenNthCalledWith(1, '#f2e8cf')
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#f2e8cf',
+        kind: 'colour',
+      })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
     })
 
     it('previews a dragged colour, then commits once when the picker changes', () => {
@@ -398,6 +431,34 @@ describe('SettingsPanel', () => {
         colour: '#123456',
         kind: 'colour',
       })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('clears an uncommitted page preview when the native colour picker is cancelled', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const picker = screen.getByLabelText('Choose custom colour')
+
+      fireEvent.input(picker, { target: { value: '#123456' } })
+      fireEvent(picker, new Event('cancel', { bubbles: true }))
+
+      expect(onBackgroundChange).not.toHaveBeenCalled()
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
+    })
+
+    it('clears the preview when changing background modes', () => {
+      const { onBackgroundChange, onPreviewColour } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      fireEvent.input(screen.getByLabelText('Choose custom colour'), {
+        target: { value: '#123456' },
+      })
+
+      choose('Background', 'Photo')
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({ ...DEFAULT_BACKGROUND, kind: 'photo' })
+      expect(onPreviewColour).toHaveBeenLastCalledWith(null)
     })
 
     it('shows the update message and disables background controls when its item is newer', () => {
@@ -428,6 +489,22 @@ describe('SettingsPanel', () => {
       fireEvent.input(hex, { target: { value: '12345g' } })
       fireEvent.keyDown(hex, { key: 'Enter' })
       expect(screen.getByText('Use six digits, like 1a2b3c')).toBeTruthy()
+    })
+
+    it('commits a valid hex value when the field loses focus', () => {
+      const { onBackgroundChange } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, kind: 'colour' },
+      })
+      const hex = screen.getByRole('textbox', { name: 'Hex colour' })
+
+      fireEvent.input(hex, { target: { value: '#a1b2c3' } })
+      fireEvent.blur(hex)
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        colour: '#a1b2c3',
+        kind: 'colour',
+      })
     })
   })
 

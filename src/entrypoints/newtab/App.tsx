@@ -310,6 +310,7 @@ export function App() {
           {popover === 'settings' && (
             <SettingsPanel
               background={background.value}
+              backgroundLoaded={background.loaded}
               backgroundReadOnly={background.readOnly}
               currentId={photoBackground ? (photo?.id ?? null) : null}
               initialSection={entry.section}
