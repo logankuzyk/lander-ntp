@@ -4,11 +4,10 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root, or
-- **`CONTEXT-MAP.md`** at the repo root if it exists: it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+- **`CONTEXT.md`** at the repo root for the glossary.
+- **Decisions**, in place of ADRs: `Type: grilling` rows in the **Lander roadmap** Notion database (see `docs/agents/issue-tracker.md`). A closed one carries a `## Resolution` section with the decision and the owner's reasoning; a still-open one is a question in progress. Query the data source (`notion-query-data-sources`, filtered on `Type: grilling`) for rows that touch the area you're about to work in, and fetch each one's page for its Resolution.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+There is no `docs/adr/` in this repo — decisions live in Notion, not as files. Don't create one. If `CONTEXT.md` doesn't exist, proceed silently: the `/domain-modeling` skill creates it lazily when terms actually get resolved.
 
 ## File structure
 
@@ -17,9 +16,6 @@ Single-context repo (this repo):
 ```
 /
 ├── CONTEXT.md
-├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
 └── src/
 ```
 
@@ -29,8 +25,8 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 
-## Flag ADR conflicts
+## Flag decision conflicts
 
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+If your output contradicts the Resolution of a closed `grilling` ticket, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
+> _Contradicts LR-9's Resolution ("The standard widget pattern"), but worth reopening because…_

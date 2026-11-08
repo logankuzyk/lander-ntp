@@ -29,4 +29,4 @@ Canonical label names, split across two Notion select properties (`Category`, `T
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` at the repo root for the glossary; decisions (ADRs) live as `grilling` tickets in the Lander roadmap Notion database, not `docs/adr/`. See `docs/agents/domain.md`.
