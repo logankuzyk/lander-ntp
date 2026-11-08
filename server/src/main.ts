@@ -8,6 +8,7 @@ import { createConsoleMailer } from './auth.js'
 import { Backups } from './backups.js'
 import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
+import { pingHeartbeat } from './heartbeat.js'
 import { createDirectoryObjectStore, createR2ObjectStore, type ObjectStore } from './objectStore.js'
 
 export type StartServerOptions = {
@@ -49,6 +50,14 @@ export function scheduleNightlyBackup(backups: Backups, clock: { now: () => Date
   }
 }
 
+export function startBackupMaintenance(backups: Backups, clock: { now: () => Date }) {
+  const startup = backups
+    .ensureRecentDump()
+    .catch((error: unknown) => console.error('Startup database dump failed', error))
+  const stop = scheduleNightlyBackup(backups, clock)
+  return { startup, stop }
+}
+
 export async function startServer(options: StartServerOptions = {}) {
   const config = options.config ?? loadConfig()
   const db = options.db ?? openDatabase(config.databasePath)
@@ -60,9 +69,8 @@ export async function startServer(options: StartServerOptions = {}) {
     db,
     ...(config.heartbeatUrl
       ? {
-          heartbeat: async () => {
-            const response = await fetch(config.heartbeatUrl!)
-            if (!response.ok) throw new Error(`Heartbeat returned status ${response.status}`)
+          heartbeat: async (signal: AbortSignal) => {
+            await pingHeartbeat(config.heartbeatUrl!, signal)
           },
         }
       : {}),
@@ -77,10 +85,8 @@ export async function startServer(options: StartServerOptions = {}) {
   })
   let stopBackupSchedule: () => void = () => undefined
   if (config.nodeEnv !== 'test') {
-    void backups
-      .ensureRecentDump()
-      .catch((error: unknown) => console.error('Startup database dump failed', error))
-    stopBackupSchedule = scheduleNightlyBackup(backups, clock)
+    const maintenance = startBackupMaintenance(backups, clock)
+    stopBackupSchedule = maintenance.stop
   }
   const server = serve({ fetch: app.fetch, port: config.port }) as HttpServer
 

@@ -171,6 +171,47 @@ describe('Backups', () => {
     expect((await store.list('dumps/')).map(({ key }) => key)).toHaveLength(1)
   })
 
+  it('does not replace a dump that is exactly 24 hours old', async () => {
+    const { backups, store } = fixture()
+    await store.put('dumps/lander-20260130T031700Z.db.gz', new Uint8Array([1]))
+
+    await expect(backups.ensureRecentDump()).resolves.toBeUndefined()
+    expect((await store.list('dumps/')).map(({ key }) => key)).toEqual([
+      'dumps/lander-20260130T031700Z.db.gz',
+    ])
+  })
+
+  it('aborts a heartbeat that stalls so the nightly run can finish', async () => {
+    const { databasePath, db, store } = fixture()
+    let heartbeatAborted = false
+    const backups = new Backups({
+      clock: { now: () => new Date('2026-01-31T03:17:00.000Z') },
+      databasePath,
+      db,
+      heartbeat: (signal) =>
+        new Promise<void>((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              heartbeatAborted = true
+              reject(signal.reason)
+            },
+            { once: true },
+          )
+        }),
+      heartbeatTimeoutMs: 10,
+      objectStore: store,
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await expect(backups.runNightly()).resolves.toBe('dumps/lander-20260131T031700Z.db.gz')
+    expect(heartbeatAborted).toBe(true)
+    expect(error).toHaveBeenCalledWith(
+      'Nightly backup completed but heartbeat failed',
+      expect.anything(),
+    )
+  })
+
   it('prunes deleted ids after 30 days and keeps ids at the 30-day boundary', async () => {
     const { backups, db, store } = fixture()
     db.exec(

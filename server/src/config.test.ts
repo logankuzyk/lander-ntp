@@ -12,6 +12,18 @@ describe('loadBackupConfig', () => {
 })
 
 describe('loadConfig', () => {
+  it('rejects a malformed optional heartbeat URL', () => {
+    expect(() => loadConfig({ AUTH_SECRET: 'a'.repeat(32), HEARTBEAT_URL: 'not a URL' })).toThrow(
+      /HEARTBEAT_URL/,
+    )
+  })
+
+  it('rejects incomplete R2 credentials', () => {
+    expect(() => loadConfig({ AUTH_SECRET: 'a'.repeat(32), R2_ACCOUNT_ID: 'account-id' })).toThrow(
+      /must be set together/,
+    )
+  })
+
   it('rejects an authentication secret shorter than 32 characters', () => {
     expect(() => loadConfig({ AUTH_SECRET: 'too-short' })).toThrow(/AUTH_SECRET/)
   })

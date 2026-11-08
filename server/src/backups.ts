@@ -19,7 +19,8 @@ export type BackupDependencies = {
   clock: { now: () => Date }
   databasePath: string
   db: DatabaseSync
-  heartbeat?: () => Promise<void>
+  heartbeat?: (signal: AbortSignal) => Promise<void>
+  heartbeatTimeoutMs?: number
   logger?: Pick<Console, 'error' | 'info'>
   objectStore: ObjectStore
 }
@@ -113,7 +114,7 @@ export class Backups {
       await this.prune(now)
       if (heartbeat) {
         try {
-          await heartbeat()
+          await heartbeat(AbortSignal.timeout(this.dependencies.heartbeatTimeoutMs ?? 10_000))
         } catch (error) {
           logger.error('Nightly backup completed but heartbeat failed', error)
         }
