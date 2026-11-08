@@ -6,19 +6,19 @@ Data source: `collection://b75cc68b-f3ca-4f28-bb11-5961b0b61d9f` — fetch it fo
 
 ## Schema
 
-| Property | Type | Values / notes |
-| --- | --- | --- |
-| `Name` | title | — |
-| `userDefined:ID` | auto-increment number | the `#42`-style reference for this tracker |
-| `Status` | select | `Open`, `In progress`, `Closed`, `Out of scope` |
-| `Type` | select | `map`, `phase`, `research`, `prototype`, `grilling`, `task`, `build` — wayfinder's hierarchy levels, not a triage field |
-| `Category` | select | `bug`, `enhancement` — the triage category role |
-| `Triage` | select | `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — the triage state role, added by `/setup-matt-pocock-skills` on 2026-11-07 |
-| `Agent` | select | `Claude`, `Codex` — which coding agent builds it; only the orchestrator sets this |
-| `Assignee` | person | — |
-| `PR` | url | the GitHub PR implementing this item, once one exists |
-| `Parent item` / `Sub-items` | relation | the map → phase → ticket hierarchy |
-| `Blocked by` / `Blocking` | relation | dependency edges |
+| Property                    | Type                  | Values / notes                                                                                                                                            |
+| --------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Name`                      | title                 | —                                                                                                                                                         |
+| `userDefined:ID`            | auto-increment number | the `#42`-style reference for this tracker                                                                                                                |
+| `Status`                    | select                | `Open`, `In progress`, `Closed`, `Out of scope`                                                                                                           |
+| `Type`                      | select                | `map`, `phase`, `research`, `prototype`, `grilling`, `task`, `build` — wayfinder's hierarchy levels, not a triage field                                   |
+| `Category`                  | select                | `bug`, `enhancement` — the triage category role                                                                                                           |
+| `Triage`                    | select                | `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — the triage state role, added by `/setup-matt-pocock-skills` on 2026-11-07 |
+| `Agent`                     | select                | `Claude`, `Codex` — which coding agent builds it; only the orchestrator sets this                                                                         |
+| `Assignee`                  | person                | —                                                                                                                                                         |
+| `PR`                        | url                   | the GitHub PR implementing this item, once one exists                                                                                                     |
+| `Parent item` / `Sub-items` | relation              | the map → phase → ticket hierarchy                                                                                                                        |
+| `Blocked by` / `Blocking`   | relation              | dependency edges                                                                                                                                          |
 
 ## Conventions
 
