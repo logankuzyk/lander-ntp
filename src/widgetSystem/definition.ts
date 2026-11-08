@@ -36,6 +36,19 @@ export type SwitchOption = OptionBase & {
   shared?: never
 }
 
+/** Free text, kept as entered so a Widget can validate and preview it while typing. */
+export type TextOption = OptionBase & {
+  control: 'text'
+  default: string
+  placeholder?: string
+}
+
+/** Icon data, null until a user uploads one. */
+export type IconOption = OptionBase & {
+  control: 'icon'
+  default: string | null
+}
+
 /** One of the listed values. */
 export type ChoiceOption = OptionBase & {
   choices: readonly { label: string; value: string }[]
@@ -112,12 +125,14 @@ export type PageValueOption = OptionBase & {
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
   | ChoiceOption
+  | IconOption
   | MultiPickOption
   | OrderedListOption
   | PageValueOption
   | PickOption
   | PlaceOption
   | SwitchOption
+  | TextOption
 
 /** A size on the Grid, in whole cells. */
 export type Cells = { h: number; w: number }

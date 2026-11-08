@@ -226,6 +226,15 @@ export function OptionsForm({
             value={read[option.id] as string}
           />
         )
+      case 'icon':
+        return (
+          <div class="settings__row">
+            <span>{option.label}</span>
+            <span class="settings__note">
+              {read[option.id] ? 'Uploaded icon' : read.url ? "The site's own icon" : 'A letter'}
+            </span>
+          </div>
+        )
       case 'orderedList': {
         const heading = `${headings}-${option.id}`
         return (
@@ -284,6 +293,20 @@ export function OptionsForm({
             label={option.label}
             onChange={(value) => change({ [option.id]: value })}
           />
+        )
+      case 'text':
+        return (
+          <label class="settings__row settings__row--text">
+            <span>{option.label}</span>
+            <input
+              class="settings__input"
+              disabled={off}
+              onInput={(event) => change({ [option.id]: event.currentTarget.value })}
+              placeholder={option.placeholder}
+              type="text"
+              value={read[option.id] as string}
+            />
+          </label>
         )
     }
   }

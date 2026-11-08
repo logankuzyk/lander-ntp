@@ -1240,6 +1240,59 @@ body {
   opacity: 0.5;
 }
 
+.settings__row--text {
+  align-items: center;
+}
+
+.settings__row--text .settings__input {
+  max-width: 65%;
+}
+
+.quick-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18em;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+  font-size: min(18cqw, 18cqh);
+}
+
+.quick-dial__icon {
+  display: grid;
+  flex: 0 0 1.7em;
+  width: 1.7em;
+  height: 1.7em;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0.35em;
+  color: white;
+  font-weight: 600;
+}
+
+.quick-dial__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.quick-dial__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (min-aspect-ratio: 3 / 2) {
+  .quick-dial {
+    flex-direction: row;
+    gap: 0.45em;
+  }
+}
+
 .settings__note a {
   color: inherit;
   text-underline-offset: 0.2em;
