@@ -413,22 +413,19 @@ body {
   width: 100%;
 }
 
-.bookmarks__items a,
 .bookmarks__more {
   color: inherit;
-  font-size: 0.8em;
-  line-height: 1;
   min-width: 0;
   overflow: hidden;
-  padding: 0.18em 0.25em;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.bookmarks__items a:hover,
-.bookmarks__items a:focus-visible {
-  text-decoration: underline;
+.bookmarks__more {
+  align-self: center;
+  font-size: 0.9em;
+  justify-self: center;
 }
 
 .bookmarks__empty {
