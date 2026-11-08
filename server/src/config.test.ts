@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { loadConfig } from './config.js'
+import { loadBackupConfig, loadConfig } from './config.js'
+
+describe('loadBackupConfig', () => {
+  it('loads local restore paths without requiring an authentication secret', () => {
+    expect(loadBackupConfig({})).toEqual({
+      databasePath: expect.stringMatching(/\/server\/data\/lander\.sqlite$/),
+      objectStoreDirectory: expect.stringMatching(/\/server\/data\/objects$/),
+    })
+  })
+})
 
 describe('loadConfig', () => {
   it('rejects an authentication secret shorter than 32 characters', () => {

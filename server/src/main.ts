@@ -5,32 +5,83 @@ import { pathToFileURL } from 'node:url'
 
 import { createApp } from './app.js'
 import { createConsoleMailer } from './auth.js'
+import { Backups } from './backups.js'
 import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
+import { createDirectoryObjectStore, createR2ObjectStore, type ObjectStore } from './objectStore.js'
 
 export type StartServerOptions = {
   config?: ServerConfig
   db?: DatabaseSync
+  objectStore?: ObjectStore
   shutdownTimeoutMs?: number
+}
+
+function makeObjectStore(config: ServerConfig): ObjectStore {
+  return config.r2
+    ? createR2ObjectStore(config.r2)
+    : createDirectoryObjectStore(config.objectStoreDirectory ?? 'data/objects')
+}
+
+function nextNightlyTime(now: Date): Date {
+  const next = new Date(now)
+  next.setUTCHours(3, 17, 0, 0)
+  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1)
+  return next
+}
+
+export function scheduleNightlyBackup(backups: Backups, clock: { now: () => Date }): () => void {
+  let stopped = false
+  let timer: NodeJS.Timeout | undefined
+  const schedule = () => {
+    if (stopped) return
+    const now = clock.now()
+    const delay = nextNightlyTime(now).getTime() - now.getTime()
+    timer = setTimeout(() => {
+      void backups.runNightly().catch(() => undefined).finally(schedule)
+    }, delay)
+    timer.unref()
+  }
+  schedule()
+  return () => {
+    stopped = true
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export async function startServer(options: StartServerOptions = {}) {
   const config = options.config ?? loadConfig()
   const db = options.db ?? openDatabase(config.databasePath)
+  const clock = { now: () => new Date() }
+  const objectStore = options.objectStore ?? makeObjectStore(config)
+  const backups = new Backups({
+    clock,
+    databasePath: config.databasePath,
+    db,
+    ...(config.heartbeatUrl
+      ? {
+          heartbeat: async () => {
+            const response = await fetch(config.heartbeatUrl!)
+            if (!response.ok) throw new Error(`Heartbeat returned status ${response.status}`)
+          },
+        }
+      : {}),
+    objectStore,
+  })
   const app = await createApp({
-    clock: { now: () => new Date() },
+    clock,
     config,
     db,
     mailer: createConsoleMailer(config.nodeEnv),
-    objectStore: {
-      get: async () => {
-        throw new Error('Object store is not configured')
-      },
-      put: async () => {
-        throw new Error('Object store is not configured')
-      },
-    },
+    objectStore,
   })
+  let stopBackupSchedule: () => void = () => undefined
+  if (config.nodeEnv !== 'test') {
+    void backups
+      .ensureRecentDump()
+      .catch((error: unknown) => console.error('Startup database dump failed', error))
+    stopBackupSchedule = scheduleNightlyBackup(backups, clock)
+  }
   const server = serve({ fetch: app.fetch, port: config.port }) as HttpServer
 
   let shuttingDown = false
@@ -48,6 +99,7 @@ export async function startServer(options: StartServerOptions = {}) {
       process.removeListener('SIGTERM', shutdown)
       process.removeListener('SIGINT', shutdown)
       if (db.isOpen) db.close()
+      stopBackupSchedule()
     })
     server.closeIdleConnections()
   }

@@ -5,6 +5,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { createAuth, type Mailer } from './auth.js'
 import type { ServerConfig } from './config.js'
+import type { ObjectStore } from './objectStore.js'
 
 const maximumBodyBytes = 16 * 1024
 
@@ -13,10 +14,7 @@ export type AppDependencies = {
   config: ServerConfig
   db: DatabaseSync
   mailer: Mailer
-  objectStore: {
-    get: (key: string) => Promise<Uint8Array | undefined>
-    put: (key: string, value: Uint8Array) => Promise<void>
-  }
+  objectStore: ObjectStore
 }
 
 export async function createApp(dependencies: AppDependencies) {

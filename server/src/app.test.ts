@@ -24,7 +24,12 @@ async function makeApp() {
     },
     db,
     mailer: { send: async () => undefined },
-    objectStore: { get: async () => undefined, put: async () => undefined },
+    objectStore: {
+      delete: async () => undefined,
+      get: async () => undefined,
+      list: async () => [],
+      put: async () => undefined,
+    },
   })
 }
 
@@ -49,7 +54,12 @@ async function makeAuthApp(configOverrides: Partial<ServerConfig> = {}) {
         messages.push(message as MailMessage)
       },
     },
-    objectStore: { get: async () => undefined, put: async () => undefined },
+    objectStore: {
+      delete: async () => undefined,
+      get: async () => undefined,
+      list: async () => [],
+      put: async () => undefined,
+    },
   })
   return { app, db, messages }
 }
