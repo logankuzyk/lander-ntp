@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { storage } from 'wxt/utils/storage'
 
 import { NEWS } from './callouts'
 import { recordInstall } from './install'
@@ -28,6 +29,28 @@ describe('recordInstall', () => {
     await recordInstall(reason)
 
     expect(await onboardingItem.getValue()).toEqual(existing)
+  })
+
+  it('keeps onboarding keys another version added', async () => {
+    const existing = { dismissed: ['weather'], futureCallout: 2, welcomed: true }
+    await onboardingItem.setValue(existing)
+
+    expect(await onboardingItem.getValue()).toEqual(existing)
+  })
+
+  it('does not save over onboarding from a newer version', async () => {
+    const newer = { dismissed: [], v: 2, welcomed: true }
+    await storage.setItem('sync:onboarding', newer)
+
+    await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
+
+    expect(await storage.getItem('sync:onboarding')).toEqual(newer)
+  })
+
+  it('does not read onboarding from a newer version', async () => {
+    await storage.setItem('sync:onboarding', { dismissed: [], v: 2, welcomed: true })
+
+    expect(await onboardingItem.getValue()).toBeNull()
   })
 
   it('ignores the browser itself updating', async () => {

@@ -45,6 +45,26 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/sync/shapes/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { message: 'Shared stored shapes must stay independent of WXT.', name: 'wxt' },
+            { message: 'Shared stored shapes must stay independent of Preact.', name: 'preact' },
+          ],
+          patterns: [
+            {
+              group: ['wxt/*', 'preact/*', '@/*'],
+              message: 'Shared stored shapes may only import pure modules by relative path.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     languageOptions: {
       globals: { ...globals.browser },
     },

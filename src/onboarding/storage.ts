@@ -1,6 +1,8 @@
 import * as v from 'valibot'
 import { storage } from 'wxt/utils/storage'
 
+import { hasNewerVersion, syncedShapes } from '@/sync/shapes'
+
 export type Onboarding = {
   /** Ids of the news callouts that have been seen off, or never needed showing; see ./callouts. */
   dismissed: string[]
@@ -8,12 +10,11 @@ export type Onboarding = {
   welcomed: boolean
 }
 
-const OnboardingSchema = v.object({ dismissed: v.array(v.string()), welcomed: v.boolean() })
-
 /** Anything in another shape counts as nothing stored. */
 const current = (value: unknown): Onboarding | null => {
-  const result = v.safeParse(OnboardingSchema, value)
-  return result.success ? result.output : null
+  if (!syncedShapes.onboarding.check(value).ok) return null
+  const result = v.safeParse(syncedShapes.onboarding.schema, value)
+  return result.success ? (result.output as Onboarding) : null
 }
 
 const stored = storage.defineItem<Onboarding | null>('sync:onboarding', { fallback: null })
@@ -36,7 +37,11 @@ export const onboardingItem = {
   fallback: null,
   getValue: async (): Promise<Onboarding | null> =>
     current(await stored.getValue()) ?? current(await pendingItem.getValue()),
-  setValue: (value: Onboarding | null): Promise<void> => stored.setValue(value),
+  setValue: async (value: Onboarding | null): Promise<void> => {
+    const existing = await stored.getValue()
+    if (hasNewerVersion(existing, syncedShapes.onboarding.version)) return
+    await stored.setValue(value)
+  },
   watch: (callback: (value: Onboarding | null) => void): (() => void) => {
     const notify = () => void onboardingItem.getValue().then(callback)
     const unwatchStored = stored.watch(notify)
