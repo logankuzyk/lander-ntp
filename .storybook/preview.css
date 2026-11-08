@@ -1,0 +1,7 @@
+/*
+ * The extension's page is 100% tall all the way down (html, body, #app). Storybook's root is
+ * not, and the Grid is laid over `.app`, so a story of the whole page would collapse without it.
+ */
+#storybook-root {
+  height: 100%;
+}

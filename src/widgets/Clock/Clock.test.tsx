@@ -64,4 +64,35 @@ describe('Clock', () => {
 
     expect(time(container)).toBe('21:05:10')
   })
+
+  it('says what it shows on its root, for the styles to size it by', () => {
+    const plain = render(<Clock hour12={false} showDate={false} showSeconds={false} />)
+    const root = plain.container.querySelector('.clock')
+    expect(root?.classList.contains('clock--seconds')).toBe(false)
+    expect(root?.classList.contains('clock--date')).toBe(false)
+    plain.unmount()
+
+    const full = render(<Clock hour12={false} showDate showSeconds />)
+    const fullRoot = full.container.querySelector('.clock')
+    expect(fullRoot?.classList.contains('clock--seconds')).toBe(true)
+    expect(fullRoot?.classList.contains('clock--date')).toBe(true)
+  })
+
+  it('names each option by its own class, so swapping them is caught', () => {
+    const classes = (showDate: boolean, showSeconds: boolean) => {
+      const { container, unmount } = render(
+        <Clock hour12={false} showDate={showDate} showSeconds={showSeconds} />,
+      )
+      const root = container.querySelector('.clock')
+      const found = {
+        date: root?.classList.contains('clock--date'),
+        seconds: root?.classList.contains('clock--seconds'),
+      }
+      unmount()
+      return found
+    }
+
+    expect(classes(false, true)).toEqual({ date: false, seconds: true })
+    expect(classes(true, false)).toEqual({ date: true, seconds: false })
+  })
 })

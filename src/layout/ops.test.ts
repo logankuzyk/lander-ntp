@@ -1,0 +1,1067 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { clockDefinition } from '@/widgets/Clock/definition'
+import { weatherDefinition } from '@/widgets/Weather/definition'
+import { defaultOptions } from '@/widgetSystem/options'
+
+import { checkLayout, storedLayout } from './check'
+import { collides, drawnRects, isOnGrid } from './geometry'
+import {
+  addWidget,
+  moveWidget,
+  type Refusal,
+  removeWidget,
+  resizeWidget,
+  restoreWidget,
+  setOptions,
+  settle,
+} from './ops'
+import type { Layout, PlacedWidget } from './types'
+
+const CLOCK_OPTIONS = { showDate: false, showSeconds: false }
+
+const clock = (id: string, col: number, row: number, extra: Partial<PlacedWidget> = {}) => ({
+  col,
+  h: 2,
+  id,
+  options: { ...CLOCK_OPTIONS },
+  row,
+  type: 'clock',
+  w: 4,
+  ...extra,
+})
+
+const weather = (id: string, col: number, row: number, extra: Partial<PlacedWidget> = {}) => ({
+  col,
+  h: 2,
+  id,
+  options: {},
+  row,
+  type: 'weather',
+  w: 2,
+  ...extra,
+})
+
+const layoutOf = (...widgets: unknown[]): Layout => checkLayout({ v: 1, widgets })
+
+/** What a Layout is stored as, as JSON, so that two can be compared whole. */
+const stored = (layout: Layout) =>
+  JSON.parse(JSON.stringify(storedLayout(layout))) as Record<string, unknown> & {
+    widgets: unknown[]
+  }
+
+const editable = (layout: Layout) => ({ layout, readOnly: false })
+
+/** The next Layout of an operation that must succeed. */
+function accepted(result: { layout: Layout; ok: true } | { ok: false; reason: Refusal }): Layout {
+  if (!result.ok) throw new Error(`refused: ${result.reason}`)
+  return result.layout
+}
+
+const refusal = (result: { ok: boolean; reason?: Refusal }) =>
+  result.ok ? 'accepted' : result.reason
+
+const placedOf = (layout: Layout, id: string): PlacedWidget => {
+  const found = layout.widgets.find(
+    (widget) => widget.kind !== 'malformed' && widget.placed.id === id,
+  )
+  if (!found || found.kind === 'malformed') throw new Error(`no Widget ${id}`)
+  return found.placed
+}
+
+describe('addWidget', () => {
+  it('puts a new Clock at the middle of an empty Grid at its starting size, with default options', () => {
+    const result = addWidget(editable(layoutOf()), 'clock')
+
+    expect(result.ok).toBe(true)
+    const next = accepted(result)
+    expect(next.widgets).toHaveLength(1)
+    expect(next.widgets[0]).toMatchObject({
+      definition: clockDefinition,
+      kind: 'known',
+      options: CLOCK_OPTIONS,
+      placed: { col: 5, h: 2, options: CLOCK_OPTIONS, row: 4, type: 'clock', w: 4 },
+    })
+  })
+
+  it('says which Widget it added, with an id of eight characters that is not taken', () => {
+    const before = layoutOf(clock('k3f9x2ma', 1, 1))
+    const result = addWidget(editable(before), 'clock')
+
+    expect(result.ok && result.id).toMatch(/^[a-z0-9]{8}$/)
+    const next = accepted(result)
+    const ids = next.widgets.map((widget) => widget.kind === 'known' && widget.placed.id)
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+    expect(ids).toContain(result.ok && result.id)
+  })
+
+  it('stores the new Widget the way LR-15 shapes one, and nothing else', () => {
+    const next = accepted(addWidget(editable(layoutOf()), 'weather'))
+
+    expect(stored(next)).toEqual({
+      v: 1,
+      widgets: [
+        {
+          col: 6,
+          h: 2,
+          id: expect.stringMatching(/^[a-z0-9]{8}$/) as unknown,
+          options: defaultOptions(weatherDefinition),
+          row: 4,
+          type: 'weather',
+          w: 2,
+        },
+      ],
+    })
+  })
+
+  it('does not change the Layout it was given, and keeps everything else in it as it was', () => {
+    const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
+    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+    const before = checkLayout({
+      extra: 'yes',
+      v: 1,
+      waiting: { weather: defaultOptions(weatherDefinition) },
+      widgets: [clock('a', 5, 4), malformed, future],
+    })
+    const snapshot = JSON.stringify(stored(before))
+
+    const next = accepted(addWidget(editable(before), 'clock'))
+
+    expect(JSON.stringify(stored(before))).toBe(snapshot)
+    const after = stored(next) as { extra?: string; waiting?: unknown; widgets: unknown[] }
+    expect(after.extra).toBe('yes')
+    expect(after.waiting).toEqual({ weather: defaultOptions(weatherDefinition) })
+    expect(after.widgets.slice(0, 3)).toEqual(
+      (JSON.parse(snapshot) as { widgets: unknown[] }).widgets,
+    )
+    expect(after.widgets).toHaveLength(4)
+  })
+
+  it('allows any number of one type', () => {
+    let layout = layoutOf()
+    for (let i = 0; i < 3; i++) layout = accepted(addWidget(editable(layout), 'weather'))
+
+    expect(layout.widgets).toHaveLength(3)
+    const rects = drawnRects(layout).map(({ rect }) => rect)
+    expect(rects).toHaveLength(3)
+    for (const rect of rects) expect(isOnGrid(rect)).toBe(true)
+    expect(
+      collides(rects[0]!, rects[1]!) ||
+        collides(rects[1]!, rects[2]!) ||
+        collides(rects[0]!, rects[2]!),
+    ).toBe(false)
+  })
+
+  it('refuses when no place of its smallest size is free, adding nothing', () => {
+    const full = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }))
+    const result = addWidget(editable(full), 'weather')
+
+    expect(result).toEqual({ ok: false, reason: 'no room' })
+  })
+
+  it('shrinks a Clock to fit before refusing it', () => {
+    // Rows 1 to 5 taken, and the corners of rows 6 to 8: only columns 5 to 7 are free.
+    const crowded = layoutOf(
+      clock('top', 1, 1, { h: 5, w: 12 }),
+      clock('l', 1, 6, { h: 3, w: 4 }),
+      clock('r', 8, 6, { h: 3, w: 5 }),
+    )
+
+    const result = addWidget(editable(crowded), 'clock')
+
+    expect(placedOf(accepted(result), result.ok ? result.id : '')).toMatchObject({
+      col: 5,
+      h: 2,
+      row: 6,
+      w: 3,
+    })
+  })
+
+  it('refuses a type this version does not know', () => {
+    expect(addWidget(editable(layoutOf()), 'bookmarks')).toEqual({
+      ok: false,
+      reason: 'unknown type',
+    })
+  })
+
+  it('refuses while the Layout is read-only, before looking at anything else', () => {
+    expect(addWidget({ layout: layoutOf(), readOnly: true }, 'clock')).toEqual({
+      ok: false,
+      reason: 'read only',
+    })
+    expect(addWidget({ layout: layoutOf(), readOnly: true }, 'bookmarks')).toEqual({
+      ok: false,
+      reason: 'read only',
+    })
+  })
+
+  describe('with options waiting from an update', () => {
+    const waitingWeather = {
+      ...defaultOptions(weatherDefinition),
+      followDevice: true,
+      unit: 'fahrenheit',
+    }
+    const waitingClock = { showDate: true, showSeconds: true }
+
+    it('starts the first Weather from them and removes them in the same step', () => {
+      const before = checkLayout({ v: 1, waiting: { weather: waitingWeather }, widgets: [] })
+
+      const next = accepted(addWidget(editable(before), 'weather'))
+
+      expect(next.widgets[0]).toMatchObject({ kind: 'known', placed: { options: waitingWeather } })
+      expect(next.waiting).toBeUndefined()
+      expect('waiting' in stored(next)).toBe(false)
+    })
+
+    it('starts the next Weather from the defaults', () => {
+      const before = checkLayout({ v: 1, waiting: { weather: waitingWeather }, widgets: [] })
+
+      const once = accepted(addWidget(editable(before), 'weather'))
+      const twice = accepted(addWidget(editable(once), 'weather'))
+
+      expect(twice.widgets[1]).toMatchObject({
+        placed: { options: defaultOptions(weatherDefinition) },
+      })
+    })
+
+    it('uses only the options of the type added, and leaves the other waiting', () => {
+      const before = checkLayout({
+        v: 1,
+        waiting: { clock: waitingClock, weather: waitingWeather },
+        widgets: [],
+      })
+
+      const next = accepted(addWidget(editable(before), 'clock'))
+
+      expect(next.waiting).toEqual({ weather: waitingWeather })
+      // Seconds start a Clock at 6 by 2: the size follows the options it starts from.
+      expect(next.widgets[0]).toMatchObject({
+        placed: { col: 4, h: 2, options: waitingClock, row: 4, w: 6 },
+      })
+    })
+
+    it('keeps the options it does not understand, and draws what it does', () => {
+      const before = checkLayout({
+        v: 1,
+        waiting: { clock: { ...waitingClock, tint: 'red' } },
+        widgets: [],
+      })
+
+      const next = accepted(addWidget(editable(before), 'clock'))
+
+      expect(next.widgets[0]).toMatchObject({
+        placed: { options: { ...waitingClock, tint: 'red' } },
+      })
+    })
+
+    it('keeps them waiting when the add is refused', () => {
+      const before = checkLayout({
+        v: 1,
+        waiting: { weather: waitingWeather },
+        widgets: [clock('all', 1, 1, { h: 8, w: 12 })],
+      })
+
+      expect(addWidget(editable(before), 'weather')).toEqual({ ok: false, reason: 'no room' })
+      expect(before.waiting).toEqual({ weather: waitingWeather })
+    })
+  })
+})
+
+describe('addWidget, at the Widget limit', () => {
+  /** `n` Clocks, three to a row, so that the Grid has room left. */
+  const clocksOf = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      clock(`clock${String(i).padStart(3, '0')}`, 1 + (i % 3) * 4, 1 + Math.floor(i / 3) * 2),
+    )
+
+  it('adds the eighth and refuses the ninth, with nothing changed', () => {
+    const seven = layoutOf(...clocksOf(7))
+    const eighth = accepted(addWidget(editable(seven), 'weather'))
+    expect(eighth.widgets).toHaveLength(8)
+
+    const result = addWidget(editable(eighth), 'weather')
+
+    expect(result).toEqual({ ok: false, reason: 'limit' })
+    expect(eighth.widgets).toHaveLength(8)
+  })
+
+  it('says limit and not no room when the Grid is also full', () => {
+    // Eight Clocks of 3 by 4 take every cell: two rows of four.
+    const full = layoutOf(
+      ...Array.from({ length: 8 }, (_, i) =>
+        clock(`clock${i}`.padEnd(8, '0'), 1 + (i % 4) * 3, 1 + Math.floor(i / 4) * 4, {
+          h: 4,
+          w: 3,
+        }),
+      ),
+    )
+    expect(addWidget(editable(full), 'clock')).toEqual({ ok: false, reason: 'limit' })
+  })
+
+  it('refuses a Layout of nine, which loaded whole, until it is back under', () => {
+    const nine = layoutOf(...clocksOf(9))
+    expect(nine.widgets).toHaveLength(9)
+    expect(refusal(addWidget(editable(nine), 'weather'))).toBe('limit')
+
+    const eight = accepted(removeWidget(editable(nine), 'clock000'))
+    expect(refusal(addWidget(editable(eight), 'weather'))).toBe('limit')
+
+    const seven = accepted(removeWidget(editable(eight), 'clock001'))
+    expect(refusal(addWidget(editable(seven), 'weather'))).toBe('accepted')
+  })
+
+  it('leaves the other reasons as they were: read only and an unknown type come first', () => {
+    const eight = layoutOf(...clocksOf(8))
+    expect(refusal(addWidget({ layout: eight, readOnly: true }, 'clock'))).toBe('read only')
+    expect(refusal(addWidget(editable(eight), 'bookmarks'))).toBe('unknown type')
+  })
+
+  it('adds without a limit when there is none', () => {
+    const nine = layoutOf(...clocksOf(9))
+    expect(refusal(addWidget(editable(nine), 'weather', undefined, null))).toBe('accepted')
+  })
+
+  it('does not stop putting back the Widget that was just removed (Undo, LR-12)', () => {
+    const eight = layoutOf(...clocksOf(8))
+    const removed = removeWidget(editable(eight), 'clock003')
+    if (!removed.ok) throw new Error('refused')
+    const seven = removed.layout
+    // Another is added in its place: the Layout is at the limit again.
+    const refilled = accepted(addWidget(editable(seven), 'weather'))
+    expect(refilled.widgets).toHaveLength(8)
+
+    const restored = restoreWidget(editable(refilled), removed.removed)
+
+    expect(restored.ok).toBe(true)
+    expect(restored.ok && restored.layout.widgets).toHaveLength(9)
+  })
+})
+
+describe('moveWidget', () => {
+  const layout = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+
+  it('moves a Widget to a free place, keeping its size and everything else about it', () => {
+    const next = accepted(moveWidget(editable(layout), 'b', { col: 1, row: 7 }))
+
+    expect(placedOf(next, 'b')).toEqual({ ...weather('b', 1, 7) })
+    expect(placedOf(next, 'a')).toEqual(clock('a', 5, 4))
+    expect(next.widgets.map((widget) => widget.kind === 'known' && widget.placed.id)).toEqual([
+      'a',
+      'b',
+    ])
+  })
+
+  it('does not change the Layout it was given', () => {
+    const snapshot = JSON.stringify(stored(layout))
+    moveWidget(editable(layout), 'b', { col: 1, row: 7 })
+    expect(JSON.stringify(stored(layout))).toBe(snapshot)
+  })
+
+  it('keeps an unknown Widget’s stored data when it moves and another Widget is removed', () => {
+    const future = {
+      col: 1,
+      h: 2,
+      id: 'future01',
+      later: { badge: 'new' },
+      options: { colour: 'teal' },
+      row: 1,
+      type: 'bookmarks',
+      w: 2,
+    }
+    const before = layoutOf(future, clock('clock001', 5, 4))
+
+    const moved = accepted(moveWidget(editable(before), 'future01', { col: 10, row: 6 }))
+    const movedFuture = { ...future, col: 10, row: 6 }
+    expect(JSON.stringify(stored(moved).widgets[0])).toBe(JSON.stringify(movedFuture))
+
+    const withoutClock = accepted(removeWidget(editable(moved), 'clock001'))
+    expect(JSON.stringify(stored(withoutClock).widgets)).toBe(JSON.stringify([movedFuture]))
+  })
+
+  it('keeps an unknown Widget’s options and other stored data when settling puts it somewhere else', () => {
+    // On the Clock's cells, after it: the Clock is drawn there and this one is drawn elsewhere.
+    const future = {
+      col: 5,
+      h: 2,
+      id: 'future01',
+      later: { badge: 'new', nested: [1, 2, { three: 3 }] },
+      options: { colour: 'teal', rows: ['a', 'b'] },
+      row: 4,
+      type: 'bookmarks',
+      w: 4,
+    }
+    const before = layoutOf(clock('clock001', 5, 4), future)
+    const drawnAt = drawnRects(before).find(({ widget }) => widget.kind !== 'known')?.rect
+    expect(drawnAt).toBeDefined()
+    expect(drawnAt).not.toMatchObject({ col: 5, row: 4 })
+
+    // Moving the Clock settles first, so the unknown Widget is saved where it was drawn.
+    const moved = accepted(moveWidget(editable(before), 'clock001', { col: 1, row: 1 }))
+
+    const [, after] = stored(moved).widgets as Record<string, unknown>[]
+    expect(after).toMatchObject({ col: drawnAt?.col, id: 'future01', row: drawnAt?.row })
+    // Everything but the cells is as it was stored, in the order it was stored.
+    const without = (widget: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(widget).filter(([key]) => !['col', 'h', 'row', 'w'].includes(key)),
+      )
+    const rest = without(after as Record<string, unknown>)
+    const original = without(future)
+    expect(JSON.stringify(rest)).toBe(JSON.stringify(original))
+  })
+
+  it('keeps what a Widget has that this version does not know', () => {
+    const odd = layoutOf(clock('a', 5, 4, { note: 'kept' } as Partial<PlacedWidget>))
+
+    const next = accepted(moveWidget(editable(odd), 'a', { col: 1, row: 1 }))
+
+    expect(placedOf(next, 'a')).toEqual({ ...clock('a', 1, 1), note: 'kept' })
+  })
+
+  it('allows touching, and a short move onto cells the Widget itself holds', () => {
+    expect(accepted(moveWidget(editable(layout), 'b', { col: 9, row: 4 })).widgets).toHaveLength(2)
+    expect(placedOf(accepted(moveWidget(editable(layout), 'a', { col: 6, row: 4 })), 'a').col).toBe(
+      6,
+    )
+    expect(placedOf(accepted(moveWidget(editable(layout), 'a', { col: 5, row: 4 })), 'a').col).toBe(
+      5,
+    )
+  })
+
+  it.each([
+    ['onto another Widget', { col: 1, row: 1 }, 'overlap'],
+    ['over one corner of another', { col: 4, row: 2 }, 'overlap'],
+    ['past the right edge', { col: 10, row: 4 }, 'outside'],
+    ['past the bottom edge', { col: 5, row: 8 }, 'outside'],
+    ['to column 0', { col: 0, row: 4 }, 'outside'],
+    ['to row 0', { col: 5, row: 0 }, 'outside'],
+    ['between cells', { col: 5.5, row: 4 }, 'outside'],
+  ])('refuses a move %s: %s', (_name, to, reason) => {
+    const crowd = layoutOf(clock('a', 5, 4), clock('b', 1, 1))
+
+    expect(refusal(moveWidget(editable(crowd), 'a', to))).toBe(reason)
+  })
+
+  it('checks the cells the other Widgets are drawn in, not where they are stored', () => {
+    // "off" is stored off the Grid and drawn at columns 5 to 8, rows 2 and 3.
+    const odd = layoutOf(clock('a', 1, 7), clock('off', 10, 4), clock('mid', 5, 4))
+    expect(refusal(moveWidget(editable(odd), 'a', { col: 5, row: 2 }))).toBe('overlap')
+    expect(refusal(moveWidget(editable(odd), 'a', { col: 9, row: 4 }))).toBe('accepted')
+  })
+
+  it('moves a Widget that was drawn elsewhere, and stores where it was moved to', () => {
+    const odd = layoutOf(clock('off', 10, 4), clock('mid', 5, 4))
+
+    const next = accepted(moveWidget(editable(odd), 'off', { col: 1, row: 1 }))
+
+    expect(placedOf(next, 'off')).toMatchObject({ col: 1, row: 1 })
+  })
+
+  it('moves a Widget of a type this version does not know', () => {
+    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+
+    const next = accepted(moveWidget(editable(layoutOf(future)), 'fut', { col: 3, row: 3 }))
+
+    expect(next.widgets[0]).toMatchObject({
+      kind: 'unknown',
+      placed: { ...future, col: 3, row: 3 },
+    })
+  })
+
+  it('refuses a Widget that is not there, or is not well-formed', () => {
+    const odd = layoutOf({ col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 })
+    expect(refusal(moveWidget(editable(layout), 'nope', { col: 1, row: 1 }))).toBe('not found')
+    expect(refusal(moveWidget(editable(odd), 'bad', { col: 1, row: 1 }))).toBe('not found')
+  })
+
+  it('refuses a Widget that has no place to be drawn', () => {
+    const lost = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }), weather('lost', 3, 3))
+    expect(refusal(moveWidget(editable(lost), 'lost', { col: 1, row: 1 }))).toBe('no room')
+  })
+
+  it('refuses while the Layout is read-only', () => {
+    expect(refusal(moveWidget({ layout, readOnly: true }, 'b', { col: 1, row: 7 }))).toBe(
+      'read only',
+    )
+  })
+})
+
+describe('resizeWidget', () => {
+  const layout = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+
+  it('changes the size, keeping the place and everything else', () => {
+    const next = accepted(resizeWidget(editable(layout), 'a', { h: 3, w: 6 }))
+
+    expect(placedOf(next, 'a')).toEqual(clock('a', 5, 4, { h: 3, w: 6 }))
+    expect(placedOf(next, 'b')).toEqual(weather('b', 11, 1))
+  })
+
+  it('allows exactly the smallest and the largest, and touching', () => {
+    expect(
+      placedOf(accepted(resizeWidget(editable(layout), 'a', { h: 2, w: 3 })), 'a'),
+    ).toMatchObject({ h: 2, w: 3 })
+    expect(
+      placedOf(accepted(resizeWidget(editable(layout), 'a', { h: 4, w: 6 })), 'a'),
+    ).toMatchObject({ h: 4, w: 6 })
+    // Weather at columns 11 and 12 may grow only downwards: 2 to 4 columns would leave the Grid.
+    expect(
+      placedOf(accepted(resizeWidget(editable(layout), 'b', { h: 3, w: 2 })), 'b'),
+    ).toMatchObject({ h: 3, w: 2 })
+  })
+
+  it.each([
+    ['one column under the smallest', { h: 2, w: 2 }, 'too small'],
+    ['one row under the smallest', { h: 1, w: 4 }, 'too small'],
+    ['one column over the largest', { h: 2, w: 9 }, 'too large'],
+    ['one row over the largest', { h: 5, w: 4 }, 'too large'],
+    ['under on one side and over on the other', { h: 9, w: 1 }, 'too small'],
+  ])('refuses a Clock %s', (_name, size, reason) => {
+    expect(refusal(resizeWidget(editable(layout), 'a', size))).toBe(reason)
+  })
+
+  it('refuses a size that runs off the Grid, and one onto a neighbour', () => {
+    expect(refusal(resizeWidget(editable(layout), 'b', { h: 2, w: 3 }))).toBe('outside')
+    expect(refusal(resizeWidget(editable(layoutOf(clock('a', 5, 7))), 'a', { h: 3, w: 4 }))).toBe(
+      'outside',
+    )
+    const beside = layoutOf(clock('a', 1, 1), clock('b', 5, 1))
+    expect(refusal(resizeWidget(editable(beside), 'a', { h: 2, w: 5 }))).toBe('overlap')
+    expect(refusal(resizeWidget(editable(beside), 'a', { h: 2, w: 4 }))).toBe('accepted')
+  })
+
+  it('refuses a size that is not whole cells', () => {
+    expect(refusal(resizeWidget(editable(layout), 'a', { h: 2, w: 4.5 }))).toBe('outside')
+  })
+
+  it('resizes from where a Widget is drawn, which is then the place that is stored', () => {
+    const odd = layoutOf(clock('off', 10, 4), clock('mid', 5, 4))
+    // "off" is drawn at column 5, row 2.
+    const next = accepted(resizeWidget(editable(odd), 'off', { h: 2, w: 5 }))
+
+    expect(placedOf(next, 'off')).toMatchObject({ col: 5, h: 2, row: 2, w: 5 })
+  })
+
+  it('does not resize a Widget of a type this version does not know', () => {
+    const future = { col: 1, h: 1, id: 'fut', options: {}, row: 1, type: 'bookmarks', w: 2 }
+    expect(refusal(resizeWidget(editable(layoutOf(future)), 'fut', { h: 2, w: 2 }))).toBe(
+      'unknown type',
+    )
+  })
+
+  it('refuses a Widget that is not there, has no place, or a Layout that is read-only', () => {
+    const lost = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }), weather('lost', 3, 3))
+    expect(refusal(resizeWidget(editable(layout), 'nope', { h: 2, w: 4 }))).toBe('not found')
+    expect(refusal(resizeWidget(editable(lost), 'lost', { h: 2, w: 2 }))).toBe('no room')
+    expect(refusal(resizeWidget({ layout, readOnly: true }, 'a', { h: 2, w: 4 }))).toBe('read only')
+  })
+
+  it('does not change the Layout it was given', () => {
+    const snapshot = JSON.stringify(stored(layout))
+    resizeWidget(editable(layout), 'a', { h: 3, w: 6 })
+    expect(JSON.stringify(stored(layout))).toBe(snapshot)
+  })
+})
+
+describe('removeWidget', () => {
+  const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'bookmarks', w: 2 }
+  const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
+  const layout = checkLayout({
+    extra: 1,
+    v: 1,
+    waiting: { clock: CLOCK_OPTIONS },
+    widgets: [clock('a', 5, 4), future, malformed, weather('b', 11, 1)],
+  })
+
+  it('takes out one Widget and leaves the rest as they were, in the same order', () => {
+    const next = accepted(removeWidget(editable(layout), 'a'))
+
+    expect(stored(next)).toEqual({
+      extra: 1,
+      v: 1,
+      waiting: { clock: CLOCK_OPTIONS },
+      widgets: [future, malformed, weather('b', 11, 1)],
+    })
+  })
+
+  it('removes a Widget of a type this version does not know', () => {
+    const next = accepted(removeWidget(editable(layout), 'fut'))
+    expect((stored(next) as { widgets: unknown[] }).widgets).toHaveLength(3)
+  })
+
+  it('removes a Widget that has no place to be drawn', () => {
+    const lost = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }), weather('lost', 3, 3))
+    expect(accepted(removeWidget(editable(lost), 'lost')).widgets).toHaveLength(1)
+  })
+
+  it('can empty the Layout', () => {
+    const next = accepted(removeWidget(editable(layoutOf(clock('a', 5, 4))), 'a'))
+    expect(stored(next)).toEqual({ v: 1, widgets: [] })
+  })
+
+  it('refuses a Widget that is not there, or is not well-formed, or a read-only Layout', () => {
+    expect(refusal(removeWidget(editable(layout), 'nope'))).toBe('not found')
+    expect(refusal(removeWidget(editable(layout), 'bad'))).toBe('not found')
+    expect(refusal(removeWidget({ layout, readOnly: true }, 'a'))).toBe('read only')
+  })
+
+  it('does not change the Layout it was given', () => {
+    const snapshot = JSON.stringify(stored(layout))
+    removeWidget(editable(layout), 'a')
+    expect(JSON.stringify(stored(layout))).toBe(snapshot)
+  })
+})
+
+describe('removeWidget, for undoing it', () => {
+  it('hands back the Widget as it was stored, options and unknown keys included', () => {
+    const kept = clock('a', 5, 4, { options: { later: 1, showDate: true, showSeconds: false } })
+    const layout = layoutOf(kept, weather('b', 11, 1))
+
+    const result = removeWidget(editable(layout), 'a')
+
+    expect(result.ok && result.removed).toEqual(kept)
+  })
+
+  it('hands back the place the Widget was drawn at, not the one it was stored at', () => {
+    // 'b' is stored on top of 'a', so it is drawn in the free place nearest the middle.
+    const layout = layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+    const drawn = drawnRects(layout).find(({ widget }) => widget.placed.id === 'b')?.rect
+
+    const result = removeWidget(editable(layout), 'b')
+
+    expect(drawn).not.toEqual({ col: 5, h: 2, row: 4, w: 4 })
+    expect(result.ok && result.removed).toMatchObject(drawn ?? {})
+  })
+})
+
+describe('restoreWidget', () => {
+  const removedFrom = (layout: Layout, id: string) => {
+    const result = removeWidget(editable(layout), id)
+    if (!result.ok) throw new Error('refused')
+    return result
+  }
+  const placeOf = (layout: Layout, id: string) =>
+    drawnRects(layout).find(({ widget }) => widget.placed.id === id)?.rect
+
+  it('puts a removed Widget back where it was, with its id and options', () => {
+    const options = { later: 1, showDate: true, showSeconds: true }
+    const layout = layoutOf(clock('a', 5, 4, { options }), weather('b', 11, 1))
+    const { layout: without, removed } = removedFrom(layout, 'a')
+
+    const result = restoreWidget(editable(without), removed)
+
+    expect(result.ok && result.id).toBe('a')
+    expect(stored(accepted(result)).widgets).toEqual(
+      expect.arrayContaining([clock('a', 5, 4, { options }), weather('b', 11, 1)]),
+    )
+  })
+
+  it('puts a Widget of a type this version does not know back as it was', () => {
+    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 8, type: 'bookmarks', w: 2 }
+    const { layout: without, removed } = removedFrom(layoutOf(future, clock('a', 5, 4)), 'fut')
+
+    const next = accepted(restoreWidget(editable(without), removed))
+
+    expect(stored(next).widgets).toContainEqual(future)
+  })
+
+  it('leaves everything else in the Layout as it was', () => {
+    const layout = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: {} },
+      widgets: [clock('a', 5, 4), weather('b', 11, 1)],
+    })
+    const { layout: without, removed } = removedFrom(layout, 'a')
+
+    const next = accepted(restoreWidget(editable(without), removed))
+
+    expect(stored(next)).toMatchObject({ extra: 1, v: 1, waiting: { weather: {} } })
+    expect(stored(next).widgets).toHaveLength(2)
+  })
+
+  it('puts it in the nearest free place of its size to where it was, when that was taken', () => {
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+
+    const next = accepted(restoreWidget(editable(layoutOf(clock('b', 5, 4))), removed))
+
+    // The rows just above the Clock that has the middle now (the rows below are as near, and
+    // the first place row by row wins).
+    expect(placeOf(next, 'a')).toEqual({ col: 5, h: 2, row: 2, w: 4 })
+    expect(placeOf(next, 'b')).toEqual({ col: 5, h: 2, row: 4, w: 4 })
+  })
+
+  it('takes the place nearest where it was, not the one nearest the middle', () => {
+    const { removed } = removedFrom(layoutOf(weather('a', 11, 1)), 'a')
+    const layout = layoutOf(clock('c', 5, 4), weather('x', 11, 1))
+
+    const next = accepted(restoreWidget(editable(layout), removed))
+
+    // Beside the Weather that has its corner, not beside the Clock in the middle.
+    expect(placeOf(next, 'a')).toEqual({ col: 9, h: 2, row: 1, w: 2 })
+  })
+
+  it('refuses when there is no room for it', () => {
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+    const full = layoutOf(clock('all', 1, 1, { h: 8, w: 12 }))
+
+    expect(refusal(restoreWidget(editable(full), removed))).toBe('no room')
+  })
+
+  it('refuses a read-only Layout', () => {
+    const { layout: without, removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+
+    expect(refusal(restoreWidget({ layout: without, readOnly: true }, removed))).toBe('read only')
+  })
+
+  it('does nothing when the Widget is already there, as when it was put back from another tab', () => {
+    const layout = layoutOf(clock('a', 5, 4))
+    const { removed } = removedFrom(layout, 'a')
+
+    const result = restoreWidget(editable(layout), removed)
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('is allowed with eight Widgets already on the Grid: putting back is not adding', () => {
+    const eight = layoutOf(
+      ...Array.from({ length: 8 }, (_, i) => weather(`w${i}`, 1 + (i % 6) * 2, i < 6 ? 1 : 3)),
+    )
+    const { removed } = removedFrom(layoutOf(clock('a', 5, 6)), 'a')
+
+    const next = accepted(restoreWidget(editable(eight), removed))
+
+    expect(next.widgets).toHaveLength(9)
+  })
+
+  it('does not change the Layout it was given', () => {
+    const { layout: without, removed } = removedFrom(layoutOf(clock('a', 5, 4)), 'a')
+    const snapshot = JSON.stringify(stored(without))
+
+    restoreWidget(editable(without), removed)
+
+    expect(JSON.stringify(stored(without))).toBe(snapshot)
+  })
+})
+
+describe('setOptions', () => {
+  const layout = layoutOf(
+    clock('a', 5, 4, { options: { showDate: false, showSeconds: false, tint: 'red' } }),
+    weather('b', 11, 1),
+  )
+
+  it('changes the options given and keeps every other stored key, known or not', () => {
+    const next = accepted(setOptions(editable(layout), 'a', { showSeconds: true }))
+
+    expect(placedOf(next, 'a').options).toEqual({ showDate: false, showSeconds: true, tint: 'red' })
+    expect(next.widgets[0]).toMatchObject({
+      kind: 'known',
+      options: { showDate: false, showSeconds: true, tint: 'red' },
+    })
+  })
+
+  it('leaves the place, the size and the other Widgets alone', () => {
+    const next = accepted(setOptions(editable(layout), 'a', { showDate: true }))
+
+    expect(placedOf(next, 'a')).toMatchObject({ col: 5, h: 2, row: 4, type: 'clock', w: 4 })
+    expect(placedOf(next, 'b')).toEqual(weather('b', 11, 1))
+  })
+
+  it('draws the checked options, so a patch that fixes what failed its check shows', () => {
+    const bad = layoutOf(clock('a', 5, 4, { options: { showDate: 'yes', showSeconds: true } }))
+    // Stored options that fail their check are drawn as defaults, and stay as stored...
+    expect(bad.widgets[0]).toMatchObject({ options: CLOCK_OPTIONS })
+
+    // ...until this Widget's options are set, with the whole form given.
+    const next = accepted(setOptions(editable(bad), 'a', { showDate: true, showSeconds: true }))
+
+    expect(placedOf(next, 'a').options).toEqual({ showDate: true, showSeconds: true })
+    expect(next.widgets[0]).toMatchObject({ options: { showDate: true, showSeconds: true } })
+  })
+
+  it('does not change the Layout it was given', () => {
+    const snapshot = JSON.stringify(stored(layout))
+    setOptions(editable(layout), 'a', { showSeconds: true })
+    expect(JSON.stringify(stored(layout))).toBe(snapshot)
+  })
+
+  it('refuses a Widget of a type this version does not know, one that is not there, or read-only', () => {
+    const future = { col: 1, h: 1, id: 'fut', options: { z: 1 }, row: 1, type: 'bookmarks', w: 2 }
+    expect(refusal(setOptions(editable(layoutOf(future)), 'fut', { z: 2 }))).toBe('unknown type')
+    expect(refusal(setOptions(editable(layout), 'nope', {}))).toBe('not found')
+    expect(refusal(setOptions({ layout, readOnly: true }, 'a', { showDate: true }))).toBe(
+      'read only',
+    )
+  })
+})
+
+/** Where every Widget is drawn, by id. */
+const drawnById = (layout: Layout) =>
+  Object.fromEntries(drawnRects(layout).map(({ rect, widget }) => [widget.placed.id, rect]))
+
+/** Where every Widget that can be placed is stored, by id. */
+const storedById = (layout: Layout) =>
+  Object.fromEntries(
+    layout.widgets.flatMap((widget) =>
+      widget.kind === 'malformed'
+        ? []
+        : [
+            [
+              widget.placed.id,
+              {
+                col: widget.placed.col,
+                h: widget.placed.h,
+                row: widget.placed.row,
+                w: widget.placed.w,
+              },
+            ],
+          ],
+    ),
+  )
+
+describe('settle', () => {
+  // "a" and "b" are stored on the same cells. "a" is first in reading order, so it keeps them
+  // and "b" is drawn at column 5, row 2.
+  const overlapping = () => layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+
+  it('writes the place each Widget is drawn at into the Layout', () => {
+    const settled = settle(overlapping())
+
+    expect(storedById(settled)).toEqual({
+      a: { col: 5, h: 2, row: 4, w: 4 },
+      b: { col: 5, h: 2, row: 2, w: 4 },
+    })
+  })
+
+  it('draws every Widget exactly where it was drawn before', () => {
+    const before = overlapping()
+
+    expect(drawnById(settle(before))).toEqual(drawnById(before))
+  })
+
+  it('does not change the Layout it was given', () => {
+    const before = overlapping()
+    const snapshot = JSON.stringify(stored(before))
+    settle(before)
+    expect(JSON.stringify(stored(before))).toBe(snapshot)
+  })
+
+  it('is the same Layout, not a copy, when every Widget is drawn where it is stored', () => {
+    const fine = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+    const settled = settle(overlapping())
+
+    expect(settle(fine)).toBe(fine)
+    expect(settle(settled)).toBe(settled)
+  })
+
+  it('leaves a Widget with no place alone, and one that is not well-formed, and keeps the rest', () => {
+    const malformed = { col: 'x', h: 1, id: 'bad', options: {}, row: 1, type: 'clock', w: 1 }
+    const before = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: defaultOptions(weatherDefinition) },
+      widgets: [
+        clock('all', 1, 1, { h: 8, w: 12 }),
+        weather('lost', 3, 3),
+        malformed,
+        { ...clock('off', 20, 20), note: 'kept' },
+      ],
+    })
+
+    // The whole Grid is taken by "all", so "lost" and "off" have no place: nothing to settle.
+    expect(settle(before)).toBe(before)
+  })
+
+  it('keeps what a settled Widget has that this version does not know', () => {
+    const before = layoutOf(clock('a', 5, 4), { ...clock('b', 5, 4), note: 'kept' })
+
+    expect(placedOf(settle(before), 'b')).toEqual({ ...clock('b', 5, 2), note: 'kept' })
+  })
+
+  it('keeps the rest of the Layout as it was', () => {
+    const before = checkLayout({
+      extra: 1,
+      v: 1,
+      waiting: { weather: defaultOptions(weatherDefinition) },
+      widgets: [clock('a', 5, 4), clock('b', 5, 4)],
+    })
+
+    const after = stored(settle(before))
+
+    expect(after.extra).toBe(1)
+    expect(after.waiting).toEqual({ weather: defaultOptions(weatherDefinition) })
+  })
+
+  it('settles a Widget of a type this version does not know', () => {
+    const future = { col: 5, h: 2, id: 'f', options: { z: 1 }, row: 4, type: 'bookmarks', w: 4 }
+    const before = layoutOf(future, clock('g', 5, 4))
+
+    // "f" keeps the cells; "g" is drawn elsewhere and stored there.
+    expect(storedById(settle(before)).f).toEqual({ col: 5, h: 2, row: 4, w: 4 })
+    expect(storedById(settle(before)).g).not.toEqual({ col: 5, h: 2, row: 4, w: 4 })
+  })
+
+  it('leaves drawn results alone for any mix of Widgets, and a second pass changes nothing', () => {
+    // A seeded generator: the same Layouts on every run.
+    let seed = 7
+    const next = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return 1 + (seed % n)
+    }
+    let corrected = 0
+    for (let round = 0; round < 200; round++) {
+      const widgets = Array.from({ length: next(10) }, (_, i) =>
+        i % 3 === 0
+          ? weather(`w${i}`, next(14) - 1, next(10) - 1, { h: next(3), w: next(3) })
+          : clock(`c${i}`, next(14) - 1, next(10) - 1, { h: next(4), w: next(8) }),
+      )
+      const before = layoutOf(...widgets)
+      const settled = settle(before)
+
+      expect(drawnById(settled), JSON.stringify(widgets)).toEqual(drawnById(before))
+      expect(settle(settled)).toBe(settled)
+      if (settled !== before) corrected++
+    }
+    // The mix is rough enough that many rounds have a Widget to correct.
+    expect(corrected).toBeGreaterThan(50)
+  })
+})
+
+describe('a Widget drawn away from its stored place is stored where it is drawn', () => {
+  // The probe: "a" and "b" are both stored at column 5, row 4. "b" is drawn at column 5, row 2.
+  const probe = () => layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+  const B_DRAWN = { col: 5, h: 2, row: 2, w: 4 }
+
+  it('when a Widget is added, so removing "a" later does not make "b" jump', () => {
+    const added = accepted(addWidget(editable(probe()), 'weather'))
+    expect(storedById(added).b).toEqual(B_DRAWN)
+
+    const removed = accepted(removeWidget(editable(added), 'a'))
+    expect(drawnById(removed).b).toEqual(B_DRAWN)
+  })
+
+  it('when "a" is removed straight away', () => {
+    const removed = accepted(removeWidget(editable(probe()), 'a'))
+
+    expect(storedById(removed).b).toEqual(B_DRAWN)
+    expect(drawnById(removed).b).toEqual(B_DRAWN)
+  })
+
+  it('when "a" is moved away', () => {
+    const moved = accepted(moveWidget(editable(probe()), 'a', { col: 1, row: 7 }))
+
+    expect(storedById(moved).b).toEqual(B_DRAWN)
+    expect(drawnById(moved).b).toEqual(B_DRAWN)
+    expect(storedById(moved).a).toEqual({ col: 1, h: 2, row: 7, w: 4 })
+  })
+
+  it('when "a" is resized', () => {
+    const resized = accepted(resizeWidget(editable(probe()), 'a', { h: 2, w: 3 }))
+
+    expect(storedById(resized).b).toEqual(B_DRAWN)
+    expect(drawnById(resized).b).toEqual(B_DRAWN)
+  })
+
+  it('when "b" itself is moved or resized', () => {
+    const moved = accepted(moveWidget(editable(probe()), 'b', { col: 1, row: 1 }))
+    expect(storedById(moved).b).toEqual({ col: 1, h: 2, row: 1, w: 4 })
+
+    const resized = accepted(resizeWidget(editable(probe()), 'b', { h: 2, w: 5 }))
+    expect(storedById(resized).b).toEqual({ col: 5, h: 2, row: 2, w: 5 })
+  })
+
+  it('and every Widget is drawn where it was drawn before the change', () => {
+    const before = probe()
+    const added = accepted(addWidget(editable(before), 'weather'))
+
+    expect(drawnById(added)).toMatchObject({ a: drawnById(before).a, b: drawnById(before).b })
+  })
+})
+
+describe('a change that changes nothing', () => {
+  const layout = layoutOf(clock('a', 5, 4), weather('b', 11, 1))
+
+  it('gives back the same Layout when a Widget is moved to where it is', () => {
+    const result = moveWidget(editable(layout), 'a', { col: 5, row: 4 })
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('gives back the same Layout when a Widget is resized to the size it is', () => {
+    const result = resizeWidget(editable(layout), 'a', { h: 2, w: 4 })
+
+    expect(result.ok && result.layout).toBe(layout)
+  })
+
+  it('does so even when other Widgets are drawn away from their stored places', () => {
+    const odd = layoutOf(clock('a', 5, 4), clock('b', 5, 4), weather('c', 11, 1))
+
+    const result = moveWidget(editable(odd), 'c', { col: 11, row: 1 })
+
+    expect(result.ok && result.layout).toBe(odd)
+  })
+
+  it('is still a change for a Widget drawn away from its stored place', () => {
+    const odd = layoutOf(clock('a', 5, 4), clock('b', 5, 4))
+
+    // "b" is stored at 5, 4 but drawn at 5, 2: resizing it to its own size writes where it is.
+    const result = resizeWidget(editable(odd), 'b', { h: 2, w: 4 })
+
+    expect(result.ok && result.layout).not.toBe(odd)
+    expect(result.ok && storedById(result.layout).b).toEqual({ col: 5, h: 2, row: 2, w: 4 })
+  })
+
+  it('is a new Layout for a move to a different place', () => {
+    const result = moveWidget(editable(layout), 'a', { col: 5, row: 5 })
+
+    expect(result.ok && result.layout).not.toBe(layout)
+  })
+})
+
+describe('waiting options and a type named like something every object has', () => {
+  const waitingWeather = defaultOptions(weatherDefinition)
+  // A registry that knows a Widget under a name that is also a key of Object.prototype.
+  const named = (name: string) => (type: string) => (type === name ? clockDefinition : undefined)
+
+  it.each(['constructor', 'toString', 'hasOwnProperty'])(
+    'does not find options for "%s" that nobody kept',
+    (name) => {
+      const before = checkLayout({ v: 1, waiting: {}, widgets: [] })
+
+      const next = accepted(addWidget(editable(before), name, named(name)))
+
+      expect(next.waiting).toEqual({})
+      expect(next.widgets[0]).toMatchObject({ placed: { options: CLOCK_OPTIONS } })
+    },
+  )
+
+  it('still uses what was kept under such a type, and leaves the other types waiting', () => {
+    const before = checkLayout({
+      v: 1,
+      waiting: { toString: { showDate: true, showSeconds: false }, weather: waitingWeather },
+      widgets: [],
+    })
+
+    const next = accepted(addWidget(editable(before), 'toString', named('toString')))
+
+    expect(next.widgets[0]).toMatchObject({ placed: { options: { showDate: true } } })
+    expect(next.waiting).toEqual({ weather: waitingWeather })
+  })
+
+  it('never gives the new Widget the id of a malformed one', () => {
+    // A malformed Widget keeps its id in the Layout, so the new id must still avoid it.
+    const malformed = { col: 'x', h: 1, id: 'aaaaaaaa', options: {}, row: 1, type: 'clock', w: 1 }
+    const layout = checkLayout({ v: 1, widgets: [malformed] })
+    // The first eight characters drawn are all "a" (byte 0), the next ones all "b" (byte 1).
+    const draws = [0, 1]
+    const random = vi.spyOn(crypto, 'getRandomValues').mockImplementation(((bytes: Uint8Array) => {
+      bytes.fill(draws.shift() ?? 2)
+      return bytes
+    }) as typeof crypto.getRandomValues)
+
+    const added = addWidget(editable(layout), 'clock')
+    random.mockRestore()
+
+    expect(added.ok && added.id).toBe('bbbbbbbb')
+  })
+})
