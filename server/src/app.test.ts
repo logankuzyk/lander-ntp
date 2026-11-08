@@ -535,6 +535,102 @@ describe('createApp', () => {
     expect(await response.json()).toEqual({ ok: true })
   })
 
+  it('syncs only the signed-in account and supports revision validators', async () => {
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const signIn = async (email: string) => {
+      await app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+      const otp = messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0]
+      const response = await app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email, otp }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+      return response.headers.get('set-auth-token')
+    }
+    const firstToken = await signIn('first@example.com')
+    const secondToken = await signIn('second@example.com')
+    const request = (token: string | null, path: string, init: RequestInit = {}) =>
+      app.request(path, {
+        ...init,
+        headers: {
+          ...(init.headers ?? {}),
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          origin,
+        },
+      })
+
+    expect((await request(null, '/v1/sync')).status).toBe(401)
+    const saved = await request(firstToken, '/v1/sync/layout', {
+      body: JSON.stringify({ value: { v: 1, widgets: [{ type: 'future-widget' }] } }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    })
+    expect(saved.status).toBe(200)
+    expect(await saved.json()).toEqual({ changed: true, rev: 1 })
+
+    const firstSnapshot = await request(firstToken, '/v1/sync')
+    expect(firstSnapshot.status).toBe(200)
+    expect(firstSnapshot.headers.get('cache-control')).toBe('no-store')
+    expect(firstSnapshot.headers.get('etag')).toBe('"1"')
+    expect(await firstSnapshot.json()).toMatchObject({
+      items: { layout: { v: 1, value: { v: 1, widgets: [{ type: 'future-widget' }] } } },
+      rev: 1,
+    })
+    const notModified = await request(firstToken, '/v1/sync', {
+      headers: { 'if-none-match': '"1"' },
+    })
+    expect(notModified.status).toBe(304)
+    expect(notModified.headers.get('cache-control')).toBe('no-store')
+
+    const otherSnapshot = await request(secondToken, '/v1/sync')
+    expect(await otherSnapshot.json()).toEqual({ items: {}, rev: 0 })
+    const unknown = await request(firstToken, '/v1/sync/made-up', {
+      body: JSON.stringify({ value: {} }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    })
+    expect(unknown.status).toBe(404)
+    expect(await unknown.json()).toEqual({ error: 'unknown_item' })
+  })
+
+  it('limits sync writes to sixty per session each minute', async () => {
+    let now = new Date('2026-01-01T00:00:00.000Z')
+    const { app, messages } = await makeAuthApp({}, () => now)
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email: 'write-limit@example.com', type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email: 'write-limit@example.com', otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signedIn.headers.get('set-auth-token')
+    const put = () =>
+      app.request('/v1/sync/onboarding', {
+        body: JSON.stringify({ value: { dismissed: [], welcomed: false } }),
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          origin,
+        },
+        method: 'PUT',
+      })
+
+    for (let attempt = 0; attempt < 60; attempt += 1) expect((await put()).status).toBe(200)
+    expect(await (await put()).json()).toEqual({ error: 'rate_limited' })
+    now = new Date(now.getTime() + 60_000)
+    expect((await put()).status).toBe(200)
+  })
+
   it('reports an unavailable database as 503', async () => {
     const app = await makeApp()
     databases.at(-1)?.close()
@@ -560,11 +656,13 @@ describe('createApp', () => {
     expect(preflight.headers.get('access-control-allow-origin')).toBe('*')
     expect(preflight.headers.get('access-control-allow-credentials')).toBeNull()
     expect(preflight.headers.get('access-control-allow-headers')).toContain('authorization')
+    expect(preflight.headers.get('access-control-allow-headers')).toContain('if-none-match')
     expect(preflight.headers.get('access-control-allow-methods')).toBe(
       'GET,POST,PUT,DELETE,OPTIONS',
     )
     expect(preflight.headers.get('access-control-max-age')).toBe('600')
-    expect(preflight.headers.get('access-control-expose-headers')).toBe('set-auth-token')
+    expect(preflight.headers.get('access-control-expose-headers')).toContain('set-auth-token')
+    expect(preflight.headers.get('access-control-expose-headers')).toContain('etag')
 
     const response = await app.request('/health')
     expect(response.headers.get('access-control-allow-origin')).toBe('*')
