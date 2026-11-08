@@ -261,7 +261,7 @@ check_dns() {
 
 check_tls() {
   local output
-  output=$(openssl s_client -connect "$LANDER_HOSTNAME:443" -servername "$LANDER_HOSTNAME" -verify_return_error </dev/null 2>&1) || {
+  output=$(openssl s_client -connect "$LANDER_HOSTNAME:443" -servername "$LANDER_HOSTNAME" -verify 10 -verify_hostname "$LANDER_HOSTNAME" -verify_return_error </dev/null 2>&1) || {
     printf '%s\n' "$output" | tail -n 8
     return 1
   }
