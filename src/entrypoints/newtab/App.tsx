@@ -240,7 +240,9 @@ export function App() {
             </RemovalProvider>
           </OptionsPopoverProvider>
           {photo && <PhotoCredit photo={photo} />}
-          {photo && popover === 'info' && <PhotoInfo onClose={close} photo={photo} />}
+          {photo && popover === 'info' && (
+            <PhotoInfo onClose={close} photo={photo} saveOutcome={saveOutcome} />
+          )}
           {popover === 'settings' && (
             <SettingsPanel
               currentId={photo?.id ?? null}
@@ -249,6 +251,7 @@ export function App() {
               onClose={close}
               photos={photos}
               readOnly={settingsReadOnly}
+              saveOutcome={saveOutcome}
               settings={settings}
               tour={entry.tour ? SETTINGS_TOUR : undefined}
               tourProgress={entry.tour || undefined}

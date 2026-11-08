@@ -917,7 +917,7 @@ describe('App, when the Layout is from a newer version', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
     const menu = screen.getByRole('menu', { name: 'Add a widget' })
     expect(menu.parentElement?.textContent).toContain(UPDATE_TO_CHANGE)
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Weather']) {
       expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBe(
         'true',
       )

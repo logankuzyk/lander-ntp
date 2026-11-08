@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
 import { App } from '@/entrypoints/newtab/App'
+import { addWidget } from '@/layout/ops'
+import { layoutItem } from '@/layout/storage'
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
+import { dateDefinition } from '@/widgets/Date/definition'
 
 import { openOptions, startEditing } from '../../.storybook/startEditing'
 
@@ -38,6 +41,23 @@ export const ClockBeside: Story = {
   play: async ({ canvasElement }) => {
     const canvas = await startEditing(canvasElement)
     await openOptions(canvas, 'Clock')
+  },
+}
+
+/** All five Date options beside a Date added to the stored Layout; no source or network request. */
+export const Date: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.optionsWeatherBeside)
+    const layout = await layoutItem.getValue()
+    if (!layout) throw new Error('the seeded Layout is missing')
+    const added = addWidget({ layout, readOnly: false }, dateDefinition.type)
+    if (!added.ok) throw new Error(`the Date add was refused: ${added.reason}`)
+    await layoutItem.setValue(added.layout)
+    return sendNothing()
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openOptions(canvas, 'Date')
   },
 }
 

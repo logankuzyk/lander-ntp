@@ -32,7 +32,7 @@ function sendNothing() {
   }
 }
 
-/** A new install (the Clock alone, in the middle): the menu above the Add button, both items there. */
+/** A new install (the Clock alone, in the middle): the menu above Add shows each available Widget. */
 export const Open: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.addMenuOpen),
   play: async ({ canvasElement }) => {
@@ -63,7 +63,7 @@ export const NoRoom: Story = {
 }
 
 /**
- * Eight Widgets, the Widget limit, with room on the Grid: the menu opens, and both items are
+ * Eight Widgets, the Widget limit, with room on the Grid: the menu opens, and every item is
  * unavailable, with the line beside its title saying why. No count is shown before this.
  */
 export const AtLimit: Story = {
@@ -135,7 +135,7 @@ export const EmptyGrid: Story = {
   },
 }
 
-/** A newer Layout: both Add choices are unavailable with the update note. */
+/** A newer Layout: every Add choice is unavailable with the update note. */
 export const NewerLayout: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
   play: async ({ canvasElement }) => {

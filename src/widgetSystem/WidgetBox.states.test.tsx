@@ -5,7 +5,13 @@ import { EXAMPLE_SIZES } from '@/test/fixtures'
 
 import type { StateMessages, WidgetDefinition } from './definition'
 import type { Need } from './needs'
-import type { Reading, ReadingCache, Source } from './source'
+import {
+  type Reading,
+  type ReadingCache,
+  reportNeed,
+  type Source,
+  type WatchedSource,
+} from './source'
 import { LOADING_DELAY_MS, WidgetBox } from './WidgetBox'
 
 const RECT = { col: 5, h: 2, row: 4, w: 4 }
@@ -270,6 +276,107 @@ describe('WidgetBox states: loading', () => {
     )
     expect(view(container)).toBe('plain')
     expect(panel(container)).toBeNull()
+  })
+})
+
+describe('WidgetBox states: a Need reported while a watched Source is running', () => {
+  it('shows an object reading that has its own need field', async () => {
+    const reading = { need: 'ordinary reading data', value: 6 }
+    const source: WatchedSource<typeof reading, Options> = {
+      kind: 'watched',
+      read: async () => reading,
+      watch: () => () => undefined,
+    }
+    const definition: WidgetDefinition<Options, typeof reading, undefined> = {
+      name: 'Example',
+      options: [],
+      sizes: EXAMPLE_SIZES,
+      source: { kind: 'watched', source },
+      type: 'example',
+      View: ({ reading }) => (
+        <p class="example">
+          {reading.need}: {reading.value}
+        </p>
+      ),
+    }
+    const { container } = render(
+      <WidgetBox
+        definition={definition}
+        options={{ name: 'a', on: false }}
+        page={PAGE}
+        rect={RECT}
+      />,
+    )
+    await pass()
+
+    expect(view(container)).toBe('ordinary reading data: 6')
+    expect(panel(container)).toBeNull()
+  })
+
+  it('uses the existing 400 ms loading delay for a watched Source', async () => {
+    const source: WatchedSource<number, Options> = {
+      kind: 'watched',
+      read: () => new Promise<number>(() => undefined),
+      watch: () => () => undefined,
+    }
+    const definition: WidgetDefinition<Options, number, undefined> = {
+      name: 'Example',
+      options: [],
+      sizes: EXAMPLE_SIZES,
+      source: { kind: 'watched', source },
+      type: 'example',
+      View: ({ reading }) => <p class="example">{reading}</p>,
+    }
+    const { container } = render(
+      <WidgetBox
+        definition={definition}
+        options={{ name: 'a', on: false }}
+        page={PAGE}
+        rect={RECT}
+      />,
+    )
+
+    await pass(LOADING_DELAY_MS - 1)
+    expect(panel(container)).toBeNull()
+    await pass(1)
+    expect(panel(container)?.getAttribute('data-state')).toBe('loading')
+  })
+
+  it('draws the matching Need as the Setup button', async () => {
+    const source: WatchedSource<number, Options> = {
+      kind: 'watched',
+      read: async () => reportNeed('choose-folder'),
+      watch: () => () => undefined,
+    }
+    const need: Need<Options> = {
+      action: { kind: 'option', option: 'name' },
+      id: 'choose-folder',
+      label: 'Choose a folder',
+      met: () => true,
+    }
+    const definition: WidgetDefinition<Options, number, undefined> = {
+      name: 'Example',
+      needs: [need],
+      options: [],
+      sizes: EXAMPLE_SIZES,
+      source: { kind: 'watched', source },
+      type: 'example',
+      View: ({ reading }) => <p class="example">{reading}</p>,
+    }
+    const { container } = render(
+      <WidgetBox
+        definition={definition}
+        id="example-id"
+        options={{ name: 'a', on: false }}
+        page={PAGE}
+        rect={RECT}
+      />,
+    )
+    await pass()
+
+    const button = container.querySelector('.widget-setup')
+    expect(button?.textContent).toBe('ExampleChoose a folder')
+    expect(button?.getAttribute('aria-label')).toBe('Example, Choose a folder')
   })
 })
 

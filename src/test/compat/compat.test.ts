@@ -3,6 +3,9 @@ import { h } from 'preact'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { DEFAULT_BACKGROUND } from '@/backdrop/storage'
+import { useBackground } from '@/backdrop/useBackground'
+import { useFavourites } from '@/backdrop/useFavourites'
 import {
   drop,
   dropKeys,
@@ -79,7 +82,7 @@ const PHASE_3_LAYOUT = {
 }
 
 /** Add a row here whenever phase 3 adds a synced write that a v0.3.0 device must survive. */
-const PHASE_3_WRITES: {
+const V030_LAYOUT_WRITES: {
   change?: Parameters<typeof saveLikeV030>[1]
   name: string
   rawSync?: Record<string, unknown>
@@ -141,8 +144,53 @@ const PHASE_3_WRITES: {
   },
 ]
 
+/** Every new synced item write goes through the page hook and leaves the released settings alone. */
+const PHASE_3_SYNC_ITEM_WRITES = [
+  {
+    key: 'background',
+    name: 'save the background choice through its commit path',
+    write: async () => {
+      let commit = (_value: typeof DEFAULT_BACKGROUND) => {}
+      function Commit() {
+        const item = useBackground()
+        commit = item.set
+        return h('output', null, String(item.loaded))
+      }
+      const page = render(h(Commit, null))
+      await waitFor(() => expect(page.container.textContent).toBe('true'))
+      await act(async () => commit({ ...DEFAULT_BACKGROUND, colour: '#123456', kind: 'colour' }))
+      await waitFor(async () =>
+        expect((await fakeBrowser.storage.sync.get('background')).background).toMatchObject({
+          kind: 'colour',
+        }),
+      )
+    },
+  },
+  {
+    key: 'favourites',
+    name: 'save favourites through their commit path',
+    write: async () => {
+      let commit = (_value: { ids: string[]; v: 1 }) => {}
+      function Commit() {
+        const item = useFavourites()
+        commit = item.set
+        return h('output', null, String(item.loaded))
+      }
+      const page = render(h(Commit, null))
+      await waitFor(() => expect(page.container.textContent).toBe('true'))
+      await act(async () => commit({ ids: ['photo-1'], v: 1 }))
+      await waitFor(async () =>
+        expect((await fakeBrowser.storage.sync.get('favourites')).favourites).toEqual({
+          ids: ['photo-1'],
+          v: 1,
+        }),
+      )
+    },
+  },
+]
+
 describe('the frozen v0.3.0 reader', () => {
-  it.each(PHASE_3_WRITES)('$name', async ({ change, rawSync, write }) => {
+  it.each(V030_LAYOUT_WRITES)('$name', async ({ change, rawSync, write }) => {
     const after = write ? await write() : await saveLikeV030(rawSync!, change!)
 
     if (write) {
@@ -167,6 +215,22 @@ describe('the frozen v0.3.0 reader', () => {
       )
       expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
     }
+  })
+
+  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ key, write }) => {
+    await fakeBrowser.storage.sync.clear()
+    await settingsItem.setValue(SEED)
+    const settingsBefore = JSON.stringify((await fakeBrowser.storage.sync.get('settings')).settings)
+
+    await write()
+    const stored = await fakeBrowser.storage.sync.get(null)
+
+    expect(stored[key]).toBeDefined()
+    expect(JSON.stringify(stored.settings)).toBe(settingsBefore)
+    expect((await asV023(stored)).settings).toEqual(stored.settings)
+    const frozen = await asV030(stored)
+    expect(frozen.settings).toEqual(stored.settings)
+    expect(frozen.layout.widgets).toEqual([])
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {
@@ -311,6 +375,71 @@ const storeExampleLayout = async (): Promise<Layout> => {
 const changeLayout = (change: (layout: Layout) => Layout) => async () => {
   await layoutItem.setValue(change(await storeExampleLayout()))
 }
+
+/** Commits a Layout through the same hook the page uses. */
+async function commitThroughPage(next: Layout): Promise<void> {
+  const page = {} as ReturnType<typeof useLayout>
+  function Probe() {
+    Object.assign(page, useLayout(DEFAULT_SETTINGS))
+    return null
+  }
+  const { unmount } = render(h(Probe, {}))
+  await waitFor(() => expect(page.loaded).toBe(true))
+  await act(async () => {
+    page.commit(next)
+  })
+  await waitFor(async () => {
+    const { layout } = await fakeBrowser.storage.sync.get('layout')
+    expect(
+      (layout as { widgets?: { type?: string }[] } | undefined)?.widgets?.some(
+        (widget) => widget.type === 'date',
+      ),
+    ).toBe(true)
+  })
+  unmount()
+}
+
+const PHASE_3_WRITES = [
+  {
+    name: 'adding a Date writes sync:layout only through the page commit path',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const layout = await storeExampleLayout()
+      const before = await fakeBrowser.storage.sync.get(null)
+      const added = addWidget({ layout, readOnly: false }, 'date')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      await commitThroughPage(added.layout)
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+]
+
+describe('phase 3 synced writes', () => {
+  it.each(PHASE_3_WRITES)('$name', async ({ write }) => {
+    const { after: rawSync, before } = await write()
+
+    const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
+      .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(rawSync[key]))
+      .sort()
+    expect(changedKeys).toEqual(['layout'])
+    expect(rawSync.settings).toEqual(before.settings)
+    expect(rawSync.onboarding).toEqual(before.onboarding)
+    expect(rawSync.layout).toMatchObject({
+      v: 1,
+      widgets: expect.arrayContaining([expect.objectContaining({ type: 'date' })]),
+    })
+
+    const v030 = await asV030(rawSync)
+    expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+    expect(
+      v030.raw.layout.widgets.find((widget) => (widget as { type?: string }).type === 'date'),
+    ).toMatchObject({
+      options: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
+      type: 'date',
+    })
+  })
+})
 
 const LEFT = { cols: -1, rows: 0 }
 const RIGHT = { cols: 1, rows: 0 }
@@ -550,6 +679,15 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       const second = addWidget({ layout: first.layout, readOnly: false }, 'clock')
       if (!second.ok) throw new Error(`the add was refused: ${second.reason}`)
       await layoutItem.setValue(second.layout)
+    },
+  },
+  {
+    layoutOnly: true,
+    name: 'add a Date Widget (addWidget and commit: sync:layout only)',
+    write: async () => {
+      const added = addWidget({ layout: await storeExampleLayout(), readOnly: false }, 'date')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      await commitThroughPage(added.layout)
     },
   },
   {
@@ -1038,6 +1176,9 @@ describe('the settings panel, now it has no Clock or Weather options (W17)', () 
     ['a pinned photo', (s: Settings) => ({ ...s, photos: { ...s.photos, pinnedId: 'p2' } })],
   ])('%s leaves the Clock’s and the Weather’s blocks as they were stored', async (_, change) => {
     await settingsItem.setValue(CUSTOM)
+    const background = { colour: '#123456', favouritesOnly: true, future: 1, kind: 'colour', v: 1 }
+    const favourites = { future: 2, ids: ['kept-photo'], v: 1 }
+    await fakeBrowser.storage.sync.set({ background, favourites })
     await changeSettings(change)()
     const stored = await fakeBrowser.storage.sync.get(null)
 
@@ -1055,6 +1196,8 @@ describe('the settings panel, now it has no Clock or Weather options (W17)', () 
     expect(fellBack).toBe(false)
     expect(settings.clock).toEqual(CUSTOM.clock)
     expect(settings.weather).toEqual(CUSTOM.weather)
+    expect(stored.background).toEqual(background)
+    expect(stored.favourites).toEqual(favourites)
   })
 
   it('keeps a top-level key it does not know through a panel save, and v0.2.3 still reads it', async () => {
@@ -1110,5 +1253,27 @@ describe('sync:layout, which v0.2.3 never reads', () => {
     const after = await saveLikeV023({ layout, settings: unreadable }, { dim: false })
 
     expect(after.raw.layout).toEqual(layout)
+  })
+})
+
+describe('background and favourites, which v0.2.3 never reads', () => {
+  const background = { colour: '#123456', favouritesOnly: true, kind: 'colour', v: 1 }
+  const favourites = { ids: ['pinned-for-later'], v: 1 }
+  const rawSync = {
+    background,
+    favourites,
+    settings: { ...SETTINGS_0_2_3, v: 1 },
+  }
+  const v023Photos = SETTINGS_0_2_3.photos as Settings['photos']
+
+  it.each([
+    ['change photo tags', { photos: { ...v023Photos, tags: ['forest'] } }],
+    ['change photo frequency', { photos: { ...v023Photos, frequency: '6h' as const } }],
+  ])('leaves both new items alone when v0.2.3 saves to %s', async (_, change) => {
+    const after = await saveLikeV023(rawSync, change)
+
+    expect(after.raw.background).toEqual(background)
+    expect(after.raw.favourites).toEqual(favourites)
+    expect(after.settings.photos).toEqual(change.photos)
   })
 })

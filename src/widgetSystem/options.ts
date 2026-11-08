@@ -20,7 +20,7 @@ function fieldsOf(option: OptionDescription): Field[] {
     case 'choice':
       return [
         {
-          default: option.default,
+          default: typeof option.default === 'function' ? option.default() : option.default,
           key: option.id,
           schema: v.picklist(option.choices.map((choice) => choice.value)),
         },
