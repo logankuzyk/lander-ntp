@@ -178,7 +178,9 @@ describe('createApp', () => {
     expect((await send('person@example.com', '203.0.113.7')).status).toBe(200)
 
     for (let attempt = 0; attempt < 84; attempt += 1) {
-      expect((await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status).toBe(200)
+      expect((await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status).toBe(
+        200,
+      )
     }
     expect((await send('last@example.com', '192.0.2.1')).status).toBe(429)
     expect(messages).toHaveLength(90)
@@ -264,9 +266,9 @@ describe('createApp', () => {
     expect(messages).toHaveLength(0)
 
     for (let attempt = 0; attempt < 90; attempt += 1) {
-      expect(
-        (await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status,
-      ).toBe(200)
+      expect((await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status).toBe(
+        200,
+      )
     }
     expect((await send('reviewer@example.com', '192.0.2.1')).status).toBe(200)
     expect(messages).toHaveLength(90)
