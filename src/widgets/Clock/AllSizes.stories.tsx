@@ -1,18 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
+import { allWidgetSizes } from '../../../.storybook/widgetStories'
 import { withPage } from '../../../.storybook/withPage'
 import { Clock } from './Clock'
 import { clockDefinition } from './definition'
 
-const { largest, smallest } = clockDefinition.sizes
-
-/** Every size from the smallest to the largest, in whole cells: 2 by 1, 3 by 1 ... 8 by 4. */
-const SIZES = Array.from({ length: largest.h - smallest.h + 1 }, (_, dh) =>
-  Array.from({ length: largest.w - smallest.w + 1 }, (_, dw) => ({
-    h: smallest.h + dh,
-    w: smallest.w + dw,
-  })),
-).flat()
+const SIZES = allWidgetSizes(clockDefinition.sizes)
 
 /**
  * Every box a Clock may be given, in a stack, each as big as it would be on the Grid at this

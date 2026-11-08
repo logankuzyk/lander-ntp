@@ -28,6 +28,8 @@ export default defineConfig({
     name: 'Lander',
     // storage.local caches the photo manifest, rotation state and weather. No host
     // permissions: the manifest endpoint and Open-Meteo send `Access-Control-Allow-Origin: *`.
+    // Asked from the Bookmarks Setup button; this ships in the release that uses it.
+    optional_permissions: ['bookmarks'],
     permissions: ['storage'],
     ...(browser === 'firefox' && {
       browser_specific_settings: {

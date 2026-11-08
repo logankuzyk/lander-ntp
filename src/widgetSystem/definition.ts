@@ -43,6 +43,28 @@ export type ChoiceOption = OptionBase & {
   default: string
 }
 
+/** A choice whose values come from this device when the menu opens. */
+export type PickChoice = { depth?: number; label: string; value: string }
+
+type PickOptionBase = OptionBase & {
+  control: 'pick'
+  emptyText: string
+  failedText: string
+  load: () => Promise<readonly PickChoice[]>
+}
+
+/** One value from a list loaded by the Widget. */
+export type PickOption = PickOptionBase & {
+  default: string
+  multiple?: false
+}
+
+/** Several values from a list loaded by the Widget. */
+export type MultiPickOption = PickOptionBase & {
+  default: readonly string[]
+  multiple: true
+}
+
 /** What a place option holds. */
 export type PlaceValue = {
   followDevice: boolean
@@ -89,7 +111,13 @@ export type PageValueOption = OptionBase & {
 
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
-  ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
+  | ChoiceOption
+  | MultiPickOption
+  | OrderedListOption
+  | PageValueOption
+  | PickOption
+  | PlaceOption
+  | SwitchOption
 
 /** A size on the Grid, in whole cells. */
 export type Cells = { h: number; w: number }
@@ -112,6 +140,8 @@ export type WidgetSizes<O> = {
  * the `context` its `useQuery` carried along; for one without, both are undefined.
  */
 export type WidgetViewProps<O, R = undefined, C = undefined> = {
+  /** The whole cells the Grid draws this Widget in. */
+  cells: Cells
   context: C
   options: O
   page: PageValues
