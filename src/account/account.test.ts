@@ -115,7 +115,7 @@ describe('account', () => {
       {
         browser: 'Firefox',
         createdAt: '2026-01-01T00:00:00.000Z',
-        current: true,
+        current: false,
         id: 'device/a',
         lastUsedAt: '2026-01-02T00:00:00.000Z',
         os: 'Linux',
@@ -142,12 +142,108 @@ describe('account', () => {
     })
   })
 
+  it('admits a pending device after one other device is removed', async () => {
+    const devices = [
+      {
+        browser: 'Firefox',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        current: false,
+        id: 'old',
+        lastUsedAt: '2026-01-02T00:00:00.000Z',
+        os: 'Linux',
+      },
+      {
+        browser: 'Chrome',
+        createdAt: '2026-01-03T00:00:00.000Z',
+        current: true,
+        id: 'new',
+        lastUsedAt: '2026-01-03T00:00:00.000Z',
+        os: 'macOS',
+      },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          response(200, { token: 'token-a', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: true }))
+        .mockResolvedValueOnce(response(200, { devices, limit: 3, pending: true }))
+        .mockResolvedValueOnce(response(204))
+        .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false })),
+    )
+
+    await account.verify('person@example.com', '123456')
+    await account.removeDevice('old')
+
+    expect(account.state).toMatchObject({ email: 'person@example.com', status: 'signed-in' })
+  })
+
+  it('keeps the signed-in account when account deletion fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          response(200, { token: 'token-a', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+        .mockResolvedValueOnce(response(500, { error: 'failed' })),
+    )
+
+    await account.verify('person@example.com', '123456')
+    await expect(account.deleteAccount()).resolves.toEqual({ error: 'http-error', ok: false })
+
+    expect(account.state.status).toBe('signed-in')
+  })
+
+  it('stores the fetched device list in signed-in state and removes only the selected device', async () => {
+    const devices = [
+      {
+        browser: 'Firefox',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        current: false,
+        id: 'older-device',
+        lastUsedAt: '2026-01-02T00:00:00.000Z',
+        os: 'Linux',
+      },
+      {
+        browser: 'Chrome',
+        createdAt: '2026-01-03T00:00:00.000Z',
+        current: true,
+        id: 'this-device',
+        lastUsedAt: '2026-01-03T00:00:00.000Z',
+        os: 'macOS',
+      },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          response(200, { token: 'token-a', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+        .mockResolvedValueOnce(response(200, { devices, limit: 3, pending: false }))
+        .mockResolvedValueOnce(response(204)),
+    )
+
+    await account.verify('person@example.com', '123456')
+    await account.devices()
+    expect(account.state).toMatchObject({ devices, status: 'signed-in' })
+
+    await account.removeDevice('older-device')
+
+    expect(account.state).toMatchObject({ devices: [devices[1]], status: 'signed-in' })
+  })
+
   it('lists and removes devices, then deletes the account with bearer requests', async () => {
     const devices = [
       {
         browser: 'Firefox',
         createdAt: '2026-01-01T00:00:00.000Z',
-        current: true,
+        current: false,
         id: 'device/a',
         lastUsedAt: '2026-01-02T00:00:00.000Z',
         os: 'Linux',

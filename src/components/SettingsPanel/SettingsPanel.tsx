@@ -358,7 +358,12 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 
 type SettingsPanelProps = {
   /** Seeded account presentation for Storybook; production pages leave these unset. */
-  accountPreview?: { codeSent?: boolean; error?: string; state?: AccountState }
+  accountPreview?: {
+    codeSent?: boolean
+    deleteOpen?: boolean
+    error?: string
+    state?: AccountState
+  }
   currentId: string | null
   /** The section to open on, when there is no tour to say. */
   initialSection?: SectionId
@@ -504,6 +509,7 @@ export function SettingsPanel({
           {section === 'account' && (
             <AccountSection
               codeSentInitially={accountPreview?.codeSent}
+              deleteOpenInitially={accountPreview?.deleteOpen}
               errorInitially={accountPreview?.error}
               stateOverride={accountPreview?.state}
             />

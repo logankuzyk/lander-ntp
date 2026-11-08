@@ -17,7 +17,7 @@ export type AccountNotice = 'none' | 'paused-no-consent' | 'signed-out-elsewhere
 
 export type AccountState =
   | { devices: Device[]; email: string; notice: AccountNotice; status: 'pending-device' }
-  | { email: string; notice: AccountNotice; status: 'signed-in' }
+  | { devices?: Device[]; email: string; notice: AccountNotice; status: 'signed-in' }
   | { notice: AccountNotice; status: 'signed-out' }
 
 export type AccountError =
@@ -68,9 +68,10 @@ class AccountClient {
       return { error: 'invalid-response', ok: false }
     }
     const devices = (result.value as { devices?: unknown }).devices
-    return Array.isArray(devices)
-      ? { ok: true, value: devices as Device[] }
-      : { error: 'invalid-response', ok: false }
+    if (!Array.isArray(devices)) return { error: 'invalid-response', ok: false }
+    if (this.#state.status === 'signed-in')
+      this.#setState({ ...this.#state, devices: devices as Device[] })
+    return { ok: true, value: devices as Device[] }
   }
 
   async initialize(): Promise<void> {
@@ -87,7 +88,21 @@ class AccountClient {
     const result = await this.#authorized(`/v1/devices/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
-    if (result.ok && this.#state.status === 'pending-device') await this.#refresh()
+    if (result.ok && this.#state.status === 'pending-device') {
+      await this.#refresh()
+    } else if (
+      result.ok &&
+      this.#state.status === 'signed-in' &&
+      this.#state.devices?.some((device) => device.id === id && device.current)
+    ) {
+      await accountItem.setValue(null)
+      this.#setState(signedOut())
+    } else if (result.ok && this.#state.status === 'signed-in' && this.#state.devices) {
+      this.#setState({
+        ...this.#state,
+        devices: this.#state.devices.filter((device) => device.id !== id),
+      })
+    }
     return result.ok ? { ok: true, value: undefined } : result
   }
 

@@ -66,6 +66,39 @@ const writes: {
           .fn<typeof fetch>()
           .mockResolvedValueOnce(login())
           .mockResolvedValueOnce(signedIn())
+          .mockResolvedValueOnce(
+            json({
+              devices: [
+                {
+                  browser: 'Firefox',
+                  createdAt: '2026-10-01T00:00:00.000Z',
+                  current: true,
+                  id: 'current-device',
+                  lastUsedAt: '2026-10-01T00:00:00.000Z',
+                  os: 'Linux',
+                },
+              ],
+              limit: 3,
+              pending: false,
+            }),
+          )
+          .mockResolvedValueOnce(new Response(null, { status: 204 })),
+      )
+      await account.verify('person@example.com', '123456')
+      await account.devices()
+      await account.removeDevice('current-device')
+    },
+    expected: null,
+    name: 'local:account clear after current device removal',
+  },
+  {
+    commit: async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(login())
+          .mockResolvedValueOnce(signedIn())
           .mockRejectedValueOnce(new TypeError('offline')),
       )
       await account.verify('person@example.com', '123456')
