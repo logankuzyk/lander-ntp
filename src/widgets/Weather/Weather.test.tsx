@@ -171,6 +171,7 @@ describe('the Weather at its smallest size', () => {
     const { container } = render(
       <Box name="Weather" rect={{ col: 11, row: 1, ...smallest }} widget="weather">
         <View
+          cells={smallest}
           context="Victoria"
           options={{ ...options, fields: options.fields.map((f) => ({ ...f, shown: true })) }}
           page={{ hour12: false }}

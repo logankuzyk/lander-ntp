@@ -4,19 +4,12 @@ import { COLS } from '@/layout/geometry'
 import { WEATHER_FIELDS } from '@/settings/schema'
 import { makePlace, makeWeather } from '@/test/fixtures'
 
+import { allWidgetSizes } from '../../../.storybook/widgetStories'
 import { withPage } from '../../../.storybook/withPage'
 import { weatherDefinition } from './definition'
 import { Weather } from './Weather'
 
-const { largest, smallest } = weatherDefinition.sizes
-
-/** Every size from the smallest to the largest, in whole cells: 2 by 2, 3 by 2 ... 4 by 3. */
-const SIZES = Array.from({ length: largest.h - smallest.h + 1 }, (_, dh) =>
-  Array.from({ length: largest.w - smallest.w + 1 }, (_, dw) => ({
-    h: smallest.h + dh,
-    w: smallest.w + dw,
-  })),
-).flat()
+const SIZES = allWidgetSizes(weatherDefinition.sizes)
 
 /**
  * Every box a Weather may be given, in a stack, each as big as it would be on the Grid at this

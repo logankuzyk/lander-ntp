@@ -112,6 +112,8 @@ export type WidgetSizes<O> = {
  * the `context` its `useQuery` carried along; for one without, both are undefined.
  */
 export type WidgetViewProps<O, R = undefined, C = undefined> = {
+  /** The whole cells the Grid draws this Widget in. */
+  cells: Cells
   context: C
   options: O
   page: PageValues

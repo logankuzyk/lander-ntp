@@ -5,6 +5,7 @@ import { useEditMode } from '@/components/EditMode/useEditMode'
 import type { Rect } from '@/layout/geometry'
 
 import type {
+  Cells,
   PageValues,
   StateMessages,
   WidgetDefinition,
@@ -279,6 +280,7 @@ function useWaited(waiting: boolean, token: string, ms: number): boolean {
 }
 
 type SourcedViewProps<O, R, C> = {
+  cells: Cells
   messages: StateMessages | undefined
   name: string
   options: O
@@ -297,6 +299,7 @@ type SourcedViewProps<O, R, C> = {
  * left out.
  */
 function SourcedView<O, R, C>({
+  cells,
   messages,
   name,
   options,
@@ -313,7 +316,7 @@ function SourcedView<O, R, C>({
   if (status === 'ready') {
     // `ready` is a reading to show; the check keeps the types honest.
     return reading === null ? null : (
-      <View context={context} options={options} page={page} reading={reading} />
+      <View cells={cells} context={context} options={options} page={page} reading={reading} />
     )
   }
   if (status === 'loading' && !waited) return null
@@ -347,7 +350,13 @@ export function WidgetBox<O, R, C>({
       removeLabel={`Remove ${definition.name}`}
       widget={definition.type}
     >
-      <Contents definition={definition} id={id} options={options} page={page} />
+      <Contents
+        cells={{ h: rect.h, w: rect.w }}
+        definition={definition}
+        id={id}
+        options={options}
+        page={page}
+      />
     </Box>
   )
 }
@@ -357,11 +366,14 @@ type Drawn<O> = 'nothing' | 'view' | SetupNeed<O>
 
 /** What goes in the box. A component of its own, so that the box does not wait for its hooks. */
 function Contents<O, R, C>({
+  cells,
   definition,
   id,
   options,
   page,
-}: Omit<WidgetBoxProps<O, R, C>, 'held' | 'rect'>) {
+}: Omit<WidgetBoxProps<O, R, C>, 'held' | 'rect'> & {
+  cells: Cells
+}) {
   const { messages, name, source, View } = definition
   const read = readOptions(definition, options)
   // The needs are asked again, with the options unchanged, when a setup button has asked the
@@ -416,6 +428,7 @@ function Contents<O, R, C>({
   if (source) {
     return (
       <SourcedView
+        cells={cells}
         messages={messages}
         name={name}
         options={read}
@@ -426,6 +439,6 @@ function Contents<O, R, C>({
     )
   }
   // No source, so no reading or context: they are the `undefined` that `R` and `C` default to.
-  const props = { options: read, page } as WidgetViewProps<O, R, C>
+  const props = { cells, options: read, page } as WidgetViewProps<O, R, C>
   return <View {...props} />
 }
