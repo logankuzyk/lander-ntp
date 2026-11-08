@@ -36,10 +36,7 @@ describe('backup maintenance', () => {
   it('checks whether a recent dump exists before creating the startup dump', async () => {
     const now = new Date('2026-01-31T03:17:00.000Z')
     const { backups, store } = makeBackups(() => now)
-    await store.put(
-      'dumps/lander-20260130T031700Z.db.gz',
-      new Uint8Array([1]),
-    )
+    await store.put('dumps/lander-20260130T031700Z.db.gz', new Uint8Array([1]))
     const run = vi.spyOn(backups, 'runNightly')
     const maintenance = startBackupMaintenance(backups, { now: () => now })
 

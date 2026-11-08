@@ -39,7 +39,10 @@ export function scheduleNightlyBackup(backups: Backups, clock: { now: () => Date
     const now = clock.now()
     const delay = nextNightlyTime(now).getTime() - now.getTime()
     timer = setTimeout(() => {
-      void backups.runNightly().catch(() => undefined).finally(schedule)
+      void backups
+        .runNightly()
+        .catch(() => undefined)
+        .finally(schedule)
     }, delay)
     timer.unref()
   }

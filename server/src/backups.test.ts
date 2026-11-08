@@ -112,7 +112,12 @@ describe('Backups', () => {
       databasePath,
       db,
       heartbeat: ping,
-      objectStore: { ...store, put: async () => { throw new Error('upload failed') } },
+      objectStore: {
+        ...store,
+        put: async () => {
+          throw new Error('upload failed')
+        },
+      },
     })
 
     await expect(failing.runNightly()).rejects.toThrow('upload failed')

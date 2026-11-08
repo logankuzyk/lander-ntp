@@ -30,7 +30,11 @@ function escapeSqlString(value: string): string {
 }
 
 function timestamp(date: Date): string {
-  return date.toISOString().replaceAll('-', '').replaceAll(':', '').replace(/\.\d{3}/, '')
+  return date
+    .toISOString()
+    .replaceAll('-', '')
+    .replaceAll(':', '')
+    .replace(/\.\d{3}/, '')
 }
 
 function dateFromDumpKey(key: string): Date | undefined {
@@ -249,4 +253,3 @@ export async function restoreDump(key: string, options: RestoreOptions): Promise
     await rm(temporaryDirectory, { force: true, recursive: true })
   }
 }
-
