@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 import { NewerVersionError } from '@/storage/guard'
-import { createWriteQueue, type WriteQueue } from '@/storage/writeQueue'
+import { createWriteQueue, type SaveResult, type WriteQueue } from '@/storage/writeQueue'
 
 /** The part of WXT's storage item this hook needs (also easy to fake in tests). */
 export type StorageItemLike<T> = {
@@ -78,7 +78,7 @@ const savesFor = <T>(item: StorageItemLike<T>): Saves<T> => {
 export function useStorageItem<T>(
   item: StorageItemLike<T>,
   options: StorageItemOptions = {},
-): [T, (value: T) => void, loaded: boolean, readOnly: boolean] {
+): [T, (value: T) => Promise<SaveResult>, loaded: boolean, readOnly: boolean] {
   const [value, setValue] = useState<T>(item.fallback)
   const [loaded, setLoaded] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
@@ -114,17 +114,17 @@ export function useStorageItem<T>(
   const handlers = useRef(options)
   handlers.current = options
   const update = useCallback(
-    (next: T) => {
-      if (readOnlyNow.current) return
+    (next: T): Promise<SaveResult> => {
+      if (readOnlyNow.current) return Promise.resolve('refused')
       const entry = savesFor(item)
       // Counts changes to the item from every hook, so a rejection can tell whether a newer one
       // has since taken over.
       const mine = ++entry.latest
       setValue(next)
-      void entry.queue.save(next).then(async (result) => {
+      return entry.queue.save(next).then(async (result) => {
         if (result === 'saved') handlers.current.onSaved?.()
         if (result === 'refused') setReadOnly(true)
-        if (result !== 'rejected' && result !== 'refused') return
+        if (result !== 'rejected' && result !== 'refused') return result
         // Before reading anything back, so a newer change that is saved meanwhile is heard of
         // after this rejection, not before it.
         if (result === 'rejected') handlers.current.onRejected?.()
@@ -137,6 +137,7 @@ export function useStorageItem<T>(
         } catch {
           // Nothing to put back from: leave what is shown.
         }
+        return result
       })
     },
     [item],

@@ -91,10 +91,11 @@ export function AnalogClock({
             return (
               <text
                 class="analog-clock__numeral"
+                dominant-baseline="central"
                 key={number}
-                textAnchor="middle"
+                text-anchor="middle"
                 x={50 + Math.sin(angle) * 33}
-                y={53 - Math.cos(angle) * 33}
+                y={50 - Math.cos(angle) * 33}
               >
                 {number}
               </text>
@@ -105,16 +106,16 @@ export function AnalogClock({
           transform={`rotate(${angles.hour} 50 50)`}
           x1="50"
           x2="50"
-          y1="52"
-          y2="27"
+          y1="50"
+          y2="25"
         />
         <line
           class="analog-clock__hand analog-clock__hand--minute"
           transform={`rotate(${angles.minute} 50 50)`}
           x1="50"
           x2="50"
-          y1="53"
-          y2="16"
+          y1="50"
+          y2="13"
         />
         {showSeconds && (
           <line
@@ -123,15 +124,21 @@ export function AnalogClock({
             transform={`rotate(${angles.second} 50 50)`}
             x1="50"
             x2="50"
-            y1="55"
-            y2="12"
+            y1="50"
+            y2="7"
           />
         )}
         <circle class="analog-clock__pin" cx="50" cy="50" r="2" />
         {showDate && (
           <g aria-hidden="true">
             <rect class="analog-clock__date-window" height="10" rx="1" width="10" x="68" y="45" />
-            <text class="analog-clock__date" textAnchor="middle" x="73" y="52">
+            <text
+              class="analog-clock__date"
+              dominant-baseline="middle"
+              text-anchor="middle"
+              x="73"
+              y="50"
+            >
               {now.getDate()}
             </text>
           </g>

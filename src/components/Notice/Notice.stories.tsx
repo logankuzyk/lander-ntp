@@ -15,3 +15,11 @@ type Story = StoryObj<typeof meta>
 
 /** What the page says when the browser refuses a change, and has put the old value back. */
 export const SaveFailed: Story = {}
+
+/** A removed Widget with a long name, at a narrow viewport: the message wraps beside its buttons. */
+export const UndoLongMessage: Story = {
+  args: {
+    action: { label: 'Undo', onClick: () => {} },
+    message: 'Unknown widget, extraordinarily-long-name-for-a-widget, removed.',
+  },
+}

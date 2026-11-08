@@ -1,7 +1,10 @@
+import { h } from 'preact'
+
 import { bookmarksPort } from '@/bookmarks/port'
 import { bookmarksSource } from '@/bookmarks/source'
 import type { BookmarkFolderChoice, BookmarkReading, BookmarksPort } from '@/bookmarks/types'
-import type { PickChoice, WidgetDefinition } from '@/widgetSystem/definition'
+import { siteIconUrl } from '@/quickDial/siteIconUrl'
+import type { PickChoice, WidgetDefinition, WidgetViewProps } from '@/widgetSystem/definition'
 import type { Need } from '@/widgetSystem/needs'
 
 import { Bookmarks } from './Bookmarks'
@@ -34,8 +37,15 @@ function decodeFolder(value: string): BookmarkFolderChoice {
   return { id: value, title: '' }
 }
 
+const folderLabel = (value: string): string | undefined => {
+  if (value === BAR) return 'Bookmarks bar'
+  const folder = decodeFolder(value)
+  return typeof folder === 'string' ? undefined : folder.title || undefined
+}
+
 export function createBookmarksDefinition(
   port: BookmarksPort,
+  iconUrl: (host: string) => string = siteIconUrl,
 ): WidgetDefinition<BookmarksOptions, BookmarkReading> {
   const permission: Need<BookmarksOptions> = {
     action: { kind: 'ask', run: () => port.request() },
@@ -74,6 +84,11 @@ export function createBookmarksDefinition(
         id: 'folder',
         label: 'Folder',
         load: loadFolders,
+        missingLabel: (value) => {
+          const title = folderLabel(value)
+          return title ? `${title} (folder missing)` : 'Folder missing'
+        },
+        valueLabel: folderLabel,
       },
       { control: 'switch', default: true, id: 'showFolderName', label: 'Show the folder name' },
       { control: 'switch', default: false, id: 'openInNewTab', label: 'Open in a new tab' },
@@ -91,7 +106,8 @@ export function createBookmarksDefinition(
     },
     type: 'bookmarks',
     unavailable: () => (port.isSupported() ? null : "Bookmarks aren't available in this browser"),
-    View: Bookmarks,
+    View: (props: WidgetViewProps<BookmarksOptions, BookmarkReading>) =>
+      h(Bookmarks, { ...props, iconUrl }),
   }
   return definition
 }

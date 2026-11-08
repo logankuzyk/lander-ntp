@@ -24,7 +24,7 @@ type OptionsPopoverProps = {
    */
   name: string
   /** The Widget's whole options, with the change made: see `OptionsForm`. */
-  onChange: (options: Record<string, unknown>) => void
+  onChange: (options: Record<string, unknown>) => Promise<unknown> | void
   onClose: () => void
   onPageValueChange: <N extends PageValueName>(name: N, value: PageValues[N]) => void
   /** What is stored for the Widget. */

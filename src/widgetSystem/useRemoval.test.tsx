@@ -1,6 +1,7 @@
-import { act, render, screen } from '@testing-library/preact'
+import { act, render, screen, waitFor } from '@testing-library/preact'
 import { useState } from 'preact/hooks'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { checkLayout } from '@/layout/check'
 import type { Layout } from '@/layout/types'
@@ -158,5 +159,109 @@ describe('useRemovalController', () => {
     expect(screen.getByTestId('notice').textContent).toBe(
       'Unknown widget, future-widget 2 removed.',
     )
+  })
+})
+
+const dialLayout = checkLayout({
+  v: 1,
+  widgets: [
+    {
+      col: 1,
+      h: 1,
+      id: 'dial0001',
+      options: { icon: 'abcdefgh', label: 'Example', newTab: false, url: 'example.com' },
+      row: 1,
+      type: 'quick-dial',
+      w: 1,
+    },
+  ],
+})
+
+const dialWithClock = checkLayout({
+  v: 1,
+  widgets: [
+    {
+      col: 1,
+      h: 1,
+      id: 'dial0001',
+      options: { icon: 'abcdefgh', label: 'Example', newTab: false, url: 'example.com' },
+      row: 1,
+      type: 'quick-dial',
+      w: 1,
+    },
+    {
+      col: 3,
+      h: 2,
+      id: 'clock0aa',
+      options: { showDate: false, showSeconds: false },
+      row: 1,
+      type: 'clock',
+      w: 4,
+    },
+  ],
+})
+
+function DialRemovalProbe({ withClock = false }: { withClock?: boolean }) {
+  const [layout, setLayout] = useState(withClock ? dialWithClock : dialLayout)
+  const { controls, notice } = useRemovalController({
+    commit: setLayout,
+    layout,
+    loaded: true,
+    readOnly: false,
+    saveFailures: 0,
+  })
+  return (
+    <>
+      <button onClick={() => controls.remove('dial0001')} type="button">
+        Remove dial
+      </button>
+      <button onClick={() => notice?.action?.onClick()} type="button">
+        Undo dial
+      </button>
+      <button onClick={() => notice?.onDismiss()} type="button">
+        Dismiss notice
+      </button>
+      <button onClick={() => controls.remove('clock0aa')} type="button">
+        Remove Clock
+      </button>
+    </>
+  )
+}
+
+describe('Quick dial icon discard', () => {
+  beforeEach(async () => fakeBrowser.storage.sync.clear())
+
+  it('keeps the icon while Undo is available and removes it when the notice is dismissed', async () => {
+    await fakeBrowser.storage.sync.set({
+      'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+    })
+    const { unmount } = render(<DialRemovalProbe />)
+
+    act(() => screen.getByRole('button', { name: 'Remove dial' }).click())
+    expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toHaveProperty('icon:abcdefgh')
+
+    act(() => screen.getByRole('button', { name: 'Undo dial' }).click())
+    expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toHaveProperty('icon:abcdefgh')
+    act(() => screen.getByRole('button', { name: 'Remove dial' }).click())
+    act(() => screen.getByRole('button', { name: 'Dismiss notice' }).click())
+    await waitFor(async () =>
+      expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toEqual({}),
+    )
+    unmount()
+  })
+
+  it('discards the previous Quick dial icon when a second removal replaces its Undo notice', async () => {
+    await fakeBrowser.storage.sync.set({
+      'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+    })
+    render(<DialRemovalProbe withClock />)
+
+    act(() => screen.getByRole('button', { name: 'Remove dial' }).click())
+    act(() => screen.getByRole('button', { name: 'Remove Clock' }).click())
+
+    await waitFor(async () =>
+      expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toEqual({}),
+    )
+    expect(screen.getByRole('button', { name: 'Undo dial' })).toBeTruthy()
   })
 })

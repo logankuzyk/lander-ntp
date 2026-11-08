@@ -29,9 +29,14 @@ import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { recordSeen } from '@/onboarding/useSeen'
+import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
+import { usePhotoRotation } from '@/photos/usePhotoRotation'
+import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
+import { useStorageItem } from '@/settings/useStorageItem'
 import { createWriteQueue } from '@/storage/writeQueue'
+import { makeManifest, makePhoto } from '@/test/fixtures'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import type { DefinitionOf } from '@/widgetSystem/definition'
 import { writeOptions } from '@/widgetSystem/options'
@@ -73,7 +78,7 @@ const PHASE_3_LAYOUT = {
       col: 6,
       h: 3,
       id: 'dial',
-      options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com' },
+      options: { icon: 'abcdefgh', label: 'Example', newTab: false, url: 'https://example.com' },
       row: 4,
       type: 'quick-dial',
       w: 5,
@@ -107,7 +112,9 @@ const V030_LAYOUT_WRITES: {
       await waitFor(() => expect(page.loaded).toBe(true))
       const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'analog-clock')
       if (!added.ok) throw new Error(`could not add Analog clock: ${added.reason}`)
-      await act(async () => page.commit(added.layout))
+      await act(async () => {
+        await page.commit(added.layout)
+      })
       await waitFor(async () =>
         expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
       )
@@ -129,13 +136,15 @@ const V030_LAYOUT_WRITES: {
       const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'quick-dial')
       if (!added.ok) throw new Error(`could not add Quick dial: ${added.reason}`)
       const configured = setOptions({ layout: added.layout, readOnly: false }, added.id, {
-        icon: null,
+        icon: 'abcdefgh',
         label: 'Example',
         newTab: false,
         url: 'https://example.com/',
       })
       if (!configured.ok) throw new Error(`could not configure Quick dial: ${configured.reason}`)
-      await act(async () => page.commit(configured.layout))
+      await act(async () => {
+        await page.commit(configured.layout)
+      })
       await waitFor(async () =>
         expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
       )
@@ -148,7 +157,7 @@ const V030_LAYOUT_WRITES: {
 const PHASE_3_SYNC_ITEM_WRITES = [
   {
     key: 'background',
-    name: 'save the background choice through its commit path',
+    name: 'save Favourites only through its commit path and keep it byte for byte for v0.3.0',
     write: async () => {
       let commit = (_value: typeof DEFAULT_BACKGROUND) => {}
       function Commit() {
@@ -158,12 +167,32 @@ const PHASE_3_SYNC_ITEM_WRITES = [
       }
       const page = render(h(Commit, null))
       await waitFor(() => expect(page.container.textContent).toBe('true'))
-      await act(async () => commit({ ...DEFAULT_BACKGROUND, colour: '#123456', kind: 'colour' }))
+      await act(async () => commit({ ...DEFAULT_BACKGROUND, favouritesOnly: true }))
       await waitFor(async () =>
         expect((await fakeBrowser.storage.sync.get('background')).background).toMatchObject({
-          kind: 'colour',
+          favouritesOnly: true,
         }),
       )
+    },
+  },
+  {
+    key: 'icon:',
+    name: 'save a Quick dial icon item; frozen readers leave Layout and settings alone',
+    write: async () => {
+      const id = await saveIcon('data:image/webp;base64,YQ==')
+      return `icon:${id}`
+    },
+  },
+  {
+    expectedPresent: false,
+    key: 'icon:abcdefgh',
+    name: 'delete a Quick dial icon through its guarded path; frozen readers leave it removed',
+    write: async () => {
+      await fakeBrowser.storage.sync.set({
+        'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+      })
+      await deleteIcon('abcdefgh')
+      return 'icon:abcdefgh'
     },
   },
   {
@@ -199,11 +228,16 @@ describe('the frozen v0.3.0 reader', () => {
       ) as { type?: string } | undefined
       if (added?.type === 'quick-dial') {
         expect(added).toMatchObject({
-          options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com/' },
+          options: {
+            icon: 'abcdefgh',
+            label: 'Example',
+            newTab: false,
+            url: 'https://example.com/',
+          },
         })
       } else {
         expect(added).toMatchObject({
-          options: { face: 'ticks', showDate: false, showSeconds: true },
+          options: { face: 'minimal', showDate: false, showSeconds: true },
         })
       }
       expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
@@ -217,20 +251,30 @@ describe('the frozen v0.3.0 reader', () => {
     }
   })
 
-  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ key, write }) => {
+  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ expectedPresent = true, key, write }) => {
     await fakeBrowser.storage.sync.clear()
     await settingsItem.setValue(SEED)
     const settingsBefore = JSON.stringify((await fakeBrowser.storage.sync.get('settings')).settings)
 
-    await write()
+    const writtenKey = (await write()) ?? key
     const stored = await fakeBrowser.storage.sync.get(null)
 
-    expect(stored[key]).toBeDefined()
+    const present = Object.keys(stored).some(
+      (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+    )
+    expect(present).toBe(expectedPresent)
     expect(JSON.stringify(stored.settings)).toBe(settingsBefore)
     expect((await asV023(stored)).settings).toEqual(stored.settings)
     const frozen = await asV030(stored)
     expect(frozen.settings).toEqual(stored.settings)
     expect(frozen.layout.widgets).toEqual([])
+    expect(frozen.raw.background).toEqual(stored.background)
+    const afterFrozenReads = await fakeBrowser.storage.sync.get(null)
+    expect(
+      Object.keys(afterFrozenReads).some(
+        (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+      ),
+    ).toBe(expectedPresent)
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {
@@ -401,9 +445,69 @@ async function commitThroughPage(next: Layout, type: string): Promise<void> {
 
 const PHASE_3_WRITES = [
   {
+    expectedChangedKeys: ['settings'],
+    expectedOptions: undefined,
+    expectedSettings: {
+      ...SEED,
+      photos: { ...SEED.photos, frequency: 'daily', mode: 'cycle' },
+    },
+    expectedType: undefined,
+    name: 'resuming cycling after choosing a photo uses the settings commit path',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue({
+        ...SEED,
+        photos: { ...SEED.photos, frequency: 'daily', mode: 'pinned', pinnedId: 'a' },
+      })
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      let commit: (value: Settings) => Promise<void> = async () => undefined
+      function Probe() {
+        const [, setValue, loaded] = useStorageItem(settingsItem)
+        commit = async (value) => {
+          await setValue(value)
+        }
+        return h('output', null, String(loaded))
+      }
+      const page = render(h(Probe, {}))
+      await waitFor(() => expect(page.container.textContent).toBe('true'))
+      await act(async () =>
+        commit({ ...SEED, photos: { ...SEED.photos, frequency: 'daily', mode: 'cycle' } }),
+      )
+      await waitFor(async () => expect((await settingsItem.getValue()).photos.mode).toBe('cycle'))
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
+    expectedChangedKeys: [],
+    expectedOptions: undefined,
+    expectedSettings: undefined,
+    expectedType: undefined,
+    name: 'pick a gallery photo through rotation; only local photo state changes',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      await manifestCache.setValue({
+        data: makeManifest([makePhoto('a'), makePhoto('b')]),
+        etag: null,
+        fetchedAt: Date.now(),
+        shape: MANIFEST_CACHE_SHAPE,
+      })
+      await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+      const before = await fakeBrowser.storage.sync.get(null)
+      const { result } = renderHook(() => usePhotoRotation(SEED.photos))
+      await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+      await act(async () => result.current.select('b'))
+      await waitFor(async () => expect((await photoState.getValue())?.currentId).toBe('b'))
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
     expectedChangedKeys: ['background'],
     expectedOnboarding: undefined,
     expectedOptions: undefined,
+    expectedSettings: undefined,
     expectedType: undefined,
     name: 'choose a background through its page hook; v0.2.3 settings stay byte-equal',
     write: async () => {
@@ -436,6 +540,7 @@ const PHASE_3_WRITES = [
     expectedChangedKeys: ['layout'],
     expectedOnboarding: undefined,
     expectedOptions: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
+    expectedSettings: undefined,
     expectedType: 'date',
     name: 'adding a Date writes sync:layout only through the page commit path',
     write: async () => {
@@ -453,6 +558,7 @@ const PHASE_3_WRITES = [
     expectedChangedKeys: ['layout'],
     expectedOnboarding: undefined,
     expectedOptions: { folder: 'bar', openInNewTab: false, showFolderName: true },
+    expectedSettings: undefined,
     expectedType: 'bookmarks',
     name: 'adding Bookmarks writes sync:layout only through the page commit path',
     write: async () => {
@@ -504,29 +610,105 @@ const PHASE_3_WRITES = [
       return { after: await fakeBrowser.storage.sync.get(null), before }
     },
   },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: {
+      colour: '#123456',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: true,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'choose a Quick dial colour through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ colour: '#123456' }),
+  },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: {
+      colour: '#ffffff',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: false,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'turn off a Quick dial icon through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ showIcon: false }),
+  },
+  {
+    expectedChangedKeys: ['icon:abcdefgh', 'layout'],
+    expectedOptions: {
+      colour: '#ffffff',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: true,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'remove a Quick dial icon through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ icon: null }, true),
+  },
 ]
+
+async function writeQuickDialOptions(changes: Record<string, unknown>, removeStoredIcon = false) {
+  await settingsItem.setValue(SEED)
+  await onboardingItem.setValue(SEED_ONBOARDING)
+  if (removeStoredIcon)
+    await fakeBrowser.storage.sync.set({
+      'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+    })
+  const layout = await storeExampleLayout()
+  const added = addWidget({ layout, readOnly: false }, 'quick-dial')
+  if (!added.ok) throw new Error(`could not add Quick dial: ${added.reason}`)
+  const configured = setOptions({ layout: added.layout, readOnly: false }, added.id, {
+    colour: '#ffffff',
+    icon: removeStoredIcon ? 'abcdefgh' : null,
+    label: 'Example',
+    newTab: false,
+    showIcon: true,
+    url: 'https://example.com/',
+    ...changes,
+  })
+  if (!configured.ok) throw new Error(`could not configure Quick dial: ${configured.reason}`)
+  const before = await fakeBrowser.storage.sync.get(null)
+  await commitThroughPage(configured.layout, 'quick-dial')
+  if (removeStoredIcon) await deleteIcon('abcdefgh')
+  return { after: await fakeBrowser.storage.sync.get(null), before }
+}
 
 describe('phase 3 synced writes', () => {
   it.each(PHASE_3_WRITES)('$name', async (row) => {
-    const { expectedChangedKeys, expectedOnboarding, expectedOptions, expectedType, write } = row
+    const {
+      expectedChangedKeys,
+      expectedOnboarding,
+      expectedOptions,
+      expectedSettings,
+      expectedType,
+      write,
+    } = row
     const { after: rawSync, before } = await write()
 
     const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
       .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(rawSync[key]))
       .sort()
     expect(changedKeys).toEqual(expectedChangedKeys)
-    expect(rawSync.settings).toEqual(before.settings)
+    if (expectedSettings) expect(rawSync.settings).toEqual(expectedSettings)
+    else expect(rawSync.settings).toEqual(before.settings)
     expect(rawSync.onboarding).toEqual(expectedOnboarding ?? before.onboarding)
     const { fellBack, settings } = await asV023(rawSync)
     expect(fellBack).toBe(false)
     expect(settings).toEqual(rawSync.settings)
     expect((await asV023(rawSync)).onboarding).toEqual(expectedOnboarding ?? before.onboarding)
     expect((await asV030(rawSync)).onboarding).toEqual(expectedOnboarding ?? before.onboarding)
-    if (expectedChangedKeys.includes('background')) {
+    if (expectedChangedKeys.some((key) => key === 'background')) {
       expect(rawSync.background).toMatchObject({ colour: '#123456', kind: 'colour', v: 1 })
       expect((await asV030(rawSync)).raw.background).toEqual(rawSync.background)
     }
-    if (expectedChangedKeys.includes('layout')) {
+    if (expectedChangedKeys.some((key) => key === 'layout')) {
       expect(rawSync.layout).toMatchObject({
         v: 1,
         widgets: expect.arrayContaining([expect.objectContaining({ type: expectedType })]),
@@ -656,7 +838,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
   },
   {
     changes: { photos: { ...SEED.photos, mode: 'pinned', pinnedId: 'p2' } },
-    name: 'pin a photo (from the gallery, or the arrow while pinned)',
+    name: 'hold the current photo with Never',
     write: changeSettings((s) => ({
       ...s,
       photos: { ...s.photos, mode: 'pinned', pinnedId: 'p2' },
@@ -875,7 +1057,9 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       )
       const changed = setOptions({ layout, readOnly: false }, weather.placed.id, options)
       if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
-      act(() => result.current.commit(changed.layout))
+      act(() => {
+        void result.current.commit(changed.layout)
+      })
       await waitFor(async () => {
         const saved = await layoutItem.getValue()
         const savedWeather = saved?.widgets.find(
