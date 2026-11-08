@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '@/entrypoints/newtab/App'
 import { onboardingItem } from '@/onboarding/storage'
+import { WIDGETS } from '@/widgetSystem/registry'
 
 import * as stories from './AddMenu.stories'
 
@@ -57,34 +58,35 @@ describe('the Add menu stories', () => {
     expect(screen.getByRole('menu', { name: 'Add a widget' }).querySelector('.new-mark')).toBeNull()
   })
 
-  it('Open seeds a new install whose menu offers the Clock and the Weather', async () => {
+  it('Open seeds a new install whose menu offers every registered Widget', async () => {
     await seed('Open')
     render(<App />)
 
     const menu = await openMenu()
 
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Analog clock', 'Weather']) {
       expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBeNull()
     }
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('NoRoom seeds a Grid with no free cell, so that both items are unavailable', async () => {
+  it('NoRoom seeds a Grid with no free cell, so every item is unavailable', async () => {
     await seed('NoRoom')
     render(<App />)
 
     const menu = await openMenu()
 
-    expect(within(menu).getByRole('menuitem', { name: /Weather/ }).textContent).toContain(
-      'There is no room for a Weather.',
-    )
-    expect(within(menu).getByRole('menuitem', { name: /Clock/ }).textContent).toContain(
-      'There is no room for a Clock.',
-    )
+    for (const { name } of WIDGETS) {
+      const article = /^[aeiou]/i.test(name) ? 'an' : 'a'
+      const item = within(menu).getByRole('menuitem', { name: new RegExp(`^${name}`) })
+
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      expect(item.textContent).toContain(`There is no room for ${article} ${name}.`)
+    }
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('AtLimit seeds eight Widgets, so that both items are unavailable under the Widget limit line', async () => {
+  it('AtLimit seeds eight Widgets, so every item is unavailable under the Widget limit line', async () => {
     await seed('AtLimit')
     const { container } = render(<App />)
     await waitFor(() => expect(container.querySelectorAll('.widget-box')).toHaveLength(8))
@@ -94,7 +96,7 @@ describe('the Add menu stories', () => {
     expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
       "That's all 8 widgets. Remove one to add another.",
     )
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Analog clock', 'Weather']) {
       const item = within(menu).getByRole('menuitem', { name })
       expect(item.getAttribute('aria-disabled')).toBe('true')
       // The line is the menu's, once: not repeated in the item.
@@ -163,7 +165,7 @@ it('NewerLayout shows the update note and disables each Add choice', async () =>
   expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
     'Update Lander to change this.',
   )
-  for (const name of ['Clock', 'Weather']) {
+  for (const name of ['Clock', 'Date', 'Analog clock', 'Weather']) {
     expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBe('true')
   }
 })
