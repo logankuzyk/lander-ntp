@@ -2,7 +2,11 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'wxt'
 
-import { accountHostPermission, PRODUCTION_SERVER_URL } from './src/account/serverAddress'
+import {
+  accountHostPermission,
+  accountServerUrl,
+  PRODUCTION_SERVER_URL,
+} from './src/account/serverAddress'
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -26,10 +30,14 @@ export default defineConfig({
   imports: false,
   manifest: async ({ browser, mode }) => {
     const { loadEnv } = await import('vite')
-    const serverUrl =
+    const configuredServerUrl =
       loadEnv(mode, process.cwd(), 'WXT_').WXT_SERVER_URL ??
       process.env.WXT_SERVER_URL ??
       PRODUCTION_SERVER_URL
+    const serverUrl = accountServerUrl(
+      configuredServerUrl,
+      mode === 'development' ? 'development' : 'production',
+    )
     return {
       description: 'A minimal new tab page featuring photography from logankuzyk.com.',
       homepage_url: 'https://logankuzyk.com',

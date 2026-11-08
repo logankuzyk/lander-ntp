@@ -117,6 +117,8 @@ class AccountClient {
       this.#setState(signedOut())
       return { ok: true, value: undefined }
     }
+    const guard = await this.#consentGuard()
+    if (!guard.ok) return guard
     const result = await this.#request('/api/auth/sign-out', {
       method: 'POST',
       token: stored.token,

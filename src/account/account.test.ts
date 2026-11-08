@@ -312,6 +312,49 @@ describe('account', () => {
     )
   })
 
+  it('does not sign out over the network after consent withdrawal and revokes the token after the next sign-in', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response(200, { token: 'old-token', user: { email: 'person@example.com' } }),
+      )
+      .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+      .mockResolvedValueOnce(
+        response(200, { token: 'new-token', user: { email: 'person@example.com' } }),
+      )
+      .mockResolvedValueOnce(response(200, { success: true }))
+      .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+    vi.stubGlobal('fetch', fetcher)
+    const contains = vi.spyOn(browser.permissions, 'contains')
+
+    await account.verify('person@example.com', '111111')
+    contains.mockResolvedValue(false as never)
+    await expect(account.signOut()).resolves.toEqual({ error: 'consent-refused', ok: false })
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(await browser.storage.local.get('account')).toEqual({
+      account: { email: 'person@example.com', staleToken: 'old-token' },
+    })
+    expect(account.state).toMatchObject({ notice: 'paused-no-consent', status: 'signed-out' })
+
+    contains.mockResolvedValue(true as never)
+    await expect(account.verify('person@example.com', '222222')).resolves.toMatchObject({
+      ok: true,
+    })
+
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      `${config.serverUrl}/api/auth/sign-in/email-otp`,
+      `${config.serverUrl}/v1/me`,
+      `${config.serverUrl}/api/auth/sign-in/email-otp`,
+      `${config.serverUrl}/api/auth/sign-out`,
+      `${config.serverUrl}/v1/me`,
+    ])
+    expect(new Headers(fetcher.mock.calls[3]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer old-token',
+    )
+  })
+
   it('does not make account requests after consent is withdrawn', async () => {
     vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
     const fetcher = vi.fn()
