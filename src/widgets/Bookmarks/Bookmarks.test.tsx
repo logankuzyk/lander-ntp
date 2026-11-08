@@ -179,7 +179,7 @@ describe('the Bookmarks Widget', () => {
     const port = createFakeBookmarksPort({ granted: true, tree: TREE })
     render(
       <WidgetBox
-        definition={createBookmarksDefinition(port, () => '/stub.ico')}
+        definition={createBookmarksDefinition(port)}
         options={{ folder: 'bar', openInNewTab: false, showFolderName: false }}
         page={PAGE}
         rect={RECT}
@@ -188,7 +188,9 @@ describe('the Bookmarks Widget', () => {
 
     const link = await screen.findByRole('link', { name: 'One bookmark' })
     expect(link.classList.contains('quick-dial')).toBe(true)
-    expect(link.querySelector('.quick-dial__icon img')?.getAttribute('src')).toBe('/stub.ico')
+    expect(link.querySelector('.quick-dial__icon img')?.getAttribute('src')).toBe(
+      'https://example.com/favicon.ico',
+    )
     expect(link.querySelector('.quick-dial__label')?.textContent).toBe('One bookmark')
   })
 
