@@ -16,12 +16,14 @@ type PhotoInfoProps = {
   locale?: string
   onClose: () => void
   photo: Photo
+  /** Keeps focus on the update note when its walk opens details. */
+  quiet?: boolean
   saveOutcome?: StorageItemOptions
 }
 
 /** Camera settings for the current photo. Opened with the ⓘ button or the `i` key. */
-export function PhotoInfo({ locale, onClose, photo, saveOutcome }: PhotoInfoProps) {
-  const { close, container } = usePopover(onClose)
+export function PhotoInfo({ locale, onClose, photo, quiet = false, saveOutcome }: PhotoInfoProps) {
+  const { close, container } = usePopover(onClose, { keepFocus: quiet })
   const favourites = useFavourites(saveOutcome)
   const marked = isFavourite(favourites.value.ids, photo.id)
   const heartSeen = useSeen('photo-heart')

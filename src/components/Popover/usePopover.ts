@@ -53,7 +53,12 @@ export function usePopover(
     // outside doesn't close it.
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target
-      if (!(target instanceof Element) || container.current?.contains(target)) return
+      if (
+        !(target instanceof Element) ||
+        container.current?.contains(target) ||
+        target.closest('.callout')
+      )
+        return
       // Toggles close the popover themselves; closing it here too would open it again.
       if (target.closest('[data-popover-toggle]')) return
       onClose()

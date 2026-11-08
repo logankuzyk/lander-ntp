@@ -40,15 +40,27 @@ const EMPTY_LAYOUT: Layout = { extra: {}, widgets: [] }
 
 const onEnd = vi.fn()
 const onFinish = vi.fn()
+const openInfo = vi.fn()
+const closeInfo = vi.fn()
 
-function renderTour(stops: readonly TourStop[] = STOPS) {
+function renderTour(
+  stops: readonly TourStop[] = STOPS,
+  info: { closeInfo?: () => void; openInfo?: () => void } = {},
+) {
   return render(
     <EditModeProvider>
       <AddMenuControlProvider>
         <button data-callout-target="edit" data-edit-toggle type="button">
           Edit
         </button>
-        <PageTour layout={EMPTY_LAYOUT} onEnd={onEnd} onFinish={onFinish} stops={stops} />
+        <PageTour
+          closeInfo={info.closeInfo}
+          layout={EMPTY_LAYOUT}
+          onEnd={onEnd}
+          onFinish={onFinish}
+          openInfo={info.openInfo}
+          stops={stops}
+        />
       </AddMenuControlProvider>
     </EditModeProvider>,
   )
@@ -57,6 +69,8 @@ function renderTour(stops: readonly TourStop[] = STOPS) {
 beforeEach(() => {
   onEnd.mockReset()
   onFinish.mockReset()
+  openInfo.mockReset()
+  closeInfo.mockReset()
   vi.useFakeTimers()
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
@@ -95,6 +109,32 @@ describe('focus when the tour starts', () => {
     await act(async () => {})
 
     expect(document.activeElement).toBe(control)
+  })
+})
+
+describe('photo details during a tour', () => {
+  it('closes details when the run ends', async () => {
+    const view = renderTour(
+      [
+        STOPS[0]!,
+        {
+          body: 'Look at the photo details.',
+          id: 'details',
+          show: { adding: false, editing: false, info: true },
+          target: 'edit',
+          title: 'Photo details',
+        },
+      ],
+      { closeInfo, openInfo },
+    )
+    await act(async () => {})
+    next()
+    await act(async () => {})
+    expect(openInfo).toHaveBeenCalledTimes(1)
+
+    view.unmount()
+
+    expect(closeInfo).toHaveBeenCalledTimes(1)
   })
 })
 
