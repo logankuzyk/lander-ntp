@@ -25,8 +25,21 @@ describe('Analog clock', () => {
     expect(dial?.getAttribute('role')).toBe('img')
     expect(dial?.getAttribute('aria-label')).toBe('Analog clock, 21:05')
     expect(container.querySelectorAll('.analog-clock__numeral')).toHaveLength(12)
+    expect(container.querySelectorAll('.analog-clock__tick')).toHaveLength(0)
     expect(container.querySelector('.analog-clock__date')?.textContent).toBe('11')
     expect(container.querySelector('.analog-clock__hand--second')).not.toBeNull()
+  })
+
+  it('draws all sixty minute ticks on the Ticks face', () => {
+    const { container } = render(<AnalogClock face="ticks" showDate={false} showSeconds={false} />)
+    expect(container.querySelectorAll('.analog-clock__tick')).toHaveLength(60)
+  })
+
+  it('uses the page 12-hour setting in its accessible time label', () => {
+    const { container } = render(
+      <AnalogClock face="ticks" hour12 showDate={false} showSeconds={false} />,
+    )
+    expect(container.querySelector('svg')?.getAttribute('aria-label')).toBe('Analog clock, 9:05')
   })
 
   it('does not add numerals or a seconds hand when those options are off', () => {
@@ -110,6 +123,21 @@ describe('Analog clock', () => {
     })
     expect(container.querySelector('.analog-clock__hand--second')?.getAttribute('transform')).toBe(
       'rotate(150 50 50)',
+    )
+  })
+
+  it('does not schedule ticks when first mounted in a hidden tab', async () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    })
+    const { container } = render(<AnalogClock face="ticks" showDate={false} showSeconds />)
+    const before = container.querySelector('.analog-clock__hand--second')?.getAttribute('transform')
+    await act(async () => {
+      vi.advanceTimersByTime(5_000)
+    })
+    expect(container.querySelector('.analog-clock__hand--second')?.getAttribute('transform')).toBe(
+      before,
     )
   })
 })

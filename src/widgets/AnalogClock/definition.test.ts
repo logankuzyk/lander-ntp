@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { render } from '@testing-library/preact'
+import { h } from 'preact'
+import { describe, expect, it, vi } from 'vitest'
 
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
 
@@ -45,5 +47,24 @@ describe('the Analog clock definition', () => {
       h: 2,
       w: 2,
     })
+  })
+
+  it('uses the page-wide 12-hour value when labeling the dial', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 11, 21, 5))
+    try {
+      const { container } = render(
+        h(analogClockDefinition.View, {
+          cells: { h: 2, w: 2 },
+          context: undefined,
+          options: defaultOptions(analogClockDefinition),
+          page: { hour12: true },
+          reading: undefined,
+        }),
+      )
+      expect(container.querySelector('svg')?.getAttribute('aria-label')).toBe('Analog clock, 9:05')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

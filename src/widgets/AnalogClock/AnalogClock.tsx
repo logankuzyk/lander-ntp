@@ -5,7 +5,7 @@ import { formatTime } from '@/utils/time'
 import type { AnalogClockOptions } from './definition'
 import { handAngles } from './handAngles'
 
-type AnalogClockProps = AnalogClockOptions & { locale?: string }
+type AnalogClockProps = AnalogClockOptions & { hour12?: boolean; locale?: string }
 
 function useClock(showSeconds: boolean) {
   const [now, setNow] = useState(() => new Date())
@@ -59,10 +59,16 @@ const points = (radius: number, count: number, inner: number) =>
     }
   })
 
-export function AnalogClock({ face, locale, showDate, showSeconds }: AnalogClockProps) {
+export function AnalogClock({
+  face,
+  hour12 = false,
+  locale,
+  showDate,
+  showSeconds,
+}: AnalogClockProps) {
   const now = useClock(showSeconds)
   const angles = handAngles(now)
-  const label = formatTime(now, { hour12: false, locale, showSeconds: false })
+  const label = formatTime(now, { hour12, locale, showSeconds: false })
   const ticks = points(43, 60, 40)
 
   return (

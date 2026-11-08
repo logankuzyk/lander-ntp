@@ -10,8 +10,8 @@ export type AnalogClockOptions = {
   showSeconds: boolean
 }
 
-function AnalogClockView({ options }: WidgetViewProps<AnalogClockOptions>) {
-  return h(AnalogClock, options)
+function AnalogClockView({ options, page }: WidgetViewProps<AnalogClockOptions>) {
+  return h(AnalogClock, { ...options, hour12: page.hour12 })
 }
 
 export const analogClockDefinition: WidgetDefinition<AnalogClockOptions> = {
