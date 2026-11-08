@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { storage } from 'wxt/utils/storage'
 
-import { manifestCache } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache } from '@/photos/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import type { Reading } from '@/widgetSystem/source'
 
@@ -132,6 +132,7 @@ describe('weatherSource', () => {
       data: { ...makeManifest([makePhoto('a')]), weather: { enabled: false } },
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
 
     expect(await weatherSource.enabled?.()).toBe(false)

@@ -4,7 +4,7 @@ import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { checkLayout, storedLayout } from '@/layout/check'
 import { layoutItem } from '@/layout/storage'
-import { manifestCache } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makeManifest, makePhoto, makePlace, makeWeather } from '@/test/fixtures'
@@ -37,6 +37,7 @@ const seedPhotos = () =>
     data: makeManifest([makePhoto('a'), makePhoto('b')]),
     etag: null,
     fetchedAt: Date.now(),
+    shape: MANIFEST_CACHE_SHAPE,
   })
 
 /** Fresh readings, so no Weather on the page asks the forecast for anything. */

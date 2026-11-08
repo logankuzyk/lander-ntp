@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import type { Frequency, PhotoSettings } from './rotation'
-import { manifestCache, photoState } from './storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from './storage'
 import { usePhotoRotation } from './usePhotoRotation'
 
 const IDS = ['a', 'b', 'c']
-const WATER = { name: 'Water', slug: 'water' }
+const WATER = { name: 'Water', optIn: false, slug: 'water' }
 
 const cycle = (frequency: Frequency, tags: string[] = []): PhotoSettings => ({
   frequency,
@@ -30,6 +30,7 @@ const seed = async (currentId = 'a') => {
     data: makeManifest(IDS.map((id) => makePhoto(id, { tags: id === 'c' ? [WATER] : [] }))),
     etag: null,
     fetchedAt: Date.now(),
+    shape: MANIFEST_CACHE_SHAPE,
   })
   await photoState.setValue({ bag: ['b'], currentId, shownAt: Date.now() })
 }
