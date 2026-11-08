@@ -24,9 +24,15 @@ export function canon(value: unknown): string {
   return JSON.stringify(value) ?? 'undefined'
 }
 
+const withoutSettingsVersion = (value: unknown): unknown => {
+  return Object.fromEntries(Object.entries(asRecord(value)).filter(([key]) => key !== 'v'))
+}
+
 const arranged = (items: SyncItems): boolean =>
   Object.hasOwn(items, 'layout') ||
-  (Object.hasOwn(items, 'settings') && canon(items.settings) !== canon(DEFAULT_SETTINGS))
+  (Object.hasOwn(items, 'settings') &&
+    canon(withoutSettingsVersion(items.settings)) !==
+      canon(withoutSettingsVersion(DEFAULT_SETTINGS)))
 
 /** Decide how to reconcile a browser and account on the first sign-in. */
 export function planFirstSignIn(local: SyncItems, remote: SyncItems): SyncAction {

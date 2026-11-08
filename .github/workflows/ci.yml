@@ -35,6 +35,22 @@ jobs:
       - run: npm run test
       - run: npm run build
 
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: server/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npm run test:integration
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

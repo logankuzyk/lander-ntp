@@ -36,12 +36,6 @@ export const WeatherOn: Story = {
     }
   },
 }
-
-/** Someone who had the extension before the weather arrived, and is told about it. */
-export const WeatherNews: Story = {
-  beforeEach: () => seedPage(PAGE_SEEDS.weatherNews),
-}
-
 /** Someone who had the extension before accounts arrived, and is told about them. */
 export const AccountNews: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.accountNews),

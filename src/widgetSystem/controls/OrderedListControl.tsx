@@ -1,15 +1,7 @@
 import { Eye, EyeOff, GripVertical } from 'lucide-preact'
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
-import type { WeatherField, WeatherFieldSetting } from '@/settings/schema'
-
-const LABELS: Record<WeatherField, string> = {
-  condition: 'Conditions',
-  feelsLike: 'Feels like',
-  highLow: 'High and low',
-  location: 'Location',
-  sun: 'Sunrise and sunset',
-}
+import type { ListEntry } from '../definition'
 
 const move = <T,>(list: readonly T[], from: number, to: number): T[] => {
   const next = [...list]
@@ -19,18 +11,15 @@ const move = <T,>(list: readonly T[], from: number, to: number): T[] => {
 }
 
 /**
- * Show or hide a field, and move it to where the shown rows end and the hidden ones begin: a
- * field switched on joins the end of the shown ones, one switched off leads the hidden ones.
+ * Show or hide an entry, and move it to where the shown rows end and the hidden ones begin: an
+ * entry switched on joins the end of the shown ones, one switched off leads the hidden ones.
  */
-const toggle = (
-  fields: readonly WeatherFieldSetting[],
-  id: WeatherField,
-): WeatherFieldSetting[] => {
-  const field = fields.find((other) => other.id === id)
-  if (!field) return [...fields]
-  const rest = fields.filter((other) => other.id !== id)
+const toggle = <E extends ListEntry>(entries: readonly E[], id: E['id']): E[] => {
+  const entry = entries.find((other) => other.id === id)
+  if (!entry) return [...entries]
+  const rest = entries.filter((other) => other.id !== id)
   const boundary = rest.findLastIndex((other) => other.shown) + 1
-  return [...rest.slice(0, boundary), { ...field, shown: !field.shown }, ...rest.slice(boundary)]
+  return [...rest.slice(0, boundary), { ...entry, shown: !entry.shown }, ...rest.slice(boundary)]
 }
 
 /** How long a row takes to slide to its new place. */
@@ -83,21 +72,33 @@ function useSlide(list: { current: HTMLElement | null }, order: string) {
   return { isSliding: (id: string) => sliding.current.has(id), register }
 }
 
-type WeatherFieldsProps = {
-  fields: readonly WeatherFieldSetting[]
-  onChange: (fields: WeatherFieldSetting[]) => void
+type OrderedListControlProps<E extends ListEntry> = {
+  /** Shows the list as it is, out of reach: the order and what is shown may not be changed. */
+  disabled?: boolean
+  /** The ids the list holds, with what to call each. */
+  items: readonly { id: E['id']; label: string }[]
+  /** The id of the heading that names the list. */
+  labelledBy: string
+  /** Every entry exactly once, in the order to draw them: what changed, whole. */
+  onChange: (value: E[]) => void
+  value: readonly E[]
 }
 
 /**
- * The lines under the temperature, in the order the widget draws them. Rows are dragged into
- * place, or moved with the arrow keys from their handle; the eye shows and hides a line.
+ * A list of things to show, in the order to draw them, each shown or hidden. Rows are dragged
+ * into place, or moved with the arrow keys from their handle; the eye shows and hides a row.
  */
-export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
-  /** The order while a row is being dragged. Only the drop is written to settings. */
-  const [draft, setDraft] = useState<{
-    dragging: WeatherField
-    fields: WeatherFieldSetting[]
-  } | null>(null)
+export function OrderedListControl<E extends ListEntry>({
+  disabled = false,
+  items,
+  labelledBy,
+  onChange,
+  value: fields,
+}: OrderedListControlProps<E>) {
+  const labelOf = (id: E['id']) => items.find((item) => item.id === id)?.label ?? id
+
+  /** The order while a row is being dragged. Only the drop is passed on. */
+  const [draft, setDraft] = useState<{ dragging: E['id']; fields: E[] } | null>(null)
   const shown = draft?.fields ?? fields
   const list = useRef<HTMLOListElement>(null)
   const { isSliding, register } = useSlide(list, shown.map(({ id }) => id).join(' '))
@@ -144,8 +145,8 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
     const before = next[to - 1]
     setAnnouncement(
       before
-        ? `${LABELS[field.id]} moved to be shown after ${LABELS[before.id].toLowerCase()}`
-        : `${LABELS[field.id]} moved to be shown first`,
+        ? `${labelOf(field.id)} moved to be shown after ${labelOf(before.id).toLowerCase()}`
+        : `${labelOf(field.id)} moved to be shown first`,
     )
     onChange(next)
   }
@@ -153,7 +154,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
   return (
     <>
       <ol
-        aria-labelledby="weather-show-heading"
+        aria-labelledby={labelledBy}
         class="fields"
         // The gaps between rows take a drop too, so letting go there isn't a cancelled drag.
         onDragOver={(event) => draft && event.preventDefault()}
@@ -161,18 +162,19 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
         ref={list}
       >
         {shown.map((field, index) => {
-          const label = LABELS[field.id]
+          const label = labelOf(field.id)
           const classes = ['fields__row']
           if (!field.shown) classes.push('fields__row--hidden')
           if (draft?.dragging === field.id) classes.push('fields__row--dragging')
           return (
             <li
               class={classes.join(' ')}
-              draggable
+              draggable={!disabled}
               key={field.id}
               onDragEnd={finish}
               onDragOver={(event) => dragOver(event, index)}
               onDragStart={(event) => {
+                if (disabled) return event.preventDefault()
                 // Firefox only starts a drag that carries data.
                 event.dataTransfer?.setData('text/plain', label)
                 if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
@@ -184,6 +186,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
               <button
                 aria-label={`Reorder ${label}`}
                 class="fields__handle"
+                disabled={disabled}
                 onKeyDown={(event) => onHandleKeyDown(event, index)}
                 title="Drag, or use the arrow keys, to reorder"
                 type="button"
@@ -195,6 +198,7 @@ export function WeatherFields({ fields, onChange }: WeatherFieldsProps) {
                 aria-label={`Show ${label}`}
                 aria-pressed={field.shown}
                 class="fields__eye"
+                disabled={disabled}
                 onClick={() => onChange(toggle(fields, field.id))}
                 type="button"
               >

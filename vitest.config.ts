@@ -6,13 +6,19 @@ export default defineConfig({
   plugins: [WxtVitest()],
   test: {
     coverage: {
-      exclude: ['src/entrypoints/**/main.tsx', '**/*.test.{ts,tsx}', '**/*.stories.tsx'],
+      exclude: [
+        'src/entrypoints/**/main.tsx',
+        // Test scaffolding, including the frozen v0.2.3 reader, which no one is to improve.
+        'src/test/compat/**',
+        '**/*.test.{ts,tsx}',
+        '**/*.stories.tsx',
+      ],
       include: ['src/**/*.{ts,tsx}'],
       provider: 'v8',
     },
     environment: 'happy-dom',
     // Agent worktrees are whole copies of the repo, tests included.
-    exclude: [...configDefaults.exclude, '.claude/**', 'server/**'],
+    exclude: [...configDefaults.exclude, '.claude/**', 'server/**', 'integration/**'],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
   },

@@ -1,16 +1,26 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { storage } from 'wxt/utils/storage'
 
-import { NEWS } from './callouts'
 import { recordInstall } from './install'
-import { onboardingItem } from './storage'
+import { onboardingItem, pendingItem } from './storage'
+
+// `callouts.ts` has no news at the moment (the Weather's was removed once its options moved onto
+// the widget), so these bring their own, as a later release would.
+vi.mock('./callouts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./callouts')>()),
+  NEWS: [
+    { body: 'One.', id: 'first', target: 'edit', title: 'First' },
+    { body: 'Two.', id: 'second', target: 'add', title: 'Second' },
+  ],
+}))
 
 describe('recordInstall', () => {
   it('has a new install welcomed, with none of the news to come', async () => {
     await recordInstall('install')
 
-    expect(await onboardingItem.getValue()).toEqual({
-      dismissed: NEWS.map(({ id }) => id),
+    // Kept back until the welcome is answered (see pendingItem), then synced.
+    expect(await pendingItem.getValue()).toEqual({
+      dismissed: ['first', 'second'],
       welcomed: false,
     })
   })
