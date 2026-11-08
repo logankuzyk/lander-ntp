@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { fn } from 'storybook/test'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { onboardingItem } from '@/onboarding/storage'
 import { makePhoto } from '@/test/fixtures'
 
@@ -21,5 +23,23 @@ type Story = StoryObj<typeof meta>
 export const HeartNew: Story = {
   beforeEach: async () => {
     await onboardingItem.setValue({ dismissed: [], welcomed: true })
+  },
+}
+
+export const Default: Story = {}
+
+export const Favourited: Story = {
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: ['heart-new'], v: 1 })
+  },
+}
+
+export const Fallback: Story = {
+  args: { photo: makePhoto('fallback') },
+}
+
+export const ReadOnly: Story = {
+  beforeEach: async () => {
+    await fakeBrowser.storage.sync.set({ favourites: { ids: ['heart-new'], v: 2 } })
   },
 }

@@ -278,7 +278,7 @@ export function App() {
           </OptionsPopoverProvider>
           {photo && <PhotoCredit photo={photo} />}
           {photo && popover === 'info' && (
-            <PhotoInfo onClose={close} photo={photo} quiet={quietInfo} />
+            <PhotoInfo onClose={close} photo={photo} quiet={quietInfo} saveOutcome={saveOutcome} />
           )}
           {popover === 'settings' && (
             <SettingsPanel
@@ -288,6 +288,7 @@ export function App() {
               onClose={close}
               photos={photos}
               readOnly={settingsReadOnly}
+              saveOutcome={saveOutcome}
               settings={settings}
               tour={entry.tour ? (entry.tour.stops ?? SETTINGS_TOUR) : undefined}
               tourProgress={entry.tour || undefined}

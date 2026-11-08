@@ -15,6 +15,7 @@ import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
 import type { Settings } from '@/settings/schema'
+import type { StorageItemOptions } from '@/settings/useStorageItem'
 import { Choice } from '@/widgetSystem/controls/Choice'
 import { Switch } from '@/widgetSystem/controls/Switch'
 
@@ -50,10 +51,11 @@ type PhotosSectionProps = {
   currentId: string | null
   onChange: (settings: Settings) => void
   photos: readonly Photo[]
+  saveOutcome?: StorageItemOptions
   settings: Settings
 }
 
-function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionProps) {
+function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: PhotosSectionProps) {
   const cycling = settings.photos
   const pinned = cycling.mode === 'pinned'
   const tags = useMemo(() => availableTags(photos), [photos])
@@ -117,6 +119,7 @@ function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionP
           key={cycling.tags.join(' ')}
           onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
           photos={photos}
+          saveOutcome={saveOutcome}
         />
       )}
     </>
@@ -202,6 +205,7 @@ type SettingsPanelProps = {
    * this one saved over them: they can be looked at and not changed.
    */
   readOnly?: boolean
+  saveOutcome?: StorageItemOptions
   settings: Settings
   /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
   tour?: readonly SettingsStop[]
@@ -221,6 +225,7 @@ export function SettingsPanel({
   onClose,
   photos,
   readOnly = false,
+  saveOutcome,
   settings,
   tour = [],
   tourProgress,
@@ -373,6 +378,7 @@ export function SettingsPanel({
                 currentId={currentId}
                 onChange={onChange}
                 photos={photos}
+                saveOutcome={saveOutcome}
                 settings={known}
               />
             )}

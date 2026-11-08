@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 
 /** A reading and when it was fetched. */
 export type Reading<R> = {
@@ -51,6 +51,143 @@ export type SourceStatus = 'failed' | 'loading' | 'off' | 'ready'
 
 /** A reading to show if there is one, and where the source stands. `reading` is set only when `ready`. */
 export type SourceState<R> = { reading: R | null; status: SourceStatus }
+
+const needResultTag: unique symbol = Symbol('NeedResult')
+
+/** A tagged result that tells the Widget to show one of its Needs. */
+export type NeedResult = { name: string; readonly [needResultTag]: true }
+
+/** Reports a Need from a watched read without colliding with an ordinary object reading. */
+export const reportNeed = (name: string): NeedResult => ({ name, [needResultTag]: true })
+
+function isNeedResult(value: unknown): value is NeedResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    needResultTag in value &&
+    value[needResultTag] === true
+  )
+}
+
+/** A local source that reads again when its underlying data changes. */
+export type WatchedSource<R, O> = {
+  kind: 'watched'
+  read: (options: O) => Promise<NeedResult | R>
+  /** Calls `onChange` when the data may have changed; returns the function that stops. */
+  watch: (onChange: () => void) => () => void
+}
+
+export type WatchedSourceState<R> = {
+  need?: string
+  reading: R | null
+  refresh: () => void
+  status: 'needs' | SourceStatus
+}
+
+/** The delay that combines a burst of source changes into one read. */
+export const WATCH_DEBOUNCE_MS = 100
+
+function sameOptions(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const left = Object.keys(a)
+  const right = Object.keys(b)
+  return (
+    left.length === right.length &&
+    left.every(
+      (key) =>
+        Object.hasOwn(b, key) &&
+        sameOptions((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  )
+}
+
+/** Reads a watched source on mount and after changes, without storing or timing its readings. */
+export function useWatchedSourceState<R, O>(
+  source: WatchedSource<R, O>,
+  options: O,
+): WatchedSourceState<R> {
+  const stable = useRef(options)
+  if (!sameOptions(stable.current, options)) stable.current = options
+  const currentOptions = stable.current
+  const generation = useRef(currentOptions)
+  const optionsChanged = generation.current !== currentOptions
+  generation.current = currentOptions
+  const [state, setState] = useState<Omit<WatchedSourceState<R>, 'refresh'>>({
+    reading: null,
+    status: 'loading',
+  })
+  const reload = useRef<() => void>(() => undefined)
+  const refresh = useCallback(() => reload.current(), [])
+
+  useEffect(() => {
+    let active = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let running = false
+    let queued = false
+    let failed = false
+    setState({ reading: null, status: 'loading' })
+    const read = async () => {
+      if (!active) return
+      if (running) {
+        queued = true
+        return
+      }
+      running = true
+      setState((old) => ({
+        need: undefined,
+        reading: old.reading,
+        status: old.reading === null ? 'loading' : 'ready',
+      }))
+      try {
+        const result = await source.read(currentOptions)
+        if (!active) return
+        failed = false
+        if (isNeedResult(result)) {
+          setState((old) => ({
+            need: result.name,
+            reading: old.reading,
+            status: 'needs',
+          }))
+        } else {
+          setState({ reading: result as R, status: 'ready' })
+        }
+      } catch {
+        if (active) {
+          failed = true
+          setState((old) => ({ reading: old.reading, status: 'failed' }))
+        }
+      } finally {
+        running = false
+        if (active && queued) {
+          queued = false
+          schedule()
+        }
+      }
+    }
+    const schedule = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => void read(), WATCH_DEBOUNCE_MS)
+    }
+    reload.current = () => void read()
+    const stop = source.watch(schedule)
+    const onVisibility = () => {
+      if (!document.hidden && failed) schedule()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    void read()
+    return () => {
+      active = false
+      clearTimeout(timer)
+      reload.current = () => undefined
+      document.removeEventListener('visibilitychange', onVisibility)
+      stop()
+    }
+  }, [source, currentOptions])
+
+  return optionsChanged ? { reading: null, refresh, status: 'loading' } : { ...state, refresh }
+}
 
 /** The fetches under way in this tab, by cache and then key. */
 const inFlight = new WeakMap<object, Map<string, Promise<Reading<unknown> | null>>>()

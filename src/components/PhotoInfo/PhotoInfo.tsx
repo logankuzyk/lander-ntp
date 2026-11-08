@@ -1,10 +1,14 @@
 import { useEffect } from 'preact/hooks'
 
+import { isFavourite, toggleFavourite } from '@/backdrop/favourites'
+import { useFavourites } from '@/backdrop/useFavourites'
+import { HeartIcon } from '@/components/FavouriteHeart/HeartIcon'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
 import { NewMark } from '@/onboarding/NewMark'
 import { recordSeen, useSeen } from '@/onboarding/useSeen'
 import type { Photo } from '@/photos/schema'
+import type { StorageItemOptions } from '@/settings/useStorageItem'
 import { formatDateTaken } from '@/utils/time'
 
 type PhotoInfoProps = {
@@ -14,11 +18,14 @@ type PhotoInfoProps = {
   photo: Photo
   /** Keeps focus on the update note when its walk opens details. */
   quiet?: boolean
+  saveOutcome?: StorageItemOptions
 }
 
 /** Camera settings for the current photo. Opened with the ⓘ button or the `i` key. */
-export function PhotoInfo({ locale, onClose, photo, quiet = false }: PhotoInfoProps) {
+export function PhotoInfo({ locale, onClose, photo, quiet = false, saveOutcome }: PhotoInfoProps) {
   const { close, container } = usePopover(onClose, { keepFocus: quiet })
+  const favourites = useFavourites(saveOutcome)
+  const marked = isFavourite(favourites.value.ids, photo.id)
   const heartSeen = useSeen('photo-heart')
 
   // Opening photo details is the first time this mark can be seen. It remains visible for this
@@ -43,6 +50,23 @@ export function PhotoInfo({ locale, onClose, photo, quiet = false }: PhotoInfoPr
       <header class="popover__header">
         <h2>Photo details</h2>
         {heartSeen.seen === false && <NewMark />}
+        {photo.id !== 'fallback' && (
+          <button
+            aria-label={marked ? 'Remove from favourites' : 'Favourite'}
+            aria-pressed={marked}
+            class="photo-info__favourite"
+            disabled={!favourites.loaded || favourites.readOnly}
+            onClick={() =>
+              favourites.set({
+                ...favourites.value,
+                ids: toggleFavourite(favourites.value.ids, photo.id),
+              })
+            }
+            type="button"
+          >
+            <HeartIcon filled={marked} />
+          </button>
+        )}
         <button
           aria-label="Close photo details"
           class="popover__close"

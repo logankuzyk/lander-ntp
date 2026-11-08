@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { onboardingItem } from '@/onboarding/storage'
 import type { Photo } from '@/photos/schema'
 import { makePhoto } from '@/test/fixtures'
@@ -30,6 +31,44 @@ const renderInfo = (photo: Photo) => {
 }
 
 describe('PhotoInfo', () => {
+  it('lets the person favourite a photo from its details', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await favouritesItem.setValue({ ids: ['older'], v: 1 })
+    renderInfo(makePhoto('heart'))
+
+    const favourite = await screen.findByRole('button', { name: 'Favourite' })
+    await waitFor(() => expect((favourite as HTMLButtonElement).disabled).toBe(false))
+    expect(favourite.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(favourite)
+
+    await waitFor(async () =>
+      expect(await favouritesItem.getValue()).toEqual({ ids: ['heart', 'older'], v: 1 }),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Remove from favourites' }).getAttribute('aria-pressed'),
+    ).toBe('true')
+    expect(await fakeBrowser.storage.sync.get(null)).toEqual({
+      favourites: { ids: ['heart', 'older'], v: 1 },
+    })
+  })
+
+  it('does not offer a heart for the bundled fallback photo', async () => {
+    await fakeBrowser.storage.sync.clear()
+    renderInfo(makePhoto('fallback'))
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Favourite' })).toBeNull()
+  })
+
+  it('disables the heart when favourites were written by a newer version', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await fakeBrowser.storage.sync.set({ favourites: { ids: ['heart'], v: 2 } })
+    renderInfo(makePhoto('heart'))
+
+    const remove = await screen.findByRole('button', { name: 'Remove from favourites' })
+    expect(remove.hasAttribute('disabled')).toBe(true)
+  })
+
   it('shows the heart New mark while details are open, and records it for the next opening', async () => {
     await fakeBrowser.storage.sync.clear()
     await onboardingItem.setValue({ dismissed: [], welcomed: true })

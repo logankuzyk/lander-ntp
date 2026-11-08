@@ -3,7 +3,7 @@ import type { ComponentType } from 'preact'
 import type { Place } from '@/settings/schema'
 
 import type { Need } from './needs'
-import type { Query, Source } from './source'
+import type { Query, Source, WatchedSource } from './source'
 
 /**
  * The page-wide values a Widget may read: settings shared by the whole page, not kept in any
@@ -40,7 +40,8 @@ export type SwitchOption = OptionBase & {
 export type ChoiceOption = OptionBase & {
   choices: readonly { label: string; value: string }[]
   control: 'choice'
-  default: string
+  /** A function is evaluated when a Widget is added, so a locale-derived choice is captured. */
+  default: (() => string) | string
 }
 
 /** A choice whose values come from this device when the menu opens. */
@@ -157,7 +158,9 @@ export type SourceQuery<R, C> = {
 }
 
 /** Where a Widget's data comes from, and what to ask of it for these options. */
-export type WidgetSource<O, R, C> = {
+export type TimedWidgetSource<O, R, C> = {
+  /** Left out for existing timed Sources; a new declaration may say it explicitly. */
+  kind?: 'timed'
   source: Source<R>
   /**
    * Works out what to load from the options. A hook, so it can follow things that change on
@@ -166,6 +169,14 @@ export type WidgetSource<O, R, C> = {
    */
   useQuery: (options: O) => SourceQuery<R, C>
 }
+
+/** A Source that reads local data again when its watch says that data changed. */
+export type WatchedWidgetSource<O, R> = {
+  kind: 'watched'
+  source: WatchedSource<R, O>
+}
+
+export type WidgetSource<O, R, C> = TimedWidgetSource<O, R, C> | WatchedWidgetSource<O, R>
 
 /** A line of thanks that links to where the Widget's data comes from. */
 export type Credit = {

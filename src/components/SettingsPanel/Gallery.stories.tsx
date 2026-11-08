@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { STORY_PHOTOS } from '@/test/fixtures'
 
 import { withPage } from '../../../.storybook/withPage'
@@ -31,3 +32,13 @@ type Story = StoryObj<typeof meta>
 
 /** All omits the pattern photo; its tag remains available as a filter. */
 export const WithPatternTag: Story = {}
+
+export const WithHearts: Story = {
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [photos[1]!.id, photos[0]!.id], v: 1 })
+  },
+}
+
+export const FavouritesChip: Story = WithHearts
+
+export const NoFavourites: Story = {}
