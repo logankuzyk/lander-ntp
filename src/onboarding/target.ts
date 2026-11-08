@@ -14,7 +14,7 @@ import type { Side } from './placeBeside'
  * order of the page is the one pointed at.
  */
 export type CalloutTarget =
-  'add' | 'edit' | 'options' | 'setup' | `menu:${string}` | `widget:${string}`
+  'add' | 'edit' | 'options' | 'photo-heart' | 'setup' | `menu:${string}` | `widget:${string}`
 
 /** The attribute that says what a thing on the page is, to a callout. */
 export const TARGET_ATTRIBUTE = 'data-callout-target'

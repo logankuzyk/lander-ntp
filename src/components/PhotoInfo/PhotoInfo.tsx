@@ -55,6 +55,7 @@ export function PhotoInfo({ locale, onClose, photo, quiet = false, saveOutcome }
             aria-label={marked ? 'Remove from favourites' : 'Favourite'}
             aria-pressed={marked}
             class="photo-info__favourite"
+            data-callout-target="photo-heart"
             disabled={!favourites.loaded || favourites.readOnly}
             onClick={() =>
               favourites.set({

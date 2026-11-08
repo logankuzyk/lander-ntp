@@ -46,12 +46,19 @@ describe('the Add menu stories', () => {
 
     const menu = await openMenu()
 
-    await waitFor(() => expect(menu.querySelectorAll('.new-mark')).toHaveLength(2))
+    await waitFor(() => expect(menu.querySelectorAll('.new-mark')).toHaveLength(6))
     await waitFor(async () =>
-      expect((await onboardingItem.getValue())?.dismissed).toEqual(['clock', 'weather-widget']),
+      expect((await onboardingItem.getValue())?.dismissed).toEqual([
+        'clock',
+        'weather-widget',
+        'date',
+        'analog-clock',
+        'bookmarks',
+        'quick-dial',
+      ]),
     )
     expect(write).toHaveBeenCalledTimes(1)
-    expect(menu.querySelectorAll('.new-mark')).toHaveLength(2)
+    expect(menu.querySelectorAll('.new-mark')).toHaveLength(6)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))

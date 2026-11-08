@@ -92,7 +92,9 @@ export function AddMenu({
       return
     }
     let active = true
-    const ids = MARKS.filter((id) => id === 'clock' || id === 'weather-widget')
+    const ids = MARKS.filter((id) =>
+      ['analog-clock', 'bookmarks', 'clock', 'date', 'quick-dial', 'weather-widget'].includes(id),
+    )
     void onboardingItem.getValue().then(async (record) => {
       if (!active || !record) return
       const unseen = ids.filter((id) => !record.dismissed.includes(id))

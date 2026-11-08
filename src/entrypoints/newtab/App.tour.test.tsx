@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { MARKS, NEWS } from '@/onboarding/callouts'
 import { onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { device } from '@/test/permissions'
@@ -16,6 +17,7 @@ import { App } from './App'
 
 /** The seeds a tour starts from: a new install, which is the Clock alone. */
 const NEW_INSTALL = PAGE_SEEDS.newInstall
+const SEEN_ON_INSTALL = [...NEWS.map(({ id }) => id), ...MARKS]
 
 /** A window whose reduced-motion setting is `reduced`: the page's other media queries are off. */
 const motion = (reduced: boolean) =>
@@ -264,7 +266,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     const stored = await fakeBrowser.storage.sync.get(null)
     expect(stored.layout).toBeUndefined()
     expect(stored.settings).toEqual(seeded.settings)
-    expect(stored.onboarding).toEqual({ dismissed: ['layout'], welcomed: true })
+    expect(stored.onboarding).toEqual({ dismissed: SEEN_ON_INSTALL, welcomed: true })
     expect(Object.keys(stored).sort()).toEqual(['onboarding', 'settings'])
   })
 
@@ -291,7 +293,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     const stored = await fakeBrowser.storage.sync.get(null)
     expect(stored.layout).toBeUndefined()
     expect(stored.settings).toEqual(seeded.settings)
-    expect(stored.onboarding).toEqual({ dismissed: ['layout'], welcomed: true })
+    expect(stored.onboarding).toEqual({ dismissed: SEEN_ON_INSTALL, welcomed: true })
   })
 
   it('puts focus on the Edit button when it is dismissed from the keyboard', async () => {

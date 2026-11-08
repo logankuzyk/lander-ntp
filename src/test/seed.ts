@@ -6,7 +6,7 @@ import { checkLayout } from '@/layout/check'
 import { COLS, type Rect } from '@/layout/geometry'
 import { layoutItem } from '@/layout/storage'
 import type { StoredLayout } from '@/layout/types'
-import { NEWS } from '@/onboarding/callouts'
+import { MARKS, NEWS } from '@/onboarding/callouts'
 import type { Onboarding } from '@/onboarding/storage'
 import { onboardingItem, pendingItem } from '@/onboarding/storage'
 import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
@@ -113,6 +113,7 @@ export async function seedPage({
 
 /** What an install that has seen all the news has dismissed, as `recordInstall` writes it. */
 const SEEN_NEWS = NEWS.map(({ id }) => id)
+const SEEN_ON_INSTALL = [...SEEN_NEWS, ...MARKS]
 
 /** Weather on for Victoria in degrees Celsius, as an update from 0.2.x leaves the settings. */
 const GRID_WEATHER_SETTINGS: Settings = {
@@ -380,7 +381,7 @@ export const PAGE_SEEDS = {
     },
   },
   /** The first tab after installing: the welcome, over the photo. */
-  newInstall: { pending: { dismissed: SEEN_NEWS, welcomed: false } },
+  newInstall: { pending: { dismissed: SEEN_ON_INSTALL, welcomed: false } },
   /**
    * A Clock in the middle and a Weather with room on its right, both stored: the options
    * popover opens to the right of either.
@@ -399,13 +400,13 @@ export const PAGE_SEEDS = {
    * setup button. A new install on its defaults has the Clock alone (`newInstall`).
    */
   tourClockAndWeather: {
-    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    pending: { dismissed: SEEN_ON_INSTALL, welcomed: false },
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
   },
   /** The first tab after installing, with both off: the welcome over an empty Grid. */
   tourEmptyGrid: {
-    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    pending: { dismissed: SEEN_ON_INSTALL, welcomed: false },
     settings: { ...DEFAULT_SETTINGS, clock: { ...DEFAULT_SETTINGS.clock, enabled: false } },
   },
   /**
@@ -413,7 +414,7 @@ export const PAGE_SEEDS = {
    * setup button is on the page, so the tour has a stop for it.
    */
   tourWeatherWaiting: {
-    pending: { dismissed: SEEN_NEWS, welcomed: false },
+    pending: { dismissed: SEEN_ON_INSTALL, welcomed: false },
     settings: {
       ...DEFAULT_SETTINGS,
       clock: { ...DEFAULT_SETTINGS.clock, enabled: false },

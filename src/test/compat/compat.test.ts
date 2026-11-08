@@ -402,6 +402,7 @@ async function commitThroughPage(next: Layout, type: string): Promise<void> {
 const PHASE_3_WRITES = [
   {
     expectedChangedKeys: ['background'],
+    expectedOnboarding: undefined,
     expectedOptions: undefined,
     expectedType: undefined,
     name: 'choose a background through its page hook; v0.2.3 settings stay byte-equal',
@@ -433,6 +434,7 @@ const PHASE_3_WRITES = [
   },
   {
     expectedChangedKeys: ['layout'],
+    expectedOnboarding: undefined,
     expectedOptions: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
     expectedType: 'date',
     name: 'adding a Date writes sync:layout only through the page commit path',
@@ -449,6 +451,7 @@ const PHASE_3_WRITES = [
   },
   {
     expectedChangedKeys: ['layout'],
+    expectedOnboarding: undefined,
     expectedOptions: { folder: 'bar', openInNewTab: false, showFolderName: true },
     expectedType: 'bookmarks',
     name: 'adding Bookmarks writes sync:layout only through the page commit path',
@@ -463,11 +466,49 @@ const PHASE_3_WRITES = [
       return { after: await fakeBrowser.storage.sync.get(null), before }
     },
   },
+  {
+    expectedChangedKeys: ['onboarding'],
+    expectedOnboarding: {
+      dismissed: [...SEED_ONBOARDING.dismissed, 'widgets-and-backgrounds'],
+      welcomed: SEED_ONBOARDING.welcomed,
+    },
+    expectedOptions: undefined,
+    expectedType: undefined,
+    name: 'dismiss the Widgets and backgrounds note through onboarding; the frozen readers keep every field and id',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      const note = NEWS.find(({ id }) => id === 'widgets-and-backgrounds')
+      if (!note) throw new Error('the news has the Widgets and backgrounds update note')
+      await changeOnboarding((record) => dismissNews(record, note.id))()
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
+    expectedChangedKeys: ['onboarding'],
+    expectedOnboarding: {
+      dismissed: [...SEED_ONBOARDING.dismissed, 'date', 'analog-clock', 'bookmarks', 'quick-dial'],
+      welcomed: SEED_ONBOARDING.welcomed,
+    },
+    expectedOptions: undefined,
+    expectedType: undefined,
+    name: 'open Add and record the four new Widget marks as ids only; frozen readers keep the record',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      await recordSeen(
+        MARKS.filter((id) => ['analog-clock', 'bookmarks', 'date', 'quick-dial'].includes(id)),
+      )
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
 ]
 
 describe('phase 3 synced writes', () => {
   it.each(PHASE_3_WRITES)('$name', async (row) => {
-    const { expectedChangedKeys, expectedOptions, expectedType, write } = row
+    const { expectedChangedKeys, expectedOnboarding, expectedOptions, expectedType, write } = row
     const { after: rawSync, before } = await write()
 
     const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
@@ -475,10 +516,12 @@ describe('phase 3 synced writes', () => {
       .sort()
     expect(changedKeys).toEqual(expectedChangedKeys)
     expect(rawSync.settings).toEqual(before.settings)
-    expect(rawSync.onboarding).toEqual(before.onboarding)
+    expect(rawSync.onboarding).toEqual(expectedOnboarding ?? before.onboarding)
     const { fellBack, settings } = await asV023(rawSync)
     expect(fellBack).toBe(false)
     expect(settings).toEqual(rawSync.settings)
+    expect((await asV023(rawSync)).onboarding).toEqual(expectedOnboarding ?? before.onboarding)
+    expect((await asV030(rawSync)).onboarding).toEqual(expectedOnboarding ?? before.onboarding)
     if (expectedChangedKeys.includes('background')) {
       expect(rawSync.background).toMatchObject({ colour: '#123456', kind: 'colour', v: 1 })
       expect((await asV030(rawSync)).raw.background).toEqual(rawSync.background)
@@ -957,11 +1000,19 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
-    name: 'see the Add menu marks (all unseen IDs gained in one onboarding write)',
+    name: 'see the Add menu marks (all unseen old and new Widget IDs gained in one onboarding write)',
     onboardingOnly: true,
-    seenIds: MARKS.filter((id) => id === 'clock' || id === 'weather-widget'),
+    seenIds: MARKS.filter((id) =>
+      ['analog-clock', 'bookmarks', 'clock', 'date', 'quick-dial', 'weather-widget'].includes(id),
+    ),
     write: async () => {
-      await recordSeen(MARKS.filter((id) => id === 'clock' || id === 'weather-widget'))
+      await recordSeen(
+        MARKS.filter((id) =>
+          ['analog-clock', 'bookmarks', 'clock', 'date', 'quick-dial', 'weather-widget'].includes(
+            id,
+          ),
+        ),
+      )
     },
   },
   {
