@@ -2,7 +2,16 @@ import { render, screen } from '@testing-library/preact'
 import { render as renderOutsideAct } from 'preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type Query, type Reading, type ReadingCache, type Source, useSource } from './source'
+import {
+  type Query,
+  type Reading,
+  type ReadingCache,
+  reportNeed,
+  type Source,
+  useSource,
+  useWatchedSourceState,
+  type WatchedSource,
+} from './source'
 
 const MAX_AGE_MS = 30 * 60 * 1000
 const MAX_STALE_MS = 3 * 60 * 60 * 1000
@@ -38,6 +47,21 @@ function Probe({ query, source }: { query: Query<number> | null; source: Source<
   return <output>{reading === null ? 'none' : String(reading)}</output>
 }
 
+function WatchedProbe({
+  options,
+  source,
+}: {
+  options: { folder: string }
+  source: WatchedSource<number, { folder: string }>
+}) {
+  const state = useWatchedSourceState(source, options)
+  return (
+    <output>
+      {state.status}:{state.reading ?? 'none'}
+    </output>
+  )
+}
+
 const shown = () => screen.getByRole('status').textContent
 
 /** Lets pending promises, and timers due within `ms` from now, run. */
@@ -58,6 +82,129 @@ afterEach(() => {
 })
 
 describe('useSource', () => {
+  it('reads once at mount and coalesces a burst of changes into one read', async () => {
+    let changed!: () => void
+    const read = vi.fn(async () => 8)
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read,
+      watch: (onChange) => {
+        changed = onChange
+        return () => undefined
+      },
+    }
+    render(<WatchedProbe options={{ folder: 'bookmarks' }} source={source} />)
+
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:8')
+    expect(read).toHaveBeenCalledTimes(1)
+
+    for (let i = 0; i < 50; i++) changed()
+    await pass(100)
+
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the last reading visible while a watched source is being read again', async () => {
+    let changed!: () => void
+    let finish!: (value: number) => void
+    let reads = 0
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: () => {
+        reads++
+        return reads === 1 ? Promise.resolve(8) : new Promise((resolve) => (finish = resolve))
+      },
+      watch: (onChange) => {
+        changed = onChange
+        return () => undefined
+      },
+    }
+    render(<WatchedProbe options={{ folder: 'bookmarks' }} source={source} />)
+    await pass()
+
+    changed()
+    await pass(100)
+    expect(screen.getByRole('status').textContent).toBe('ready:8')
+
+    finish(9)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:9')
+  })
+
+  it('recovers from a failed watched read on the next change and re-reads when it becomes visible', async () => {
+    let changed!: () => void
+    let calls = 0
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: async () => {
+        calls++
+        if (calls === 1 || calls === 3) throw new Error('not ready')
+        return 14
+      },
+      watch: (onChange) => {
+        changed = onChange
+        return () => undefined
+      },
+    }
+    render(<WatchedProbe options={{ folder: 'bookmarks' }} source={source} />)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('failed:none')
+
+    changed()
+    await pass(100)
+    expect(screen.getByRole('status').textContent).toBe('ready:14')
+    changed()
+    await pass(100)
+    expect(screen.getByRole('status').textContent).toBe('failed:14')
+
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await pass(100)
+    expect(calls).toBe(3)
+    hidden.mockReturnValue(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await pass(100)
+
+    expect(screen.getByRole('status').textContent).toBe('ready:14')
+    expect(calls).toBe(4)
+  })
+
+  it('unsubscribes when options change and when the Widget leaves the Grid', async () => {
+    const listeners = new Set<() => void>()
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: async ({ folder }) => (folder === 'first' ? 1 : 2),
+      watch: (onChange) => {
+        listeners.add(onChange)
+        return () => listeners.delete(onChange)
+      },
+    }
+    const rendered = render(<WatchedProbe options={{ folder: 'first' }} source={source} />)
+    await pass()
+    expect(listeners.size).toBe(1)
+
+    rendered.rerender(<WatchedProbe options={{ folder: 'second' }} source={source} />)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:2')
+    expect(listeners.size).toBe(1)
+
+    rendered.unmount()
+    expect(listeners.size).toBe(0)
+  })
+
+  it('reports a Need by name from a watched read', async () => {
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: async () => reportNeed('choose-folder'),
+      watch: () => () => undefined,
+    }
+    render(<WatchedProbe options={{ folder: 'missing' }} source={source} />)
+    await pass()
+
+    expect(screen.getByRole('status').textContent).toBe('needs:none')
+  })
+
   it('fetches nothing and shows nothing without a query, even with a reading cached', async () => {
     const { cache, source } = makeSource()
     await cache.set('a', { data: 5, fetchedAt: Date.now() })

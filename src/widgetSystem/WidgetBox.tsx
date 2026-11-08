@@ -7,6 +7,7 @@ import type { Rect } from '@/layout/geometry'
 import type {
   PageValues,
   StateMessages,
+  TimedWidgetSource,
   WidgetDefinition,
   WidgetSource,
   WidgetViewProps,
@@ -15,7 +16,7 @@ import { accessibleName } from './name'
 import { CHECKING, recheckAll, useRecheck, useUnmetNeed } from './needs'
 import { readOptions } from './options'
 import { hasSetup, SetupButton, type SetupNeed } from './SetupButton'
-import { useSourceState } from './source'
+import { useSourceState, useWatchedSourceState } from './source'
 import { useOptionsPopover } from './useOptionsPopover'
 import { useRemoval } from './useRemoval'
 import { WidgetState } from './WidgetState'
@@ -279,8 +280,10 @@ function useWaited(waiting: boolean, token: string, ms: number): boolean {
 }
 
 type SourcedViewProps<O, R, C> = {
+  id?: string
   messages: StateMessages | undefined
   name: string
+  needs: WidgetDefinition<O, R, C>['needs']
   options: O
   page: PageValues
   source: WidgetSource<O, R, C>
@@ -297,13 +300,53 @@ type SourcedViewProps<O, R, C> = {
  * left out.
  */
 function SourcedView<O, R, C>({
+  id,
+  messages,
+  name,
+  needs,
+  options,
+  page,
+  source,
+  View,
+}: SourcedViewProps<O, R, C>) {
+  if (source.kind === 'watched') {
+    return (
+      <WatchedSourcedView
+        id={id}
+        messages={messages}
+        name={name}
+        needs={needs}
+        options={options}
+        page={page}
+        source={source}
+        View={View}
+      />
+    )
+  }
+  return (
+    <TimedSourcedView
+      messages={messages}
+      name={name}
+      options={options}
+      page={page}
+      source={source}
+      View={View}
+    />
+  )
+}
+
+type TimedSourcedViewProps<O, R, C> = Omit<SourcedViewProps<O, R, C>, 'needs'> & {
+  source: TimedWidgetSource<O, R, C>
+}
+
+function TimedSourcedView<O, R, C>({
   messages,
   name,
   options,
   page,
   source,
   View,
-}: SourcedViewProps<O, R, C>) {
+}: TimedSourcedViewProps<O, R, C>) {
   const { context, query } = source.useQuery(options)
   const { reading, status } = useSourceState(source.source, query)
   // Only time in view counts: a tab opened in the background has not started loading, as far as
@@ -318,6 +361,49 @@ function SourcedView<O, R, C>({
   }
   if (status === 'loading' && !waited) return null
   return <WidgetState messages={messages} name={name} state={status} />
+}
+
+type WatchedSourcedViewProps<O, R, C> = Omit<SourcedViewProps<O, R, C>, 'source'> & {
+  source: { kind: 'watched'; source: import('./source').WatchedSource<R, O> }
+}
+
+function WatchedSourcedView<O, R, C>({
+  id,
+  messages,
+  name,
+  needs,
+  options,
+  page,
+  source,
+  View,
+}: WatchedSourcedViewProps<O, R, C>) {
+  const state = useWatchedSourceState(source.source, options)
+  const visible = useVisible()
+  const waited = useWaited(state.status === 'loading' && visible, 'watched', LOADING_DELAY_MS)
+  if (state.status === 'needs') {
+    const need = needs?.find((candidate) => candidate.id === state.need)
+    if (need && hasSetup(need)) {
+      return (
+        <SetupButton
+          id={id}
+          name={name}
+          need={need}
+          onAsked={() => {
+            state.refresh()
+            recheckAll()
+          }}
+        />
+      )
+    }
+    return <WidgetState messages={messages} name={name} state="failed" />
+  }
+  if (state.status === 'ready') {
+    return state.reading === null ? null : (
+      <View context={undefined as C} options={options} page={page} reading={state.reading} />
+    )
+  }
+  if (state.status === 'loading' && !waited) return null
+  return <WidgetState messages={messages} name={name} state={state.status} />
 }
 
 /**
@@ -416,8 +502,10 @@ function Contents<O, R, C>({
   if (source) {
     return (
       <SourcedView
+        id={id}
         messages={messages}
         name={name}
+        needs={definition.needs}
         options={read}
         page={page}
         source={source}
