@@ -27,6 +27,7 @@ describe('Date parts', () => {
   it('rings today in the month and calculates ISO week numbers across a year boundary', () => {
     expect(isoWeek(localDate(2021, 1, 1))).toBe(53)
     expect(isoWeek(localDate(2021, 1, 4))).toBe(1)
+    expect(isoWeek(localDate(2025, 12, 29))).toBe(1)
     expect(firstDayOfWeek('en-US')).toBe('sunday')
     expect(firstDayOfWeek('en-GB')).toBe('monday')
   })

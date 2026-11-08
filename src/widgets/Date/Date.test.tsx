@@ -49,6 +49,36 @@ describe('Date Widget', () => {
     expect(container.textContent).toBe('Saturday, October 18, 2025')
   })
 
+  it('shows or hides the year in the month grid heading', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(3, 3)} {...options} locale="en-US" showYear />,
+    )
+    expect(container.querySelector('.date__month')?.textContent).toBe('October 2025')
+
+    rerender(<Date cells={cells(3, 3)} {...options} locale="en-US" showYear={false} />)
+    expect(container.querySelector('.date__month')?.textContent).toBe('October')
+  })
+
+  it('shows or hides the year in the day card month label', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(2, 2)} {...options} locale="en-US" showYear />,
+    )
+    expect(container.querySelector('.date__card-month')?.textContent).toBe('October 2025')
+
+    rerender(<Date cells={cells(2, 2)} {...options} locale="en-US" showYear={false} />)
+    expect(container.querySelector('.date__card-month')?.textContent).toBe('October')
+  })
+
+  it('marks only today in the week strip', () => {
+    const { container } = render(<Date cells={cells(5, 1)} {...options} />)
+    const currentDay = container.querySelector('time[aria-current="date"]')
+
+    expect(container.querySelectorAll('time[aria-current="date"]')).toHaveLength(1)
+    expect(currentDay?.getAttribute('datetime')).toBe(
+      new globalThis.Date(2025, 9, 18, 12).toISOString(),
+    )
+  })
+
   it('shows the ISO week number and marks today in the month grid', () => {
     const { container } = render(<Date cells={cells(3, 3)} {...options} showYear weekNumbers />)
     expect(container.querySelectorAll('.date__week-number').length).toBe(5)
@@ -63,7 +93,7 @@ describe('Date Widget', () => {
         <Date cells={cells(3, 3)} {...options} weekNumbers weekStartsOn={weekStartsOn} />,
       )
       expect(container.querySelector('.date__week-number')?.textContent).toBe(
-        weekStartsOn === 'monday' ? '53' : '52',
+        '53',
       )
       const firstDay = container.querySelector('.date__weekday')?.textContent
       expect(firstDay).toBe(weekStartsOn === 'monday' ? 'M' : 'S')

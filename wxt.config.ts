@@ -7,7 +7,7 @@ export default defineConfig({
   dev: {
     // The local website (see README) runs on 3000. If WXT took that port first, Next.js would
     // move to 3001 and WXT_PHOTO_MANIFEST_URL would point at WXT's own dev server.
-    server: { port: 3100 },
+    server: { port: 3100, strictPort: true },
   },
   hooks: {
     // One profile per browser, since Chrome and Edge can't share a user data dir. Set here

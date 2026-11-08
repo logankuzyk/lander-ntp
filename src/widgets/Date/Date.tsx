@@ -110,7 +110,7 @@ export function Date({
             ...(weekNumbers
               ? [
                   <span class="date__week-number" key={`week-${index}`}>
-                    {isoWeek(week[0]!)}
+                    {isoWeek(week.find((day) => day.getDay() === 4)!)}
                   </span>,
                 ]
               : []),
