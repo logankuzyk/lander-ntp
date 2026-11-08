@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
+import { userEvent, within } from 'storybook/test'
 
 import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
@@ -7,7 +8,7 @@ import { App } from './App'
 // No `withPage`: App draws its own wrapper and sets the font from the stored settings. Each story
 // seeds the storage it needs, after the preview has cleared it (see .storybook/preview.tsx). The
 // seeds are in PAGE_SEEDS, where src/test/seed.test.tsx checks each draws what its story says.
-const meta = { component: App } satisfies Meta<typeof App>
+const meta = { component: App, title: 'Page' } satisfies Meta<typeof App>
 export default meta
 
 type Story = StoryObj<typeof meta>
@@ -34,5 +35,29 @@ export const WeatherOn: Story = {
     return () => {
       globalThis.fetch = real
     }
+  },
+}
+
+const colourStory = (seed: (typeof PAGE_SEEDS)['colourDark']): Story => ({
+  beforeEach: () => seedPage(seed),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Edit' }))
+  },
+})
+
+/** Clock and Weather over the darkest preset, with the Grid in Edit mode. */
+export const ColourDark: Story = colourStory(PAGE_SEEDS.colourDark)
+
+/** Clock and Weather over a mid colour, with the Grid in Edit mode. */
+export const ColourMid: Story = colourStory(PAGE_SEEDS.colourMid)
+
+/** Clock and Weather over a light colour; the dot grid stays readable in Edit mode. */
+export const ColourLight: Story = colourStory(PAGE_SEEDS.colourLight)
+
+/** The settings panel keeps its own dark panel and white text over a light colour. */
+export const ColourWithSettingsOpen: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.colourWithSettingsOpen),
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole('button', { name: 'Settings' }))
   },
 }

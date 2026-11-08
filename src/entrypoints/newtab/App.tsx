@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
+import { readableInk } from '@/backdrop/readableInk'
+import { displayKind } from '@/backdrop/storage'
+import { useBackground } from '@/backdrop/useBackground'
 import { AddMenuControlProvider } from '@/components/AddMenu/useAddMenuControl'
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
@@ -21,6 +24,7 @@ import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
 import { useNews } from '@/onboarding/useNews'
 import { preloadNext } from '@/photos/image'
+import { usePhotoCatalog } from '@/photos/usePhotoCatalog'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
@@ -65,6 +69,7 @@ export function App() {
     settingsItem,
     saveOutcome,
   )
+  const background = useBackground(saveOutcome)
   // The Layout is the stored one, or worked out from the settings while there is none. Only
   // right once the stored settings have loaded, as the hook starts from the defaults.
   const {
@@ -101,9 +106,12 @@ export function App() {
   const [quietInfo, setQuietInfo] = useState(false)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
+  const photoBackground = background.loaded && displayKind(background.value) === 'photo'
   const { next, photo, photos, upcoming } = usePhotoRotation(
-    settingsLoaded ? settings.photos : null,
+    settingsLoaded && photoBackground ? settings.photos : null,
   )
+  const catalog = usePhotoCatalog(popover === 'settings' && !photoBackground)
+  const availablePhotos = photoBackground ? photos : catalog
 
   const toggle = (which: Exclude<Popover, null>) => {
     setQuietInfo(false)
@@ -123,6 +131,10 @@ export function App() {
   useEffect(() => {
     if (popover === 'settings') setTouring(false)
   }, [popover])
+
+  useEffect(() => {
+    if (!photoBackground && popover === 'info') setPopover(null)
+  }, [photoBackground, popover])
 
   // Out of the way while a popover has the corner, and until the welcome has been answered.
   // A note at a thing on the page is placed by the Layout, so it waits for it as the Grid does.
@@ -175,8 +187,20 @@ export function App() {
   return (
     <EditModeProvider canChange={!layoutReadOnly}>
       <AddMenuControlProvider>
-        <main class="app">
-          {photo && (
+        <main
+          class="app"
+          data-ink={
+            photoBackground
+              ? 'light'
+              : background.loaded
+                ? readableInk(background.value.colour) === '#111'
+                  ? 'dark'
+                  : 'light'
+                : undefined
+          }
+        >
+          {background.loaded && !photoBackground && <Background colour={background.value.colour} />}
+          {photoBackground && photo && (
             <Background
               dim={settings.dim}
               onLoad={() => {
@@ -276,17 +300,17 @@ export function App() {
               )}
             </RemovalProvider>
           </OptionsPopoverProvider>
-          {photo && <PhotoCredit photo={photo} />}
-          {photo && popover === 'info' && (
+          {photoBackground && photo && <PhotoCredit photo={photo} />}
+          {photoBackground && photo && popover === 'info' && (
             <PhotoInfo onClose={close} photo={photo} quiet={quietInfo} saveOutcome={saveOutcome} />
           )}
           {popover === 'settings' && (
             <SettingsPanel
-              currentId={photo?.id ?? null}
+              currentId={photoBackground ? (photo?.id ?? null) : null}
               initialSection={entry.section}
               onChange={setSettings}
               onClose={close}
-              photos={photos}
+              photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}
               settings={settings}
@@ -318,8 +342,8 @@ export function App() {
             layout={layout}
             layoutLoaded={settingsLoaded && layoutLoaded}
             onCommit={commit}
-            onNext={showNext}
-            onToggleInfo={photo ? () => toggle('info') : undefined}
+            onNext={photoBackground ? showNext : undefined}
+            onToggleInfo={photoBackground && photo ? () => toggle('info') : undefined}
             onToggleSettings={() => {
               setEntry(FROM_GEAR)
               toggle('settings')

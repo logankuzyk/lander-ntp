@@ -19,10 +19,21 @@ const [PHOTO] = STORY_PHOTOS
  * brings its own, as `App` does. The credit is the longest the story photos have, as the bar is
  * tightest when it is long.
  */
-const withBottomBar: Decorator = (Story) => (
+const withBottomBar: Decorator = (Story, context) => (
   <EditModeProvider>
-    {PHOTO && <PhotoCredit photo={{ ...PHOTO, printUrl: 'https://logankuzyk.com/prints/coast' }} />}
-    <Story />
+    {context.name === 'OnColour' ? (
+      <main class="app" data-ink="dark">
+        <div class="background background--colour" style={{ backgroundColor: '#f2e8cf' }} />
+        <Story />
+      </main>
+    ) : (
+      <>
+        {PHOTO && (
+          <PhotoCredit photo={{ ...PHOTO, printUrl: 'https://logankuzyk.com/prints/coast' }} />
+        )}
+        <Story />
+      </>
+    )}
   </EditModeProvider>
 )
 
@@ -40,7 +51,7 @@ const meta = {
   },
   component: Controls,
   decorators: [withBottomBar, withPage],
-  title: 'BottomBar',
+  title: 'Controls',
 } satisfies Meta<typeof Controls>
 export default meta
 
@@ -58,4 +69,9 @@ export const Editing: Story = {
   play: async ({ canvasElement }) => {
     await startEditing(canvasElement)
   },
+}
+
+/** The Bottom bar uses the page's dark ink over a light solid background. */
+export const OnColour: Story = {
+  args: { onNext: undefined, onToggleInfo: undefined },
 }
