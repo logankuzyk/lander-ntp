@@ -82,7 +82,7 @@ export function Date({
             dateTime={day.toISOString()}
             key={day.toISOString()}
           >
-            <span>{formatWeekday(day, locale, 'narrow')}</span>
+            <span>{formatWeekday(day, locale, format === 'short' ? 'narrow' : 'long')}</span>
             <strong>{formatDay(day, locale)}</strong>
           </time>
         ))}
@@ -93,8 +93,10 @@ export function Date({
   if (isMonthGrid) {
     const weeks = monthWeeks(today, weekStartsOn)
     return (
-      <div class="date date--grid">
-        <strong class="date__month">{formatMonth(today, locale, showYear)}</strong>
+      <div class={`date date--grid${format === 'long' ? ' date--long' : ''}`}>
+        <strong class="date__month">
+          {formatMonth(today, locale, showYear, format === 'short' ? 'short' : 'long')}
+        </strong>
         <div class={`date__calendar${weekNumbers ? ' date__calendar--weeks' : ''}`}>
           {weekNumbers && (
             <span aria-hidden="true" class="date__week-number-label">
@@ -102,8 +104,12 @@ export function Date({
             </span>
           )}
           {weeks[0]!.map((day) => (
-            <span class="date__weekday" key={`weekday-${day.getDay()}`}>
-              {formatWeekday(day, locale, 'narrow')}
+            <span
+              class="date__weekday"
+              key={`weekday-${day.getDay()}`}
+              title={format === 'long' ? formatWeekday(day, locale, 'long') : undefined}
+            >
+              {formatWeekday(day, locale, format === 'short' ? 'narrow' : 'long')}
             </span>
           ))}
           {weeks.flatMap((week, index) => [
@@ -143,11 +149,13 @@ export function Date({
 
   return (
     <div class="date date--card">
-      <span class="date__card-weekday">{formatWeekday(today, locale)}</span>
+      <span class="date__card-weekday">
+        {formatWeekday(today, locale, format === 'short' ? 'short' : 'long')}
+      </span>
       <strong class="date__card-day">{formatDay(today, locale)}</strong>
       <span class="date__card-month">
         {new Intl.DateTimeFormat(locale, {
-          month: 'long',
+          month: format === 'short' ? 'short' : 'long',
           ...(showYear ? { year: 'numeric' } : {}),
         }).format(today)}
       </span>
