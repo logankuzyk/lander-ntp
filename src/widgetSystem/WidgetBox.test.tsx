@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { EXAMPLE_SIZES } from '@/test/fixtures'
 import { clockDefinition } from '@/widgets/Clock/definition'
 
-import type { WidgetDefinition } from './definition'
+import type { WidgetDefinition, WidgetViewProps } from './definition'
 import type { Need } from './needs'
 import type { Query, Reading, Source } from './source'
 import { WidgetBox } from './WidgetBox'
@@ -393,7 +393,19 @@ describe('WidgetBox with a source', () => {
 
   it('draws the View with the reading and what the source carried once it has one', async () => {
     const fetch = vi.fn(() => Promise.resolve(7))
-    const definition = example(() => ({ fetch, key: 'k' }))
+    const receivedCells: unknown[] = []
+    const base = example(() => ({ fetch, key: 'k' }))
+    const definition = {
+      ...base,
+      View: (props: WidgetViewProps<Options, number, string>) => {
+        receivedCells.push(props.cells)
+        return (
+          <p class="example">
+            {props.reading} {props.context}
+          </p>
+        )
+      },
+    }
     const { container } = render(
       <WidgetBox definition={definition} options={{}} page={page} rect={RECT} />,
     )
@@ -402,6 +414,7 @@ describe('WidgetBox with a source', () => {
     await settleSource()
 
     expect(container.querySelector('.example')?.textContent).toBe('7 context a')
+    expect(receivedCells).toEqual([{ h: RECT.h, w: RECT.w }])
     expect(box(container).children).toHaveLength(1)
   })
 
