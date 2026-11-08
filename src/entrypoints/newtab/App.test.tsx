@@ -4,7 +4,7 @@ import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
-import { manifestCache, photoState } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makeManifest, makePhoto, makeWeather } from '@/test/fixtures'
@@ -32,6 +32,7 @@ const seedPhotos = () =>
     data: makeManifest([makePhoto('a'), makePhoto('b')]),
     etag: null,
     fetchedAt: Date.now(),
+    shape: MANIFEST_CACHE_SHAPE,
   })
 
 beforeEach(() => {
@@ -82,6 +83,7 @@ describe('App', () => {
       data: makeManifest([makePhoto('a', { location: 'Tofino, BC' })]),
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
     render(<App />)
 
@@ -142,6 +144,7 @@ describe('App', () => {
       data: makeManifest([makePhoto('a', { exif: { camera: 'Canon, EOS R5' } })]),
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
     render(<App />)
 

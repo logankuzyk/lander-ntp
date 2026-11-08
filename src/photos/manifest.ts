@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { browser } from 'wxt/browser'
 
 import { type Manifest, ManifestSchema } from './schema'
-import { manifestCache, type ManifestCache } from './storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache, type ManifestCache } from './storage'
 
 export const MANIFEST_URL =
   import.meta.env.WXT_PHOTO_MANIFEST_URL || 'https://logankuzyk.com/new-tab/photos.json'
@@ -54,11 +54,14 @@ export async function revalidateManifest(
 
   try {
     const response = await fetch(MANIFEST_URL, {
-      headers: cached?.etag ? { 'If-None-Match': cached.etag } : {},
+      headers:
+        cached?.shape === MANIFEST_CACHE_SHAPE && cached.etag
+          ? { 'If-None-Match': cached.etag }
+          : {},
       signal: controller.signal,
     })
 
-    if (response.status === 304 && cached) {
+    if (response.status === 304 && cached?.shape === MANIFEST_CACHE_SHAPE) {
       const next = { ...cached, fetchedAt: now }
       await manifestCache.setValue(next)
       return next
@@ -68,7 +71,12 @@ export async function revalidateManifest(
     const result = v.safeParse(ManifestSchema, await response.json())
     if (!result.success) return null
 
-    const next = { data: result.output, etag: response.headers.get('ETag'), fetchedAt: now }
+    const next = {
+      data: result.output,
+      etag: response.headers.get('ETag'),
+      fetchedAt: now,
+      shape: MANIFEST_CACHE_SHAPE,
+    }
     await manifestCache.setValue(next)
     return next
   } catch {
@@ -100,7 +108,7 @@ export async function getManifest(now = Date.now()): Promise<ManifestResult> {
   const cached = stored && parsed?.success ? { ...stored, data: parsed.output } : null
 
   if (cached) {
-    const stale = now - cached.fetchedAt >= MAX_AGE_MS
+    const stale = now - cached.fetchedAt >= MAX_AGE_MS || cached.shape !== MANIFEST_CACHE_SHAPE
     return {
       manifest: usable(cached.data),
       revalidation: stale

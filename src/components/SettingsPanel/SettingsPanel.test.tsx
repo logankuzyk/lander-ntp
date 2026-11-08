@@ -17,8 +17,8 @@ const settings: Settings = {
 }
 
 const PHOTOS = [
-  makePhoto('a', { alt: 'Waterfall', tags: [{ name: 'Water', slug: 'water' }] }),
-  makePhoto('b', { alt: 'Tide pools', tags: [{ name: 'Beach', slug: 'beach' }] }),
+  makePhoto('a', { alt: 'Waterfall', tags: [{ name: 'Water', optIn: false, slug: 'water' }] }),
+  makePhoto('b', { alt: 'Tide pools', tags: [{ name: 'Beach', optIn: false, slug: 'beach' }] }),
 ]
 
 const renderPanel = ({
