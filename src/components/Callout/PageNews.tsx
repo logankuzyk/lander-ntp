@@ -13,6 +13,7 @@ type PageNewsProps = {
   dismiss: (id: string) => void
   layout: Layout
   news: PageCallout
+  onWalkChange?: (walking: boolean) => void
   openInfo?: () => void
   openSettings?: (
     section: SettingsStop['section'],
@@ -21,15 +22,16 @@ type PageNewsProps = {
 }
 
 /**
- * News about a thing on the page, drawn beside it. Its button is "Got it", or "Show me" for news
- * that has `showMe`: that goes into edit mode as it dismisses the note, which is why this is
- * drawn inside the edit mode provider and `App` itself, which draws the provider, cannot do it.
+ * News about a thing on the page, drawn beside it. "Show me" either starts its walk or, for a
+ * one-step note with `showMe`, enters edit mode as it dismisses the note. It is drawn inside the
+ * edit mode provider, which is why `App` itself cannot draw it.
  */
 export function PageNews({
   closeInfo,
   dismiss,
   layout,
   news,
+  onWalkChange,
   openInfo,
   openSettings,
 }: PageNewsProps) {
@@ -39,6 +41,7 @@ export function PageNews({
   const finish = () => {
     if (dismissed) return
     setDismissed(true)
+    onWalkChange?.(false)
     dismiss(news.id)
   }
   if (walking && news.walk) {
@@ -63,7 +66,13 @@ export function PageNews({
     )
   }
   const action = news.walk
-    ? { label: news.actionLabel ?? 'Show me', onClick: () => setWalking(true) }
+    ? {
+        label: news.actionLabel ?? 'Show me',
+        onClick: () => {
+          setWalking(true)
+          onWalkChange?.(true)
+        },
+      }
     : news.showMe === 'edit'
       ? {
           label: 'Show me',

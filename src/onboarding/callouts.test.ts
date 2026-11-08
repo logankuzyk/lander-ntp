@@ -78,8 +78,24 @@ describe('the news', () => {
       expect(note?.section).toBeUndefined()
     })
 
-    it('has a "Show me" that goes into edit mode, and no other way to act', () => {
-      expect(note).toMatchObject({ showMe: 'edit' })
+    it('has a "Show me" that starts its walk', () => {
+      expect(note).toMatchObject({ actionLabel: 'Show me', walk: expect.any(Array) })
+    })
+
+    it('offers the guided walk from the production update note', () => {
+      if (!note || note.target === undefined) throw new Error('layout note is not a page callout')
+      expect(note.actionLabel).toBe('Show me')
+      expect(note.walk?.map(({ id }) => id)).toEqual([
+        'tour-edit',
+        'news-photo-details',
+        'tour-move',
+        'tour-options',
+        'tour-setup',
+        'tour-add',
+        'tour-done',
+        'tour-photos',
+        'tour-general',
+      ])
     })
 
     it('says the page can be edited and where the Clock and Weather options went', () => {

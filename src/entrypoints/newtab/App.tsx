@@ -97,6 +97,7 @@ export function App() {
   // Whether the guided tour of the page is running: started by the welcome's "Show me around", in
   // this tab only. Nothing about it is stored; the welcome's answer is the one thing written.
   const [touring, setTouring] = useState(false)
+  const [walkingNews, setWalkingNews] = useState(false)
   const [quietInfo, setQuietInfo] = useState(false)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
@@ -127,7 +128,9 @@ export function App() {
   // A note at a thing on the page is placed by the Layout, so it waits for it as the Grid does.
   // Not alongside the tour, which is the one note a new install sees.
   const news = useNews(
-    popover === null && layoutLoaded && !touring ? onboarding : null,
+    (popover === null || (walkingNews && popover === 'info')) && layoutLoaded && !touring
+      ? onboarding
+      : null,
     settingsLoaded ? settings : null,
   )
   const dismiss = (id: string) => {
@@ -215,6 +218,7 @@ export function App() {
               dismiss={dismiss}
               layout={layout}
               news={news}
+              onWalkChange={setWalkingNews}
               openInfo={() => {
                 setQuietInfo(true)
                 setPopover('info')

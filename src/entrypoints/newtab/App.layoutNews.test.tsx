@@ -71,6 +71,25 @@ describe('App, with the update note about the Layout', () => {
     expect(note.contains(document.activeElement)).toBe(false)
   })
 
+  it('keeps details open during the walk and restores normal focus after a manual toggle', async () => {
+    await seedPage(PAGE_SEEDS.layoutNewsClockOnly)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Show me' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Next' }))
+
+    const details = await screen.findByRole('dialog', { name: 'Photo details' })
+    expect(screen.getByRole('note')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Next' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Photo details' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: 'Photo details' }))
+
+    await screen.findByRole('dialog', { name: 'Photo details' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close photo details' }))
+    expect(details.isConnected).toBe(false)
+  })
+
   it('waits for the stored Layout before it is drawn, as the Grid does', async () => {
     await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
     // The Layout arrives after the settings and the record: the note is placed by it.
@@ -96,7 +115,7 @@ describe('App, with the update note about the Layout', () => {
     expect(container.querySelector('.grid')).not.toBeNull()
   })
 
-  it('has "Show me" go into edit mode with focus on Done, and be dismissed for good', async () => {
+  it('starts its walk and dismisses it for good', async () => {
     await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
     const { unmount } = render(<App />)
     const edit = screen.getByRole('button', { name: 'Edit' })
@@ -105,14 +124,15 @@ describe('App, with the update note about the Layout', () => {
     fireEvent.click(
       within(await screen.findByRole('note')).getByRole('button', { name: 'Show me' }),
     )
+    expect(await screen.findByText('Edit your page')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+    fireEvent.click(within(screen.getByRole('note')).getByRole('button', { name: 'Dismiss' }))
 
-    const done = await screen.findByRole('button', { name: 'Done' })
-    expect(done.getAttribute('aria-pressed')).toBe('true')
     await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
-    expect(document.activeElement).toBe(done)
     await waitFor(async () =>
       expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout']),
     )
+    expect(edit.getAttribute('aria-pressed')).toBe('false')
 
     // Once each: another tab does not show it again.
     unmount()
@@ -149,7 +169,7 @@ describe('App, with the update note about the Layout', () => {
     const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Show me' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
     await vi.waitFor(async () =>
       expect(await onboardingItem.getValue()).toEqual({
         dismissed: ['weather', 'layout'],

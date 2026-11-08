@@ -63,8 +63,8 @@ export const BothOff: Story = {
   },
 }
 
-/** After "Show me": the page is in edit mode, the note is gone, and Done has focus. */
-export const AfterShowMe: Story = {
+/** After "Show me": the first walk stop is beside Edit and the page has not changed. */
+export const WalkFirstStop: Story = {
   beforeEach: async () => {
     await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
     return sendNothing()
@@ -72,8 +72,9 @@ export const AfterShowMe: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await userEvent.click(await canvas.findByRole('button', { name: 'Show me' }))
-    await waitFor(() => expect(canvas.queryByRole('note')).toBeNull())
-    await expect(canvas.getByRole('button', { name: 'Done' })).toHaveFocus()
+    await expect(canvas.getByText('Edit your page')).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Next' })).toBeInTheDocument()
+    await expect(canvas.getByRole('button', { name: 'Done' })).not.toBeInTheDocument()
   },
 }
 

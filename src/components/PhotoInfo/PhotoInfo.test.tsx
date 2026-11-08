@@ -106,6 +106,7 @@ describe('PhotoInfo', () => {
   })
 
   it('keeps the walk open and keeps its action focused when quiet details are opened', () => {
+    const onClose = vi.fn()
     render(
       <>
         <aside class="callout" role="note">
@@ -113,7 +114,7 @@ describe('PhotoInfo', () => {
             Next
           </button>
         </aside>
-        <PhotoInfo onClose={vi.fn()} photo={makePhoto('a')} quiet />
+        <PhotoInfo onClose={onClose} photo={makePhoto('a')} quiet />
       </>,
     )
     const next = screen.getByRole('button', { name: 'Next' })
@@ -123,6 +124,7 @@ describe('PhotoInfo', () => {
 
     expect(screen.getByRole('dialog', { name: 'Photo details' })).toBeTruthy()
     expect(document.activeElement).toBe(next)
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('closes with the button, with Escape and with a click outside', () => {
