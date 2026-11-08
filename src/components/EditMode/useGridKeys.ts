@@ -166,6 +166,12 @@ export function useGridKeys({ commit, grid, layout }: Options) {
   }
 
   const onKeyDownCapture = (event: KeyboardEvent) => {
+    const target = event.target
+    if (
+      target instanceof Element &&
+      target.closest('.popover, dialog, [role="dialog"], .settings-panel')
+    )
+      return
     const was = current.current
     if (!was) {
       pickUp(event)

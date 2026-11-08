@@ -33,6 +33,8 @@ export type SettingsStop = CalloutBase & {
  * ones behind it back (like one that is `available`), so that they keep their order.
  */
 export type PageCallout = CalloutBase & {
+  /** Label for starting a walk attached to this note. */
+  actionLabel?: string
   section?: undefined
   /**
    * Its one button is "Show me" instead of "Got it", and goes into edit mode as it dismisses the
@@ -40,6 +42,8 @@ export type PageCallout = CalloutBase & {
    */
   showMe?: 'edit'
   target: CalloutTarget
+  /** The stops shown after its action is pressed. */
+  walk?: readonly TourStop[]
 }
 
 export type CalloutInfo = PageCallout | SettingsStop
@@ -50,6 +54,8 @@ export type PageState = {
   adding: boolean
   /** The page is in edit mode. */
   editing: boolean
+  /** Photo details are open without taking focus from the callout. */
+  info?: boolean
 }
 
 /**

@@ -12,11 +12,13 @@ type PhotoInfoProps = {
   locale?: string
   onClose: () => void
   photo: Photo
+  /** Keeps focus on the update note when its walk opens details. */
+  quiet?: boolean
 }
 
 /** Camera settings for the current photo. Opened with the ⓘ button or the `i` key. */
-export function PhotoInfo({ locale, onClose, photo }: PhotoInfoProps) {
-  const { close, container } = usePopover(onClose)
+export function PhotoInfo({ locale, onClose, photo, quiet = false }: PhotoInfoProps) {
+  const { close, container } = usePopover(onClose, { keepFocus: quiet })
   const heartSeen = useSeen('photo-heart')
 
   // Opening photo details is the first time this mark can be seen. It remains visible for this

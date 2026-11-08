@@ -15,7 +15,8 @@ const isEditable = (target: EventTarget | null) =>
  * the welcome, which is a modal: nothing behind it should answer.
  */
 const inPopover = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('.popover, dialog, [role="menu"]') !== null
+  target instanceof Element &&
+  target.closest('.popover, dialog, [role="dialog"], [role="menu"]') !== null
 
 type ControlsProps = {
   /** True while the photo being faded in is still loading. */

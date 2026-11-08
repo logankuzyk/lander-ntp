@@ -318,6 +318,21 @@ describe('Grid, a picked-up Widget refused over a neighbour', () => {
 })
 
 describe('Grid, putting a picked-up Widget back', () => {
+  it('leaves Escape inside a dialog to the dialog while the Widget is held', () => {
+    const { box } = setup()
+    box('clock').focus()
+    key(box('clock'), 'Enter')
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    const close = document.createElement('button')
+    dialog.append(close)
+    box('clock').closest('.grid')?.append(dialog)
+
+    key(close, 'Escape')
+
+    expect(held(box('clock'))).toBe(true)
+  })
+
   it('puts it back with Escape, saves nothing, says so, and does not leave edit mode', () => {
     const { box, commit, ghost, said } = setup()
     box('clock').focus()

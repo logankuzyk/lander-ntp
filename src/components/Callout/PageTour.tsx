@@ -18,12 +18,15 @@ import { Callout } from './Callout'
 export const MISSING_MS = 1_500
 
 type PageTourProps = {
+  closeInfo?: () => void
   /** The Layout, for placing a note again when it moves a widget. */
   layout: Layout
   /** The run is over, without the settings panel's stops: dismissed, or ended by hand. */
   onEnd: () => void
   /** The page's stops are done: the settings panel's come next. */
   onFinish: (plan: TourPlan) => void
+  /** Opens photo details without taking focus from this callout. */
+  openInfo?: () => void
   /** The stops to plan from; the tour of a new install. */
   stops?: readonly TourStop[]
 }
@@ -42,7 +45,14 @@ type PageTourProps = {
  *
  * Drawn inside the edit mode provider and the Add menu's, as `PageNews` is.
  */
-export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProps) {
+export function PageTour({
+  closeInfo,
+  layout,
+  onEnd,
+  onFinish,
+  openInfo,
+  stops = TOUR,
+}: PageTourProps) {
   const { canChange, editing, enter, leave } = useEditMode()
   const menu = useAddMenuControl()
   // Worked out once the page has drawn, from what it has: see `pageFacts`.
@@ -53,11 +63,13 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
   const sawEditing = useRef(false)
 
   // The latest of everything the callbacks below use; they run later than the render they are in.
-  const latest = useRef({ editing, enter, leave, menu, onEnd, onFinish, plan })
-  latest.current = { editing, enter, leave, menu, onEnd, onFinish, plan }
+  const latest = useRef({ closeInfo, editing, enter, leave, menu, onEnd, onFinish, openInfo, plan })
+  latest.current = { closeInfo, editing, enter, leave, menu, onEnd, onFinish, openInfo, plan }
 
   useLayoutEffect(() => {
-    setPlan(planTour(pageFacts(canChange), stops))
+    const next = planTour(pageFacts(canChange), stops)
+    setPlan(next)
+    if (next.page.length === 0) latest.current.onFinish(next)
     // Once: a tour does not change its stops as the page does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -73,13 +85,15 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
   }, [plan])
 
   /** Brings the page to what a stop describes. */
-  const bring = ({ adding, editing: wantEditing }: PageState) => {
+  const bring = ({ adding, editing: wantEditing, info: wantInfo }: PageState) => {
     const now = latest.current
     if (wantEditing && !now.editing) {
       entered.current = true
       now.enter()
     }
     now.menu?.setOpen(adding, { quiet: true })
+    if (wantInfo) now.openInfo?.()
+    else now.closeInfo?.()
   }
 
   const go = (to: number) => {
@@ -112,6 +126,7 @@ export function PageTour({ layout, onEnd, onFinish, stops = TOUR }: PageTourProp
       const now = latest.current
       if (entered.current) now.leave()
       now.menu?.setOpen(false)
+      now.closeInfo?.()
       // Focus on the note, or on nothing because the note has gone (Escape, E and Done end the
       // run from the keyboard with it on Next): to the Edit button, so that a keyboard is not
       // dropped at the top of the page. On anything else, it is the person's and is left.
