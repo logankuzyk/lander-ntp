@@ -30,7 +30,7 @@ Lander makes only these requests:
 
 - It **downloads the photo list** from `https://logankuzyk.com/new-tab/photos.json`, at most about every six hours.
 - It **loads photo images** from the addresses in that list, which are hosted by logankuzyk.com.
-- When a **Quick dial Widget** is on the Grid, it may load that site's icon from `https://<site-host>/favicon.ico`. The request goes directly to the site whose address you chose, without a referrer; no host permission or icon service is used. If no icon is available, Lander draws a letter instead.
+- When a **Quick dial or Bookmarks Widget** is on the Grid, it may load a site's icon from `https://<site-host>/favicon.ico`. The request goes directly to the site, without a referrer; no host permission or icon service is used. For Bookmarks, Lander uses each bookmark's address only to load that site's icon and does not send bookmark data anywhere. If no icon is available, Lander draws a letter instead.
 
 If you add the Weather Widget, it also makes these requests to [Open-Meteo](https://open-meteo.com/), a free weather service:
 
@@ -52,7 +52,7 @@ Other things about the weather requests:
 - **No Weather, no requests**: when Weather is not in your Layout, no weather requests are made.
 - **Other services**: the photo list, which is published by logankuzyk.com, can switch Weather off or point the forecast, place search and town name requests at a different service, if Open-Meteo or BigDataCloud stops being available. Those requests would then carry the same information to that service instead, always over an encrypted (https) connection; this policy will be updated if that happens. Open-Meteo's handling of the requests is covered by [its own terms and privacy policy](https://open-meteo.com/en/terms).
 
-Apart from the place you pick for the weather, and the site whose icon a Quick dial loads, these requests carry nothing about you, your settings or your browsing. As with any website visit, the servers that answer them can see standard request information such as your IP address and browser user agent. It is used only to serve the files, and is not used to identify or track you.
+Apart from the place you pick for the weather, and the site whose icon a Quick dial or Bookmarks Widget loads, these requests carry nothing about you, your settings or your browsing. As with any website visit, the servers that answer them can see standard request information such as your IP address and browser user agent. It is used only to serve the files, and is not used to identify or track you.
 
 Lander does not read your browsing history, the pages you visit, your tabs or any other data in your browser.
 

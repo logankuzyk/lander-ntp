@@ -1,7 +1,10 @@
+import { h } from 'preact'
+
 import { bookmarksPort } from '@/bookmarks/port'
 import { bookmarksSource } from '@/bookmarks/source'
 import type { BookmarkFolderChoice, BookmarkReading, BookmarksPort } from '@/bookmarks/types'
-import type { PickChoice, WidgetDefinition } from '@/widgetSystem/definition'
+import { siteIconUrl } from '@/quickDial/siteIconUrl'
+import type { PickChoice, WidgetDefinition, WidgetViewProps } from '@/widgetSystem/definition'
 import type { Need } from '@/widgetSystem/needs'
 
 import { Bookmarks } from './Bookmarks'
@@ -42,6 +45,7 @@ const folderLabel = (value: string): string | undefined => {
 
 export function createBookmarksDefinition(
   port: BookmarksPort,
+  iconUrl: (host: string) => string = siteIconUrl,
 ): WidgetDefinition<BookmarksOptions, BookmarkReading> {
   const permission: Need<BookmarksOptions> = {
     action: { kind: 'ask', run: () => port.request() },
@@ -102,7 +106,8 @@ export function createBookmarksDefinition(
     },
     type: 'bookmarks',
     unavailable: () => (port.isSupported() ? null : "Bookmarks aren't available in this browser"),
-    View: Bookmarks,
+    View: (props: WidgetViewProps<BookmarksOptions, BookmarkReading>) =>
+      h(Bookmarks, { ...props, iconUrl }),
   }
   return definition
 }

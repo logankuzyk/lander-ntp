@@ -175,6 +175,25 @@ describe('the Bookmarks Widget', () => {
     expect(screen.getByText('Bookmarks bar')).toBeTruthy()
   })
 
+  it('draws each bookmark with the Quick dial icon tile and label style', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <WidgetBox
+        definition={createBookmarksDefinition(port)}
+        options={{ folder: 'bar', openInNewTab: false, showFolderName: false }}
+        page={PAGE}
+        rect={RECT}
+      />,
+    )
+
+    const link = await screen.findByRole('link', { name: 'One bookmark' })
+    expect(link.classList.contains('quick-dial')).toBe(true)
+    expect(link.querySelector('.quick-dial__icon img')?.getAttribute('src')).toBe(
+      'https://example.com/favicon.ico',
+    )
+    expect(link.querySelector('.quick-dial__label')?.textContent).toBe('One bookmark')
+  })
+
   it('opens links in a new tab when that option is on', async () => {
     const port = createFakeBookmarksPort({ granted: true, tree: TREE })
     render(
