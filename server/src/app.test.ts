@@ -6,8 +6,9 @@ import { createConsoleMailer } from './auth.js'
 import type { ServerConfig } from './config.js'
 
 const databases: DatabaseSync[] = []
+let testClientAddress = 1
 
-type MailMessage = { html: string; subject: string; text: string; to: string }
+type MailMessage = { subject: string; text: string; to: string }
 
 async function makeApp() {
   const db = new DatabaseSync(':memory:')
@@ -28,21 +29,26 @@ async function makeApp() {
   })
 }
 
-async function makeAuthApp(configOverrides: Partial<ServerConfig> = {}) {
+async function makeAuthApp(
+  configOverrides: Partial<ServerConfig> = {},
+  now: () => Date = () => new Date('2026-01-01T00:00:00.000Z'),
+) {
   const messages: MailMessage[] = []
   const db = new DatabaseSync(':memory:')
   databases.push(db)
+  const config: ServerConfig = {
+    authSecret: 'a'.repeat(32),
+    databasePath: ':memory:',
+    nodeEnv: 'test',
+    port: 3000,
+    trustAnyExtensionOrigin: false,
+    trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
+    trustProxyHeader: 'x-test-client-ip',
+    ...configOverrides,
+  }
   const app = await createApp({
-    clock: { now: () => new Date('2026-01-01T00:00:00.000Z') },
-    config: {
-      authSecret: 'a'.repeat(32),
-      databasePath: ':memory:',
-      nodeEnv: 'test',
-      port: 3000,
-      trustAnyExtensionOrigin: false,
-      trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
-      ...configOverrides,
-    },
+    clock: { now },
+    config,
     db,
     mailer: {
       send: async (message) => {
@@ -51,6 +57,15 @@ async function makeAuthApp(configOverrides: Partial<ServerConfig> = {}) {
     },
     objectStore: { get: async () => undefined, put: async () => undefined },
   })
+  const clientIp = `203.0.113.${testClientAddress++}`
+  const request = app.request.bind(app)
+  app.request = (input, init) => {
+    const headers = new Headers(init?.headers)
+    if (config.trustProxyHeader && !headers.has(config.trustProxyHeader)) {
+      headers.set(config.trustProxyHeader, clientIp)
+    }
+    return request(input, { ...init, headers })
+  }
   return { app, db, messages }
 }
 
@@ -83,6 +98,110 @@ describe('createApp', () => {
     await expect(createConsoleMailer('production').send(message)).rejects.toThrow(
       /development-only/,
     )
+  })
+
+  it('sends a fixed, short-lived reviewer code without sending email', async () => {
+    const { app, messages } = await makeAuthApp({
+      reviewerCode: '482931',
+      reviewerEmail: 'reviewer@example.com',
+    })
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+
+    const send = async (email: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+
+    expect((await send('reviewer@example.com')).status).toBe(200)
+    expect(messages).toHaveLength(0)
+    const reviewerSignIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email: 'reviewer@example.com', otp: '482931' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    expect(reviewerSignIn.status).toBe(200)
+
+    expect((await send('other@example.com')).status).toBe(200)
+    const otherSignIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email: 'other@example.com', otp: '482931' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    expect(otherSignIn.status).not.toBe(200)
+    expect(messages).toHaveLength(1)
+  })
+
+  it('does not accept the reviewer code when reviewer settings are unset', async () => {
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'ordinary@example.com'
+
+    const send = await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    expect(send.status).toBe(200)
+    expect(messages).toHaveLength(1)
+
+    const signIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp: '482931' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    expect(signIn.status).not.toBe(200)
+  })
+
+  it('limits an address to five sends per hour and the service to ninety per day', async () => {
+    let currentTime = new Date('2026-01-01T00:00:00.000Z')
+    const { app, messages } = await makeAuthApp(
+      { trustProxyHeader: 'cf-connecting-ip' },
+      () => currentTime,
+    )
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const send = (email: string, ip: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'cf-connecting-ip': ip, 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await send('person@example.com', `203.0.113.${attempt + 1}`)).status).toBe(200)
+    }
+    expect((await send('person@example.com', '203.0.113.6')).status).toBe(429)
+    currentTime = new Date('2026-01-01T01:00:00.000Z')
+    expect((await send('person@example.com', '203.0.113.7')).status).toBe(200)
+
+    for (let attempt = 0; attempt < 84; attempt += 1) {
+      expect((await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status).toBe(200)
+    }
+    expect((await send('last@example.com', '192.0.2.1')).status).toBe(429)
+    expect(messages).toHaveLength(90)
+  })
+
+  it('ignores a caller supplied client address header unless proxy trust is configured', async () => {
+    const { app, messages } = await makeAuthApp({ trustProxyHeader: undefined })
+    const send = (email: string, ip: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: {
+          'cf-connecting-ip': ip,
+          'content-type': 'application/json',
+          origin: 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa',
+        },
+        method: 'POST',
+      })
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect((await send(`person-${attempt}@example.com`, `203.0.113.${attempt + 1}`)).status).toBe(
+        200,
+      )
+    }
+    expect((await send('fourth@example.com', '203.0.113.4')).status).toBe(429)
+    expect(messages).toHaveLength(3)
   })
 
   it('signs in with a code from a trusted extension, authenticates /v1/me, and revokes on sign-out', async () => {
@@ -242,7 +361,7 @@ describe('createApp', () => {
   })
 
   it('rate limits code sends per client address and does not reveal whether an address exists', async () => {
-    const { app, messages } = await makeAuthApp()
+    const { app, messages } = await makeAuthApp({ trustProxyHeader: 'cf-connecting-ip' })
     const sendCode = (email: string, clientIp: string) =>
       app.request('/api/auth/email-otp/send-verification-otp', {
         body: JSON.stringify({ email, type: 'sign-in' }),

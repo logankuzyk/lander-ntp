@@ -4,7 +4,7 @@ import { type DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
 
 import { createApp } from './app.js'
-import { createConsoleMailer } from './auth.js'
+import { createServerMailer } from './auth.js'
 import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
 
@@ -21,7 +21,7 @@ export async function startServer(options: StartServerOptions = {}) {
     clock: { now: () => new Date() },
     config,
     db,
-    mailer: createConsoleMailer(config.nodeEnv),
+    mailer: createServerMailer(config),
     objectStore: {
       get: async () => {
         throw new Error('Object store is not configured')

@@ -11,7 +11,10 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({
         AUTH_SECRET: 'a'.repeat(32),
+        MAIL_FROM: 'Lander <sign-in@example.com>',
+        MAIL_REPLY_TO: 'privacy@example.com',
         NODE_ENV: 'production',
+        RESEND_API_KEY: 'test-only-mail-key',
         TRUST_ANY_EXTENSION_ORIGIN: 'true',
       }),
     ).toThrow(/production/i)
@@ -34,6 +37,42 @@ describe('loadConfig', () => {
 
     expect(config.nodeEnv).toBe('development')
     expect(config.port).toBe(3000)
+  })
+
+  it('loads optional mail, reviewer and proxy settings without setting defaults', () => {
+    const config = loadConfig({
+      AUTH_SECRET: 'a'.repeat(32),
+      MAIL_FROM: 'Lander <sign-in@example.com>',
+      MAIL_REPLY_TO: 'privacy@example.com',
+      RESEND_API_KEY: 'test-only-mail-key',
+      REVIEWER_CODE: '482931',
+      REVIEWER_EMAIL: 'reviewer@example.com',
+      TRUST_PROXY_HEADER: 'cf-connecting-ip',
+    })
+
+    expect(config.resendApiKey).toBe('test-only-mail-key')
+    expect(config.mailFrom).toBe('Lander <sign-in@example.com>')
+    expect(config.mailReplyTo).toBe('privacy@example.com')
+    expect(config.reviewerCode).toBe('482931')
+    expect(config.reviewerEmail).toBe('reviewer@example.com')
+    expect(config.trustProxyHeader).toBe('cf-connecting-ip')
+    expect(loadConfig({ AUTH_SECRET: 'a'.repeat(32) })).toMatchObject({
+      mailFrom: undefined,
+      mailReplyTo: undefined,
+      resendApiKey: undefined,
+      reviewerCode: undefined,
+      reviewerEmail: undefined,
+      trustProxyHeader: undefined,
+    })
+  })
+
+  it('requires complete production mail configuration and paired reviewer settings', () => {
+    expect(() => loadConfig({ AUTH_SECRET: 'a'.repeat(32), NODE_ENV: 'production' })).toThrow(
+      /RESEND_API_KEY/,
+    )
+    expect(() =>
+      loadConfig({ AUTH_SECRET: 'a'.repeat(32), REVIEWER_EMAIL: 'reviewer@example.com' }),
+    ).toThrow(/REVIEWER_EMAIL and REVIEWER_CODE/)
   })
 
   it('includes the store ID and parses additional trusted extension IDs', () => {
