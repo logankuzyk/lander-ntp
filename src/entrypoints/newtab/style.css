@@ -660,11 +660,16 @@ body {
   overflow: visible;
 }
 
-.analog-clock__rim,
-.analog-clock__date-window {
+.analog-clock__rim {
   fill: rgb(0 0 0 / 18%);
   stroke: currentColor;
   stroke-width: 1.5;
+}
+
+.analog-clock__date-window {
+  fill: rgb(0 0 0 / 18%);
+  stroke: currentColor;
+  stroke-width: 1;
 }
 
 .analog-clock__tick {
@@ -704,6 +709,7 @@ body {
 }
 
 .analog-clock__date {
+  dominant-baseline: middle;
   fill: currentColor;
   font-size: 6px;
   font-weight: 500;
@@ -1072,7 +1078,17 @@ body {
 .date__month {
   font-size: 1.15em;
   font-weight: 500;
+  text-align: left;
+}
+
+.date--grid.date--long .date__weekday {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .date__calendar {

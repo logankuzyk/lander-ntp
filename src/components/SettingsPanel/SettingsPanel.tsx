@@ -57,6 +57,7 @@ type PhotosSectionProps = {
   currentId: string | null
   onBackgroundChange: (background: Background) => void
   onChange: (settings: Settings) => void
+  onSelectPhoto: (id: string) => void
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
   settings: Settings
@@ -67,6 +68,7 @@ type BackgroundSectionProps = {
   currentId: string | null
   onChange: (background: Background) => void
   onPreviewColour?: (colour: string | null) => void
+  onSelectPhoto: (id: string) => void
   onSettingsChange: (settings: Settings) => void
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
@@ -78,6 +80,7 @@ function BackgroundSection({
   currentId,
   onChange,
   onPreviewColour,
+  onSelectPhoto,
   onSettingsChange,
   photos,
   saveOutcome,
@@ -118,6 +121,7 @@ function BackgroundSection({
           currentId={currentId}
           onBackgroundChange={onChange}
           onChange={onSettingsChange}
+          onSelectPhoto={onSelectPhoto}
           photos={photos}
           saveOutcome={saveOutcome}
           settings={settings}
@@ -132,6 +136,7 @@ function PhotosSection({
   currentId,
   onBackgroundChange,
   onChange,
+  onSelectPhoto,
   photos,
   saveOutcome,
   settings,
@@ -174,7 +179,7 @@ function PhotosSection({
           }
           value={pinned ? NEVER : cycling.frequency}
         />
-        {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
+        {/* Tags are kept while a photo is held with Never, for when cycling resumes. */}
         {!pinned && !background.favouritesOnly && tags.length > 0 && (
           <div class="settings__row settings__row--wrap">
             <span id={tagsLabel}>Tags</span>
@@ -189,31 +194,27 @@ function PhotosSection({
         )}
         {pinned && (
           <p class="settings__note">
-            Keeping this photo.{' '}
+            This photo is held.{' '}
             <button class="settings__link" onClick={() => update({ mode: 'cycle' })} type="button">
               Resume cycling
             </button>
           </p>
         )}
-        {!pinned && (
-          <>
-            <Switch
-              checked={background.favouritesOnly}
-              disabled={!favourites.loaded || (!hasFavourite && !background.favouritesOnly)}
-              label="Favourites only"
-              onChange={(favouritesOnly) => onBackgroundChange({ ...background, favouritesOnly })}
-            />
-            {!hasFavourite && !background.favouritesOnly && favourites.loaded && (
-              <p class="settings__note">Mark photos with the heart to use this.</p>
-            )}
-            {favouritesGone && (
-              <p class="settings__note">
-                {pool.source === 'tags'
-                  ? 'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.'
-                  : 'None of your favourites are on the site right now, so every photo is cycled.'}
-              </p>
-            )}
-          </>
+        <Switch
+          checked={background.favouritesOnly}
+          disabled={!favourites.loaded || (!hasFavourite && !background.favouritesOnly)}
+          label="Favourites only"
+          onChange={(favouritesOnly) => onBackgroundChange({ ...background, favouritesOnly })}
+        />
+        {!hasFavourite && !background.favouritesOnly && favourites.loaded && (
+          <p class="settings__note">Mark photos with the heart to use this.</p>
+        )}
+        {favouritesGone && (
+          <p class="settings__note">
+            {pool.source === 'tags'
+              ? 'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.'
+              : 'None of your favourites are on the site right now, so every photo is cycled.'}
+          </p>
         )}
         <Switch
           checked={settings.dim}
@@ -229,7 +230,7 @@ function PhotosSection({
           initialTag={cycling.tags.length === 1 ? (cycling.tags[0] ?? null) : null}
           // Remounted when the cycled tags change, so the filter follows them.
           key={cycling.tags.join(' ')}
-          onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
+          onSelect={onSelectPhoto}
           photos={photos}
           saveOutcome={saveOutcome}
         />
@@ -315,6 +316,7 @@ type SettingsPanelProps = {
   onChange: (settings: Settings) => void
   onClose: () => void
   onPreviewColour?: (colour: string | null) => void
+  onSelectPhoto?: (id: string) => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
   /**
@@ -345,6 +347,7 @@ export function SettingsPanel({
   onChange,
   onClose,
   onPreviewColour,
+  onSelectPhoto = () => {},
   photos,
   readOnly = false,
   saveOutcome,
@@ -512,6 +515,7 @@ export function SettingsPanel({
                   if (backgroundLoaded) onBackgroundChange(next)
                 }}
                 onPreviewColour={onPreviewColour}
+                onSelectPhoto={onSelectPhoto}
                 onSettingsChange={onChange}
                 photos={photos}
                 saveOutcome={saveOutcome}

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { backgroundItem, DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
@@ -177,7 +178,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
   })
 
-  it('loads and allows choosing a photo from Settings while the page has a colour', async () => {
+  it('loads a photo from Settings over a colour background without stopping cycling', async () => {
     await manifestCache.setValue({
       data: makeManifest([makePhoto('a', { alt: 'Forest' }), makePhoto('b', { alt: 'Coast' })]),
       etag: null,
@@ -196,10 +197,11 @@ describe('App', () => {
 
     await waitFor(async () =>
       expect((await settingsItem.getValue()).photos).toMatchObject({
-        mode: 'pinned',
-        pinnedId: 'a',
+        mode: 'cycle',
+        pinnedId: null,
       }),
     )
+    expect((await photoState.getValue())?.currentId).toBe('a')
   })
 
   it('shows the bundled photo when offline with nothing cached', async () => {
@@ -286,9 +288,10 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
   })
 
-  it('pins a photo picked from the gallery in settings', async () => {
+  it('shows a photo picked from the gallery and keeps cycling with Favourites only available', async () => {
     await seedPhotos()
     await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    await favouritesItem.setValue({ ids: ['b'], v: 1 })
     await settingsItem.setValue({
       ...DEFAULT_SETTINGS,
       photos: { ...DEFAULT_SETTINGS.photos, frequency: '1h' },
@@ -304,12 +307,43 @@ describe('App', () => {
     await waitFor(async () =>
       expect((await settingsItem.getValue()).photos).toEqual({
         frequency: '1h',
-        mode: 'pinned',
-        pinnedId: 'b',
+        mode: 'cycle',
+        pinnedId: null,
         tags: [],
       }),
     )
     expect((await photoState.getValue())?.currentId).toBe('b')
+
+    const favouritesOnly = within(settings).getByRole('switch', { name: 'Favourites only' })
+    fireEvent.click(favouritesOnly)
+    await waitFor(async () => expect((await backgroundItem.getValue()).favouritesOnly).toBe(true))
+  })
+
+  it('resumes a held photo selection so the chosen photo survives a new tab', async () => {
+    await seedPhotos()
+    await favouritesItem.setValue({ ids: ['a'], v: 1 })
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, favouritesOnly: true })
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    await settingsItem.setValue({
+      ...DEFAULT_SETTINGS,
+      photos: { ...DEFAULT_SETTINGS.photos, frequency: 'daily', mode: 'pinned', pinnedId: 'a' },
+    })
+    const firstTab = render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/a/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const settings = await screen.findByRole('dialog', { name: 'Settings' })
+    fireEvent.click(await within(settings).findByRole('button', { name: 'Photo b' }))
+
+    await waitFor(async () => expect((await settingsItem.getValue()).photos.mode).toBe('cycle'))
+    expect((await photoState.getValue())?.currentId).toBe('b')
+    firstTab.unmount()
+
+    render(<App />)
+    expect(await currentPhotoSrc()).toContain('/photos/b/')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+    await waitFor(async () => expect(await currentPhotoSrc()).toContain('/photos/a/'))
   })
 
   it('pins the next photo when → is pressed while pinned', async () => {

@@ -152,7 +152,7 @@ export const TOUR: readonly TourStop[] = [
     title: 'When you are done',
   },
   {
-    body: 'Choose how often the photo changes, and which tags to draw from. Or pick one from the gallery to keep.',
+    body: 'Choose how often the photo changes, which tags to draw from, and whether to cycle your favourite photos. Pick a photo from the gallery to show it now.',
     id: 'tour-photos',
     section: 'photos',
     title: 'Photos',

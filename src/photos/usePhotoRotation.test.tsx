@@ -136,6 +136,81 @@ describe('usePhotoRotation', () => {
     }
   })
 
+  it('cycles from a photo picked by hand once the usual interval is up', async () => {
+    vi.useFakeTimers()
+    try {
+      await seed()
+      const { result } = renderRotation(cycle('30s'))
+      for (let turn = 0; turn < 10 && result.current.photo?.id !== 'a'; turn++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0)
+          await Promise.resolve()
+        })
+      }
+      expect(result.current.photo?.id).toBe('a')
+
+      await act(async () => result.current.select('c'))
+      expect(result.current.photo?.id).toBe('c')
+      expect((await photoState.getValue())?.currentId).toBe('c')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
+
+      expect(result.current.photo?.id).toBe('b')
+      expect((await photoState.getValue())?.currentId).toBe('b')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a gallery selection outside the Favourites pool until the next advance', async () => {
+    await seed('a')
+    await favouritesItem.setValue({ ids: ['a'], v: 1 })
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, favouritesOnly: true })
+    const { rerender, result } = renderRotation(pinned('a'))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    await act(async () => result.current.select('b'))
+    rerender(cycle('daily'))
+    await act(async () => {})
+
+    expect(result.current.photo?.id).toBe('b')
+    let shown: string | null = null
+    await act(async () => {
+      shown = await result.current.next()
+    })
+    expect(shown).toBe('a')
+  })
+
+  it('shows a queued gallery selection after the rotation manifest loads', async () => {
+    await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+    let respond: (response: Response) => void = () => {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            respond = resolve
+          }),
+      ),
+    )
+    const { rerender, result } = renderRotation(pinned('a'))
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+
+    await act(async () => result.current.select('b'))
+    rerender(cycle('daily'))
+    respond(
+      new Response(JSON.stringify(makeManifest(IDS.map((id) => makePhoto(id)))), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      }),
+    )
+
+    await waitFor(() => expect(result.current.photo?.id).toBe('b'))
+    expect((await photoState.getValue())?.currentId).toBe('b')
+  })
+
   it('waits for both synced Backdrop items before watching or drawing a photo', async () => {
     await seed('a')
     const backgroundRead = deferred<Awaited<ReturnType<typeof backgroundItem.read>>>()
