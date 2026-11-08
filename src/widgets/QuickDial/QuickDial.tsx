@@ -8,6 +8,7 @@ export type QuickDialProps = {
   iconUrl?: (host: string) => string
   label: string
   newTab: boolean
+  uploadedIcon?: string | null
   url: string
 }
 
@@ -17,12 +18,22 @@ function colourFor(host: string): string {
   return `hsl(${Math.abs(hash) % 360} 48% 38%)`
 }
 
-export function QuickDial({ iconUrl = siteIconUrl, label, newTab, url }: QuickDialProps) {
+export function QuickDial({
+  iconUrl = siteIconUrl,
+  label,
+  newTab,
+  uploadedIcon,
+  url,
+}: QuickDialProps) {
   const { editing } = useEditMode()
   const tidy = tidyUrl(url)
   const host = tidy ? new URL(tidy).hostname : ''
   const [failed, setFailed] = useState(false)
-  useEffect(() => setFailed(false), [tidy])
+  const [uploadedFailed, setUploadedFailed] = useState(false)
+  useEffect(() => {
+    setFailed(false)
+    setUploadedFailed(false)
+  }, [tidy, uploadedIcon])
   const title = label.trim() || host
   const stopInEdit = (event: Event) => {
     if (editing) event.preventDefault()
@@ -43,9 +54,11 @@ export function QuickDial({ iconUrl = siteIconUrl, label, newTab, url }: QuickDi
         {host && !failed ? (
           <img
             alt=""
-            onError={() => setFailed(true)}
+            onError={() =>
+              uploadedIcon && !uploadedFailed ? setUploadedFailed(true) : setFailed(true)
+            }
             referrerPolicy="no-referrer"
-            src={iconUrl(host)}
+            src={uploadedIcon && !uploadedFailed ? uploadedIcon : iconUrl(host)}
           />
         ) : (
           <span aria-hidden="true">{host.charAt(0).toUpperCase()}</span>

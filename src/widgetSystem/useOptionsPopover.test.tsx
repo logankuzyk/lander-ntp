@@ -12,15 +12,17 @@ import { OptionsPopoverProvider, useOptionsPopover } from './useOptionsPopover'
 // without a control that would never make that call (none calls `onChange` with what is stored).
 vi.mock('./OptionsForm', async () => {
   const { h } = await import('preact')
+  const { useState } = await import('preact/hooks')
   return {
     OptionsForm: ({
       onChange,
       options,
     }: {
-      onChange: (options: Record<string, unknown>) => void
+      onChange: (options: Record<string, unknown>) => boolean | Promise<boolean> | void
       options: Record<string, unknown>
-    }) =>
-      h(
+    }) => {
+      const [outcome, setOutcome] = useState('pending')
+      return h(
         'div',
         null,
         h('button', { onClick: () => onChange({ ...options }), type: 'button' }, 'same'),
@@ -42,7 +44,17 @@ vi.mock('./OptionsForm', async () => {
           },
           'both',
         ),
-      ),
+        h(
+          'button',
+          {
+            onClick: async () => setOutcome(String(await onChange({ ...options, showDate: true }))),
+            type: 'button',
+          },
+          'outcome',
+        ),
+        h('output', null, outcome),
+      )
+    },
   }
 })
 
@@ -64,7 +76,7 @@ const NONE = layoutOf()
 
 type HarnessProps = {
   canChange?: boolean
-  commit?: (next: Layout) => void
+  commit?: (next: Layout) => Promise<string> | void
   layout?: Layout
   loaded?: boolean
   onOpen?: () => void
@@ -178,6 +190,17 @@ describe('OptionsPopoverProvider', () => {
         showDate: true,
         showSeconds: true,
       })
+    })
+
+    it('treats a superseded Layout save as applied by the newer queued save', async () => {
+      const commit = vi.fn(async () => 'superseded')
+      render(harness({ commit }))
+      press('open')
+
+      press('outcome')
+
+      expect(await screen.findByText('true')).toBeTruthy()
+      expect(commit).toHaveBeenCalledOnce()
     })
   })
 

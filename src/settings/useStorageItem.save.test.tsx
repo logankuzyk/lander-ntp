@@ -62,7 +62,10 @@ function mount(item: StorageItemLike<number>, handlers?: StorageItemOptions) {
     /** The same hook again with other handlers, as `App` does on each render. */
     rerender: (next: StorageItemOptions) => rerender(<Counter options={next} />),
     shown: () => container.querySelector('output')?.textContent,
-    update: (value: number) => act(() => api.update(value)),
+    update: (value: number) =>
+      act(() => {
+        void api.update(value)
+      }),
   }
 }
 

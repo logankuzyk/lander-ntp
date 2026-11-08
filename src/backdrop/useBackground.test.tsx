@@ -22,9 +22,9 @@ describe('useBackground', () => {
       kind: 'photo',
     })
 
-    await act(async () =>
-      result.current.set({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'colour' }),
-    )
+    await act(async () => {
+      await result.current.set({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'colour' })
+    })
     await waitFor(() => expect(localStorage.getItem(BACKGROUND_HINT_KEY)).toContain('#f2e8cf'))
     expect(JSON.parse(localStorage.getItem(BACKGROUND_HINT_KEY) ?? '')).toEqual({
       colour: '#f2e8cf',

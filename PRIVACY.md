@@ -14,7 +14,8 @@ Lander uses the browser's extension storage (the `storage` permission) to keep:
 
 - **Your settings**: how photos rotate, which tags or photo you picked, font, dimming and page-wide values such as 12- or 24-hour time. They also still hold a clock block and a weather block: if you set up the clock or the weather in an earlier version, the choices you made then, including the place you picked and whether the weather followed your location, and otherwise the defaults. This version does not rewrite those blocks.
 - **Your Layout**: which Widgets you put on the Grid, their positions and sizes, and their options, including Weather options such as place, units and display choices. Your settings and Layout are kept in the browser's synced storage, so if you are signed in to your browser with sync turned on, your browser carries them between your devices. That sync is run by your browser vendor (for example Google, Mozilla or Microsoft) under their privacy policy. Lander never receives this data.
-- **Your favourite photos**: the ids of photos you mark as favourites, kept in synced storage so they are available on your other devices. Lander never receives this data.
+- **Your favourite photos**: the ids of photos you mark as favourites, kept in synced storage so they are available on your other devices.
+- **Quick dial icons you upload**: small copies of the images you choose, kept in synced storage with your Quick dial so they are available on your other devices. They are not sent to Lander or another service.
 - **Which welcome and update notes you have seen**, so each is shown once. This is kept in synced storage too, with a copy on your device for a new install until you have answered the welcome.
 - **A cached copy of the photo list**, so the new tab loads quickly and works offline.
 - **The weather for each place you use**, cached on your device so it does not need to be fetched in every new tab. These are not synced.

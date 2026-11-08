@@ -51,7 +51,10 @@ function mount(item: StorageItemLike<number>, onRejected?: () => void) {
   return {
     readOnly: () => output()?.getAttribute('data-read-only'),
     shown: () => output()?.textContent,
-    update: (value: number) => act(() => api.update(value)),
+    update: (value: number) =>
+      act(() => {
+        void api.update(value)
+      }),
   }
 }
 
