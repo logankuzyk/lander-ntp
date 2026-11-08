@@ -2624,13 +2624,13 @@ button.chip:hover {
 }
 
 .callout--notice .callout__header {
-  align-items: flex-start;
+  align-items: center;
 }
 
 /*
- * A notice with a button beside it ("Clock removed.  Undo") keeps its words on one line and is
- * as wide as they, the button and the Dismiss need (its usual width is a share of its parent,
- * which has no width of its own).
+ * A notice with a button beside it ("Clock removed.  Undo") is as wide as its contents up to
+ * the viewport, where the message wraps and the buttons keep their size. Its usual width is a
+ * share of its parent, which has no width of its own.
  */
 .callout--has-action {
   width: max-content;
@@ -2638,7 +2638,13 @@ button.chip:hover {
 }
 
 .callout--has-action .callout__header span {
-  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.callout--has-action .callout__header button {
+  flex: none;
 }
 
 /* A stop on the tour: to the left of the settings panel, level with its foot. */

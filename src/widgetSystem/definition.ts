@@ -71,6 +71,10 @@ type PickOptionBase = OptionBase & {
   emptyText: string
   failedText: string
   load: () => Promise<readonly PickChoice[]>
+  /** A stored value's label when it is absent from this device's loaded list. */
+  missingLabel?: (value: string) => string
+  /** A label for the stored value before this device's list has loaded. */
+  valueLabel?: (value: string) => string | undefined
 }
 
 /** One value from a list loaded by the Widget. */

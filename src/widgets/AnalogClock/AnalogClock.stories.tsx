@@ -6,7 +6,7 @@ import { AnalogClock } from './AnalogClock'
 import { analogClockDefinition } from './definition'
 
 const meta = {
-  args: { face: 'ticks', showDate: false, showSeconds: true },
+  args: { face: 'minimal', showDate: false, showSeconds: true },
   component: AnalogClock,
   decorators: [withBox, withPage],
   parameters: { box: { col: 6, h: 2, row: 4, w: 2 } },
@@ -22,7 +22,7 @@ const sizeRect = (size: 'largest' | 'smallest' | 'starting') => {
   return rect(analogClockDefinition.sizes[size].w, analogClockDefinition.sizes[size].h)
 }
 
-/** A new Analog clock has Ticks and the Seconds hand on. */
+/** A new Analog clock has the Minimal face and the Seconds hand on. */
 export const Starting: Story = { parameters: { box: rect(2, 2) } }
 
 /** The smallest Analog clock may be: 2 by 2. */

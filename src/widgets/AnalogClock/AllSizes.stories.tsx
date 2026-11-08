@@ -4,7 +4,7 @@ import { withPage } from '../../../.storybook/withPage'
 import { AnalogClock } from './AnalogClock'
 
 const meta = {
-  args: { face: 'ticks', showDate: false, showSeconds: true },
+  args: { face: 'minimal', showDate: false, showSeconds: true },
   component: AnalogClock,
   decorators: [withPage],
   title: 'Analog clock',
@@ -18,7 +18,7 @@ function Sizes() {
     <div style={{ alignItems: 'center', display: 'flex', gap: '2rem' }}>
       {[2, 2, 6].map((cells, index) => (
         <div key={index} style={{ height: `${cells * 5}rem`, width: `${cells * 5}rem` }}>
-          <AnalogClock face="ticks" showDate={false} showSeconds />
+          <AnalogClock face="minimal" showDate={false} showSeconds />
         </div>
       ))}
     </div>
@@ -26,6 +26,6 @@ function Sizes() {
 }
 
 export const AllSizes: Story = {
-  args: { face: 'ticks', showDate: false, showSeconds: true },
+  args: { face: 'minimal', showDate: false, showSeconds: true },
   render: () => <Sizes />,
 }

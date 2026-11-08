@@ -16,7 +16,7 @@ describe('the Analog clock definition', () => {
       ['showDate', 'Date window'],
     ])
     expect(defaultOptions(analogClockDefinition)).toEqual({
-      face: 'ticks',
+      face: 'minimal',
       showDate: false,
       showSeconds: true,
     })
@@ -29,7 +29,7 @@ describe('the Analog clock definition', () => {
       showSeconds: true,
     })
     expect(readOptions(analogClockDefinition, { face: 'roman', showSeconds: 'yes' })).toEqual({
-      face: 'ticks',
+      face: 'minimal',
       showDate: false,
       showSeconds: true,
     })

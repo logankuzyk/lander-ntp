@@ -279,9 +279,11 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             multiple
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string[]}
+            valueLabel={option.valueLabel}
           />
         ) : (
           <PickFromList
@@ -290,8 +292,10 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string}
+            valueLabel={option.valueLabel}
           />
         )
       case 'place':
