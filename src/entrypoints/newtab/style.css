@@ -1332,6 +1332,31 @@ body {
   padding-top: calc((var(--popover-control) - var(--popover-line)) / 2);
 }
 
+.settings__row--icon > div {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.settings__icon-preview {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #f3f3f3;
+}
+
+.settings__icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings__error {
+  margin: 0;
+  color: #a12b2b;
+}
+
 .settings__note {
   opacity: 0.75;
 }

@@ -30,3 +30,22 @@ type Story = StoryObj<typeof meta>
 export const Smallest: Story = { parameters: { box: box(1, 1) } }
 export const Starting: Story = { parameters: { box: box(1, 1) } }
 export const Largest: Story = { parameters: { box: box(3, 3) } }
+
+/** Draws the selected synced icon instead of loading the site's favicon. */
+export const Uploaded: Story = {
+  args: { uploadedIcon: dataIcon() },
+  parameters: { box: box(1, 1) },
+}
+
+export const UploadedSmallest: Story = {
+  args: { uploadedIcon: dataIcon() },
+  parameters: { box: box(1, 1) },
+}
+export const UploadedStarting: Story = {
+  args: { uploadedIcon: dataIcon() },
+  parameters: { box: box(1, 1) },
+}
+export const UploadedLargest: Story = {
+  args: { uploadedIcon: dataIcon() },
+  parameters: { box: box(3, 3) },
+}

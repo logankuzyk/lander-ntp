@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'preact/hooks'
 
 import type { Settings } from '@/settings/schema'
 import { type StorageItemOptions, useStorageItem } from '@/settings/useStorageItem'
+import type { SaveResult } from '@/storage/writeQueue'
 
 import { deriveLayout } from './derive'
 import { layoutItem } from './storage'
@@ -34,6 +35,6 @@ import type { Layout } from './types'
 export function useLayout(settings: Settings, options?: StorageItemOptions) {
   const [stored, update, loaded, readOnly] = useStorageItem(layoutItem, options)
   const derived = useMemo(() => deriveLayout(settings), [settings])
-  const commit = useCallback((next: Layout) => update(next), [update])
+  const commit = useCallback((next: Layout): Promise<SaveResult> => update(next), [update])
   return { commit, layout: stored ?? derived, loaded, readOnly }
 }
