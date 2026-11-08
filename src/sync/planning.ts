@@ -49,8 +49,8 @@ export function mergeOnboarding(a: unknown, b: unknown): Record<string, unknown>
       : []),
   ])
   return {
-    ...left,
     ...right,
+    ...left,
     dismissed: [...dismissed].sort(),
     welcomed: left.welcomed === true || right.welcomed === true,
   }

@@ -9,6 +9,23 @@ describe('sync planning', () => {
     expect(planFirstSignIn({ settings }, {})).toBe('upload')
   })
 
+  it('recognizes a stored Layout as arranged', () => {
+    expect(planFirstSignIn({ layout: { widgets: [] } }, {})).toBe('upload')
+  })
+
+  it('downloads an arranged account copy when this browser has nothing arranged', () => {
+    expect(planFirstSignIn({}, { settings: { dim: false } })).toBe('download')
+  })
+
+  it('merges differing onboarding without asking when arranged settings match', () => {
+    expect(
+      planFirstSignIn(
+        { onboarding: { dismissed: ['weather'] }, settings: { dim: false } },
+        { onboarding: { dismissed: [] }, settings: { dim: false } },
+      ),
+    ).toBe('nothing')
+  })
+
   it('canonicalizes object keys without changing array order', () => {
     const value = JSON.parse('{"z":1,"nested":{"y":2,"x":3},"a":[2,1]}')
     expect(canon(value)).toBe('{"a":[2,1],"nested":{"x":3,"y":2},"z":1}')
@@ -21,6 +38,15 @@ describe('sync planning', () => {
         { dismissed: ['accounts'], welcomed: true },
       ),
     ).toEqual({ dismissed: ['accounts', 'weather'], welcomed: true })
+  })
+
+  it('keeps the local value when devices disagree on an unknown onboarding field', () => {
+    expect(
+      mergeOnboarding(
+        { dismissed: [], futureField: 'local', welcomed: false },
+        { dismissed: [], futureField: 'remote', welcomed: false },
+      ),
+    ).toEqual({ dismissed: [], futureField: 'local', welcomed: false })
   })
 
   it('pulls only remote values that changed since the saved snapshot', () => {
