@@ -75,7 +75,7 @@ describe('keyboard session, picking up', () => {
   })
 
   it('picks up a Widget of a type this version does not know, which can move but not resize', () => {
-    const future = layoutOf({ ...clock('futr0001', 5, 4), type: 'bookmarks' })
+    const future = layoutOf({ ...clock('futr0001', 5, 4), type: 'future-widget' })
     const session = held(future, 'futr0001')
     expect(nudge(session, RIGHT).place.col).toBe(6)
     const stretched = stretch(session, RIGHT)

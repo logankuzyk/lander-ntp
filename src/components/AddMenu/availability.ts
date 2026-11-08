@@ -43,7 +43,9 @@ export function itemState(
   type: string,
   name: string,
   note: string | null,
+  unavailable: string | null = null,
 ): ItemState {
+  if (unavailable !== null) return { available: false, reason: unavailable }
   if (note !== null) return { available: false, reason: null }
   const attempt = addWidget(editable, type)
   if (attempt.ok) return { available: true }

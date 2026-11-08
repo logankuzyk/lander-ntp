@@ -1,4 +1,4 @@
-import { bookmarkItems, flattenFolders, resolveFolder } from './tree'
+import { bookmarkItems, resolveFolder, selectableFolders } from './tree'
 import type { BookmarkFolderChoice, BookmarkNode, BookmarksPort } from './types'
 
 type BrowserEvent = {
@@ -39,7 +39,7 @@ export function createBookmarksPort({ bookmarks, permissions }: PortApis): Bookm
     folders: async () => {
       if (!(await permissions.contains?.(PERMISSION))) return []
       const tree = await bookmarks().getTree()
-      return flattenFolders(tree[0]?.children ?? [])
+      return selectableFolders(tree[0]?.children ?? [])
     },
     isSupported: () => typeof permissions.contains === 'function',
     read: async (choice: BookmarkFolderChoice) => {

@@ -706,11 +706,11 @@ describe('Grid, which Widgets and cells it drags', () => {
 
   it('drags a Widget of a type this version does not know', () => {
     const layout = layoutOf(
-      { ...clock('futr0001', 5, 4), options: { colour: 'teal' }, type: 'bookmarks' },
+      { ...clock('futr0001', 5, 4), options: { colour: 'teal' }, type: 'future-widget' },
       weather('wthr0001', 11, 1),
     )
     const { box, commit } = setup(layout)
-    const futureBox = box('bookmarks')
+    const futureBox = box('future-widget')
     expect(futureBox.dataset.widgetId).toBe('futr0001')
 
     press(futureBox, 450, 350)

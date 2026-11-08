@@ -246,6 +246,8 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
   summary?: (options: O) => string | undefined
   /** The id that is stored. Never renamed or reused. */
   type: string
+  /** Why this Widget cannot be added in this browser, checked by the Add menu. */
+  unavailable?: () => string | null
   View: ComponentType<WidgetViewProps<O, R, C>>
 }
 

@@ -269,7 +269,7 @@ describe('drawnRects', () => {
 
   it('holds the cells of a Widget this version does not know, and draws it', () => {
     // Both want the same place, and "f" comes first in reading order.
-    const future = { col: 5, h: 2, id: 'f', options: { x: 1 }, row: 4, type: 'bookmarks', w: 4 }
+    const future = { col: 5, h: 2, id: 'f', options: { x: 1 }, row: 4, type: 'future-widget', w: 4 }
     const layout = layoutOf(future, clock('g', 5, 4))
 
     const drawn = drawnRects(layout)

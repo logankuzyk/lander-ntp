@@ -1,4 +1,5 @@
 import { analogClockDefinition } from '@/widgets/AnalogClock/definition'
+import { bookmarksDefinition } from '@/widgets/Bookmarks/definition'
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { dateDefinition } from '@/widgets/Date/definition'
 import { quickDialDefinition } from '@/widgets/QuickDial/definition'
@@ -20,6 +21,7 @@ export const WIDGETS: readonly AnyWidgetDefinition[] = [
   clockDefinition,
   dateDefinition,
   analogClockDefinition,
+  bookmarksDefinition,
   weatherDefinition,
   quickDialDefinition,
 ]

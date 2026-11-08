@@ -242,8 +242,8 @@ describe('Grid', () => {
   })
 
   it('draws a Widget of a type it does not know, in its place, and says it needs a newer version', () => {
-    const grid = drawnGrid(layoutOf(stored('aaaaaaaa', 'bookmarks', [1, 3, 3, 4])))
-    expect(boxes(grid)).toEqual([['bookmarks', '1 / span 3', '3 / span 4']])
+    const grid = drawnGrid(layoutOf(stored('aaaaaaaa', 'future-widget', [1, 3, 3, 4])))
+    expect(boxes(grid)).toEqual([['future-widget', '1 / span 3', '3 / span 4']])
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
   })
 
@@ -278,15 +278,15 @@ describe('Grid', () => {
   })
 
   it('keeps the element of a Widget it cannot draw too, when another comes before it', () => {
-    const unknown = stored('cccccccc', 'bookmarks', [1, 4, 3, 2])
+    const unknown = stored('cccccccc', 'future-widget', [1, 4, 3, 2])
     const view = render(<Grid layout={layoutOf(unknown)} page={PAGE} />)
-    const before = view.container.querySelector('[data-widget="bookmarks"]')
+    const before = view.container.querySelector('[data-widget="future-widget"]')
 
     view.rerender(
       <Grid layout={layoutOf(stored('aaaaaaaa', 'calendar', [1, 1, 3, 2]), unknown)} page={PAGE} />,
     )
 
-    expect(view.container.querySelector('[data-widget="bookmarks"]')).toBe(before)
+    expect(view.container.querySelector('[data-widget="future-widget"]')).toBe(before)
   })
 
   it('hands the Widgets the page values it is given, not its own', () => {
@@ -451,17 +451,17 @@ describe('Grid in edit mode', () => {
   })
 
   it('frames a Widget it does not know too, so it can be reached', () => {
-    renderEditable(layoutOf(stored('aaaaaaaa', 'bookmarks', [1, 3, 3, 4])))
+    renderEditable(layoutOf(stored('aaaaaaaa', 'future-widget', [1, 3, 3, 4])))
     edit()
 
-    const group = screen.getByRole('group', { name: 'Unknown widget, bookmarks' })
+    const group = screen.getByRole('group', { name: 'Unknown widget, future-widget' })
     expect(group.getAttribute('tabindex')).toBe('0')
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
   })
 
   it('lets a person remove an unknown Widget, but has no options or resize handle for it', () => {
     const remove = vi.fn()
-    const layout = layoutOf(stored('future01', 'bookmarks', [1, 3, 3, 4]))
+    const layout = layoutOf(stored('future01', 'future-widget', [1, 3, 3, 4]))
     render(
       <EditModeProvider>
         <EditToggles />
@@ -473,11 +473,15 @@ describe('Grid in edit mode', () => {
     edit()
 
     expect(screen.getByText('Needs a newer version of Lander')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Remove Unknown widget, bookmarks' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Unknown widget, bookmarks options' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Remove Unknown widget, future-widget' }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: 'Unknown widget, future-widget options' }),
+    ).toBeNull()
     expect(document.querySelector('.widget-box__resize')).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Unknown widget, bookmarks' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Unknown widget, future-widget' }))
 
     expect(remove).toHaveBeenCalledWith('future01')
   })

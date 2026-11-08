@@ -50,7 +50,15 @@ describe('the Widget limit', () => {
   })
 
   it('counts a Widget of a type this version does not know, and one waiting for setup', () => {
-    const unknown = { col: 1, h: 2, id: 'unknown0', options: {}, row: 7, type: 'bookmarks', w: 2 }
+    const unknown = {
+      col: 1,
+      h: 2,
+      id: 'unknown0',
+      options: {},
+      row: 7,
+      type: 'future-widget',
+      w: 2,
+    }
     // A Weather with no place yet: it shows its setup button, and is a Widget like any other.
     const weather = { col: 3, h: 2, id: 'weather0', options: {}, row: 7, type: 'weather', w: 2 }
     const six = layoutOf(...clocks(6), unknown, weather)
