@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server'
+import { getConnInfo } from '@hono/node-server/conninfo'
 import { type Server as HttpServer } from 'node:http'
 import { type DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
@@ -21,6 +22,7 @@ export async function startServer(options: StartServerOptions = {}) {
     clock: { now: () => new Date() },
     config,
     db,
+    getClientAddress: (context) => getConnInfo(context).remote.address,
     mailer: createServerMailer(config),
     objectStore: {
       get: async () => {

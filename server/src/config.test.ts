@@ -46,7 +46,7 @@ describe('loadConfig', () => {
       MAIL_REPLY_TO: 'privacy@example.com',
       RESEND_API_KEY: 'test-only-mail-key',
       REVIEWER_CODE: '482931',
-      REVIEWER_EMAIL: 'reviewer@example.com',
+      REVIEWER_EMAIL: 'Reviewer@Example.com',
       TRUST_PROXY_HEADER: 'cf-connecting-ip',
     })
 

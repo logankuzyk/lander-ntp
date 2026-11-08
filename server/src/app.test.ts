@@ -24,6 +24,7 @@ async function makeApp() {
       trustedExtensionIds: ['ocglhjclnhfbgbccffinhioaangigioa'],
     },
     db,
+    getClientAddress: (context) => new URL(context.req.url).hostname,
     mailer: { send: async () => undefined },
     objectStore: { get: async () => undefined, put: async () => undefined },
   })
@@ -50,6 +51,7 @@ async function makeAuthApp(
     clock: { now },
     config,
     db,
+    getClientAddress: (context) => new URL(context.req.url).hostname,
     mailer: {
       send: async (message) => {
         messages.push(message as MailMessage)
@@ -202,6 +204,72 @@ describe('createApp', () => {
     }
     expect((await send('fourth@example.com', '203.0.113.4')).status).toBe(429)
     expect(messages).toHaveLength(3)
+  })
+
+  it('uses each request client address when no proxy header is trusted', async () => {
+    const { app, messages } = await makeAuthApp({ trustProxyHeader: undefined })
+    const send = (clientIp: string) =>
+      app.request(`http://${clientIp}/api/auth/email-otp/send-verification-otp`, {
+        body: JSON.stringify({ email: `person-${clientIp}@example.com`, type: 'sign-in' }),
+        headers: {
+          'content-type': 'application/json',
+          origin: 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa',
+        },
+        method: 'POST',
+      })
+
+    for (const clientIp of ['203.0.113.1', '203.0.113.2', '203.0.113.3', '203.0.113.4']) {
+      expect((await send(clientIp)).status).toBe(200)
+    }
+    expect(messages).toHaveLength(4)
+  })
+
+  it('does not spend a client send limit on malformed email addresses', async () => {
+    const { app } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const send = (email: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect((await send('not-an-email')).status).not.toBe(200)
+    }
+    expect((await send('valid@example.com')).status).toBe(200)
+  })
+
+  it('exempts reviewer code requests from per-email and daily email limits', async () => {
+    const { app, messages } = await makeAuthApp({
+      reviewerCode: '482931',
+      reviewerEmail: 'reviewer@example.com',
+      trustProxyHeader: 'cf-connecting-ip',
+    })
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const send = (email: string, ip: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: {
+          'cf-connecting-ip': ip,
+          'content-type': 'application/json',
+          origin,
+        },
+        method: 'POST',
+      })
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      expect((await send('reviewer@example.com', `203.0.113.${attempt + 1}`)).status).toBe(200)
+    }
+    expect(messages).toHaveLength(0)
+
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      expect(
+        (await send(`person-${attempt}@example.com`, `198.51.100.${attempt}`)).status,
+      ).toBe(200)
+    }
+    expect((await send('reviewer@example.com', '192.0.2.1')).status).toBe(200)
+    expect(messages).toHaveLength(90)
   })
 
   it('signs in with a code from a trusted extension, authenticates /v1/me, and revokes on sign-out', async () => {

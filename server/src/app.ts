@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import type { DatabaseSync } from 'node:sqlite'
@@ -18,6 +18,7 @@ export type AppDependencies = {
   clock: { now: () => Date }
   config: ServerConfig
   db: DatabaseSync
+  getClientAddress: (context: Context) => string | undefined
   mailer: Mailer
   objectStore: {
     get: (key: string) => Promise<Uint8Array | undefined>
@@ -65,9 +66,10 @@ export async function createApp(dependencies: AppDependencies) {
 
     const email = body.email.trim().toLowerCase()
     const now = dependencies.clock.now().getTime()
-    const ip = dependencies.config.trustProxyHeader
-      ? (context.req.header(dependencies.config.trustProxyHeader) ?? 'unknown')
-      : 'unknown'
+    const trustedProxyAddress = dependencies.config.trustProxyHeader
+      ? context.req.header(dependencies.config.trustProxyHeader)?.trim()
+      : undefined
+    const ip = trustedProxyAddress || dependencies.getClientAddress(context) || 'unknown'
     for (const [address, sentAt] of ipSends) {
       const activeSends = sentAt.filter((time) => now - time < ipWindowMs)
       if (activeSends.length === 0) {
