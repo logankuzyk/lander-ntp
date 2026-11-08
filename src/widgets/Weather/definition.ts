@@ -68,7 +68,10 @@ function useWeatherQuery(options: WeatherOptions): SourceQuery<Reading, PlaceNam
   return {
     // Not drawn without a reading, which needs a place; the empty name is never read.
     context: found?.name ?? '',
-    query: found && { fetch: () => fetchWeather(found, unit), key: cacheKey(found, unit) },
+    query: found && {
+      fetch: async () => ((await locationConsented()) ? fetchWeather(found, unit) : null),
+      key: cacheKey(found, unit),
+    },
   }
 }
 
