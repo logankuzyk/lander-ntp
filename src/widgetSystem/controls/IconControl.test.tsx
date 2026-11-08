@@ -23,7 +23,7 @@ describe('Quick dial icon control', () => {
         <IconControl disabled={false} onChange={onChange} siteIcon="/site.ico" value="oldicon1" />,
       )
 
-      fireEvent.change(screen.getByLabelText('Upload an icon'), {
+      fireEvent.change(screen.getByLabelText('Choose an icon image'), {
         target: { files: [new File(['source'], 'icon.png', { type: 'image/png' })] },
       })
       fireEvent.click(await screen.findByRole('button', { name: 'Use this icon' }))
@@ -42,12 +42,20 @@ describe('Quick dial icon control', () => {
       <IconControl disabled={false} onChange={onChange} siteIcon="/site.ico" value="oldicon1" />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use the site’s icon' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove uploaded icon' }))
 
     await screen.findByRole('alert')
     expect(onChange).toHaveBeenCalledWith(null)
     expect(await fakeBrowser.storage.sync.get('icon:oldicon1')).toEqual({
       'icon:oldicon1': { data: 'data:image/webp;base64,Yg==', v: 1 },
     })
+  })
+
+  it('shows an accessible pencil control over the favicon preview', () => {
+    render(<IconControl disabled={false} onChange={() => {}} siteIcon="/site.ico" value={null} />)
+
+    expect(screen.getByRole('button', { name: 'Change icon' })).toBeTruthy()
+    expect(screen.getByLabelText('Choose an icon image')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Upload' })).toBeNull()
   })
 })

@@ -663,14 +663,15 @@ body {
   overflow: visible;
 }
 
-.analog-clock__rim,
-.analog-clock__date-window {
+.analog-clock__rim {
   fill: rgb(0 0 0 / 18%);
   stroke: currentColor;
   stroke-width: 1.5;
 }
 
 .analog-clock__date-window {
+  fill: rgb(0 0 0 / 18%);
+  stroke: currentColor;
   stroke-width: 1;
 }
 
@@ -1395,6 +1396,48 @@ body {
   display: grid;
   justify-items: start;
   gap: 8px;
+}
+
+.quick-dial-icon-editor {
+  position: relative;
+}
+
+.quick-dial-icon-editor__letter {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 600;
+}
+
+.quick-dial-icon-editor__actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.quick-dial-icon-editor:hover .quick-dial-icon-editor__actions,
+.quick-dial-icon-editor:focus-within .quick-dial-icon-editor__actions {
+  opacity: 1;
+}
+
+.quick-dial-icon-editor__button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #111;
+  background: #fff;
+  box-shadow: 0 1px 4px #0005;
+  cursor: pointer;
 }
 
 .settings__icon-preview {
@@ -2587,13 +2630,13 @@ button.chip:hover {
 }
 
 .callout--notice .callout__header {
-  align-items: flex-start;
+  align-items: center;
 }
 
 /*
- * A notice with a button beside it ("Clock removed.  Undo") keeps its words on one line and is
- * as wide as they, the button and the Dismiss need (its usual width is a share of its parent,
- * which has no width of its own).
+ * A notice with a button beside it ("Clock removed.  Undo") is as wide as its contents up to
+ * the viewport, where the message wraps and the buttons keep their size. Its usual width is a
+ * share of its parent, which has no width of its own.
  */
 .callout--has-action {
   width: max-content;
@@ -2601,7 +2644,13 @@ button.chip:hover {
 }
 
 .callout--has-action .callout__header span {
-  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.callout--has-action .callout__header button {
+  flex: none;
 }
 
 /* A stop on the tour: to the left of the settings panel, level with its foot. */

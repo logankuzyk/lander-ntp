@@ -112,6 +112,21 @@ describe('Notice with an action', () => {
 
     expect(screen.getByRole('status').textContent?.startsWith('Clock removed.')).toBe(true)
   })
+
+  it('keeps the message and both buttons in the same header row', () => {
+    render(
+      <Notice
+        action={{ label: 'Undo', onClick: () => {} }}
+        message="A long widget name removed."
+        onDismiss={() => {}}
+      />,
+    )
+
+    const header = document.querySelector('.callout--has-action .callout__header')
+    expect(header?.querySelector('span')?.textContent).toBe('A long widget name removed.')
+    expect(header?.querySelectorAll('button')).toHaveLength(2)
+    expect(header?.children).toHaveLength(3)
+  })
 })
 
 describe('Notice, keeping its words together', () => {
