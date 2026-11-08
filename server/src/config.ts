@@ -12,10 +12,19 @@ const environmentSchema = v.object({
     v.pipe(v.string(), v.trim(), v.minLength(1, 'DATABASE_PATH must not be empty')),
     'data/lander.sqlite',
   ),
+  HEARTBEAT_URL: v.optional(v.pipe(v.string(), v.trim())),
   MAIL_FROM: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   MAIL_REPLY_TO: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   NODE_ENV: v.optional(v.picklist(['development', 'production', 'test']), 'development'),
+  OBJECT_STORE_DIR: v.optional(
+    v.pipe(v.string(), v.trim(), v.minLength(1, 'OBJECT_STORE_DIR must not be empty')),
+    'data/objects',
+  ),
   PORT: v.optional(v.pipe(v.string(), v.regex(/^\d+$/, 'PORT must contain digits only')), '3000'),
+  R2_ACCESS_KEY_ID: v.optional(v.pipe(v.string(), v.trim())),
+  R2_ACCOUNT_ID: v.optional(v.pipe(v.string(), v.trim())),
+  R2_BUCKET: v.optional(v.pipe(v.string(), v.trim())),
+  R2_SECRET_ACCESS_KEY: v.optional(v.pipe(v.string(), v.trim())),
   RESEND_API_KEY: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   REVIEWER_CODE: v.optional(
     v.pipe(v.string(), v.regex(/^\d{6}$/, 'REVIEWER_CODE must be six digits')),
@@ -32,21 +41,88 @@ const environmentSchema = v.object({
   TRUSTED_EXTENSION_IDS: v.optional(v.string(), ''),
 })
 
+const backupEnvironmentSchema = v.object({
+  DATABASE_PATH: v.optional(
+    v.pipe(v.string(), v.trim(), v.minLength(1, 'DATABASE_PATH must not be empty')),
+    'data/lander.sqlite',
+  ),
+  OBJECT_STORE_DIR: v.optional(
+    v.pipe(v.string(), v.trim(), v.minLength(1, 'OBJECT_STORE_DIR must not be empty')),
+    'data/objects',
+  ),
+  R2_ACCESS_KEY_ID: v.optional(v.pipe(v.string(), v.trim())),
+  R2_ACCOUNT_ID: v.optional(v.pipe(v.string(), v.trim())),
+  R2_BUCKET: v.optional(v.pipe(v.string(), v.trim())),
+  R2_SECRET_ACCESS_KEY: v.optional(v.pipe(v.string(), v.trim())),
+})
+
 const chromeStoreExtensionId = 'ocglhjclnhfbgbccffinhioaangigioa'
 
 export type ServerConfig = {
   authSecret: string
   databasePath: string
+  heartbeatUrl?: string
   mailFrom?: string
   mailReplyTo?: string
   nodeEnv: 'development' | 'production' | 'test'
+  objectStoreDirectory?: string
   port: number
+  r2?: { accessKeyId: string; accountId: string; bucket: string; secretAccessKey: string }
   resendApiKey?: string
   reviewerCode?: string
   reviewerEmail?: string
   trustAnyExtensionOrigin: boolean
   trustedExtensionIds: string[]
   trustProxyHeader?: string
+}
+
+export type BackupConfig = {
+  databasePath: string
+  objectStoreDirectory: string
+  r2?: NonNullable<ServerConfig['r2']>
+}
+
+export function loadBackupConfig(
+  environment: Record<string, string | undefined> = process.env,
+): BackupConfig {
+  const result = v.safeParse(backupEnvironmentSchema, environment)
+  if (!result.success) {
+    const message = result.issues.map((issue) => issue.message).join('; ')
+    throw new Error(`Invalid backup configuration: ${message}`)
+  }
+  const values = result.output
+  const r2Values = [
+    values.R2_ACCOUNT_ID,
+    values.R2_BUCKET,
+    values.R2_ACCESS_KEY_ID,
+    values.R2_SECRET_ACCESS_KEY,
+  ]
+  if (r2Values.some(Boolean) && r2Values.some((value) => !value)) {
+    throw new Error(
+      'R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set together',
+    )
+  }
+  const serverDirectory = dirname(fileURLToPath(import.meta.url))
+  return {
+    databasePath:
+      values.DATABASE_PATH === ':memory:'
+        ? values.DATABASE_PATH
+        : resolve(serverDirectory, '..', values.DATABASE_PATH),
+    objectStoreDirectory: resolve(serverDirectory, '..', values.OBJECT_STORE_DIR),
+    ...(values.R2_ACCOUNT_ID &&
+    values.R2_BUCKET &&
+    values.R2_ACCESS_KEY_ID &&
+    values.R2_SECRET_ACCESS_KEY
+      ? {
+          r2: {
+            accessKeyId: values.R2_ACCESS_KEY_ID,
+            accountId: values.R2_ACCOUNT_ID,
+            bucket: values.R2_BUCKET,
+            secretAccessKey: values.R2_SECRET_ACCESS_KEY,
+          },
+        }
+      : {}),
+  }
 }
 
 export function loadConfig(
@@ -67,6 +143,24 @@ export function loadConfig(
   }
 
   const values = result.output
+  const r2Values = [
+    values.R2_ACCOUNT_ID,
+    values.R2_BUCKET,
+    values.R2_ACCESS_KEY_ID,
+    values.R2_SECRET_ACCESS_KEY,
+  ]
+  if (r2Values.some(Boolean) && r2Values.some((value) => !value)) {
+    throw new Error(
+      'R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set together',
+    )
+  }
+  if (values.HEARTBEAT_URL) {
+    try {
+      new URL(values.HEARTBEAT_URL)
+    } catch {
+      throw new Error('HEARTBEAT_URL must be a URL')
+    }
+  }
   const port = Number(values.PORT)
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error('PORT must be an integer between 1 and 65535')
@@ -95,11 +189,30 @@ export function loadConfig(
         : resolve(dirname(fileURLToPath(import.meta.url)), '..', values.DATABASE_PATH),
     mailFrom: values.MAIL_FROM,
     mailReplyTo: values.MAIL_REPLY_TO,
+    ...(values.HEARTBEAT_URL ? { heartbeatUrl: values.HEARTBEAT_URL } : {}),
     nodeEnv: values.NODE_ENV,
+    objectStoreDirectory: resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      values.OBJECT_STORE_DIR,
+    ),
     port,
     resendApiKey: values.RESEND_API_KEY,
     reviewerCode: values.REVIEWER_CODE,
     reviewerEmail: values.REVIEWER_EMAIL?.toLowerCase(),
+    ...(values.R2_ACCOUNT_ID &&
+    values.R2_BUCKET &&
+    values.R2_ACCESS_KEY_ID &&
+    values.R2_SECRET_ACCESS_KEY
+      ? {
+          r2: {
+            accessKeyId: values.R2_ACCESS_KEY_ID,
+            accountId: values.R2_ACCOUNT_ID,
+            bucket: values.R2_BUCKET,
+            secretAccessKey: values.R2_SECRET_ACCESS_KEY,
+          },
+        }
+      : {}),
     trustAnyExtensionOrigin,
     trustedExtensionIds: [
       ...new Set([

@@ -26,7 +26,12 @@ async function makeApp() {
     db,
     getClientAddress: (context) => new URL(context.req.url).hostname,
     mailer: { send: async () => undefined },
-    objectStore: { get: async () => undefined, put: async () => undefined },
+    objectStore: {
+      delete: async () => undefined,
+      get: async () => undefined,
+      list: async () => [],
+      put: async () => undefined,
+    },
   })
 }
 
@@ -57,7 +62,12 @@ async function makeAuthApp(
         messages.push(message as MailMessage)
       },
     },
-    objectStore: { get: async () => undefined, put: async () => undefined },
+    objectStore: {
+      delete: async () => undefined,
+      get: async () => undefined,
+      list: async () => [],
+      put: async () => undefined,
+    },
   })
   const clientIp = `203.0.113.${testClientAddress++}`
   const request = app.request.bind(app)

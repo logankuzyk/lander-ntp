@@ -1,8 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
-import { loadConfig } from './config.js'
+import { loadBackupConfig, loadConfig } from './config.js'
+
+describe('loadBackupConfig', () => {
+  it('loads local restore paths without requiring an authentication secret', () => {
+    expect(loadBackupConfig({})).toEqual({
+      databasePath: expect.stringMatching(/\/server\/data\/lander\.sqlite$/),
+      objectStoreDirectory: expect.stringMatching(/\/server\/data\/objects$/),
+    })
+  })
+})
 
 describe('loadConfig', () => {
+  it('rejects a malformed optional heartbeat URL', () => {
+    expect(() => loadConfig({ AUTH_SECRET: 'a'.repeat(32), HEARTBEAT_URL: 'not a URL' })).toThrow(
+      /HEARTBEAT_URL/,
+    )
+  })
+
+  it('rejects incomplete R2 credentials', () => {
+    expect(() => loadConfig({ AUTH_SECRET: 'a'.repeat(32), R2_ACCOUNT_ID: 'account-id' })).toThrow(
+      /must be set together/,
+    )
+  })
+
   it('rejects an authentication secret shorter than 32 characters', () => {
     expect(() => loadConfig({ AUTH_SECRET: 'too-short' })).toThrow(/AUTH_SECRET/)
   })

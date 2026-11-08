@@ -9,11 +9,13 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "lint": "eslint .",
+    "restore": "npm run build && node dist/restore.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json && tsc --noEmit --project tsconfig.test.json"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "aws4fetch": "^1.0.20",
     "better-auth": "1.7.7",
     "hono": "^4.11.4",
     "valibot": "^1.2.0"
