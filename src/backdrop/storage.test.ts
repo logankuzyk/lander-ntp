@@ -10,6 +10,8 @@ describe('the background choice', () => {
 
   it('uses photos when no choice has been saved and does not write on load', async () => {
     expect(await backgroundItem.read()).toEqual({ newer: false, value: DEFAULT_BACKGROUND })
+    expect(DEFAULT_BACKGROUND.kind).toBe('photo')
+    expect(DEFAULT_BACKGROUND.favouritesOnly).toBe(false)
     expect(await fakeBrowser.storage.sync.get(null)).toEqual({})
   })
 
@@ -28,6 +30,11 @@ describe('the background choice', () => {
         checkBackground({ colour: '#123456', favouritesOnly: false, kind: 'future', v: 1 }),
       ),
     ).toBe('photo')
+    expect(
+      displayKind(
+        checkBackground({ colour: '#123456', favouritesOnly: false, kind: 'colour', v: 1 }),
+      ),
+    ).toBe('colour')
   })
 
   it('uses the first colour preset when the stored colour is unreadable', () => {
@@ -59,4 +66,18 @@ describe('the background choice', () => {
       expect((await fakeBrowser.storage.sync.get('background')).background).toEqual(raw)
     }
   })
+
+  it.each([
+    { colour: '#123456', favouritesOnly: false, v: 1 },
+    { colour: '#123456', favouritesOnly: false, kind: 7, v: 1 },
+  ])(
+    'marks a background with no readable kind read-only and preserves it on write',
+    async (raw) => {
+      await fakeBrowser.storage.sync.set({ background: raw })
+
+      expect((await backgroundItem.read()).newer).toBe(true)
+      await expect(backgroundItem.setValue(DEFAULT_BACKGROUND)).rejects.toThrow()
+      expect((await fakeBrowser.storage.sync.get('background')).background).toEqual(raw)
+    },
+  )
 })

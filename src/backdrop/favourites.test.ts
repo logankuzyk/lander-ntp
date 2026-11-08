@@ -31,6 +31,14 @@ describe('favourites', () => {
     expect(checkFavourites(null)).toEqual({ ids: [], v: 1 })
   })
 
+  it('drops non-string ids from a stored favourites list', () => {
+    expect(checkFavourites({ ids: ['a', 7, null, 'b'], v: 1 }).ids).toEqual(['a', 'b'])
+  })
+
+  it('removes duplicate ids from a stored favourites list', () => {
+    expect(checkFavourites({ ids: ['a', 'b', 'a'], v: 1 }).ids).toEqual(['a', 'b'])
+  })
+
   it('does not write defaults on load and refuses newer values unchanged', async () => {
     expect((await favouritesItem.read()).value).toEqual({ ids: [], v: 1 })
     expect(await fakeBrowser.storage.sync.get(null)).toEqual({})
