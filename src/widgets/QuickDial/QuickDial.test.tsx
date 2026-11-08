@@ -29,6 +29,20 @@ describe('Quick dial', () => {
     expect(container.querySelector('img')?.getAttribute('src')).toBe('/other.com.ico')
   })
 
+  it('uses the host when the label contains only whitespace', () => {
+    render(<QuickDial iconUrl={() => '/stub.ico'} label="   " newTab={false} url="example.com" />)
+
+    expect(screen.getByRole('link', { name: 'example.com' }).textContent).toBe('example.com')
+  })
+
+  it('opens in a new tab without sending a referrer when selected', () => {
+    render(<QuickDial iconUrl={() => '/stub.ico'} label="Example" newTab url="example.com" />)
+    const link = screen.getByRole('link', { name: 'Example' })
+
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noreferrer')
+  })
+
   it('does not navigate on click or Enter in Edit mode', () => {
     function EnterEdit() {
       const { enter } = useEditMode()

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/preact'
 import { describe, expect, it } from 'vitest'
 
 import { accessibleName } from '@/widgetSystem/name'
+import { readOptions } from '@/widgetSystem/options'
 import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { quickDialDefinition } from './definition'
@@ -43,6 +44,17 @@ describe('the Quick dial definition', () => {
         url: 'javascript:alert(1)',
       }),
     ).toBe(false)
+  })
+
+  it('reads the nullable icon and string Site and Label options without falling back', () => {
+    const options = {
+      icon: null,
+      label: 'Reading list',
+      newTab: false,
+      url: 'https://example.com/reading',
+    }
+
+    expect(readOptions(quickDialDefinition, options)).toEqual(options)
   })
 
   it('gives two Quick dials different accessible names from their labels', () => {
