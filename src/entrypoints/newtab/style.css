@@ -1217,6 +1217,12 @@ button.chip:hover {
   right: 1.25rem;
 }
 
+/* News of accounts: beside the account section in settings. */
+.callout--account {
+  top: 1rem;
+  right: 1.25rem;
+}
+
 /* A stop on the tour: to the left of the settings panel, level with its foot. */
 .callout--tour {
   position: absolute;

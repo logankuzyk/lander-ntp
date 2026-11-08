@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 
 import { onboardingItem } from '@/onboarding/storage'
 import { manifestCache, photoState } from '@/photos/storage'
@@ -324,7 +325,7 @@ describe('App', () => {
 
       const settings = await screen.findByRole('dialog', { name: 'Settings' })
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
-      expect(within(settings).getByRole('note').textContent).toContain('1 of 4')
+      expect(within(settings).getByRole('note').textContent).toContain('1 of 5')
       await waitFor(async () => expect((await onboardingItem.getValue())?.welcomed).toBe(true))
 
       // Opened again from the gear, it is just the settings.
@@ -351,15 +352,41 @@ describe('App', () => {
       )
     })
 
+    it('tells a signed-out updated install about accounts, and opens the account section', async () => {
+      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
+      render(<App />)
+
+      const note = await screen.findByRole('note')
+      expect(note.textContent).toContain('New: accounts')
+      expect(note.textContent).toContain('Signing in is optional')
+
+      fireEvent.click(within(note).getByRole('button', { name: 'Set up' }))
+
+      const settings = await screen.findByRole('dialog', { name: 'Settings' })
+      expect(screen.getByRole('tab', { name: 'Account', selected: true })).toBeTruthy()
+      expect(within(settings).queryByRole('note')).toBeNull()
+    })
+
+    it('does not tell a signed-in updated install about accounts', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(true as never)
+      await browser.storage.local.set({ account: { email: 'person@example.test', token: 'test' } })
+      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(screen.queryByRole('note')).toBeNull()
+    })
+
     it('keeps the news dismissed', async () => {
-      await onboardingItem.setValue({ dismissed: [], welcomed: true })
+      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
       const { unmount } = render(<App />)
 
       fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
 
       await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
       await waitFor(async () =>
-        expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather']),
+        expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather', 'accounts']),
       )
 
       unmount()
@@ -368,7 +395,7 @@ describe('App', () => {
       expect(screen.queryByRole('note')).toBeNull()
     })
 
-    it('has no news of the weather for someone already using it', async () => {
+    it('announces accounts without repeating weather news for someone already using weather', async () => {
       await onboardingItem.setValue({ dismissed: [], welcomed: true })
       await settingsItem.setValue({
         ...DEFAULT_SETTINGS,
@@ -379,7 +406,7 @@ describe('App', () => {
       await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
       // Long enough for the availability check to have answered.
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(screen.queryByRole('note')).toBeNull()
+      expect(screen.getByRole('note').textContent).toContain('New: accounts')
     })
 
     it('has no news of the weather while the manifest has it switched off', async () => {

@@ -61,7 +61,7 @@ describe('settings panel stories', () => {
   it('walks the tour in WithTheTour', () => {
     renderStory('WithTheTour')
 
-    expect(screen.getByText('1 of 4')).toBeTruthy()
+    expect(screen.getByText('1 of 5')).toBeTruthy()
   })
 
   it('shows the code field in AccountCodeSent', () => {

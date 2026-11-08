@@ -73,6 +73,8 @@ const SEEN_NEWS = NEWS.map(({ id }) => id)
  * the test that checks it cannot drift apart.
  */
 export const PAGE_SEEDS = {
+  /** Someone who had the extension before accounts arrived, with weather news already dismissed. */
+  accountNews: { onboarding: { dismissed: ['weather'], welcomed: true } },
   /** The first tab after installing: the welcome, over the photo. */
   newInstall: { pending: { dismissed: SEEN_NEWS, welcomed: false } },
   /** Someone using it day to day, with the settings as they come. */

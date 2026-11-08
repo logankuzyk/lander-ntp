@@ -1,3 +1,5 @@
+import { account } from '@/account/account'
+import { ACCOUNT_NEWS } from '@/account/copy'
 import type { SectionId } from '@/components/SettingsPanel/SettingsPanel'
 import type { Settings } from '@/settings/schema'
 import { getEndpoints } from '@/weather/endpoints'
@@ -37,6 +39,12 @@ export const TOUR: readonly CalloutInfo[] = [
     title: 'Weather',
   },
   {
+    body: ACCOUNT_NEWS.body,
+    id: 'tour-account',
+    section: 'account',
+    title: ACCOUNT_NEWS.tourTitle,
+  },
+  {
     body: 'Set the font for the clock and everything around it.',
     id: 'tour-general',
     section: 'general',
@@ -58,5 +66,12 @@ export const NEWS: readonly CalloutInfo[] = [
     relevant: (settings) => !settings.weather.enabled,
     section: 'weather',
     title: 'New: weather',
+  },
+  {
+    available: async () => !(await account.hasSession()),
+    body: ACCOUNT_NEWS.body,
+    id: 'accounts',
+    section: 'account',
+    title: ACCOUNT_NEWS.title,
   },
 ]
