@@ -108,7 +108,7 @@ export function App() {
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
   const photoBackground = background.loaded && displayKind(background.value) === 'photo'
-  const { next, photo, photos, upcoming } = usePhotoRotation(
+  const { next, photo, photos, select, upcoming } = usePhotoRotation(
     settingsLoaded && photoBackground ? settings.photos : null,
   )
   const catalog = usePhotoCatalog(popover === 'settings' && !photoBackground)
@@ -318,6 +318,7 @@ export function App() {
               onChange={setSettings}
               onClose={close}
               onPreviewColour={setPreviewColour}
+              onSelectPhoto={(id) => void select(id)}
               photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}

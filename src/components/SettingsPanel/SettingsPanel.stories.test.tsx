@@ -22,7 +22,7 @@ describe('settings panel stories', () => {
     ['ColourCustom', 'Background'],
     ['ColourHexError', 'Background'],
     ['PhotosCycling', 'Background'],
-    ['PhotosKept', 'Background'],
+    ['PhotoHeld', 'Background'],
     ['General', 'General'],
     ['WithTheTour', 'Background'],
     ['FromNewerVersion', 'Background'],
@@ -32,10 +32,11 @@ describe('settings panel stories', () => {
     expect(selectedTab()).toBe(tab)
   })
 
-  it('shows the photo as kept in PhotosKept', () => {
-    renderStory('PhotosKept')
+  it('shows a held photo and keeps Favourites only available in PhotoHeld', () => {
+    renderStory('PhotoHeld')
 
-    expect(screen.getByText(/Keeping this photo/)).toBeTruthy()
+    expect(screen.getByText(/This photo is held/)).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Favourites only' })).toBeTruthy()
   })
 
   it('walks the tour in WithTheTour', () => {

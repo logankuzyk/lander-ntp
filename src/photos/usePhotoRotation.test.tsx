@@ -136,6 +136,34 @@ describe('usePhotoRotation', () => {
     }
   })
 
+  it('cycles from a photo picked by hand once the usual interval is up', async () => {
+    vi.useFakeTimers()
+    try {
+      await seed()
+      const { result } = renderRotation(cycle('30s'))
+      for (let turn = 0; turn < 10 && result.current.photo?.id !== 'a'; turn++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0)
+          await Promise.resolve()
+        })
+      }
+      expect(result.current.photo?.id).toBe('a')
+
+      await act(async () => result.current.select('c'))
+      expect(result.current.photo?.id).toBe('c')
+      expect((await photoState.getValue())?.currentId).toBe('c')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000)
+      })
+
+      expect(result.current.photo?.id).toBe('b')
+      expect((await photoState.getValue())?.currentId).toBe('b')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('waits for both synced Backdrop items before watching or drawing a photo', async () => {
     await seed('a')
     const backgroundRead = deferred<Awaited<ReturnType<typeof backgroundItem.read>>>()

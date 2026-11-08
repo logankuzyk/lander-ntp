@@ -39,6 +39,7 @@ const renderPanel = ({
 } = {}) => {
   const onChange = vi.fn()
   const onBackgroundChange = vi.fn()
+  const onSelectPhoto = vi.fn()
   const onPreviewColour = vi.fn()
   const onClose = vi.fn()
   const view = render(
@@ -51,11 +52,12 @@ const renderPanel = ({
       onChange={onChange}
       onClose={onClose}
       onPreviewColour={onPreviewColour}
+      onSelectPhoto={onSelectPhoto}
       photos={photos}
       settings={{ ...settings, ...overrides }}
     />,
   )
-  return { ...view, onBackgroundChange, onChange, onClose, onPreviewColour }
+  return { ...view, onBackgroundChange, onChange, onClose, onPreviewColour, onSelectPhoto }
 }
 
 const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
@@ -344,12 +346,13 @@ describe('SettingsPanel', () => {
       )
     })
 
-    it('pins a photo picked from the gallery', () => {
-      const { onChange } = renderPanel()
+    it('shows a photo picked from the gallery without changing cycling settings', () => {
+      const { onChange, onSelectPhoto } = renderPanel()
 
       fireEvent.click(screen.getByRole('button', { name: 'Tide pools' }))
 
-      expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'b' }))
+      expect(onSelectPhoto).toHaveBeenCalledWith('b')
+      expect(onChange).not.toHaveBeenCalled()
     })
 
     it('reads tags no photo has as all photos, and clears them on the next change', () => {

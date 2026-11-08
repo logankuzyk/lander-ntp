@@ -6,6 +6,7 @@ import { useFavourites } from '@/backdrop/useFavourites'
 import { getManifest } from './manifest'
 import { poolFor } from './pool'
 import {
+  choosePhoto,
   msUntilAdvance,
   nextPhoto,
   type Pace,
@@ -45,6 +46,8 @@ export type PhotoRotation = {
   photo: Photo | null
   /** Every photo in the manifest; empty until it has loaded. */
   photos: Photo[]
+  /** Show a photo picked from the gallery without changing the cycling settings. */
+  select: (id: string) => Promise<void>
   /** The photo that comes next, for preloading. Null while a photo is pinned. */
   upcoming: Photo | null
 }
@@ -175,6 +178,23 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
 
   const next = useCallback(() => advance(), [advance])
 
+  const select = useCallback(
+    async (id: string) => {
+      if (!manifest) return
+      const selected = choosePhoto(
+        stateRef.current,
+        id,
+        manifest.photos.map((photo) => photo.id),
+        Date.now(),
+      )
+      if (!selected) return
+      stateRef.current = selected
+      setState(selected)
+      await photoState.setValue(selected)
+    },
+    [manifest],
+  )
+
   // Follow the shared photo: another tab's timer, or its next-photo button.
   useEffect(() => {
     if (!settingsKnown || pace === null || !sharesPhoto(pace)) return
@@ -230,7 +250,17 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       next,
       photo,
       photos: manifest?.photos ?? NO_PHOTOS,
+      select,
       upcoming: upcoming === photo ? null : upcoming,
     }
-  }, [manifest, state, mode, tagKey, next, favourites.value.ids, background.value.favouritesOnly])
+  }, [
+    manifest,
+    state,
+    mode,
+    tagKey,
+    next,
+    select,
+    favourites.value.ids,
+    background.value.favouritesOnly,
+  ])
 }

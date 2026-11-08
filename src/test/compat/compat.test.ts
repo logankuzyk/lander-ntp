@@ -29,10 +29,13 @@ import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { recordSeen } from '@/onboarding/useSeen'
+import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
+import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
+import { makeManifest, makePhoto } from '@/test/fixtures'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import type { DefinitionOf } from '@/widgetSystem/definition'
 import { writeOptions } from '@/widgetSystem/options'
@@ -441,6 +444,29 @@ async function commitThroughPage(next: Layout, type: string): Promise<void> {
 
 const PHASE_3_WRITES = [
   {
+    expectedChangedKeys: [],
+    expectedOptions: undefined,
+    expectedType: undefined,
+    name: 'pick a gallery photo through rotation; only local photo state changes',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue(SEED)
+      await manifestCache.setValue({
+        data: makeManifest([makePhoto('a'), makePhoto('b')]),
+        etag: null,
+        fetchedAt: Date.now(),
+        shape: MANIFEST_CACHE_SHAPE,
+      })
+      await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
+      const before = await fakeBrowser.storage.sync.get(null)
+      const { result } = renderHook(() => usePhotoRotation(SEED.photos))
+      await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+      await act(async () => result.current.select('b'))
+      await waitFor(async () => expect((await photoState.getValue())?.currentId).toBe('b'))
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
     expectedChangedKeys: ['background'],
     expectedOptions: undefined,
     expectedType: undefined,
@@ -653,7 +679,7 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
   },
   {
     changes: { photos: { ...SEED.photos, mode: 'pinned', pinnedId: 'p2' } },
-    name: 'pin a photo (from the gallery, or the arrow while pinned)',
+    name: 'hold the current photo with Never',
     write: changeSettings((s) => ({
       ...s,
       photos: { ...s.photos, mode: 'pinned', pinnedId: 'p2' },
