@@ -23,6 +23,7 @@ import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
 import { useNews } from '@/onboarding/useNews'
 import { preloadNext } from '@/photos/image'
+import { usePhotoCatalog } from '@/photos/usePhotoCatalog'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
@@ -103,6 +104,8 @@ export function App() {
   const { next, photo, photos, upcoming } = usePhotoRotation(
     settingsLoaded && photoBackground ? settings.photos : null,
   )
+  const catalog = usePhotoCatalog(popover === 'settings' && !photoBackground)
+  const availablePhotos = photoBackground ? photos : catalog
 
   const toggle = (which: Exclude<Popover, null>) =>
     setPopover((open) => (open === which ? null : which))
@@ -270,7 +273,7 @@ export function App() {
               initialSection={entry.section}
               onChange={setSettings}
               onClose={close}
-              photos={photos}
+              photos={availablePhotos}
               readOnly={settingsReadOnly}
               settings={settings}
               tour={entry.tour ? SETTINGS_TOUR : undefined}

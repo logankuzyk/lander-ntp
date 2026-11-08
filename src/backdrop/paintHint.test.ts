@@ -30,6 +30,16 @@ describe('applyBackgroundHint', () => {
     expect(root.style.getPropertyValue('--color-bg')).toBe('')
   })
 
+  it('rejects a valid colour followed by trailing characters', () => {
+    const root = document.createElement('html')
+    applyBackgroundHint(root, () =>
+      JSON.stringify({ colour: '#f2e8cfbroken', ink: '#111', kind: 'colour' }),
+    )
+
+    expect(root.style.getPropertyValue('--color-bg')).toBe('')
+    expect(root.dataset.ink).toBeUndefined()
+  })
+
   it('uses the same key that the background hook persists', () => {
     expect(BACKGROUND_HINT_KEY).toBe('lander:background-hint')
   })

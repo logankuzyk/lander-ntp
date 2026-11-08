@@ -93,6 +93,17 @@ describe('App', () => {
     expect((await settingsItem.getValue()).photos).toEqual(DEFAULT_SETTINGS.photos)
   })
 
+  it.each([
+    ['light page ink for a dark colour', '#1d3557', 'light'],
+    ['dark page ink for a light colour', '#f2e8cf', 'dark'],
+  ])('sets %s', async (_name, colour, ink) => {
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour, kind: 'colour' })
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+    expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe(ink)
+  })
+
   it('shows the same photo after changing to a colour and back', async () => {
     await seedPhotos()
     await photoState.setValue({ bag: ['b'], currentId: 'a', shownAt: Date.now() })
@@ -128,6 +139,29 @@ describe('App', () => {
     )
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Photo details' })).toBeNull())
+  })
+
+  it('loads and allows choosing a photo from Settings while the page has a colour', async () => {
+    await manifestCache.setValue({
+      data: makeManifest([makePhoto('a', { alt: 'Forest' }), makePhoto('b', { alt: 'Coast' })]),
+      etag: null,
+      fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
+    })
+    await backgroundItem.setValue({ ...DEFAULT_BACKGROUND, colour: '#f2e8cf', kind: 'colour' })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+    const panel = await screen.findByRole('dialog', { name: 'Settings' })
+    expect(await within(panel).findByRole('heading', { name: 'Gallery' })).toBeTruthy()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Forest' }))
+
+    await waitFor(async () =>
+      expect((await settingsItem.getValue()).photos).toMatchObject({
+        mode: 'pinned',
+        pinnedId: 'a',
+      }),
+    )
   })
 
   it('shows the bundled photo when offline with nothing cached', async () => {
