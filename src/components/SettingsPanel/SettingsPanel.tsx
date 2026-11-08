@@ -1,5 +1,7 @@
 import { useId, useMemo, useRef, useState } from 'preact/hooks'
 
+import type { AccountState } from '@/account/account'
+import { AccountSection } from '@/account/AccountSection'
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { Select } from '@/components/Dropdown/Select'
@@ -39,6 +41,7 @@ const SECTIONS = [
   ['photos', 'Photos'],
   ['clock', 'Clock'],
   ['weather', 'Weather'],
+  ['account', 'Account'],
   ['general', 'General'],
 ] as const
 
@@ -354,6 +357,8 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 }
 
 type SettingsPanelProps = {
+  /** Seeded account presentation for Storybook; production pages leave these unset. */
+  accountPreview?: { codeSent?: boolean; error?: string; state?: AccountState }
   currentId: string | null
   /** The section to open on, when there is no tour to say. */
   initialSection?: SectionId
@@ -368,6 +373,7 @@ type SettingsPanelProps = {
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
+  accountPreview,
   currentId,
   initialSection = 'photos',
   onChange,
@@ -495,6 +501,13 @@ export function SettingsPanel({
           )}
           {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
           {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
+          {section === 'account' && (
+            <AccountSection
+              codeSentInitially={accountPreview?.codeSent}
+              errorInitially={accountPreview?.error}
+              stateOverride={accountPreview?.state}
+            />
+          )}
           {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
         </div>
       </div>

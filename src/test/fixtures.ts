@@ -1,3 +1,4 @@
+import type { AccountState } from '@/account/account'
 import type { Manifest, Photo } from '@/photos/schema'
 import type { Place } from '@/settings/schema'
 import type { Weather } from '@/weather/openMeteo'
@@ -50,6 +51,15 @@ export const makePlace = (overrides: Partial<Place> = {}): Place => ({
   latitude: 48.43,
   longitude: -123.37,
   name: 'Victoria',
+  ...overrides,
+})
+
+export const makeAccount = (
+  overrides: Partial<Extract<AccountState, { status: 'signed-in' }>> = {},
+): Extract<AccountState, { status: 'signed-in' }> => ({
+  email: 'person@example.com',
+  notice: 'none',
+  status: 'signed-in',
   ...overrides,
 })
 

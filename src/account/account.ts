@@ -21,7 +21,13 @@ export type AccountState =
   | { notice: AccountNotice; status: 'signed-out' }
 
 export type AccountError =
-  'consent-refused' | 'http-error' | 'invalid-response' | 'network-error' | 'signed-out'
+  | 'consent-refused'
+  | 'http-error'
+  | 'invalid-response'
+  | 'network-error'
+  | 'signed-out'
+  | 'too-many-tries'
+  | 'wrong-code'
 
 export type AccountResult<T = undefined> =
   { error: AccountError; ok: false } | { ok: true; value: T }
@@ -253,7 +259,16 @@ class AccountClient {
         this.#setState({ notice: 'signed-out-elsewhere', status: 'signed-out' })
         return { error: 'signed-out', ok: false }
       }
-      if (!response.ok && response.status !== 204) return { error: 'http-error', ok: false }
+      if (response.status === 429) return { error: 'too-many-tries', ok: false }
+      if (!response.ok && response.status !== 204) {
+        return {
+          error:
+            response.status === 400 && path === '/api/auth/sign-in/email-otp'
+              ? 'wrong-code'
+              : 'http-error',
+          ok: false,
+        }
+      }
       if (response.status === 204) return { ok: true, response, value: undefined }
       let value: unknown
       try {

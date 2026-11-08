@@ -24,6 +24,14 @@ describe('settings panel stories', () => {
     ['WeatherChoosingAPlace', 'Weather'],
     ['General', 'General'],
     ['WithTheTour', 'Photos'],
+    ['AccountSignedOut', 'Account'],
+    ['AccountCodeSent', 'Account'],
+    ['AccountWrongCode', 'Account'],
+    ['AccountSignedIn', 'Account'],
+    ['AccountNeverSynced', 'Account'],
+    ['AccountSignedOutElsewhere', 'Account'],
+    ['AccountPaused', 'Account'],
+    ['AccountConsentRefused', 'Account'],
   ] as const)('%s opens on %s', (name, tab) => {
     renderStory(name)
 
@@ -49,6 +57,22 @@ describe('settings panel stories', () => {
     renderStory('WithTheTour')
 
     expect(screen.getByText('1 of 4')).toBeTruthy()
+  })
+
+  it('shows the code field in AccountCodeSent', () => {
+    renderStory('AccountCodeSent')
+    expect(screen.getByLabelText('Code')).toBeTruthy()
+  })
+
+  it('shows the wrong-code message in AccountWrongCode', () => {
+    renderStory('AccountWrongCode')
+    expect(screen.getByRole('alert').textContent).toContain('wrong or has expired')
+  })
+
+  it('shows the signed-in account in AccountSignedIn', () => {
+    renderStory('AccountSignedIn')
+    expect(screen.getByText('person@example.com')).toBeTruthy()
+    expect(screen.getByText('Not synced yet')).toBeTruthy()
   })
 
   it('keeps the settings in state, so a switch responds', () => {
