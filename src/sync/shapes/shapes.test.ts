@@ -46,6 +46,21 @@ describe('synced stored shapes', () => {
     })
   })
 
+  it('checks Layout shape without inspecting Widget options and keeps unknown fields', () => {
+    expect(
+      syncedShapes.layout.check({
+        futureLayoutField: { kept: true },
+        v: 1,
+        widgets: [{ id: 'one', options: 'opaque future options', type: 'future-widget' }],
+      }),
+    ).toEqual({ ok: true, v: 1 })
+  })
+
+  it('rejects an unreadable or newer Layout shape', () => {
+    expect(syncedShapes.layout.check({ v: 1 })).toEqual({ ok: false })
+    expect(syncedShapes.layout.check({ v: 2, widgets: [] })).toEqual({ ok: false })
+  })
+
   it('rejects values outside the current shape', () => {
     expect(syncedShapes.settings.check({ photos: 'anything' })).toEqual({ ok: false })
     expect(syncedShapes.onboarding.check({ dismissed: 'none', welcomed: true })).toEqual({

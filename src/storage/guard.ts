@@ -40,6 +40,8 @@ export type GuardedItem<T> = {
    * the page last read, so a newer value that arrived by sync in between is still protected.
    */
   write: (value: T) => Promise<void>
+  /** Preserve an incoming raw value while protecting a newer value already stored here. */
+  writeRaw: (value: unknown) => Promise<void>
 }
 
 type GuardedItemOptions<T> = {
@@ -94,6 +96,10 @@ export function defineGuardedItem<T>({
     write: async (value) => {
       if (newerThanKnown(await raw.getValue())) throw new NewerVersionError(key)
       await raw.setValue(serialize(value))
+    },
+    writeRaw: async (value) => {
+      if (newerThanKnown(await raw.getValue())) throw new NewerVersionError(key)
+      await raw.setValue(value)
     },
   }
 }
