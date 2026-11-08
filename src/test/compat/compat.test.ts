@@ -110,6 +110,7 @@ describe('stored account compatibility', () => {
   beforeEach(async () => {
     await browser.storage.local.clear()
     vi.stubEnv('BROWSER', 'chrome')
+    vi.spyOn(browser.permissions, 'contains').mockResolvedValue(true as never)
   })
 
   afterEach(() => {

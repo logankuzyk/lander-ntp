@@ -2,6 +2,8 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'wxt'
 
+import { accountHostPermission, PRODUCTION_SERVER_URL } from './src/account/serverAddress'
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   dev: {
@@ -22,33 +24,40 @@ export default defineConfig({
   },
   // Explicit imports keep modules greppable and lint-friendly.
   imports: false,
-  manifest: ({ browser }) => ({
-    description: 'A minimal new tab page featuring photography from logankuzyk.com.',
-    homepage_url: 'https://logankuzyk.com',
-    name: 'Lander',
-    // storage.local caches the photo manifest, rotation state and weather. No host
-    // permissions: the manifest endpoint and Open-Meteo send `Access-Control-Allow-Origin: *`.
-    permissions: ['storage'],
-    ...(browser === 'firefox' && {
-      browser_specific_settings: {
-        gecko: {
-          // Sending a place for the forecast and sending an email for account sync are both
-          // consented. Required stays none, so install and update do not prompt.
-          data_collection_permissions: {
-            optional: ['locationInfo', 'personallyIdentifyingInfo', 'authenticationInfo'],
-            required: ['none'],
+  manifest: async ({ browser, mode }) => {
+    const { loadEnv } = await import('vite')
+    const serverUrl =
+      loadEnv(mode, process.cwd(), 'WXT_').WXT_SERVER_URL ??
+      process.env.WXT_SERVER_URL ??
+      PRODUCTION_SERVER_URL
+    return {
+      description: 'A minimal new tab page featuring photography from logankuzyk.com.',
+      homepage_url: 'https://logankuzyk.com',
+      name: 'Lander',
+      // The account API origin is separate from the photo and weather endpoints, which use CORS.
+      optional_host_permissions: [accountHostPermission(serverUrl)],
+      permissions: ['storage'],
+      ...(browser === 'firefox' && {
+        browser_specific_settings: {
+          gecko: {
+            // Sending a place for the forecast and sending an email for account sync are both
+            // consented. Required stays none, so install and update do not prompt.
+            data_collection_permissions: {
+              optional: ['locationInfo', 'personallyIdentifyingInfo', 'authenticationInfo'],
+              required: ['none'],
+            },
+            id: 'lander-ntp@logankuzyk.com',
+            strict_min_version: '140.0',
           },
-          id: 'lander-ntp@logankuzyk.com',
-          strict_min_version: '140.0',
+          // data_collection_permissions landed in Firefox for Android 142.
+          gecko_android: { strict_min_version: '142.0' },
         },
-        // data_collection_permissions landed in Firefox for Android 142.
-        gecko_android: { strict_min_version: '142.0' },
-      },
-      // Lists the page under Settings > Home > "Homepage and new windows". Firefox keeps that
-      // separate from new tabs, which chrome_url_overrides covers.
-      chrome_settings_overrides: { homepage: 'newtab.html' },
-    }),
-  }),
+        // Lists the page under Settings > Home > "Homepage and new windows". Firefox keeps that
+        // separate from new tabs, which chrome_url_overrides covers.
+        chrome_settings_overrides: { homepage: 'newtab.html' },
+      }),
+    }
+  },
   // WXT defaults Firefox to MV2; ship MV3 everywhere.
   manifestVersion: 3,
   srcDir: 'src',

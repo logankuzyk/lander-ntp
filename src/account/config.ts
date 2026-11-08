@@ -1,5 +1,5 @@
-const config = {
-  serverUrl: (import.meta.env.WXT_SERVER_URL ?? 'https://api.lander-ntp.com').replace(/\/$/, ''),
-}
+import { accountServerUrl } from './serverAddress'
+
+const config = { serverUrl: accountServerUrl(import.meta.env.WXT_SERVER_URL) }
 
 export default config

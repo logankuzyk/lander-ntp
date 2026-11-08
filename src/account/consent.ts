@@ -1,27 +1,37 @@
 import { browser } from 'wxt/browser'
 
+import config from './config'
+import { accountHostPermission } from './serverAddress'
+
 const SIGN_IN_DATA = ['locationInfo', 'personallyIdentifyingInfo', 'authenticationInfo'] as const
+const ACCOUNT_ORIGIN = [accountHostPermission(config.serverUrl)]
 
 /** Ask before sending an email address or syncing a Layout from this device. */
 export async function requestSignInConsent(): Promise<boolean> {
-  if (import.meta.env.BROWSER !== 'firefox') return true
   try {
-    // `data_collection` is newer than the typings.
-    return await browser.permissions.request({ data_collection: [...SIGN_IN_DATA] } as Parameters<
-      typeof browser.permissions.request
-    >[0])
+    // `data_collection` is newer than the typings. The origin is an optional host permission.
+    const permissions =
+      import.meta.env.BROWSER === 'firefox'
+        ? { data_collection: [...SIGN_IN_DATA], origins: ACCOUNT_ORIGIN }
+        : { origins: ACCOUNT_ORIGIN }
+    return await browser.permissions.request(
+      permissions as Parameters<typeof browser.permissions.request>[0],
+    )
   } catch {
     return false
   }
 }
 
-/** Whether Firefox still allows the data this device may send to account sync. */
+/** Whether this device still allows the data and server origin the account client needs. */
 export async function signInConsented(): Promise<boolean> {
-  if (import.meta.env.BROWSER !== 'firefox') return true
   try {
-    return await browser.permissions.contains({ data_collection: [...SIGN_IN_DATA] } as Parameters<
-      typeof browser.permissions.contains
-    >[0])
+    const permissions =
+      import.meta.env.BROWSER === 'firefox'
+        ? { data_collection: [...SIGN_IN_DATA], origins: ACCOUNT_ORIGIN }
+        : { origins: ACCOUNT_ORIGIN }
+    return await browser.permissions.contains(
+      permissions as Parameters<typeof browser.permissions.contains>[0],
+    )
   } catch {
     return false
   }
