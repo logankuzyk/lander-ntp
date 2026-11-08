@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { createBookmarksPort } from './createPort'
 import { createFakeBookmarksPort } from './fake'
 import { bookmarksSource } from './source'
+import type { BookmarkNode } from './types'
 
 describe('bookmarksSource', () => {
   afterEach(() => vi.useRealTimers())
@@ -19,7 +21,13 @@ describe('bookmarksSource', () => {
                 { id: 'local-file', title: 'File', url: 'file:///private/notes.txt' },
                 { id: 'browser-page', title: 'Browser page', url: 'chrome://settings' },
                 { id: 'data', title: 'Data', url: 'data:text/plain,hello' },
-                { children: [], id: 'nested', title: 'Nested' },
+                {
+                  children: [
+                    { id: 'inside', title: 'Nested bookmark', url: 'https://example.com/inside' },
+                  ],
+                  id: 'nested',
+                  title: 'Nested',
+                },
                 { id: 'separator', title: '', type: 'separator' },
               ],
               id: 'folder',
@@ -59,6 +67,60 @@ describe('bookmarksSource', () => {
     await expect(source.read({ folder: { id: 'folder', title: 'Old' } })).resolves.toMatchObject({
       name: 'folder',
     })
+  })
+
+  it('does not try to read bookmarks until the permission is granted', async () => {
+    const port = createFakeBookmarksPort({ granted: false })
+    const read = vi.spyOn(port, 'read')
+
+    await expect(bookmarksSource(port).read({ folder: 'bar' })).resolves.toMatchObject({
+      name: 'permission',
+    })
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it('gets folder choices from the granted browser tree', async () => {
+    const nodes: BookmarkNode[] = [
+      { children: [{ children: [], id: 'saved', title: 'Saved' }], id: 'bar', title: 'Toolbar' },
+    ]
+    const event = { addListener: vi.fn(), removeListener: vi.fn() }
+    const permissions = {
+      contains: vi.fn(async () => true),
+      onAdded: event,
+      onRemoved: event,
+      request: vi.fn(async () => true),
+    }
+    const bookmarks = {
+      getSubTree: vi.fn(
+        async (id: string) => nodes[0]?.children?.filter((node) => node.id === id) ?? [],
+      ),
+      getTree: vi.fn(async () => nodes),
+      onChanged: event,
+      onChildrenReordered: event,
+      onCreated: event,
+      onImportBegan: event,
+      onImportEnded: event,
+      onMoved: event,
+      onRemoved: event,
+    }
+    const port = createBookmarksPort({ bookmarks: () => bookmarks, permissions })
+
+    await expect(port.folders()).resolves.toEqual([{ depth: 0, id: 'saved', title: 'Saved' }])
+    expect(bookmarks.getTree).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not claim support when the permission API is unavailable', () => {
+    const event = { addListener: vi.fn(), removeListener: vi.fn() }
+    const bookmarks = vi.fn(() => {
+      throw new Error('bookmarks API must stay untouched')
+    })
+    const port = createBookmarksPort({
+      bookmarks,
+      permissions: { onAdded: event, onRemoved: event },
+    })
+
+    expect(port.isSupported()).toBe(false)
+    expect(bookmarks).not.toHaveBeenCalled()
   })
 
   it.each([
