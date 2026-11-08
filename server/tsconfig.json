@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@/*": ["../src/*"],
+      "valibot": ["./node_modules/valibot/dist/index.d.mts"]
+    },
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "..",
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
