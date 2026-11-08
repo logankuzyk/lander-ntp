@@ -61,6 +61,12 @@ describe('SettingsStore', () => {
     })
   })
 
+  it('rejects a Layout that has no readable Widget list', () => {
+    const store = makeStore()
+
+    expect(store.put('account-a', 'layout', { v: 1, waiting: {} })).toBe('invalid')
+  })
+
   it('uses version 1 when a layout omits its version', () => {
     const store = makeStore()
     const layout = { widgets: [{ options: {}, type: 'clock' }] }

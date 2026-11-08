@@ -10,7 +10,8 @@ const config: StorybookConfig = {
     const { default: preact } = await import('@preact/preset-vite')
     return mergeConfig(config, {
       define: {
-        'import.meta.env.BROWSER': JSON.stringify('chrome'),
+        // Chrome unless a story says otherwise (`asFirefox`): the page reads this as it runs.
+        'import.meta.env.BROWSER': 'globalThis.__storyBrowser',
         'import.meta.env.MANIFEST_VERSION': '3',
       },
       envPrefix: ['VITE_', 'WXT_', 'STORYBOOK_'],

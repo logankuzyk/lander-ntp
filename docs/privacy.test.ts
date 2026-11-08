@@ -10,7 +10,7 @@ describe('privacy copy', () => {
     expect(policy).toContain('## Without an account')
     expect(policy).toContain('## If you sign in')
     expect(policy).toContain(
-      'Without an account, Lander sends no account data to its server. It still stores your Layout, settings, photo list cache, current photo and weather cache in your browser.',
+      'Without an account, Lander sends no account data to its server. Lander has no analytics, advertising or tracking. It still stores your Layout, settings, photo list cache, current photo and weather cache in your browser.',
     )
     expect(policy).not.toContain('Without an account, Lander stores nothing about you.')
     expect(policy).not.toContain('Lander does not collect, sell or share any personal information.')

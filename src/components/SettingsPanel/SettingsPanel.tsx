@@ -1,26 +1,24 @@
-import { useId, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import type { AccountState } from '@/account/account'
 import { AccountSection } from '@/account/AccountSection'
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
-import { Select } from '@/components/Dropdown/Select'
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
+import { useEditMode } from '@/components/EditMode/useEditMode'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
-import type { CalloutInfo } from '@/onboarding/callouts'
+import type { SettingsStop } from '@/onboarding/callouts'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
-import type { Settings, WeatherSettings } from '@/settings/schema'
-import { allowLocation, locationConsented } from '@/weather/consent'
-import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
-import { placeName } from '@/weather/placeName'
+import type { Settings } from '@/settings/schema'
+import { Choice } from '@/widgetSystem/controls/Choice'
+import { Switch } from '@/widgetSystem/controls/Switch'
 
 import { Gallery } from './Gallery'
-import { PlaceSearch } from './PlaceSearch'
-import { WeatherFields } from './WeatherFields'
 
 const FREQUENCY_LABELS: Record<Frequency, string> = {
   '1h': 'Every hour',
@@ -34,56 +32,20 @@ const FREQUENCY_LABELS: Record<Frequency, string> = {
   'every-visit': 'Every new tab',
 }
 
+/** What the panel says while the settings are from a newer version. */
+const UPDATE_TO_CHANGE = READ_ONLY_UPDATE_NOTE
+
 /** The "Change photo" choice that pins the photo on screen. */
 const NEVER = 'never'
 
+/** The Clock and the Weather are set up on their widgets (edit mode), not here. */
 const SECTIONS = [
   ['photos', 'Photos'],
-  ['clock', 'Clock'],
-  ['weather', 'Weather'],
   ['account', 'Account'],
   ['general', 'General'],
 ] as const
 
 export type SectionId = (typeof SECTIONS)[number][0]
-
-type ToggleProps = {
-  checked: boolean
-  label: string
-  onChange: (checked: boolean) => void
-}
-
-function Toggle({ checked, label, onChange }: ToggleProps) {
-  return (
-    <label class="settings__row">
-      <span>{label}</span>
-      <input
-        checked={checked}
-        class="switch"
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        role="switch"
-        type="checkbox"
-      />
-    </label>
-  )
-}
-
-type ChoiceProps<T extends string> = {
-  label: string
-  onChange: (value: T) => void
-  options: readonly (readonly [T, string])[]
-  value: T
-}
-
-function Choice<T extends string>({ label, onChange, options, value }: ChoiceProps<T>) {
-  const labelId = useId()
-  return (
-    <div class="settings__row">
-      <span id={labelId}>{label}</span>
-      <Select labelId={labelId} onChange={onChange} options={options} value={value} />
-    </div>
-  )
-}
 
 type PhotosSectionProps = {
   currentId: string | null
@@ -107,16 +69,16 @@ function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionP
       <section aria-labelledby="cycling-heading">
         <h3 id="cycling-heading">Cycling</h3>
         <Choice<Frequency | typeof NEVER>
+          choices={[
+            ...FREQUENCIES.map((id) => ({ label: FREQUENCY_LABELS[id], value: id })),
+            { label: 'Never', value: NEVER },
+          ]}
           label="Change photo"
           onChange={(choice) =>
             choice === NEVER
               ? update({ mode: 'pinned', pinnedId: currentId })
               : update({ frequency: choice, mode: 'cycle' })
           }
-          options={[
-            ...FREQUENCIES.map((id) => [id, FREQUENCY_LABELS[id]] as const),
-            [NEVER, 'Never'],
-          ]}
           value={pinned ? NEVER : cycling.frequency}
         />
         {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
@@ -140,7 +102,7 @@ function PhotosSection({ currentId, onChange, photos, settings }: PhotosSectionP
             </button>
           </p>
         )}
-        <Toggle
+        <Switch
           checked={settings.dim}
           label="Dim the photo"
           onChange={(dim) => onChange({ ...settings, dim })}
@@ -166,172 +128,43 @@ type SectionProps = {
   onChange: (settings: Settings) => void
   settings: Settings
 }
-
-function ClockSection({ onChange, settings }: SectionProps) {
-  const clock = (changes: Partial<Settings['clock']>) =>
-    onChange({ ...settings, clock: { ...settings.clock, ...changes } })
-
-  return (
-    <section>
-      <Toggle
-        checked={settings.clock.enabled}
-        label="Show clock"
-        onChange={(enabled) => clock({ enabled })}
-      />
-      {/* Out of the way of both the eye and Tab while the clock is off. */}
-      {settings.clock.enabled && (
-        <>
-          <Toggle
-            checked={!settings.clock.hour12}
-            label="24-hour time"
-            onChange={(h24) => clock({ hour12: !h24 })}
-          />
-          <Toggle
-            checked={settings.clock.showDate}
-            label="Show date"
-            onChange={(showDate) => clock({ showDate })}
-          />
-          <Toggle
-            checked={settings.clock.showSeconds}
-            label="Show seconds"
-            onChange={(showSeconds) => clock({ showSeconds })}
-          />
-        </>
-      )}
-    </section>
-  )
-}
-
-function WeatherSection({ onChange, settings }: SectionProps) {
-  const current = settings.weather
-  const [changingPlace, setChangingPlace] = useState(false)
-  const [locateFailed, setLocateFailed] = useState(false)
-  const [consentNeeded, setConsentNeeded] = useState(false)
-  const [, setRefused] = useState(0)
-
-  // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
-  // a change is laid over the settings as they are when it is made, not as they were at the click.
-  const latest = useRef(settings)
-  latest.current = settings
-  const locating = useRef(false)
-
-  const weather = (changes: Partial<WeatherSettings>) =>
-    onChange({ ...latest.current, weather: { ...latest.current.weather, ...changes } })
-
-  // The click that shows the browser's prompt. The position goes to local storage, where the
-  // widget picks it up; the settings only record that the weather follows the device.
-  const follow = async () => {
-    if (locating.current) return
-    locating.current = true
-    setLocateFailed(false)
-    try {
-      // Start geolocation on the click: waiting for Firefox's asynchronous consent check first
-      // can lose the browser's user activation. The position stays local until consent is known.
-      const consent = locationConsented()
-      const positionRequest = locate()
-      if (!(await consent)) {
-        setConsentNeeded(true)
-        return
-      }
-      setConsentNeeded(false)
-      const position = await positionRequest
-      if (!position) return setLocateFailed(true)
-      // Consent can be withdrawn while the browser is waiting for the position. Check again at
-      // the point where this path would send it to the reverse geocoder.
-      if (import.meta.env.BROWSER === 'firefox' && !(await locationConsented())) {
-        setConsentNeeded(true)
-        return
-      }
-      await devicePosition.setValue({ ...position, name: await placeName(position) })
-      setChangingPlace(false)
-      weather({ followDevice: true })
-    } finally {
-      locating.current = false
-    }
-  }
-
-  const enable = async (enabled: boolean) => {
-    // Nothing changed, but the checkbox has ticked itself: render again to put it back.
-    if (enabled && !(await allowLocation())) return setRefused((count) => count + 1)
-    weather({ enabled })
-  }
-
-  return (
-    <>
-      <section>
-        <Toggle
-          checked={current.enabled}
-          label="Show weather"
-          onChange={(enabled) => void enable(enabled)}
-        />
-        {current.enabled &&
-          ((current.place || current.followDevice) && !changingPlace ? (
-            <div class="settings__row">
-              <span>Place</span>
-              <span>
-                {current.followDevice ? CURRENT_LOCATION : current.place?.name}{' '}
-                <button class="settings__link" onClick={() => setChangingPlace(true)} type="button">
-                  Change
-                </button>
-              </span>
-            </div>
-          ) : (
-            <PlaceSearch
-              locateFailed={locateFailed}
-              onConsentNeeded={setConsentNeeded}
-              onLocate={() => void follow()}
-              onSelect={(place) => {
-                setConsentNeeded(false)
-                setChangingPlace(false)
-                weather({ followDevice: false, place })
-              }}
-            />
-          ))}
-        {current.enabled && consentNeeded && (
-          <p class="settings__note">
-            Firefox data consent is needed to search places or follow your location.
-          </p>
-        )}
-        {current.enabled && (
-          <>
-            <Choice<WeatherSettings['unit']>
-              label="Units"
-              onChange={(unit) => weather({ unit })}
-              options={[
-                ['celsius', 'Celsius'],
-                ['fahrenheit', 'Fahrenheit'],
-              ]}
-              value={current.unit}
-            />
-          </>
-        )}
-      </section>
-
-      {current.enabled && (
-        <section aria-labelledby="weather-show-heading">
-          <h3 id="weather-show-heading">Show</h3>
-          <WeatherFields fields={current.fields} onChange={(fields) => weather({ fields })} />
-        </section>
-      )}
-      {current.enabled && (
-        <p class="settings__note settings__credit">
-          <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
-        </p>
-      )}
-    </>
-  )
-}
-
 function GeneralSection({ onChange, settings }: SectionProps) {
   return (
     <section>
       <Choice<FontId>
+        choices={FONT_IDS.map((id) => ({ label: FONTS[id].label, value: id }))}
         label="Font"
         onChange={(font) => onChange({ ...settings, font })}
-        options={FONT_IDS.map((id) => [id, FONTS[id].label] as const)}
         value={settings.font}
       />
     </section>
+  )
+}
+
+/**
+ * Where the Clock's and the Weather's options went. The button is the Bottom bar's Edit button
+ * from here: it closes the panel and enters edit mode, where every widget has its Options. It
+ * changes no setting, so it sits outside the fieldset that a newer version's settings turn off.
+ */
+function EditPointer({ onClose }: { onClose: () => void }) {
+  const { enter } = useEditMode()
+
+  return (
+    <p class="settings__note settings__edit">
+      Clock and Weather options are on the widgets now.{' '}
+      <button
+        class="settings__link"
+        onClick={() => {
+          enter()
+          // The panel is about to go, with focus in it; the page's button reads Done now.
+          document.querySelector<HTMLElement>('[data-edit-toggle]')?.focus()
+          onClose()
+        }}
+        type="button"
+      >
+        Edit
+      </button>
+    </p>
   )
 }
 
@@ -371,9 +204,20 @@ type SettingsPanelProps = {
   onClose: () => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
+  /**
+   * The settings were written by a newer version of the page, which would lose something if
+   * this one saved over them: they can be looked at and not changed.
+   */
+  readOnly?: boolean
   settings: Settings
   /** Stops to walk through, one note beside the panel at a time; see onboarding/callouts. */
-  tour?: readonly CalloutInfo[]
+  tour?: readonly SettingsStop[]
+  /**
+   * Where the tour is on the page before it comes here: the stops already shown, and how many
+   * there are in all, so that the first stop here reads "6 of 7" and not "1 of 2". Without it
+   * the panel's stops are counted alone.
+   */
+  tourProgress?: { before: number; total: number }
 }
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
@@ -384,11 +228,17 @@ export function SettingsPanel({
   onChange,
   onClose,
   photos,
+  readOnly = false,
   settings,
   tour = [],
+  tourProgress,
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
-  const { close, container } = usePopover(onClose)
+  const readOnlyId = useId()
+  // Carrying on from the tour on the page, focus is on the note's button, where the last stop had
+  // it, and not on Close, which one more Enter would press.
+  const carryingOn = tourProgress !== undefined && tour.length > 0
+  const { close, container } = usePopover(onClose, { keepFocus: carryingOn })
   const body = useRef<HTMLDivElement>(null)
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   const [section, setSection] = useState<SectionId>(tour[0]?.section ?? initialSection)
@@ -396,6 +246,11 @@ export function SettingsPanel({
   const [step, setStep] = useState<number | null>(tour.length > 0 ? 0 : null)
   const stop = step === null ? undefined : tour[step]
   const resetGrowth = useGrowOnScroll(container, body)
+  useEffect(() => {
+    if (carryingOn) container.current?.querySelector<HTMLElement>('.callout__action')?.focus()
+    // Once, as it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Each section starts at rest, from the top. The tour follows along: opening a section it
   // has a stop for moves it there.
@@ -404,6 +259,13 @@ export function SettingsPanel({
     resetGrowth()
     const index = tour.findIndex((callout) => callout.section === id)
     if (index !== -1) setStep((at) => (at === null ? null : index))
+  }
+
+  // The tour ends with Done, or Dismiss: focus was on the note's button, which goes, so it goes to
+  // the panel's Close button and not the page behind it.
+  const endTour = () => {
+    if (document.activeElement?.closest('.callout')) close.current?.focus()
+    setStep(null)
   }
 
   const nextStop = step === null ? undefined : tour[step + 1]
@@ -444,12 +306,12 @@ export function SettingsPanel({
                     if (latestSection.current === section) show(nextStop.section)
                   },
                 }
-              : { label: 'Done', onClick: () => setStep(null) }
+              : { label: 'Done', onClick: endTour }
           }
           body={stop.body}
           class="callout--tour"
-          onDismiss={() => setStep(null)}
-          progress={`${step + 1} of ${tour.length}`}
+          onDismiss={endTour}
+          progress={`${(tourProgress?.before ?? 0) + step + 1} of ${tourProgress?.total ?? tour.length}`}
           title={stop.title}
         />
       )}
@@ -465,6 +327,12 @@ export function SettingsPanel({
           <CloseIcon />
         </button>
       </header>
+
+      {readOnly && (
+        <p class="settings__note settings__readonly" id={readOnlyId}>
+          {UPDATE_TO_CHANGE}
+        </p>
+      )}
 
       <div class="settings__layout">
         <div aria-orientation="vertical" class="settings__nav" role="tablist">
@@ -496,25 +364,30 @@ export function SettingsPanel({
           ref={body}
           role="tabpanel"
         >
-          {section === 'photos' && (
-            <PhotosSection
-              currentId={currentId}
-              onChange={onChange}
-              photos={photos}
-              settings={known}
-            />
-          )}
-          {section === 'clock' && <ClockSection onChange={onChange} settings={known} />}
-          {section === 'weather' && <WeatherSection onChange={onChange} settings={known} />}
-          {section === 'account' && (
-            <AccountSection
-              codeSentInitially={accountPreview?.codeSent}
-              deleteOpenInitially={accountPreview?.deleteOpen}
-              errorInitially={accountPreview?.error}
-              stateOverride={accountPreview?.state}
-            />
-          )}
-          {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
+          <fieldset
+            aria-describedby={readOnly ? readOnlyId : undefined}
+            class="settings__fieldset"
+            disabled={readOnly}
+          >
+            {section === 'photos' && (
+              <PhotosSection
+                currentId={currentId}
+                onChange={onChange}
+                photos={photos}
+                settings={known}
+              />
+            )}
+            {section === 'account' && (
+              <AccountSection
+                codeSentInitially={accountPreview?.codeSent}
+                deleteOpenInitially={accountPreview?.deleteOpen}
+                errorInitially={accountPreview?.error}
+                stateOverride={accountPreview?.state}
+              />
+            )}
+            {section === 'general' && <GeneralSection onChange={onChange} settings={known} />}
+          </fieldset>
+          {section === 'general' && <EditPointer onClose={onClose} />}
         </div>
       </div>
     </aside>

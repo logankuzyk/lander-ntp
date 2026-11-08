@@ -47,6 +47,30 @@ export const locate = (): Promise<Coordinates | null> =>
   })
 
 /**
+ * How long a click's question about the location waits for an answer. A prompt left open (or
+ * lost with the tab out of view) can leave `locate` waiting for ever; the setup button waits for
+ * its action to settle before it can be pressed again.
+ */
+const ASK_PATIENCE_MS = 60_000
+
+/**
+ * `locate` for the setup button: asks the browser before it returns, so a click's own call
+ * shows the prompt, and gives up with null, as a refusal does, if nothing has answered after
+ * `giveUpMs`. The prompt, if it is still up, stays up and is answered as usual: whatever it
+ * grants is noticed when the browser says the permission changed.
+ */
+export function askForLocation(giveUpMs = ASK_PATIENCE_MS): Promise<Coordinates | null> {
+  const answer = locate()
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), giveUpMs)
+    void answer.then((position) => {
+      clearTimeout(timer)
+      resolve(position)
+    })
+  })
+}
+
+/**
  * Whether `locate` can answer without a prompt. Settings sync, so a device can be told to
  * follow its location before anyone has allowed that on it; a new tab shouldn't ask unbidden.
  */

@@ -13,6 +13,10 @@ describe('the Clock definition', () => {
     expect(clockDefinition.name).toBe('Clock')
   })
 
+  it('has no summary: the time is not part of its name, which would change every second', () => {
+    expect(clockDefinition.summary).toBeUndefined()
+  })
+
   it("starts a new Clock with the options today's settings default to", () => {
     expect(defaultOptions(clockDefinition)).toEqual({ showDate, showSeconds })
   })
@@ -52,11 +56,35 @@ describe('the Clock definition', () => {
     })
   })
 
-  it('words its options as the settings panel does, in its order', () => {
+  it("words its options as the settings panel does, with the page-wide switch last as the Weather's is", () => {
     expect(clockDefinition.options.map(({ id, label }) => [id, label])).toEqual([
-      ['hour12', '24-hour time'],
       ['showDate', 'Show date'],
       ['showSeconds', 'Show seconds'],
+      ['hour12', '24-hour time'],
     ])
+  })
+
+  it('marks "24-hour time" as the opposite of the hour12 it shows, so a form inverts it', () => {
+    expect(clockDefinition.options.find((option) => option.id === 'hour12')).toMatchObject({
+      invert: true,
+    })
+  })
+
+  it('has no credit to give', () => {
+    expect(clockDefinition.credit).toBeUndefined()
+  })
+
+  it('starts at least at its smallest size and at most at its largest, whatever its options', () => {
+    const { largest, smallest, starting } = clockDefinition.sizes
+    for (const showDate of [false, true]) {
+      for (const showSeconds of [false, true]) {
+        const size = starting({ showDate, showSeconds })
+
+        expect(size.w).toBeGreaterThanOrEqual(smallest.w)
+        expect(size.h).toBeGreaterThanOrEqual(smallest.h)
+        expect(size.w).toBeLessThanOrEqual(largest.w)
+        expect(size.h).toBeLessThanOrEqual(largest.h)
+      }
+    }
   })
 })

@@ -2,4 +2,5 @@
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 fakeBrowser.runtime.getURL = ((path: string) => path) as typeof fakeBrowser.runtime.getURL
-Object.assign(globalThis, { browser: fakeBrowser, chrome: fakeBrowser })
+// `__storyBrowser` is what `import.meta.env.BROWSER` reads in stories (see main.ts).
+Object.assign(globalThis, { __storyBrowser: 'chrome', browser: fakeBrowser, chrome: fakeBrowser })

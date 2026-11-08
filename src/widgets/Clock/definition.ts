@@ -22,11 +22,9 @@ function ClockView({ options, page }: WidgetViewProps<ClockOptions>) {
 
 export const clockDefinition: WidgetDefinition<ClockOptions> = {
   name: 'Clock',
-  // The order and wording are copied from the settings panel. Defaults come from today's
-  // settings, so those cannot drift.
+  // The wording is copied from the settings panel; the page-wide switch comes last, as the
+  // Weather's does. Defaults come from today's settings, so those cannot drift.
   options: [
-    // Label and value are opposite: checked means hour12 is false. A form must invert it, as SettingsPanel does with !hour12.
-    { control: 'switch', id: 'hour12', label: '24-hour time', shared: 'hour12' },
     {
       control: 'switch',
       default: DEFAULT_SETTINGS.clock.showDate,
@@ -39,7 +37,20 @@ export const clockDefinition: WidgetDefinition<ClockOptions> = {
       id: 'showSeconds',
       label: 'Show seconds',
     },
+    // Label and value are opposite: checked means hour12 is false, so a form inverts it.
+    { control: 'switch', id: 'hour12', invert: true, label: '24-hour time', shared: 'hour12' },
   ],
+  // Measured in Storybook (LR-86), in all four fonts at 1440 by 900, 1366 by 768 and 1280 by 720.
+  // The smallest holds seconds and the date: at 1280 by 720, where a cell is about 103 by 79 px,
+  // 3 by 2 gives digits near 64px and a 12px date, even in the widest font. Narrower is under 45px.
+  // The Clock fills any box (it is as big as fits across and down), so nothing past 8 by 4 is
+  // needed to show it well.
+  sizes: {
+    largest: { h: 4, w: 8 },
+    smallest: { h: 2, w: 3 },
+    // Seconds need six columns. Both widths are even, so a new Clock is centred (LR-12).
+    starting: (options) => ({ h: 2, w: options.showSeconds ? 6 : 4 }),
+  },
   type: 'clock',
   View: ClockView,
 }
