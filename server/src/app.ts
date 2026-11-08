@@ -3,7 +3,9 @@ import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import type { DatabaseSync } from 'node:sqlite'
 
+import { deleteAccount } from './accounts.js'
 import { createAuth, type Mailer } from './auth.js'
+import { publishDeletedIds } from './backups.js'
 import type { ServerConfig } from './config.js'
 import { Devices } from './devices.js'
 import type { ObjectStore } from './objectStore.js'
@@ -22,6 +24,7 @@ export type AppDependencies = {
   clock: { now: () => Date }
   config: ServerConfig
   db: DatabaseSync
+  deletedIdsPublishTimeoutMs?: number
   getClientAddress: (context: Context) => string | undefined
   mailer: Mailer
   objectStore: ObjectStore
@@ -29,6 +32,10 @@ export type AppDependencies = {
 
 export async function createApp(dependencies: AppDependencies) {
   const { db } = dependencies
+  db.exec(`CREATE TABLE IF NOT EXISTS deleted_account (
+    user_id TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL
+  )`)
   const devicesRef: { value?: Devices } = {}
   const auth = await createAuth(dependencies, async (session) => {
     if (!devicesRef.value) throw new Error('Devices are not initialized')
@@ -214,6 +221,37 @@ export async function createApp(dependencies: AppDependencies) {
 
   app.delete('/v1/devices/:id', (context) => {
     devices?.remove(context.get('userId'), context.req.param('id'), context.get('sessionId'))
+    return context.body(null, 204)
+  })
+
+  app.delete('/v1/account', async (context) => {
+    const deleted = deleteAccount(db, context.get('userId'), dependencies.clock.now())
+    if (deleted) {
+      const controller = new AbortController()
+      let timeout: NodeJS.Timeout | undefined
+      try {
+        const timedOut = new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            const error = new Error('Deleted account list publication timed out')
+            controller.abort(error)
+            reject(error)
+          }, dependencies.deletedIdsPublishTimeoutMs ?? 5_000)
+        })
+        await Promise.race([
+          publishDeletedIds(
+            db,
+            dependencies.objectStore,
+            dependencies.clock.now(),
+            controller.signal,
+          ),
+          timedOut,
+        ])
+      } catch (error) {
+        console.error('Deleted account list publication failed', error)
+      } finally {
+        if (timeout) clearTimeout(timeout)
+      }
+    }
     return context.body(null, 204)
   })
 

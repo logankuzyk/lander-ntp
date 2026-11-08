@@ -28,6 +28,7 @@ function makeBackups(now: () => Date) {
   const store = createDirectoryObjectStore(directory)
   return {
     backups: new Backups({ clock: { now }, databasePath: ':memory:', db, objectStore: store }),
+    db,
     store,
   }
 }
@@ -58,5 +59,33 @@ describe('backup maintenance', () => {
     expect(run).toHaveBeenCalledTimes(1)
     expect(vi.getTimerCount()).toBeGreaterThan(0)
     stop()
+  })
+
+  it('deletes inactive accounts and publishes their ids in the nightly dump path', async () => {
+    const now = new Date('2026-11-01T03:17:00.000Z')
+    const { backups, db, store } = makeBackups(() => now)
+    db.exec(`
+      ALTER TABLE user ADD COLUMN email TEXT;
+      ALTER TABLE user ADD COLUMN createdAt TEXT;
+      CREATE TABLE verification (id TEXT PRIMARY KEY, identifier TEXT);
+      CREATE TABLE session (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE, updatedAt TEXT);
+      CREATE TABLE account (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE);
+      CREATE TABLE settings_account (user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE, last_used_at INTEGER);
+      CREATE TABLE settings_item (user_id TEXT REFERENCES user(id) ON DELETE CASCADE, item TEXT);
+    `)
+    db.prepare('INSERT INTO user (id, email, createdAt) VALUES (?, ?, ?)').run(
+      'stale',
+      'stale@example.test',
+      '2024-01-01T00:00:00.000Z',
+    )
+    db.prepare('INSERT INTO settings_account VALUES (?, ?)').run(
+      'stale',
+      now.getTime() - 13 * 30 * 24 * 60 * 60 * 1000,
+    )
+    await backups.runNightly()
+
+    expect(db.prepare('SELECT id FROM user').all()).toEqual([])
+    const deletedIds = await store.get('deleted-ids.json')
+    expect(new TextDecoder().decode(deletedIds)).toContain('stale')
   })
 })

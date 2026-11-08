@@ -6,7 +6,7 @@ const external = ['@hono/node-server', 'aws4fetch', 'better-auth', 'hono']
 await build({
   alias: { '@': resolve('../src') },
   bundle: true,
-  entryPoints: ['src/main.ts', 'src/restore.ts'],
+  entryPoints: ['src/main.ts', 'src/restore.ts', 'src/accountCli.ts'],
   external,
   format: 'esm',
   nodePaths: [resolve('node_modules')],

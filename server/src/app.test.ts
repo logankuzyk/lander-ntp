@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from './app.js'
 import { createConsoleMailer } from './auth.js'
 import type { ServerConfig } from './config.js'
+import type { ObjectStore } from './objectStore.js'
 
 const databases: DatabaseSync[] = []
 let testClientAddress = 1
@@ -38,8 +39,11 @@ async function makeApp() {
 async function makeAuthApp(
   configOverrides: Partial<ServerConfig> = {},
   now: () => Date = () => new Date('2026-01-01T00:00:00.000Z'),
+  objectStoreOverrides: Partial<ObjectStore> = {},
+  deletedIdsPublishTimeoutMs = 5_000,
 ) {
   const messages: MailMessage[] = []
+  const publishedObjects: { key: string; value: Uint8Array }[] = []
   const db = new DatabaseSync(':memory:')
   databases.push(db)
   const config: ServerConfig = {
@@ -56,6 +60,7 @@ async function makeAuthApp(
     clock: { now },
     config,
     db,
+    deletedIdsPublishTimeoutMs,
     getClientAddress: (context) => new URL(context.req.url).hostname,
     mailer: {
       send: async (message) => {
@@ -66,7 +71,11 @@ async function makeAuthApp(
       delete: async () => undefined,
       get: async () => undefined,
       list: async () => [],
-      put: async () => undefined,
+      put: async (key, value) => {
+        publishedObjects.push({ key, value })
+        await objectStoreOverrides.put?.(key, value)
+      },
+      ...objectStoreOverrides,
     },
   })
   const clientIp = `203.0.113.${testClientAddress++}`
@@ -78,7 +87,7 @@ async function makeAuthApp(
     }
     return request(input, { ...init, headers })
   }
-  return { app, db, messages }
+  return { app, db, messages, publishedObjects }
 }
 
 afterEach(() => {
@@ -94,6 +103,154 @@ afterEach(() => {
 })
 
 describe('createApp', () => {
+  it('deletes the signed-in account and revokes every session', async () => {
+    const { app, db, messages, publishedObjects } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'delete-me@example.com'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signedIn.headers.get('set-auth-token')
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const secondOtp = messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0]
+    const secondSignedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp: secondOtp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const secondToken = secondSignedIn.headers.get('set-auth-token')
+    const user = db.prepare('SELECT id FROM user WHERE email = ?').get(email) as
+      { id: string } | undefined
+    if (!user) throw new Error('Expected the signed-in user')
+
+    const deleted = await app.request('/v1/account', {
+      headers: { authorization: `Bearer ${token}`, origin },
+      method: 'DELETE',
+    })
+
+    expect(deleted.status).toBe(204)
+    expect(db.prepare('SELECT id FROM user WHERE id = ?').get(user.id)).toBeUndefined()
+    expect(
+      db.prepare('SELECT user_id FROM deleted_account WHERE user_id = ?').get(user.id),
+    ).toBeDefined()
+    expect(publishedObjects).toHaveLength(1)
+    expect(publishedObjects[0]?.key).toBe('deleted-ids.json')
+    expect(new TextDecoder().decode(publishedObjects[0]?.value)).toContain(user.id)
+    expect(
+      (await app.request('/v1/me', { headers: { authorization: `Bearer ${token}`, origin } }))
+        .status,
+    ).toBe(401)
+    expect(
+      (await app.request('/v1/me', { headers: { authorization: `Bearer ${secondToken}`, origin } }))
+        .status,
+    ).toBe(401)
+    expect(
+      (
+        await app.request('/v1/account', {
+          headers: { authorization: `Bearer ${token}`, origin },
+          method: 'DELETE',
+        })
+      ).status,
+    ).toBe(401)
+  })
+
+  it('keeps account deletion successful when deleted-id publication fails', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { app, db, messages } = await makeAuthApp({}, undefined, {
+      put: async () => {
+        throw new Error('object store unavailable')
+      },
+    })
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'publication-failure@example.com'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+
+    const response = await app.request('/v1/account', {
+      headers: { authorization: `Bearer ${signedIn.headers.get('set-auth-token')}`, origin },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(204)
+    expect(db.prepare('SELECT id FROM user WHERE email = ?').get(email)).toBeUndefined()
+    expect(log).toHaveBeenCalledWith('Deleted account list publication failed', expect.any(Error))
+  })
+
+  it('returns 204 when deleted-id publication stalls, after aborting the store request', async () => {
+    let started: (() => void) | undefined
+    let aborted = false
+    const putStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const { app, messages } = await makeAuthApp(
+      {},
+      undefined,
+      {
+        put: async (_key, _value, signal) =>
+          new Promise<void>((_resolve, reject) => {
+            started?.()
+            signal?.addEventListener(
+              'abort',
+              () => {
+                aborted = true
+                reject(signal.reason)
+              },
+              { once: true },
+            )
+          }),
+      },
+      10,
+    )
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'stalled-publication@example.com'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+
+    const responsePromise = app.request('/v1/account', {
+      headers: { authorization: `Bearer ${signedIn.headers.get('set-auth-token')}`, origin },
+      method: 'DELETE',
+    })
+    await putStarted
+    const response = await Promise.race([
+      responsePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 40)),
+    ])
+
+    expect(response).not.toBeNull()
+    expect(response?.status).toBe(204)
+    expect(aborted).toBe(true)
+  })
+
   it('prints sign-in mail in development and refuses to send it in production', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const message = {

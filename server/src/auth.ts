@@ -111,7 +111,7 @@ export async function createAuth(
       window: 60,
     },
     secret: config.authSecret,
-    session: { expiresIn: 60 * 60 * 24 * 60, updateAge: 60 * 60 * 24 },
+    session: { expiresIn: 60 * 60 * 24 * 60, freshAge: 0, updateAge: 60 * 60 * 24 },
     trustedOrigins: [
       ...config.trustedExtensionIds.map((id) => `chrome-extension://${id}`),
       'moz-extension://*',
