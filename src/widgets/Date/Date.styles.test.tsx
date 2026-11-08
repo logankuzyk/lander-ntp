@@ -17,4 +17,12 @@ describe('Date styles', () => {
       /font-family: var\(--font-serif, 'Instrument Serif', serif\)/,
     )
   })
+
+  it('thins the Analog Clock date window border', () => {
+    expect(rule('.analog-clock__date-window')).toMatch(/stroke-width:\s*1(?:;|$)/)
+  })
+
+  it('aligns the month heading with the calendar grid', () => {
+    expect(rule('.date__month')).toMatch(/text-align:\s*left(?:;|$)/)
+  })
 })

@@ -670,6 +670,10 @@ body {
   stroke-width: 1.5;
 }
 
+.analog-clock__date-window {
+  stroke-width: 1;
+}
+
 .analog-clock__tick {
   stroke: currentColor;
   stroke-linecap: round;
@@ -707,6 +711,7 @@ body {
 }
 
 .analog-clock__date {
+  dominant-baseline: middle;
   fill: currentColor;
   font-size: 6px;
   font-weight: 500;
@@ -1075,7 +1080,7 @@ body {
 .date__month {
   font-size: 1.15em;
   font-weight: 500;
-  text-align: center;
+  text-align: left;
 }
 
 .date__calendar {

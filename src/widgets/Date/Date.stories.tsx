@@ -45,6 +45,22 @@ export const GridOff: Story = {
   args: { ...meta.args, cells: { h: 3, w: 3 }, monthGrid: false },
   parameters: { box: centred({ h: 3, w: 3 }) },
 }
+export const ShortCard: Story = {
+  args: { ...meta.args, cells: { h: 2, w: 2 }, format: 'short' },
+  parameters: { box: centred({ h: 2, w: 2 }) },
+}
+export const LongCard: Story = {
+  args: { ...meta.args, cells: { h: 2, w: 2 }, format: 'long' },
+  parameters: { box: centred({ h: 2, w: 2 }) },
+}
+export const ShortMonthGrid: Story = {
+  args: { ...meta.args, cells: { h: 3, w: 3 }, format: 'short' },
+  parameters: { box: centred({ h: 3, w: 3 }) },
+}
+export const LongMonthGrid: Story = {
+  args: { ...meta.args, cells: { h: 3, w: 3 }, format: 'long' },
+  parameters: { box: centred({ h: 3, w: 3 }) },
+}
 export const WeekStrip: Story = {
   args: { ...meta.args, cells: { h: 1, w: 5 } },
   decorators: [withPage],

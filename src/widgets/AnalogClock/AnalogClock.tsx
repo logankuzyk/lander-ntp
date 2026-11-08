@@ -131,7 +131,13 @@ export function AnalogClock({
         {showDate && (
           <g aria-hidden="true">
             <rect class="analog-clock__date-window" height="10" rx="1" width="10" x="68" y="45" />
-            <text class="analog-clock__date" textAnchor="middle" x="73" y="52">
+            <text
+              class="analog-clock__date"
+              dominantBaseline="middle"
+              textAnchor="middle"
+              x="73"
+              y="50"
+            >
               {now.getDate()}
             </text>
           </g>

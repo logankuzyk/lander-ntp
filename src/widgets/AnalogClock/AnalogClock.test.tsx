@@ -27,6 +27,10 @@ describe('Analog clock', () => {
     expect(container.querySelectorAll('.analog-clock__numeral')).toHaveLength(12)
     expect(container.querySelectorAll('.analog-clock__tick')).toHaveLength(0)
     expect(container.querySelector('.analog-clock__date')?.textContent).toBe('11')
+    expect(container.querySelector('.analog-clock__date')?.getAttribute('dominant-baseline')).toBe(
+      'middle',
+    )
+    expect(container.querySelector('.analog-clock__date')?.getAttribute('y')).toBe('50')
     expect(container.querySelector('.analog-clock__hand--second')).not.toBeNull()
   })
 
