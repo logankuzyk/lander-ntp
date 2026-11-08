@@ -55,3 +55,35 @@ _Avoid_: Pending options
 **Widget limit**:
 The number of widgets a user may place on the grid at once (8). Each widget the page draws counts as one, at any size; one that is kept but never drawn (malformed, or with no free place) does not, since it has no × to remove it by. A layout already over it loads whole; only adding stops.
 _Avoid_: Cap, quota
+
+**Background**:
+The page behind the Widgets: either the photo currently shown or a colour chosen in the Background tab.
+_Avoid_: Wallpaper
+
+**Favourite**:
+A photo marked to be included in the Favourites photo pool. Its id is kept even when the photo is temporarily absent from the current photo list.
+_Avoid_: Saved photo
+
+**Pattern tag**:
+A photo tag marked `optIn` by the website. Photos with a Pattern tag are left out of All and can be included by choosing one of their tags.
+_Avoid_: Pattern category
+
+**Quick dial**:
+A Widget with a link to a site and its icon. It can use the site's favicon or an uploaded Icon.
+_Avoid_: Bookmark tile
+
+**Icon**:
+The image shown for a Quick dial, either the site's favicon or a small uploaded image.
+_Avoid_: Logo
+
+**Walk**:
+The guided tour through actions on the page and in Settings.
+_Avoid_: Tutorial mode
+
+**New mark**:
+The small indicator beside a new feature until it has been shown once.
+_Avoid_: Badge
+
+**Run**:
+One active Walk or update callout flow, made up of ordered stops.
+_Avoid_: Session

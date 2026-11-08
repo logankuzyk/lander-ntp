@@ -2,6 +2,8 @@
 
 A minimal new tab page showing photography from [logankuzyk.com](https://logankuzyk.com), with a Grid of Widgets you choose, such as a clock or the weather, photo details, and a gallery in settings for picking a photo or a tag to cycle through. Use Edit mode to add, move, resize, and remove Widgets. Explore the page and its Widgets in Storybook.
 
+The Grid can hold Date, Analog clock, Bookmarks, and Quick dial Widgets. The Background tab lets you choose a photo or a colour, and you can mark photos as favourites for cycling or view them in the gallery.
+
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
 ## Install
