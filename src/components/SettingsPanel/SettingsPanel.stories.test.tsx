@@ -74,9 +74,13 @@ describe('settings panel stories', () => {
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeTruthy(),
     )
+    expect((await onboardingItem.getValue())?.dismissed).not.toContain('photos')
     fireEvent.click(screen.getByRole('tab', { name: 'Photos' }))
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeNull(),
+    )
+    await waitFor(async () =>
+      expect((await onboardingItem.getValue())?.dismissed).toContain('photos'),
     )
   })
 })

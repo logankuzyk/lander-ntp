@@ -641,7 +641,9 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     name: 'see the Add menu marks (all unseen IDs gained in one onboarding write)',
     onboardingOnly: true,
     seenIds: MARKS.filter((id) => id === 'clock' || id === 'weather-widget'),
-    write: () => recordSeen(MARKS.filter((id) => id === 'clock' || id === 'weather-widget')),
+    write: async () => {
+      await recordSeen(MARKS.filter((id) => id === 'clock' || id === 'weather-widget'))
+    },
   },
   {
     name: 'dismiss the update note about the Layout (W30; dismissNews, from the record v0.2.3 stored: one id gained)',
