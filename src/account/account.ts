@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'preact/hooks'
 import { storage } from 'wxt/utils/storage'
 
+import { type SyncedItemKey, syncedShapes } from '@/sync/shapes'
+
 import config from './config'
 import { requestSignInConsent, signInConsented } from './consent'
 
@@ -80,6 +82,17 @@ class AccountClient {
       document.addEventListener('visibilitychange', this.#visibilityHandler)
     }
     await this.#refresh()
+  }
+
+  async pushSyncItem(key: SyncedItemKey, value: unknown): Promise<AccountResult> {
+    const consent = await this.#consentGuard()
+    if (!consent.ok) return consent
+    if (!syncedShapes[key].check(value).ok) return { error: 'invalid-response', ok: false }
+    const result = await this.#authorized(`/v1/sync/${syncedShapes[key].key}`, {
+      body: json({ value }),
+      method: 'PUT',
+    })
+    return result.ok ? { ok: true, value: undefined } : result
   }
 
   async removeDevice(id: string): Promise<AccountResult> {

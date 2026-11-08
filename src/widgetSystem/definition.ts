@@ -20,6 +20,13 @@ type OptionBase = {
   id: string
   /** What people read beside the control. */
   label: string
+  /**
+   * The ids of the Widget's needs (see `needs`) that must be met before the control may be used,
+   * for a control that would send something somewhere: until they are, the form holds it back and
+   * shows the first unmet need's words and action beside it. Left out, the control is always
+   * there. Each id must name one of the Widget's needs.
+   */
+  needs?: readonly string[]
 }
 
 /** On or off. */
@@ -72,12 +79,33 @@ export type OrderedListOption = OptionBase & {
 export type PageValueOption = OptionBase & {
   control: 'switch'
   default?: never
+  /**
+   * The switch says the opposite of the value: "24-hour time" is on when `hour12` is off. The
+   * form that draws it inverts the value on the way in and the change on the way out.
+   */
+  invert?: boolean
   shared: PageValueName
 }
 
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
   ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
+
+/** A size on the Grid, in whole cells. */
+export type Cells = { h: number; w: number }
+
+/**
+ * The sizes a Widget may have, in cells. Any whole number of cells between `smallest` and
+ * `largest` is allowed, and the Widget's content fills whatever box it is given.
+ */
+export type WidgetSizes<O> = {
+  /** The most it may be resized to. */
+  largest: Cells
+  /** The least it may be resized to. It holds everything the options can turn on at once. */
+  smallest: Cells
+  /** Where it starts when added, which may depend on the options. Between smallest and largest. */
+  starting: (options: O) => Cells
+}
 
 /**
  * What a View is given. A Widget with a source also gets the `reading` the source loaded and
@@ -109,11 +137,34 @@ export type WidgetSource<O, R, C> = {
   useQuery: (options: O) => SourceQuery<R, C>
 }
 
+/** A line of thanks that links to where the Widget's data comes from. */
+export type Credit = {
+  href: string
+  text: string
+}
+
+/**
+ * The one line the box says in place of a Widget that has nothing to show: while it loads,
+ * when it cannot, and when its source is switched off. Any left out use the shared words.
+ */
+export type StateMessages = {
+  failed?: string
+  loading?: string
+  off?: string
+}
+
 /**
  * What a Widget declares. `R` is what its source loads and `C` what the source carries to the
  * View. Both are only for definitions with a `source`; a Widget without one leaves them alone.
  */
 export type WidgetDefinition<O, R = undefined, C = undefined> = {
+  /** A line at the foot of its options, such as who its data is from. */
+  credit?: Credit
+  /**
+   * The words for the box's loading, failed and switched-off states, for a Widget with a
+   * source. See `StateMessages`.
+   */
+  messages?: StateMessages
   /** What people read: "Weather". Free to change. */
   name: string
   /**
@@ -122,11 +173,21 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
    */
   needs?: readonly Need<O>[]
   options: readonly OptionDescription[]
+  /** How big it may be on the Grid, and how big it starts. */
+  sizes: WidgetSizes<O>
   /**
    * Where its data comes from. Run once every need is met; the View is drawn only with a
-   * reading. Defined once, not rebuilt on each render.
+   * reading, and without one the box says why (see `messages`). Defined once, not rebuilt on
+   * each render.
    */
   source?: WidgetSource<O, R, C>
+  /**
+   * A few words from the options that tell one Widget of this type from another, such as the
+   * Weather's place. The box's accessible name is `name`, a comma and this ("Weather,
+   * Victoria"). Nothing, or an empty string, leaves the name alone. It must not follow what the
+   * Widget shows (the Clock's time would change every second), only the options.
+   */
+  summary?: (options: O) => string | undefined
   /** The id that is stored. Never renamed or reused. */
   type: string
   View: ComponentType<WidgetViewProps<O, R, C>>

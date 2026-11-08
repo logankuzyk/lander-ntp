@@ -1,21 +1,32 @@
 import { fireEvent, render, screen } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
 
+import { EditModeProvider } from '@/components/EditMode/useEditMode'
+import { deriveLayout } from '@/layout/derive'
+import { DEFAULT_SETTINGS } from '@/settings/schema'
+
 import { Controls } from './Controls'
 
-const renderControls = ({ busy = false, withInfo = true } = {}) => {
+const LAYOUT = deriveLayout(DEFAULT_SETTINGS)
+
+const renderControls = ({ busy = false, canChange = true, withInfo = true } = {}) => {
   const onNext = vi.fn()
   const onToggleSettings = vi.fn()
   const onToggleInfo = vi.fn()
   render(
-    <Controls
-      busy={busy}
-      infoOpen={false}
-      onNext={onNext}
-      onToggleInfo={withInfo ? onToggleInfo : undefined}
-      onToggleSettings={onToggleSettings}
-      settingsOpen={false}
-    />,
+    <EditModeProvider canChange={canChange}>
+      <Controls
+        busy={busy}
+        infoOpen={false}
+        layout={LAYOUT}
+        layoutLoaded
+        onCommit={vi.fn()}
+        onNext={onNext}
+        onToggleInfo={withInfo ? onToggleInfo : undefined}
+        onToggleSettings={onToggleSettings}
+        settingsOpen={false}
+      />
+    </EditModeProvider>,
   )
   return { onNext, onToggleInfo, onToggleSettings }
 }
@@ -144,5 +155,225 @@ describe('Controls', () => {
 
     expect(button.getAttribute('aria-busy')).toBe('false')
     expect(button.classList.contains('control--busy')).toBe(false)
+  })
+
+  describe('edit mode', () => {
+    const editButton = () => screen.getByRole('button', { name: 'Edit' })
+    const doneButton = () => screen.getByRole('button', { name: 'Done' })
+
+    it('has an Edit button that is not pressed', () => {
+      renderControls()
+
+      expect(editButton().getAttribute('aria-pressed')).toBe('false')
+      expect(editButton().getAttribute('title')).toBe('Edit (E)')
+    })
+
+    it('sits first, so the page’s own buttons stay where they are when it reads Done', () => {
+      renderControls()
+
+      const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))
+      expect(names).toEqual(['Edit', 'Next photo', 'Photo details', 'Settings'])
+    })
+
+    it('reads Done and is pressed while editing, and Edit again once it is pressed', () => {
+      renderControls()
+
+      fireEvent.click(editButton())
+      expect(doneButton().getAttribute('aria-pressed')).toBe('true')
+      expect(doneButton().getAttribute('title')).toBe('Done (E)')
+      expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+
+      fireEvent.click(doneButton())
+      expect(editButton().getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('keeps focus on the button when it changes from Edit to Done', () => {
+      renderControls()
+      editButton().focus()
+
+      fireEvent.click(editButton())
+
+      expect(document.activeElement).toBe(doneButton())
+    })
+
+    it('is toggled by the E key', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(doneButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(editButton()).toBeTruthy()
+    })
+
+    it('is toggled once by a held E: the keydowns that repeat are ignored', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      // Each repeat is checked, as an even number of them would put it back by themselves.
+      for (let held = 0; held < 4; held++) {
+        fireEvent.keyDown(window, { key: 'e', repeat: true })
+        expect(doneButton()).toBeTruthy()
+      }
+
+      fireEvent.keyDown(window, { key: 'e' })
+      for (let held = 0; held < 4; held++) {
+        fireEvent.keyDown(window, { key: 'e', repeat: true })
+        expect(editButton()).toBeTruthy()
+      }
+    })
+
+    it('keeps focus on the Edit button when it ends with a frame focused, from Escape or E', () => {
+      renderControls()
+      render(
+        // A button stands in for the frame, which is a tab stop: only what is in a `.widget-box` counts.
+        <button class="widget-box" type="button">
+          Clock
+        </button>,
+      )
+      const frame = () => document.querySelector<HTMLElement>('.widget-box')
+
+      for (const key of ['Escape', 'e']) {
+        fireEvent.keyDown(window, { key: 'e' })
+        frame()?.focus()
+        expect(document.activeElement).toBe(frame())
+
+        fireEvent.keyDown(frame() ?? window, { key })
+
+        expect(document.activeElement).toBe(editButton())
+      }
+    })
+
+    it('leaves focus alone when it ends with focus somewhere else', () => {
+      renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+      const next = screen.getByRole('button', { name: 'Next photo' })
+      next.focus()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      expect(document.activeElement).toBe(next)
+    })
+
+    it('is left with Escape, and Escape does nothing otherwise', () => {
+      renderControls()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(editButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(editButton()).toBeTruthy()
+    })
+
+    it('ignores E and Escape with modifiers, in a field, in a popover and in the welcome', () => {
+      renderControls()
+      render(<input aria-label="Search" />)
+      render(
+        <aside aria-label="Settings" class="popover" role="dialog">
+          <button type="button">Beach</button>
+        </aside>,
+      )
+      render(
+        <dialog open>
+          <button type="button">Skip</button>
+        </dialog>,
+      )
+
+      fireEvent.keyDown(window, { key: 'e', metaKey: true })
+      fireEvent.keyDown(window, { ctrlKey: true, key: 'e' })
+      fireEvent.keyDown(window, { altKey: true, key: 'e' })
+      fireEvent.keyDown(window, { key: 'e', shiftKey: true })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Beach' }), { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Skip' }), { key: 'e' })
+      expect(editButton()).toBeTruthy()
+
+      fireEvent.keyDown(window, { key: 'e' })
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Escape' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Beach' }), { key: 'Escape' })
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Skip' }), { key: 'Escape' })
+      expect(doneButton()).toBeTruthy()
+    })
+
+    it('leaves Escape to whatever already used it, such as a popover that closes first', () => {
+      renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+      // The popover's own listener is on the document, ahead of the window's.
+      document.addEventListener('keydown', (event) => event.preventDefault(), { once: true })
+
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+
+      expect(doneButton()).toBeTruthy()
+    })
+
+    it('keeps the other buttons and the → key working while editing', () => {
+      const { onNext, onToggleInfo, onToggleSettings } = renderControls()
+      fireEvent.keyDown(window, { key: 'e' })
+
+      fireEvent.keyDown(window, { key: 'ArrowRight' })
+      fireEvent.click(screen.getByRole('button', { name: 'Next photo' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Photo details' }))
+      fireEvent.keyDown(window, { key: 'i' })
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+      expect(onNext).toHaveBeenCalledTimes(2)
+      expect(onToggleInfo).toHaveBeenCalledTimes(2)
+      expect(onToggleSettings).toHaveBeenCalledOnce()
+      expect(doneButton()).toBeTruthy()
+    })
+  })
+})
+
+describe('Controls, the Edit button and a held key', () => {
+  // The settings panel's Edit button hands focus to this one, so a person still holding Enter
+  // from it would press this one on every repeat, and edit mode would flicker (Done, Edit, Done).
+  // A browser clicks a button on each Enter keydown, repeats included; stopping the repeat's
+  // default stops those clicks.
+  it('is not pressed again by the repeats of a held Enter, which it did not see go down', () => {
+    renderControls()
+    const button = screen.getByRole('button', { name: 'Edit' })
+
+    // `fireEvent` says false when the keydown's default was stopped.
+    expect(fireEvent.keyDown(button, { key: 'Enter', repeat: true })).toBe(false)
+  })
+
+  it('is still pressed by an Enter that goes down on it, and by Space', () => {
+    renderControls()
+    const button = screen.getByRole('button', { name: 'Edit' })
+
+    expect(fireEvent.keyDown(button, { key: 'Enter' })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: ' ' })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: ' ', repeat: true })).toBe(true)
+  })
+
+  describe('while the Layout cannot be changed', () => {
+    it('says why beside Done, and ties the words to the button so that a reader says them with it', () => {
+      renderControls({ canChange: false })
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+      const done = screen.getByRole('button', { name: 'Done' })
+      const id = done.getAttribute('aria-describedby')
+      expect(id).toBeTruthy()
+      expect(document.getElementById(id ?? '')?.textContent).toBe('Update Lander to change this.')
+    })
+
+    it('has nothing to say outside edit mode, and does not describe the Edit button', () => {
+      renderControls({ canChange: false })
+
+      expect(
+        screen.getByRole('button', { name: 'Edit' }).getAttribute('aria-describedby'),
+      ).toBeNull()
+      expect(screen.queryByText('Update Lander to change this.')).toBeNull()
+    })
+
+    it('does not describe Done when the Layout can be changed', () => {
+      renderControls()
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+      expect(
+        screen.getByRole('button', { name: 'Done' }).getAttribute('aria-describedby'),
+      ).toBeNull()
+    })
   })
 })

@@ -1,20 +1,24 @@
-import { act, render, screen, waitFor } from '@testing-library/preact'
+import { act, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
+import { Grid } from '@/components/Grid/Grid'
+import { deriveLayout } from '@/layout/derive'
 import { manifestCache } from '@/photos/storage'
 import { DEFAULT_SETTINGS, type Settings, type WeatherSettings } from '@/settings/schema'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
-import { weatherCache } from '@/weather/storage'
-import { MAX_AGE_MS, MAX_STALE_MS } from '@/weather/weatherSource'
-import { pageValues, widgetsFromSettings } from '@/widgetSystem/fromSettings'
+import { weatherReadings } from '@/weather/storage'
+import { MAX_AGE_MS, MAX_STALE_MS, weatherSource } from '@/weather/weatherSource'
+import { pageValues } from '@/widgetSystem/fromSettings'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
-import { widgetDefinition } from '@/widgetSystem/registry'
-import { WidgetHost } from '@/widgetSystem/WidgetHost'
+import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { weatherDefinition } from './definition'
+
+/** Where the Weather sits on the Grid when it is added: the top right. */
+const RECT = { col: 11, h: 2, row: 1, w: 2 }
 
 const PLACE = { latitude: 48.43, longitude: -123.37, name: 'Victoria' }
 
@@ -75,29 +79,15 @@ function Probe({ settings }: { settings: WeatherSettings | null }) {
     clock: { ...DEFAULT_SETTINGS.clock, enabled: false },
     weather: settings,
   }
-  return (
-    <main>
-      {page &&
-        widgetsFromSettings(page).map(({ options, type }) => {
-          const definition = widgetDefinition(type)
-          return (
-            definition && (
-              <WidgetHost
-                definition={definition}
-                key={type}
-                options={options}
-                page={pageValues(page)}
-              />
-            )
-          )
-        })}
-    </main>
-  )
+  return <main>{page && <Grid layout={deriveLayout(page)} page={pageValues(page)} />}</main>
 }
 
 /** The temperature on the page, or 'none' when the Weather draws nothing. */
 const shown = () =>
   document.querySelector('.weather__temperature')?.textContent?.replace('°', '') ?? 'none'
+
+/** The panel the box draws instead of the Weather when it has nothing to show, if it does. */
+const statePanel = () => document.querySelector('.widget-state')
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -109,6 +99,25 @@ describe('the Weather definition', () => {
   it('is stored as "weather" and called Weather', () => {
     expect(weatherDefinition.type).toBe('weather')
     expect(weatherDefinition.name).toBe('Weather')
+  })
+
+  describe('summary', () => {
+    const options = defaultOptions(weatherDefinition)
+    const summary = (changes: Partial<typeof options>) =>
+      weatherDefinition.summary?.({ ...options, ...changes })
+
+    it("is the place's name", () => {
+      expect(summary({ followDevice: false, place: PLACE })).toBe('Victoria')
+    })
+
+    it('is "Current location" while following the device, whatever place is stored', () => {
+      expect(summary({ followDevice: true, place: null })).toBe('Current location')
+      expect(summary({ followDevice: true, place: PLACE })).toBe('Current location')
+    })
+
+    it('is nothing when there is no place', () => {
+      expect(summary({ followDevice: false, place: null })).toBeUndefined()
+    })
   })
 
   it("starts a new Weather with the options today's settings default to", () => {
@@ -160,6 +169,19 @@ describe('the Weather definition', () => {
     )
   })
 
+  it('marks "24-hour time" as the opposite of the hour12 it shows, so a form inverts it', () => {
+    expect(weatherDefinition.options.find((option) => option.id === 'hour12')).toMatchObject({
+      invert: true,
+    })
+  })
+
+  it('credits Open-Meteo at the foot of its options', () => {
+    expect(weatherDefinition.credit).toEqual({
+      href: 'https://open-meteo.com/',
+      text: 'Weather data by Open-Meteo.com',
+    })
+  })
+
   it("words its options as the settings panel does, in the panel's order", () => {
     expect(weatherDefinition.options.map(({ id, label }) => [id, label])).toEqual([
       ['place', 'Place'],
@@ -169,8 +191,21 @@ describe('the Weather definition', () => {
     ])
   })
 
-  it('needs, in order, the location agreement and then a place', () => {
-    expect(weatherDefinition.needs?.map(({ id }) => id)).toEqual(['locationConsent', 'place'])
+  it("needs, in order, the location agreement, a place and, when it follows the device, the device's location", () => {
+    expect(weatherDefinition.needs?.map(({ id }) => id)).toEqual([
+      'locationConsent',
+      'place',
+      'deviceLocation',
+    ])
+  })
+
+  it('keeps the place option, which sends what is typed in it, behind the location agreement', () => {
+    expect(weatherDefinition.options.find((option) => option.id === 'place')?.needs).toEqual([
+      'locationConsent',
+    ])
+    expect(weatherDefinition.options.filter((option) => option.needs).map(({ id }) => id)).toEqual([
+      'place',
+    ])
   })
 
   it('has a place when one is picked or the device is followed, and not otherwise', () => {
@@ -181,6 +216,26 @@ describe('the Weather definition', () => {
     expect(place?.met({ ...options, followDevice: true, place: null })).toBe(true)
   })
 
+  it('asks for a place with the words "Choose a place", by opening the options at the place', () => {
+    const place = weatherDefinition.needs?.find(({ id }) => id === 'place')
+    expect(place?.label).toBe('Choose a place')
+    expect(place?.action).toEqual({ kind: 'option', option: 'place' })
+    // The option it opens at is one the Weather has.
+    expect(weatherDefinition.options.some(({ id }) => id === 'place')).toBe(true)
+  })
+
+  it('asks for the location agreement with the words "Allow sending your place", by asking the browser', () => {
+    const consent = weatherDefinition.needs?.find(({ id }) => id === 'locationConsent')
+    expect(consent?.label).toBe('Allow sending your place')
+    expect(consent?.action?.kind).toBe('ask')
+  })
+
+  it('asks for the device\'s location with the words "Allow location", by asking the browser', () => {
+    const location = weatherDefinition.needs?.find(({ id }) => id === 'deviceLocation')
+    expect(location?.label).toBe('Allow location')
+    expect(location?.action?.kind).toBe('ask')
+  })
+
   it('has the location agreement at once on browsers that do not ask for it', () => {
     const consent = weatherDefinition.needs?.find(({ id }) => id === 'locationConsent')
     expect(consent?.met(defaultOptions(weatherDefinition))).toBe(true)
@@ -188,27 +243,41 @@ describe('the Weather definition', () => {
 })
 
 describe('the Weather on the page', () => {
-  it('draws the Weather with no wrapper of its own, in the place it always was', async () => {
-    await weatherCache.setValue({
+  it('names its box for the Weather and its place, and leaves the Weather inside as it was', async () => {
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
+    })
+
+    const { container } = render(<Probe settings={ON} />)
+
+    const named = await screen.findByRole('group', { name: 'Weather, Victoria' })
+    expect(named).toBe(container.querySelector('.widget-box'))
+    // The Weather's own region keeps its label (the page's other tests find it by it).
+    expect(await within(named).findByRole('region', { name: 'Weather' })).toBeTruthy()
+  })
+
+  it('draws the Weather alone in its box, on the Grid, in the top right corner', async () => {
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
+      data: READING,
+      fetchedAt: Date.now(),
     })
 
     const { container } = render(<Probe settings={ON} />)
 
     await waitFor(() => expect(shown()).toBe('5'))
-    const main = container.querySelector('main')
-    expect(main?.children).toHaveLength(1)
-    expect(main?.firstElementChild?.classList.contains('weather')).toBe(true)
-    expect(screen.getByRole('region', { name: 'Weather' })).toBe(main?.firstElementChild)
+    const boxes = container.querySelectorAll<HTMLElement>('.grid > .widget-box')
+    expect(boxes).toHaveLength(1)
+    expect(boxes[0]?.style.gridColumn).toBe('11 / span 2')
+    expect(boxes[0]?.style.gridRow).toBe('1 / span 2')
+    expect(boxes[0]?.children).toHaveLength(1)
+    expect(screen.getByRole('region', { name: 'Weather' })).toBe(boxes[0]?.firstElementChild)
   })
 
   it('reads the sun times in the page’s 12/24-hour time', async () => {
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
     })
     const options = {
       fields: [{ id: 'sun', shown: true }, ...ONLY_LOCATION.filter(({ id }) => id !== 'sun')],
@@ -218,13 +287,25 @@ describe('the Weather on the page', () => {
     }
 
     const twentyFour = render(
-      <WidgetHost definition={weatherDefinition} options={options} page={{ hour12: false }} />,
+      <WidgetBox
+        definition={weatherDefinition}
+        options={options}
+        page={{ hour12: false }}
+        rect={RECT}
+      />,
     )
     await waitFor(() => expect(shown()).toBe('5'))
     expect(screen.getByLabelText('Sunrise').textContent).toBe('07:13')
     twentyFour.unmount()
 
-    render(<WidgetHost definition={weatherDefinition} options={options} page={{ hour12: true }} />)
+    render(
+      <WidgetBox
+        definition={weatherDefinition}
+        options={options}
+        page={{ hour12: true }}
+        rect={RECT}
+      />,
+    )
     await waitFor(() => expect(shown()).toBe('5'))
     expect(screen.getByLabelText('Sunrise').textContent).toBe('7:13')
   })
@@ -251,7 +332,9 @@ describe('the Weather', () => {
       ...DEFAULT_SETTINGS,
       weather: { ...ON, place: null },
     }
-    expect(widgetsFromSettings(settings).map(({ type }) => type)).toContain('weather')
+    expect(
+      deriveLayout(settings).widgets.map((widget) => widget.kind === 'known' && widget.placed.type),
+    ).toContain('weather')
 
     const { container } = render(<Probe settings={{ ...ON, place: null }} />)
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -266,19 +349,17 @@ describe('the Weather', () => {
     render(<Probe settings={ON} />)
 
     await waitFor(() => expect(shown()).toBe('12'))
-    expect(await weatherCache.getValue()).toMatchObject({
+    expect(await weatherSource.cache.get(cacheKey(PLACE, ON.unit))).toMatchObject({
       data: { temperature: 12 },
-      key: cacheKey(PLACE, ON.unit),
     })
   })
 
   it('serves a fresh cache without asking again', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -289,10 +370,9 @@ describe('the Weather', () => {
 
   it('shows a stale cache, then the refreshed reading', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(forecast(12)))
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -304,10 +384,9 @@ describe('the Weather', () => {
   it('keeps a stale reading when the refresh fails', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -319,16 +398,54 @@ describe('the Weather', () => {
   it('drops a reading too old to be the weather now when the refresh fails', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_STALE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
 
     await waitFor(() => expect(fetch).toHaveBeenCalled())
     expect(shown()).toBe('none')
+  })
+
+  it("says it can't reach the forecast when the fetch fails and nothing recent is cached", async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(statePanel()?.getAttribute('data-state')).toBe('failed'))
+    expect(statePanel()?.textContent).toBe("WeatherCan't reach the forecast")
+    expect(shown()).toBe('none')
+  })
+
+  it('says it is loading, after a moment, while the forecast is being fetched', async () => {
+    // A fetch that never ends stays in the loader's list of requests under way for its key, for
+    // as long as the module lives: a place of its own keeps it from holding up the other tests.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    )
+    const elsewhere = { latitude: 1.5, longitude: 2.5, name: 'Elsewhere' }
+
+    render(<Probe settings={{ ...ON, place: elsewhere }} />)
+    expect(statePanel()).toBeNull()
+
+    await waitFor(() => expect(statePanel()?.getAttribute('data-state')).toBe('loading'))
+    expect(statePanel()?.textContent).toBe('WeatherLoading')
+  })
+
+  it('says nothing while a cached reading is shown, even when the refresh fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
+      data: READING,
+      fetchedAt: Date.now() - MAX_AGE_MS - 1,
+    })
+
+    render(<Probe settings={ON} />)
+
+    await waitFor(() => expect(shown()).toBe('5'))
+    expect(statePanel()).toBeNull()
   })
 
   it('waits until the tab is looked at before asking', async () => {
@@ -355,10 +472,9 @@ describe('the Weather', () => {
       etag: null,
       fetchedAt: Date.now(),
     })
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,
       fetchedAt: Date.now() - MAX_AGE_MS - 1,
-      key: cacheKey(PLACE, ON.unit),
     })
 
     render(<Probe settings={ON} />)
@@ -366,15 +482,17 @@ describe('the Weather', () => {
 
     expect(shown()).toBe('none')
     expect(fetch).not.toHaveBeenCalled()
+    // Not a blank box: it says it is switched off, in the same place.
+    expect(statePanel()?.getAttribute('data-state')).toBe('off')
+    expect(statePanel()?.textContent).toBe('WeatherSwitched off for now')
   })
 
   it('ignores a cache for another place or unit', async () => {
     const fetch = vi.fn().mockResolvedValue(forecast(54))
     vi.stubGlobal('fetch', fetch)
-    await weatherCache.setValue({
+    await weatherSource.cache.set(cacheKey(PLACE, 'celsius'), {
       data: READING,
       fetchedAt: Date.now(),
-      key: cacheKey(PLACE, 'celsius'),
     })
 
     render(<Probe settings={{ ...ON, unit: 'fahrenheit' }} />)
@@ -385,6 +503,79 @@ describe('the Weather', () => {
     const url = new URL(fetch.mock.calls[0]![0] as string)
     expect(url.searchParams.get('temperature_unit')).toBe('fahrenheit')
     expect(url.searchParams.get('latitude')).toBe(String(PLACE.latitude))
+  })
+
+  describe('with two Weathers on the page', () => {
+    const options = (place: typeof PLACE) => ({
+      fields: ONLY_LOCATION,
+      followDevice: false,
+      place,
+      unit: ON.unit,
+    })
+    const page = { hour12: false }
+    const OTHER = { latitude: 49.28, longitude: -123.12, name: 'Vancouver' }
+
+    it('makes one request for two Weathers of one place, and both show it', async () => {
+      const fetch = vi.fn().mockResolvedValue(forecast(12))
+      vi.stubGlobal('fetch', fetch)
+
+      render(
+        <>
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
+        </>,
+      )
+
+      await waitFor(() => expect(document.querySelectorAll('.weather')).toHaveLength(2))
+      expect(
+        [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+      ).toEqual(['12°', '12°'])
+      expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps a reading for each of two places, not one replacing the other', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => Promise.resolve(forecast(url.includes('latitude=49.28') ? 15 : 12))),
+      )
+
+      render(
+        <>
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(PLACE)}
+            page={page}
+            rect={RECT}
+          />
+          <WidgetBox
+            definition={weatherDefinition}
+            options={options(OTHER)}
+            page={page}
+            rect={RECT}
+          />
+        </>,
+      )
+
+      await waitFor(() =>
+        expect(
+          [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+        ).toEqual(['12°', '15°']),
+      )
+      expect(await weatherSource.cache.keys()).toEqual([
+        cacheKey(PLACE, ON.unit),
+        cacheKey(OTHER, ON.unit),
+      ])
+    })
   })
 
   it('does not ask the device, or for a name, when a picked place is shown', async () => {
@@ -449,10 +640,9 @@ describe('the Weather', () => {
         }))
 
     const cached = (position: typeof HERE) =>
-      weatherCache.setValue({
+      weatherSource.cache.set(cacheKey({ name: '', ...position }, ON.unit), {
         data: READING,
         fetchedAt: Date.now(),
-        key: cacheKey({ name: '', ...position }, ON.unit),
       })
 
     /** The place the Weather says it is for: the location line is the only one shown. */
@@ -517,7 +707,7 @@ describe('the Weather', () => {
     })
 
     it('moves when settings pick the position again while the tab is open', async () => {
-      device('prompt')
+      device('granted')
       answering(15, 'Vancouver')
       await devicePosition.setValue({ ...HERE, name: 'Victoria' })
       await cached(HERE)
@@ -600,7 +790,7 @@ describe('the Weather on Firefox', () => {
 
   it('does not fetch a synced place if consent is withdrawn after the Need is met', async () => {
     vi.stubEnv('BROWSER', 'firefox')
-    await weatherCache.removeValue()
+    await weatherReadings.setValue({})
     const contains = vi
       .spyOn(browser.permissions, 'contains')
       .mockResolvedValueOnce(true as never)
@@ -638,7 +828,7 @@ describe('the Weather on Firefox', () => {
   it('stops device updates before reverse-geocoding when consent is withdrawn', async () => {
     vi.stubEnv('BROWSER', 'firefox')
     await devicePosition.removeValue()
-    await weatherCache.removeValue()
+    await weatherReadings.setValue({})
     expect(await devicePosition.getValue()).toBeNull()
     let consented = true
     const contains = vi

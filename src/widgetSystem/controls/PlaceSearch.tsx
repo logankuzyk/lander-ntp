@@ -12,9 +12,19 @@ const DEBOUNCE_MS = 300
 const MIN_LENGTH = 2
 
 type PlaceSearchProps = {
+  /** The id of a line that says why the box is held back, which describes it. */
+  describedBy?: string
+  /** The box cannot be typed in, and suggests nothing. */
+  disabled?: boolean
+  /**
+   * Takes focus when it appears (or, held back at first, when it is first let through), with the suggestions left closed until the box is clicked,
+   * typed in or moved through with the arrow keys: so Escape, pressed first, closes whatever the
+   * search sits in and not just a list nobody asked for.
+   */
+  focusOnMount?: boolean
   locateFailed: boolean
   /** Show or clear the shared weather consent-needed state. */
-  onConsentNeeded: (needed: boolean) => void
+  onConsentNeeded?: (needed: boolean) => void
   /** Follow the device instead of a place searched for. */
   onLocate: () => void
   onSelect: (place: Place) => void
@@ -27,8 +37,11 @@ type PlaceSearchProps = {
  * one there.
  */
 export function PlaceSearch({
+  describedBy,
+  disabled = false,
+  focusOnMount = false,
   locateFailed,
-  onConsentNeeded,
+  onConsentNeeded = () => {},
   onLocate,
   onSelect,
 }: PlaceSearchProps) {
@@ -44,13 +57,29 @@ export function PlaceSearch({
   /** Counts the searches, to tell an answer for text since typed over from the latest. */
   const request = useRef(0)
   const list = useRef<HTMLUListElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  /** Set while the box is given focus by `focusOnMount`, which is not a reason to suggest. */
+  const quiet = useRef(false)
 
   usePlacement(open, anchor, list, 'fill', results)
+
+  // Focus is given once, as soon as the box can take it: when it appears, or, if it was held back
+  // when it appeared (a need is still being looked up), when it is first let through.
+  const focused = useRef(false)
+  useEffect(() => {
+    if (!focusOnMount || disabled || focused.current || !input.current) return
+    focused.current = true
+    quiet.current = true
+    input.current.focus()
+    quiet.current = false
+    // Only the first time it is not disabled.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled])
 
   const name = query.trim()
   useEffect(() => {
     const mine = ++request.current
-    if (name.length < MIN_LENGTH) {
+    if (disabled || name.length < MIN_LENGTH) {
       setResults(null)
       onConsentNeeded(false)
       return
@@ -73,7 +102,7 @@ export function PlaceSearch({
       })
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [name, onConsentNeeded])
+  }, [disabled, name, onConsentNeeded])
 
   const found = results !== 'failed' && results ? results : []
   const suggestions =
@@ -93,6 +122,7 @@ export function PlaceSearch({
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (disabled) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       // One slot past the suggestions is the text as typed, between the last and the first.
@@ -120,20 +150,28 @@ export function PlaceSearch({
             aria-activedescendant={open && chosen ? optionId(chosen.id) : undefined}
             aria-autocomplete="list"
             aria-controls={open ? listId : undefined}
+            aria-describedby={describedBy}
             aria-expanded={open}
             aria-label="Search for a place"
             autocomplete="off"
             class="settings__input"
+            disabled={disabled}
             onBlur={close}
-            onClick={() => setOpen(true)}
-            onFocus={() => setOpen(true)}
+            onClick={() => {
+              if (!disabled) setOpen(true)
+            }}
+            onFocus={() => {
+              if (!quiet.current && !disabled) setOpen(true)
+            }}
             onInput={(event) => {
+              if (disabled) return
               setQuery(event.currentTarget.value)
               setActive(null)
               setOpen(true)
             }}
             onKeyDown={onKeyDown}
             placeholder="City or town"
+            ref={input}
             role="combobox"
             type="search"
             value={chosen ? chosen.label : query}
@@ -151,7 +189,7 @@ export function PlaceSearch({
           )}
         </div>
       </div>
-      {open && (
+      {open && !disabled && (
         <ul
           aria-label="Places"
           class="dropdown__menu suggestions"

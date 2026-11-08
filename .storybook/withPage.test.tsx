@@ -24,6 +24,15 @@ describe('withPage', () => {
     expect(app?.style.minHeight).toBe('100vh')
   })
 
+  it('centres the story, which the page itself no longer does', () => {
+    renderWithPage({ font: 'system' })
+
+    const { display, placeItems } = (screen.getByText('The story').parentElement as HTMLElement)
+      .style
+    expect(display).toBe('grid')
+    expect(placeItems).toBe('center')
+  })
+
   it('sets the display font from the toolbar, as the page does from settings', () => {
     renderWithPage({ font: 'instrument-serif' })
 

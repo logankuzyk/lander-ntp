@@ -1,10 +1,19 @@
-import { render, screen, waitFor } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 
 import { App } from '@/entrypoints/newtab/App'
 
 import { STORY_PHOTOS } from './fixtures'
-import { PAGE_SEEDS, seedPage } from './seed'
+import { device } from './permissions'
+import {
+  PAGE_SEEDS,
+  seedPage,
+  weatherBoxRect,
+  type WeatherBoxSize,
+  weatherSetupSeed,
+  weatherStateSeed,
+} from './seed'
 
 const fetchSpy = vi.fn()
 
@@ -69,16 +78,355 @@ describe('the page stories', () => {
     expect(screen.queryByRole('note')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+})
 
-  it('give an updated install the weather news', async () => {
-    await seedPage(PAGE_SEEDS.weatherNews)
-    render(<App />)
+describe('the tour stories’ seeds', () => {
+  /** Each Widget on the page as [type, column, row], the test DOM drawing them at once. */
+  const widgets = (container: ParentNode) =>
+    [...container.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [
+      box.dataset.widget,
+      box.style.gridColumn,
+      box.style.gridRow,
+    ])
 
-    const note = await screen.findByRole('note')
-    expect(note.textContent).toContain('New: weather')
-    await expectFirstStoryPhoto()
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.queryByRole('region', { name: 'Weather' })).toBeNull()
+  it('give a new install the Clock and a Weather for Victoria, and no setup button', async () => {
+    await seedPage(PAGE_SEEDS.tourClockAndWeather)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    expect((await screen.findByRole('region', { name: 'Weather' })).textContent).toContain('13°')
+    expect(widgets(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '5 / span 4', '4 / span 2'],
+    ])
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('give a new install a Weather waiting for a place: its setup button, and no Clock', async () => {
+    await seedPage(PAGE_SEEDS.tourWeatherWaiting)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    await waitFor(() =>
+      expect(container.querySelector('[data-callout-target="setup"]')).not.toBeNull(),
+    )
+    expect(widgets(container)).toEqual([['weather', '11 / span 2', '1 / span 2']])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give a new install an empty Grid when the Clock and the Weather are off', async () => {
+    await seedPage(PAGE_SEEDS.tourEmptyGrid)
+    const { container } = render(<App />)
+
+    expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    expect(widgets(container)).toEqual([])
+  })
+})
+
+/** Each box on the page as [type, column, row]: where CSS grid is told to put it. */
+const boxes = (container: ParentNode) =>
+  [...container.querySelectorAll<HTMLElement>('.widget-box')].map((box) => [
+    box.dataset.widget,
+    box.style.gridColumn,
+    box.style.gridRow,
+  ])
+
+describe('the Grid stories', () => {
+  it('give a new install the Clock in the middle, and nothing else', async () => {
+    await seedPage(PAGE_SEEDS.gridNewInstall)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    expect(boxes(container)).toEqual([['clock', '5 / span 4', '4 / span 2']])
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give an updated user the Weather in the top right corner and the Clock where it was', async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    const { container } = render(<App />)
+
+    const weather = await screen.findByRole('region', { name: 'Weather' })
+    expect(weather.textContent).toContain('13°')
+    expect(boxes(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '5 / span 4', '4 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the Clock with seconds six columns, from column 4', async () => {
+    await seedPage(PAGE_SEEDS.gridClockWithSeconds)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    expect(boxes(container)).toEqual([['clock', '4 / span 6', '4 / span 2']])
+    expect(container.querySelector('.clock__time')?.textContent).toMatch(/^\d{1,2}:\d{2}:\d{2}$/)
+  })
+
+  it('give an empty Grid when the Clock and the Weather are off', async () => {
+    await seedPage(PAGE_SEEDS.gridEmpty)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(container.querySelector('.grid')).not.toBeNull())
+    expect(boxes(container)).toEqual([])
+  })
+
+  it('give eight Widgets from a stored Layout, each Weather with its reading', async () => {
+    await seedPage(PAGE_SEEDS.gridEightWidgets)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(screen.getAllByRole('region', { name: 'Weather' })).toHaveLength(4))
+    expect(boxes(container)).toHaveLength(8)
+    expect(container.querySelectorAll('.clock')).toHaveLength(4)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give nine Widgets from a stored Layout over the Widget limit, every one drawn', async () => {
+    await seedPage(PAGE_SEEDS.gridNineWidgets)
+    const { container } = render(<App />)
+
+    await waitFor(() => expect(screen.getAllByRole('region', { name: 'Weather' })).toHaveLength(5))
+    expect(boxes(container)).toHaveLength(9)
+    expect(container.querySelectorAll('.clock')).toHaveLength(4)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the resize stories a Clock with room all round it, and the Weather in the corner', async () => {
+    await seedPage(PAGE_SEEDS.gridResizeRoom)
+    const { container } = render(<App />)
+
+    await screen.findByRole('region', { name: 'Weather' })
+    expect(boxes(container)).toEqual([
+      ['weather', '11 / span 2', '1 / span 2'],
+      ['clock', '3 / span 4', '3 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the resize stories a Clock and a Weather one column apart, in the same rows', async () => {
+    await seedPage(PAGE_SEEDS.gridResizeBeside)
+    const { container } = render(<App />)
+
+    await screen.findByRole('region', { name: 'Weather' })
+    expect(boxes(container)).toEqual([
+      ['clock', '3 / span 4', '4 / span 2'],
+      ['weather', '8 / span 2', '4 / span 2'],
+    ])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('the Grid editing stories', () => {
+  /** What each story's play does: wait for the page, then press Edit. */
+  const startEditing = async () => {
+    // The Edit button is there at once; the Grid waits for the stored settings and Layout.
+    await waitFor(() => expect(document.querySelector('.grid')).not.toBeNull())
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+  }
+
+  it('give two Widgets, each in a frame with its name, under the dots', async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    const { container } = render(<App />)
+
+    await startEditing()
+
+    expect(screen.getByRole('button', { name: 'Done' }).getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
+    expect(
+      (await screen.findAllByRole('group')).map((frame) => frame.getAttribute('aria-label')),
+    ).toEqual(['Weather, Victoria', 'Clock'])
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give two Weathers frames that say which place each is for', async () => {
+    await seedPage(PAGE_SEEDS.gridTwoWeathers)
+    render(<App />)
+
+    await startEditing()
+
+    expect(
+      (await screen.findAllByRole('group')).map((frame) => frame.getAttribute('aria-label')),
+    ).toEqual(['Weather, Victoria', 'Weather, Vancouver'])
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll('.weather__temperature')].map((t) => t.textContent),
+      ).toEqual(['13°', '9°']),
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('give the dots alone when there is no Widget', async () => {
+    await seedPage(PAGE_SEEDS.gridEmpty)
+    const { container } = render(<App />)
+
+    await startEditing()
+
+    expect(container.querySelector('.grid--editing .grid__dots')).not.toBeNull()
+    expect(screen.queryByRole('group')).toBeNull()
+  })
+
+  it('can put focus on the first frame, which is a tab stop', async () => {
+    await seedPage(PAGE_SEEDS.gridUpdatedClockAndWeather)
+    render(<App />)
+    await startEditing()
+
+    const [first] = await screen.findAllByRole('group')
+    first?.focus()
+
+    expect(document.activeElement).toBe(first)
+    expect(first?.getAttribute('aria-label')).toBe('Weather, Victoria')
+  })
+})
+
+describe('the Weather setup stories', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+
+  it.each(SIZES)(
+    'give a Weather with no place the setup button at %s, asking nothing',
+    async (size) => {
+      await seedPage(weatherSetupSeed(size))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', { name: 'Weather, Choose a place' })
+      expect(button.textContent).toBe('WeatherChoose a place')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(container.querySelector('.widget-box')?.children).toHaveLength(1)
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it('open the options at the place search when the button is pressed, asking nothing', async () => {
+    await seedPage(weatherSetupSeed('starting'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Weather, Choose a place' }))
+
+    expect(screen.getByRole('dialog', { name: 'Weather options' })).toBeTruthy()
+    expect(document.activeElement).toBe(
+      screen.getByRole('combobox', { name: 'Search for a place' }),
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('the Weather setup stories for the browser’s permissions', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+  const stories = (container: ParentNode) =>
+    [...container.querySelectorAll('.widget-setup')].map((button) => button.textContent)
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it.each(SIZES)(
+    'give a Weather on Firefox, with a place and no agreement, the button to allow sending it at %s, asking nothing',
+    async (size) => {
+      vi.stubEnv('BROWSER', 'firefox')
+      const contains = vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      const request = vi.spyOn(browser.permissions, 'request')
+      await seedPage(weatherSetupSeed(size, 'consent'))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', {
+        name: 'Weather, Allow sending your place',
+      })
+      expect(button.textContent).toBe('WeatherAllow sending your place')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(stories(container)).toHaveLength(1)
+      expect(contains).toHaveBeenCalled()
+      expect(request).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that follows the device, where the location is not allowed, the button to allow it at %s, asking nothing',
+    async (size) => {
+      const here = device('prompt')
+      await seedPage(weatherSetupSeed(size, 'location'))
+      const { container } = render(<App />)
+
+      const button = await screen.findByRole('button', { name: 'Weather, Allow location' })
+      expect(button.textContent).toBe('WeatherAllow location')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(stories(container)).toHaveLength(1)
+      expect(here.getCurrentPosition).not.toHaveBeenCalled()
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+})
+
+// Last, because a Weather left loading keeps its request under way for the rest of the file.
+describe('the Weather state stories', () => {
+  const SIZES: WeatherBoxSize[] = ['smallest', 'starting', 'largest']
+  const panel = () => document.querySelector('.widget-state')
+
+  it('put the Weather in the top right corner at each of its sizes, the largest bigger than the smallest', () => {
+    const smallest = weatherBoxRect('smallest')
+    const starting = weatherBoxRect('starting')
+    const largest = weatherBoxRect('largest')
+    for (const rect of [smallest, starting, largest]) {
+      expect(rect.row).toBe(1)
+      expect(rect.col + rect.w).toBe(13)
+    }
+    expect(starting.w).toBeGreaterThanOrEqual(smallest.w)
+    expect(largest.w * largest.h).toBeGreaterThan(smallest.w * smallest.h)
+  })
+
+  it.each(SIZES)(
+    'give a Weather that is switched off the off panel at %s, asking nothing',
+    async (size) => {
+      await seedPage(weatherStateSeed('off', size))
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('off'))
+      expect(panel()?.textContent).toBe('WeatherSwitched off for now')
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that cannot reach the forecast the failed panel at %s',
+    async (size) => {
+      fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))
+      await seedPage(weatherStateSeed('failed', size))
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('failed'))
+      expect(panel()?.textContent).toBe("WeatherCan't reach the forecast")
+      const { col, h, row, w } = weatherBoxRect(size)
+      expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+    },
+  )
+
+  it.each(SIZES)(
+    'give a Weather that is loading the loading panel at %s, after a moment',
+    async (size) => {
+      let release!: (response: unknown) => void
+      fetchSpy.mockReturnValue(new Promise((resolve) => (release = resolve)))
+      try {
+        await seedPage(weatherStateSeed('loading', size))
+        const { container } = render(<App />)
+
+        await waitFor(() => expect(container.querySelector('.widget-box')).not.toBeNull())
+        expect(panel()).toBeNull()
+        await waitFor(() => expect(panel()?.getAttribute('data-state')).toBe('loading'))
+        expect(panel()?.textContent).toBe('WeatherLoading')
+        const { col, h, row, w } = weatherBoxRect(size)
+        expect(boxes(container)).toEqual([['weather', `${col} / span ${w}`, `${row} / span ${h}`]])
+      } finally {
+        // Let the request end, so it is not left under way for the next test of this place.
+        release({ ok: false })
+      }
+    },
+  )
 })
