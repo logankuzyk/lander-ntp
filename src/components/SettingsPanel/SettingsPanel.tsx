@@ -19,6 +19,7 @@ import { usePopover } from '@/components/Popover/usePopover'
 import type { SettingsStop } from '@/onboarding/callouts'
 import { NewMark } from '@/onboarding/NewMark'
 import { useSeen } from '@/onboarding/useSeen'
+import { poolFor } from '@/photos/pool'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
@@ -238,8 +239,13 @@ function PhotosSection({
   const hasFavourite = fallback
     ? favourites.value.ids.length > 0
     : presentFavourites(favourites.value.ids, photos).length > 0
-  const favouritesGone =
-    favourites.loaded && background.favouritesOnly && !fallback && !hasFavourite
+  const pool = poolFor({
+    favourites: favourites.value.ids,
+    favouritesOnly: background.favouritesOnly,
+    photos,
+    tags: cycling.tags,
+  })
+  const favouritesGone = favourites.loaded && pool.favouritesGone
 
   const tagsLabel = useId()
 
@@ -297,7 +303,9 @@ function PhotosSection({
             )}
             {favouritesGone && (
               <p class="settings__note">
-                None of your favourites are on the site right now, so every photo is cycled.
+                {pool.source === 'tags'
+                  ? 'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.'
+                  : 'None of your favourites are on the site right now, so every photo is cycled.'}
               </p>
             )}
           </>

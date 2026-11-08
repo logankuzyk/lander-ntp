@@ -74,8 +74,8 @@ describe('SettingsPanel', () => {
       const toggle = (await screen.findByRole('switch', {
         name: 'Favourites only',
       })) as HTMLInputElement
-      expect(toggle.disabled).toBe(true)
       expect(await screen.findByText('Mark photos with the heart to use this.')).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
       expect(screen.getByRole('combobox', { name: 'Tags' })).toBeTruthy()
 
       await act(async () => {
@@ -131,33 +131,40 @@ describe('SettingsPanel', () => {
       expect(await favouritesItem.getValue()).toEqual({ ids: ['a'], v: 1 })
     })
 
-    it('uses stored favourites with the bundled fallback list without showing the missing-favourites note', async () => {
+    it('keeps the missing-favourites note off for the bundled fallback photo', async () => {
       await fakeBrowser.storage.sync.clear()
-      await fakeBrowser.storage.sync.set({ favourites: { ids: ['a'], v: 1 } })
+      await fakeBrowser.storage.sync.set({ favourites: { ids: [], v: 1 } })
       const photos = [{ ...PHOTOS[0]!, id: 'fallback' }]
-      const { container, rerender } = renderPanel({ photos })
+      const { container } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, favouritesOnly: true },
+        photos,
+      })
 
       const panel = within(container as HTMLElement)
       const toggle = (await panel.findByRole('switch', {
         name: 'Favourites only',
       })) as HTMLInputElement
       await waitFor(() => expect(toggle.disabled).toBe(false))
-      rerender(
-        <SettingsPanel
-          background={{ ...DEFAULT_BACKGROUND, favouritesOnly: true }}
-          currentId="a"
-          onBackgroundChange={vi.fn()}
-          onChange={vi.fn()}
-          onClose={vi.fn()}
-          photos={photos}
-          settings={settings}
-        />,
-      )
       expect(
         within(panel.getByRole('dialog', { name: 'Settings' }) as HTMLElement).queryByText(
           /None of your favourites are on the site/,
         ),
       ).toBeNull()
+    })
+
+    it('explains that matching Tags remain in use when favourites are gone', async () => {
+      await fakeBrowser.storage.sync.clear()
+      await fakeBrowser.storage.sync.set({ favourites: { ids: ['gone'], v: 1 } })
+      renderPanel({
+        background: { ...DEFAULT_BACKGROUND, favouritesOnly: true },
+        overrides: withPhotos({ tags: ['water'] }),
+      })
+
+      expect(
+        await screen.findByText(
+          'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.',
+        ),
+      ).toBeTruthy()
     })
   })
 
