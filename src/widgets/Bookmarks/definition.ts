@@ -34,6 +34,12 @@ function decodeFolder(value: string): BookmarkFolderChoice {
   return { id: value, title: '' }
 }
 
+const folderLabel = (value: string): string | undefined => {
+  if (value === BAR) return 'Bookmarks bar'
+  const folder = decodeFolder(value)
+  return typeof folder === 'string' ? undefined : folder.title || undefined
+}
+
 export function createBookmarksDefinition(
   port: BookmarksPort,
 ): WidgetDefinition<BookmarksOptions, BookmarkReading> {
@@ -74,6 +80,11 @@ export function createBookmarksDefinition(
         id: 'folder',
         label: 'Folder',
         load: loadFolders,
+        missingLabel: (value) => {
+          const title = folderLabel(value)
+          return title ? `${title} (folder missing)` : 'Folder missing'
+        },
+        valueLabel: folderLabel,
       },
       { control: 'switch', default: true, id: 'showFolderName', label: 'Show the folder name' },
       { control: 'switch', default: false, id: 'openInNewTab', label: 'Open in a new tab' },

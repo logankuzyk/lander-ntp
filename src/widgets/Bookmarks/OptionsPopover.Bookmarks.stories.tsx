@@ -15,7 +15,23 @@ type Story = StoryObj<typeof meta>
 export const Folder: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await userEvent.click(await canvas.findByRole('button', { name: 'Bookmarks options' }))
+    const dialog = await canvas.findByRole('dialog', { name: 'Bookmarks options' })
+    await expect(within(dialog).getByRole('combobox', { name: 'Folder' })).toHaveTextContent(
+      'Reading',
+    )
+  },
+}
+
+export const FolderMissing: Story = {
+  args: { folderMissing: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
     await userEvent.click(await canvas.findByRole('button', { name: 'Bookmarks, Choose a folder' }))
-    await expect(canvas.findByRole('dialog', { name: 'Bookmarks options' })).resolves.toBeTruthy()
+    const dialog = await canvas.findByRole('dialog', { name: 'Bookmarks options' })
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Folder' }))
+    await expect(within(dialog).getByRole('combobox', { name: 'Folder' })).toHaveTextContent(
+      'Reading (folder missing)',
+    )
   },
 }

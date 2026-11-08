@@ -11,6 +11,8 @@ type PickFromListBaseProps = {
   failedText: string
   label: string
   load: () => Promise<readonly PickChoice[]>
+  missingLabel?: (value: string) => string
+  valueLabel?: (value: string) => string | undefined
 }
 
 type SingleProps = PickFromListBaseProps & {
@@ -95,7 +97,9 @@ export function PickFromList(props: PickFromListProps) {
   const value = props.value
   const options = [
     ...(choices ?? []).map(({ depth, label, value: id }) => [id, label, depth] as const),
-    ...(choices && value && !known.has(value) ? ([[value, 'Not on this device']] as const) : []),
+    ...(choices && value && !known.has(value)
+      ? ([[value, props.missingLabel?.(value) ?? 'Not on this device']] as const)
+      : []),
   ]
   return (
     <div class="settings__row">
@@ -108,6 +112,7 @@ export function PickFromList(props: PickFromListProps) {
         onOpen={() => void load()}
         options={options}
         value={value}
+        valueLabel={props.valueLabel}
       />
     </div>
   )

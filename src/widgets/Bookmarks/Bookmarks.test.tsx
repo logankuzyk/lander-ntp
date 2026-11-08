@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createFakeBookmarksPort } from '@/bookmarks/fake'
 import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode'
+import { OptionsPopover } from '@/widgetSystem/OptionsPopover'
 import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { createBookmarksDefinition } from './definition'
@@ -32,6 +33,55 @@ afterEach(() => {
 })
 
 describe('the Bookmarks Widget', () => {
+  it('shows the stored folder name as soon as its options open', () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Reading"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{
+          folder: JSON.stringify({ id: 'reading', title: 'Reading' }),
+          openInNewTab: false,
+          showFolderName: true,
+        }}
+        page={PAGE}
+      />,
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain('Reading')
+  })
+
+  it('labels a saved folder missing from this device in its options', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Reading"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{
+          folder: JSON.stringify({ id: 'gone', title: 'Reading' }),
+          openInNewTab: false,
+          showFolderName: true,
+        }}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+
+    expect(await screen.findByRole('option', { name: 'Reading (folder missing)' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain(
+      'Reading (folder missing)',
+    )
+  })
+
   it('lists the portable Bookmarks bar once, without a device-specific bar choice', async () => {
     const port = createFakeBookmarksPort({
       granted: true,
