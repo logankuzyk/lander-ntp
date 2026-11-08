@@ -27,6 +27,7 @@ import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
+import { commitPulledItem } from '@/sync/commit'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import { writeOptions } from '@/widgetSystem/options'
 
@@ -389,6 +390,28 @@ type PhaseTwoWrite = {
  * A PR that adds a write adds a row here, in the same change.
  */
 const PHASE_2_WRITES: PhaseTwoWrite[] = [
+  {
+    layoutOnly: true,
+    name: 'pull a Layout from the account through the guarded Layout write queue',
+    write: async () => {
+      const pulled = {
+        v: 1,
+        widgets: [
+          {
+            col: 1,
+            h: 1,
+            id: 'pulled01',
+            options: { future: true },
+            row: 1,
+            type: 'future-widget',
+            w: 1,
+          },
+        ],
+      }
+      const result = await commitPulledItem('layout', pulled)
+      if (result !== 'saved') throw new Error(`the Layout pull was ${result}`)
+    },
+  },
   {
     changes: { photos: { ...SEED.photos, frequency: '6h', mode: 'cycle' } },
     name: 'choose how often photos change',

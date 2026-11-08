@@ -37,6 +37,8 @@ export const layoutItem = {
    * Throws a `NewerVersionError`, writing nothing, when the stored Layout is newer or cannot be
    * read.
    */
+  /** Store a Layout pulled from an account without restamping its version or dropping unknown data. */
+  setRemoteValue: (value: unknown): Promise<void> => guarded.writeRaw(value),
   setValue: (value: Layout | null): Promise<void> => guarded.write(value),
   watch: (callback: (value: Layout | null, newer?: boolean) => void): (() => void) =>
     guarded.watch((read) => (read ? callback(read.value, read.newer) : callback(null))),

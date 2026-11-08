@@ -45,6 +45,14 @@ const OnboardingSchema = v.looseObject({
   welcomed: v.boolean(),
 })
 
+// The shared check stays at the Layout boundary: Widget definitions and their options belong
+// to the extension, so a future Widget's opaque options must travel through unchanged.
+const LayoutSchema = v.looseObject({
+  v: v.optional(v.number()),
+  waiting: v.optional(v.record(v.string(), v.unknown())),
+  widgets: v.array(v.unknown()),
+})
+
 const CURRENT_ITEM_VERSION = 1
 
 type ShapeCheck = { ok: false } | { ok: true; v: number }
@@ -71,6 +79,12 @@ const check = (schema: v.GenericSchema, value: unknown): ShapeCheck => {
 
 /** Pure shape checks shared by the extension and the sync server. */
 export const syncedShapes = {
+  layout: {
+    check: (value: unknown): ShapeCheck => check(LayoutSchema, value),
+    key: 'layout',
+    schema: LayoutSchema,
+    version: CURRENT_ITEM_VERSION,
+  },
   onboarding: {
     check: (value: unknown): ShapeCheck => check(OnboardingSchema, value),
     key: 'onboarding',
@@ -84,6 +98,8 @@ export const syncedShapes = {
     version: CURRENT_ITEM_VERSION,
   },
 } as const
+
+export type SyncedItemKey = keyof typeof syncedShapes
 
 /** Count the UTF-8 bytes browsers store for a synced item's key and JSON value. */
 export const itemBytes = (key: string, value: unknown): number =>

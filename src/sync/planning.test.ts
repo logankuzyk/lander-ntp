@@ -92,6 +92,15 @@ describe('sync planning', () => {
     ).toEqual({ settings: { v: 2, value: 'remote' } })
   })
 
+  it('pulls a changed Layout as the item named layout', () => {
+    const local = { v: 1, widgets: [] }
+    const remote = { v: 1, widgets: [{ id: 'clock01', type: 'clock' }] }
+
+    expect(planPull({ layout: local }, { layout: remote }, { layout: local })).toEqual({
+      layout: remote,
+    })
+  })
+
   it('treats absent settings and onboarding versions as version 1', () => {
     expect(
       planPull(

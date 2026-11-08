@@ -110,6 +110,44 @@ describe('account', () => {
     })
   })
 
+  it('pushes a Layout to the account endpoint using the browser item key', async () => {
+    const layout = { v: 1, widgets: [] }
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response(200, { token: 'token-a', user: { email: 'person@example.com' } }),
+      )
+      .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+      .mockResolvedValueOnce(response(200, { changed: true, rev: 1 }))
+    vi.stubGlobal('fetch', fetcher)
+    await account.verify('person@example.com', '123456')
+
+    await expect(account.pushSyncItem('layout', layout)).resolves.toMatchObject({ ok: true })
+
+    expect(fetcher.mock.calls[2]?.[0]).toBe(`${config.serverUrl}/v1/sync/layout`)
+    expect(fetcher.mock.calls[2]?.[1]).toMatchObject({
+      body: JSON.stringify({ value: layout }),
+      method: 'PUT',
+    })
+  })
+
+  it('refuses an unreadable Layout before uploading it', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response(200, { token: 'token-a', user: { email: 'person@example.com' } }),
+      )
+      .mockResolvedValueOnce(response(200, { email: 'person@example.com', pending: false }))
+    vi.stubGlobal('fetch', fetcher)
+    await account.verify('person@example.com', '123456')
+
+    await expect(account.pushSyncItem('layout', { v: 1, widgets: 'not a list' })).resolves.toEqual({
+      error: 'invalid-response',
+      ok: false,
+    })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
   it('reports a pending device and loads the device list after verification', async () => {
     const devices = [
       {

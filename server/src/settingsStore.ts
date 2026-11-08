@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import * as v from 'valibot'
 
 import { itemBytes, syncedShapes } from '@/sync/shapes/index.js'
 
@@ -119,6 +120,7 @@ function itemVersion(item: SyncItem, value: unknown): number | undefined {
     const checked = syncedShapes[item].check(value)
     return checked.ok ? checked.v : undefined
   }
+  if (!v.safeParse(syncedShapes.layout.schema, value).success) return undefined
   if (typeof value !== 'object' || value === null) return undefined
   const version = 'v' in value ? value.v : 1
   return typeof version === 'number' && Number.isSafeInteger(version) && version >= 1
