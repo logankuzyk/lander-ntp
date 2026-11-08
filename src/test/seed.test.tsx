@@ -9,6 +9,7 @@ import { STORY_PHOTOS } from './fixtures'
 import { device } from './permissions'
 import {
   PAGE_SEEDS,
+  type PageSeed,
   seedPage,
   weatherBoxRect,
   type WeatherBoxSize,
@@ -47,6 +48,47 @@ afterEach(() => {
 })
 
 describe('the page stories', () => {
+  it.each([
+    ['everyWidgetOnPhoto', undefined, false],
+    ['everyWidgetOnDarkColour', '#1d3557', false],
+    ['everyWidgetOnLightColour', '#f2e8cf', false],
+    ['everyWidgetEditingOnLightColour', '#f2e8cf', true],
+    ['everyWidgetAtTheLimit', undefined, false],
+  ] as const)(
+    'seed the %s page with every Widget and Weather reading without requests',
+    async (name, colour, editing) => {
+      const seed = (PAGE_SEEDS as Record<string, PageSeed>)[name]
+      expect(seed).toBeDefined()
+      await seedPage(seed)
+      const { container } = render(<App />)
+      if (editing) fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+
+      const expectedCount = name === 'everyWidgetAtTheLimit' ? 8 : 6
+      await waitFor(() =>
+        expect(container.querySelectorAll('.widget-box')).toHaveLength(expectedCount),
+      )
+      expect(
+        [...container.querySelectorAll<HTMLElement>('.widget-box')].map(
+          (box) => box.dataset.widget,
+        ),
+      ).toEqual(
+        expect.arrayContaining([
+          'clock',
+          'date',
+          'analog-clock',
+          'bookmarks',
+          'weather',
+          'quick-dial',
+        ]),
+      )
+      expect((await screen.findByRole('region', { name: 'Weather' })).textContent).toContain('13°')
+      if (colour)
+        expect(container.querySelector('.background')?.getAttribute('style')).toContain(colour)
+      expect(container.querySelector('.grid--editing') !== null).toBe(editing)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
   it('seeds the current manifest cache shape so the page does not revalidate', async () => {
     await seedPage()
 
