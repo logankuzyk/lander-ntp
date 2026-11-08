@@ -264,7 +264,7 @@ describe('SettingsPanel', () => {
       })
 
       expect(screen.getByText('person@example.com')).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
     })
 
     it('shows the signed-out-elsewhere notice distinctly from the paused notice', () => {
@@ -322,6 +322,7 @@ describe('SettingsPanel', () => {
         )
         .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
         .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
+        .mockResolvedValueOnce(jsonResponse({ devices: [], limit: 3, pending: false }))
         .mockResolvedValueOnce(new Response(null, { status: 204 }))
       vi.stubGlobal('fetch', fetch)
       await account.verify('person@example.com', '123456')
@@ -331,7 +332,7 @@ describe('SettingsPanel', () => {
       expect(screen.getByText('Not synced yet')).toBeTruthy()
       fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
       await waitFor(() => expect(screen.queryByText('person@example.com')).toBeNull())
-      expect(fetch).toHaveBeenCalledTimes(4)
+      expect(fetch).toHaveBeenCalledTimes(5)
     })
   })
 

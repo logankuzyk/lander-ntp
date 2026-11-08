@@ -534,6 +534,36 @@ body {
   cursor: pointer;
 }
 
+.account-devices {
+  display: grid;
+  gap: var(--popover-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-devices li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 0.75rem;
+}
+
+.account-devices li > span:first-child {
+  grid-column: 1 / -1;
+}
+
+.account-devices li > button {
+  justify-self: start;
+}
+
+.account-settings dialog {
+  max-width: min(24rem, calc(100vw - 2rem));
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 0.5rem;
+  background: #202020;
+  color: white;
+}
+
 .settings :focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
