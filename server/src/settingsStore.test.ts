@@ -61,6 +61,15 @@ describe('SettingsStore', () => {
     })
   })
 
+  it('uses version 1 when a layout omits its version', () => {
+    const store = makeStore()
+    const layout = { widgets: [{ options: {}, type: 'clock' }] }
+
+    expect(store.put('account-a', 'layout', layout)).toMatchObject({
+      saved: { v: 1, value: layout },
+    })
+  })
+
   it('accepts an item of exactly 8,192 UTF-8 bytes and rejects 8,193', () => {
     const store = makeStore()
     const prefix = '{"v":1,"data":"'
@@ -98,5 +107,29 @@ describe('SettingsStore', () => {
     })
     expect(store.put('account-a', 'layout', { v: 1, widgets: [] })).toBe('older_version')
     expect(store.get('account-a').items.layout).toEqual({ v: 2, value: { v: 2, widgets: [] } })
+  })
+
+  it('updates account activity at most once an hour', () => {
+    let now = new Date('2026-01-01T00:00:00.000Z')
+    const db = new DatabaseSync(':memory:')
+    databases.push(db)
+    db.exec('CREATE TABLE user (id TEXT PRIMARY KEY)')
+    db.prepare('INSERT INTO user (id) VALUES (?)').run('account-a')
+    const store = new SettingsStore(db, { now: () => now })
+    const lastUsed = () =>
+      (
+        db
+          .prepare('SELECT last_used_at FROM settings_account WHERE user_id = ?')
+          .get('account-a') as { last_used_at: number | null } | undefined
+      )?.last_used_at
+
+    store.touch('account-a', now)
+    expect(lastUsed()).toBe(now.getTime())
+    now = new Date(now.getTime() + 30 * 60 * 1000)
+    store.touch('account-a', now)
+    expect(lastUsed()).toBe(new Date('2026-01-01T00:00:00.000Z').getTime())
+    now = new Date('2026-01-01T01:00:00.000Z')
+    store.touch('account-a', now)
+    expect(lastUsed()).toBe(now.getTime())
   })
 })

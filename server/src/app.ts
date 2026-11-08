@@ -7,6 +7,7 @@ import { createAuth, type Mailer } from './auth.js'
 import type { ServerConfig } from './config.js'
 import type { ObjectStore } from './objectStore.js'
 import { SettingsStore } from './settingsStore.js'
+import { pruneExpiredSyncWrites } from './syncWriteLimit.js'
 
 const maximumBodyBytes = 16 * 1024
 const emailWindowMs = 60 * 60 * 1000
@@ -178,7 +179,8 @@ export async function createApp(dependencies: AppDependencies) {
   app.put('/v1/sync/:item', async (context) => {
     const now = dependencies.clock.now().getTime()
     const sessionId = context.get('sessionId')
-    const writes = (syncWrites.get(sessionId) ?? []).filter((timestamp) => now - timestamp < 60_000)
+    pruneExpiredSyncWrites(syncWrites, now)
+    const writes = syncWrites.get(sessionId) ?? []
     if (writes.length >= 60) return context.json({ error: 'rate_limited' }, 429)
     writes.push(now)
     syncWrites.set(sessionId, writes)

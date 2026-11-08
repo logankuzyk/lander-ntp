@@ -631,6 +631,69 @@ describe('createApp', () => {
     expect((await put()).status).toBe(200)
   })
 
+  it('keeps separate write limits for two sessions on one account', async () => {
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const signIn = async () => {
+      await app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email: 'multi-session@example.com', type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+      const otp = messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0]
+      const response = await app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email: 'multi-session@example.com', otp }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+      return response.headers.get('set-auth-token')
+    }
+    const firstToken = await signIn()
+    const secondToken = await signIn()
+    const put = (token: string | null) =>
+      app.request('/v1/sync/onboarding', {
+        body: JSON.stringify({ value: { dismissed: [], welcomed: false } }),
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          origin,
+        },
+        method: 'PUT',
+      })
+
+    for (let attempt = 0; attempt < 59; attempt += 1)
+      expect((await put(firstToken)).status).toBe(200)
+    expect((await put(secondToken)).status).toBe(200)
+    expect((await put(secondToken)).status).toBe(200)
+  })
+
+  it('records account activity for authenticated requests', async () => {
+    const now = new Date('2026-01-01T12:00:00.000Z')
+    const { app, db, messages } = await makeAuthApp({}, () => now)
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email: 'activity@example.com', type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email: 'activity@example.com', otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signedIn.headers.get('set-auth-token')
+    await app.request('/v1/sync', { headers: { authorization: `Bearer ${token}`, origin } })
+    const user = db.prepare('SELECT id FROM user WHERE email = ?').get('activity@example.com') as
+      { id: string } | undefined
+    if (!user) throw new Error('Expected the authenticated user to exist')
+    const account = db
+      .prepare('SELECT last_used_at FROM settings_account WHERE user_id = ?')
+      .get(user.id) as { last_used_at: number | null } | undefined
+
+    expect(account?.last_used_at).toBe(now.getTime())
+  })
+
   it('reports an unavailable database as 503', async () => {
     const app = await makeApp()
     databases.at(-1)?.close()
