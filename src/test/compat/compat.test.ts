@@ -28,7 +28,111 @@ import { createWriteQueue } from '@/storage/writeQueue'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import { writeOptions } from '@/widgetSystem/options'
 
-import { asV023, saveLikeV023 } from './compat'
+import { asV023, asV030, saveLikeV023, saveLikeV030 } from './compat'
+
+const PHASE_3_LAYOUT = {
+  v: 1,
+  widgets: [
+    { col: 1, h: 2, id: 'clock', options: {}, row: 1, type: 'clock', w: 3 },
+    {
+      col: 5,
+      h: 2,
+      id: 'date',
+      options: { format: 'long', showWeekday: true },
+      row: 1,
+      type: 'date',
+      w: 3,
+    },
+    {
+      col: 9,
+      h: 3,
+      id: 'analog',
+      options: { face: 'roman', showSeconds: true },
+      row: 1,
+      type: 'analog-clock',
+      w: 3,
+    },
+    {
+      col: 1,
+      h: 3,
+      id: 'bookmarks',
+      options: { folderId: 'bar', folderTitle: 'Bookmarks bar', showFolderName: true },
+      row: 4,
+      type: 'bookmarks',
+      w: 4,
+    },
+    {
+      col: 6,
+      h: 3,
+      id: 'dial',
+      options: { links: [{ title: 'Example', url: 'https://example.com' }] },
+      row: 4,
+      type: 'quick-dial',
+      w: 5,
+    },
+  ],
+}
+
+/** Add a row here whenever phase 3 adds a synced write that a v0.3.0 device must survive. */
+const PHASE_3_WRITES = [
+  {
+    change: { col: 1, id: 'clock', kind: 'move', row: 7 } as const,
+    name: 'a v0.3.0 Clock move keeps all four newer Widget types byte for byte',
+    rawSync: { layout: PHASE_3_LAYOUT },
+  },
+]
+
+describe('the frozen v0.3.0 reader', () => {
+  it.each(PHASE_3_WRITES)('$name', async ({ change, rawSync }) => {
+    const after = await saveLikeV030(rawSync, change)
+
+    expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
+    expect(JSON.stringify(after.raw.layout.widgets.slice(1))).toBe(
+      JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
+    )
+    expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
+  })
+
+  it('keeps unknown Widget types when removing a different Widget', async () => {
+    const after = await saveLikeV030({ layout: PHASE_3_LAYOUT }, { id: 'clock', kind: 'remove' })
+
+    expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
+    expect(JSON.stringify(after.raw.layout.widgets)).toBe(
+      JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
+    )
+  })
+
+  it('does not write over a Layout with a newer version', async () => {
+    const layout = { ...PHASE_3_LAYOUT, v: 2 }
+    const after = await saveLikeV030({ layout }, { col: 5, id: 'clock', kind: 'move', row: 5 })
+
+    expect(after.layout.readOnly).toBe(true)
+    expect(after.raw.layout).toEqual(layout)
+  })
+
+  it.each([0, -1, 1.5, '1'])('does not write over a Layout with invalid v %s', async (v) => {
+    const layout = { ...PHASE_3_LAYOUT, v }
+    const after = await saveLikeV030({ layout }, { col: 5, id: 'clock', kind: 'move', row: 5 })
+
+    expect(after.layout.readOnly).toBe(true)
+    expect(after.raw.layout).toEqual(layout)
+  })
+
+  it('reads all four phase 3 Widgets as unknown and leaves v0.2.3 settings and onboarding alone', async () => {
+    const rawSync = {
+      layout: PHASE_3_LAYOUT,
+      onboarding: { dismissed: ['layout'], welcomed: true },
+      settings: { ...SETTINGS_0_2_3, v: 1 },
+    }
+    const v030 = await asV030(rawSync)
+    const v023 = await asV023(rawSync)
+
+    expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
+    expect(v023.fellBack).toBe(false)
+    expect(v023.settings).toEqual(rawSync.settings)
+    expect(v023.onboarding).toEqual(rawSync.onboarding)
+  })
+})
 
 /** What a v0.2.3 device wrote: the shape the frozen reader accepts as it stands. */
 const SETTINGS_0_2_3 = {
