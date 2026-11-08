@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { layoutItem } from '@/layout/storage'
@@ -8,6 +9,7 @@ import { manifestCache, photoState } from '@/photos/storage'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { makeManifest, makePhoto, makeWeather } from '@/test/fixtures'
+import { PAGE_SEEDS, seedPage } from '@/test/seed'
 import { cacheKey } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
 
@@ -333,9 +335,8 @@ describe('App', () => {
       const note = await screen.findByRole('note')
       drawn.mockRestore()
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
-
       expect(note.textContent).toContain('Edit your page')
-      expect(note.textContent).toContain('1 of 7')
+      expect(note.textContent).toContain('1 of 8')
       // The settings come at the end of the tour, and the tour is not offered again from the gear.
       expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
       await waitFor(async () => expect((await onboardingItem.getValue())?.welcomed).toBe(true))
@@ -344,28 +345,111 @@ describe('App', () => {
       expect(within(await screen.findByRole('dialog')).queryByRole('note')).toBeNull()
     })
 
-    it('has no news for an updated install now: the weather one, which opened a tab that is gone, is removed', async () => {
-      await onboardingItem.setValue({ dismissed: [], welcomed: true })
+    it('shows Layout news, not the removed Weather news, for an updated install', async () => {
+      await seedPage(PAGE_SEEDS.layoutNewsClockAndWeather)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+        () => new DOMRect(1100, 834, 40, 40),
+      )
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(256)
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(140)
+      render(<App />)
+      const note = await screen.findByRole('note')
+      expect(note.textContent).toContain('You can edit your page now')
+      expect(note.textContent).not.toContain('New: weather')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
 
+    it('tells a signed-out updated install about accounts, and opens the account section', async () => {
+      await onboardingItem.setValue({ dismissed: ['weather', 'layout'], welcomed: true })
+      render(<App />)
+
+      const note = await screen.findByRole('note')
+      expect(note.textContent).toContain('New: accounts')
+      expect(note.textContent).toContain('Signing in is optional')
+
+      fireEvent.click(within(note).getByRole('button', { name: 'Set up' }))
+
+      const settings = await screen.findByRole('dialog', { name: 'Settings' })
+      expect(screen.getByRole('tab', { name: 'Account', selected: true })).toBeTruthy()
+      expect(within(settings).queryByRole('note')).toBeNull()
+    })
+
+    it('does not tell a signed-in updated install about accounts', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(true as never)
+      await browser.storage.local.set({ account: { email: 'person@example.test', token: 'test' } })
+      await onboardingItem.setValue({ dismissed: ['weather', 'layout'], welcomed: true })
+      const { container } = render(<App />)
+
+      await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(screen.queryByRole('note')).toBeNull()
+      expect(await onboardingItem.getValue()).toEqual({
+        dismissed: ['weather', 'layout'],
+        welcomed: true,
+      })
+    })
+
+    it('treats a stored session without consent as signed out for the accounts news', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      await browser.storage.local.set({ account: { email: 'person@example.test', token: 'test' } })
+      await onboardingItem.setValue({ dismissed: ['weather', 'layout'], welcomed: true })
+      render(<App />)
+
+      const note = await screen.findByRole('note')
+      expect(note.textContent).toContain('New: accounts')
+    })
+
+    it('keeps the news dismissed', async () => {
+      await onboardingItem.setValue({ dismissed: ['weather', 'layout'], welcomed: true })
+      const { unmount } = render(<App />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
+
+      await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
+      await waitFor(async () =>
+        expect((await onboardingItem.getValue())?.dismissed).toEqual([
+          'weather',
+          'layout',
+          'accounts',
+        ]),
+      )
+
+      unmount()
+      const { container } = render(<App />)
+      await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
+      expect(screen.queryByRole('note')).toBeNull()
+    })
+
+    it('announces accounts without repeating weather news for someone already using weather', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      await browser.storage.local.remove('account')
+      await onboardingItem.setValue({ dismissed: ['layout'], welcomed: true })
+      await settingsItem.setValue({
+        ...DEFAULT_SETTINGS,
+        weather: { ...DEFAULT_SETTINGS.weather, enabled: true },
+      })
       const { container } = render(<App />)
 
       await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
       // Long enough for the availability check to have answered.
       await new Promise((resolve) => setTimeout(resolve, 20))
-      expect(screen.queryByRole('note')).toBeNull()
-      expect(screen.queryByRole('dialog')).toBeNull()
-      // Nothing written: no dismissal is made for it either.
-      expect(await onboardingItem.getValue()).toEqual({ dismissed: [], welcomed: true })
+      expect(screen.getByRole('note').textContent).toContain('New: accounts')
     })
 
     it('leaves the weather id in a stored record alone', async () => {
-      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
+      await onboardingItem.setValue({
+        dismissed: ['weather', 'layout', 'accounts'],
+        welcomed: true,
+      })
       const { container } = render(<App />)
 
       await waitFor(() => expect(container.querySelector('time')).not.toBeNull())
       await new Promise((resolve) => setTimeout(resolve, 20))
       expect(screen.queryByRole('note')).toBeNull()
-      expect(await onboardingItem.getValue()).toEqual({ dismissed: ['weather'], welcomed: true })
+      expect(await onboardingItem.getValue()).toEqual({
+        dismissed: ['weather', 'layout', 'accounts'],
+        welcomed: true,
+      })
     })
   })
 })

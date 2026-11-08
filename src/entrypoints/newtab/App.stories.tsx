@@ -36,3 +36,7 @@ export const WeatherOn: Story = {
     }
   },
 }
+/** Someone who had the extension before accounts arrived, and is told about them. */
+export const AccountNews: Story = {
+  beforeEach: () => seedPage(PAGE_SEEDS.accountNews),
+}

@@ -169,7 +169,10 @@ describe('App, with the update note about the Layout', () => {
   it('is not shown to a new install, before or after the welcome is answered', async () => {
     await seedPage(PAGE_SEEDS.newInstall)
     // As the background script records it (install.ts): the news already seen.
-    expect(await onboardingItem.getValue()).toEqual({ dismissed: ['layout'], welcomed: false })
+    expect(await onboardingItem.getValue()).toEqual({
+      dismissed: ['layout', 'accounts'],
+      welcomed: false,
+    })
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Skip' }))
@@ -179,7 +182,7 @@ describe('App, with the update note about the Layout', () => {
     )
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(screen.queryByRole('note')).toBeNull()
-    expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout'])
+    expect((await onboardingItem.getValue())?.dismissed).toEqual(['layout', 'accounts'])
   })
 
   it('is out of the way while settings are open, as news is', async () => {

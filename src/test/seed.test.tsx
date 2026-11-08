@@ -216,6 +216,17 @@ describe('the Grid stories', () => {
     ])
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it('give a signed-out updated install the account news without a request', async () => {
+    await seedPage(PAGE_SEEDS.accountNews)
+    render(<App />)
+
+    const note = await screen.findByRole('note')
+    expect(note.textContent).toContain('New: accounts')
+    expect(note.textContent).toContain('Signing in is optional')
+    await expectFirstStoryPhoto()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('the Grid editing stories', () => {

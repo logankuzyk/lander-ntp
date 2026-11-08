@@ -76,6 +76,10 @@ class AccountClient {
     return { ok: true, value: devices as Device[] }
   }
 
+  async hasSession(): Promise<boolean> {
+    return (await signInConsented()) && Boolean((await accountItem.getValue())?.token)
+  }
+
   async initialize(): Promise<void> {
     if (!this.#initialized) {
       this.#initialized = true

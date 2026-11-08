@@ -1,3 +1,5 @@
+import { account } from '@/account/account'
+import { ACCOUNT_NEWS } from '@/account/copy'
 import type { SectionId } from '@/components/SettingsPanel/SettingsPanel'
 import type { Settings } from '@/settings/schema'
 
@@ -90,7 +92,7 @@ export type TourStop = PageTourStop | SettingsStop
 /**
  * The tour a new install is offered after the welcome, in order: edit mode, moving and resizing
  * a Widget, a Widget's options, the setup button, the Add menu and Done on the page, then the
- * settings panel's Photos and Font (its own stops, drawn inside it: the Clock's and the
+ * settings panel's Photos, Account and Font (its own stops, drawn inside it: the Clock's and the
  * Weather's options are on their widgets). `planTour` picks the stops a page has. The words are
  * proposed, for the owner to review (LR-107).
  */
@@ -155,6 +157,12 @@ export const TOUR: readonly TourStop[] = [
     title: 'Photos',
   },
   {
+    body: ACCOUNT_NEWS.body,
+    id: 'tour-account',
+    section: 'account',
+    title: ACCOUNT_NEWS.tourTitle,
+  },
+  {
     body: 'Set the font for the clock and everything around it.',
     id: 'tour-general',
     section: 'general',
@@ -183,5 +191,12 @@ export const NEWS: readonly CalloutInfo[] = [
     showMe: 'edit',
     target: 'edit',
     title: 'You can edit your page now',
+  },
+  {
+    available: async () => !(await account.hasSession()),
+    body: ACCOUNT_NEWS.body,
+    id: 'accounts',
+    section: 'account',
+    title: ACCOUNT_NEWS.title,
   },
 ]

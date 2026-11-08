@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { NEWS } from './callouts'
 import { recordInstall } from './install'
 import { onboardingItem, pendingItem } from './storage'
 
@@ -8,8 +9,9 @@ describe('recordInstall, with the news that ships', () => {
   it('has a new install record the update note as seen: the welcome tour covers it', async () => {
     await recordInstall('install')
 
-    expect(await pendingItem.getValue()).toEqual({ dismissed: ['layout'], welcomed: false })
-    expect(await onboardingItem.getValue()).toEqual({ dismissed: ['layout'], welcomed: false })
+    const dismissed = NEWS.map(({ id }) => id)
+    expect(await pendingItem.getValue()).toEqual({ dismissed, welcomed: false })
+    expect(await onboardingItem.getValue()).toEqual({ dismissed, welcomed: false })
   })
 
   it('gives an update from before there was a record the note, with no welcome', async () => {

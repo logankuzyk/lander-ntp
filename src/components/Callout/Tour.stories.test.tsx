@@ -52,17 +52,18 @@ async function takeTour(stop?: string) {
 }
 
 const STOPS = [
-  ['Edit', 'Edit your page', '1 of 7'],
-  ['MoveAndResize', 'Move and resize', '2 of 7'],
-  ['Options', 'Options', '3 of 7'],
-  ['Add', 'Add a widget', '4 of 7'],
-  ['Done', 'When you are done', '5 of 7'],
-  ['Photos', 'Photos', '6 of 7'],
-  ['Font', 'Font', '7 of 7'],
-  ['Setup', 'Set up a widget', '4 of 8'],
-  ['ClockAndWeather', 'Move and resize', '2 of 7'],
-  ['EmptyGrid', 'Add a widget', '2 of 5'],
-  ['NewerLayout', 'Edit your page', '1 of 4'],
+  ['Edit', 'Edit your page', '1 of 8'],
+  ['MoveAndResize', 'Move and resize', '2 of 8'],
+  ['Options', 'Options', '3 of 8'],
+  ['Add', 'Add a widget', '4 of 8'],
+  ['Done', 'When you are done', '5 of 8'],
+  ['Photos', 'Photos', '6 of 8'],
+  ['Account', 'Account', '7 of 8'],
+  ['Font', 'Font', '8 of 8'],
+  ['Setup', 'Set up a widget', '4 of 9'],
+  ['ClockAndWeather', 'Move and resize', '2 of 8'],
+  ['EmptyGrid', 'Add a widget', '2 of 6'],
+  ['NewerLayout', 'Edit your page', '1 of 5'],
 ] as const
 
 describe('the tour stories', () => {
@@ -122,7 +123,7 @@ describe('the tour stories', () => {
 
   it('has a story for every stop of the tour', () => {
     expect(Object.keys(stories).filter((name) => name !== 'default')).toEqual(
-      expect.arrayContaining(['Welcome', ...STOPS.slice(0, 7).map(([name]) => name)]),
+      expect.arrayContaining(['Welcome', ...STOPS.slice(0, 8).map(([name]) => name)]),
     )
   })
 })

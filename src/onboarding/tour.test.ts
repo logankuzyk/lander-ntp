@@ -5,7 +5,7 @@ import { planTour } from './tour'
 const ids = (stops: readonly { id: string }[]) => stops.map(({ id }) => id)
 
 describe('planTour', () => {
-  it('has Edit, move and resize, options, Add and Done on the page, then Photos and the font, for a page with a widget', () => {
+  it('has Edit, move and resize, options, Add and Done on the page, then Photos, Account and Font, for a page with a widget', () => {
     const plan = planTour({
       canChange: true,
       menu: 'menu:clock',
@@ -20,8 +20,8 @@ describe('planTour', () => {
       'tour-add',
       'tour-done',
     ])
-    expect(ids(plan.settings)).toEqual(['tour-photos', 'tour-general'])
-    expect(plan.total).toBe(7)
+    expect(ids(plan.settings)).toEqual(['tour-photos', 'tour-account', 'tour-general'])
+    expect(plan.total).toBe(8)
   })
 
   it('has a stop of its own for the setup button only when a widget is waiting for setup', () => {
@@ -40,7 +40,7 @@ describe('planTour', () => {
       'tour-add',
       'tour-done',
     ])
-    expect(plan.total).toBe(8)
+    expect(plan.total).toBe(9)
   })
 
   it('folds the setup button into the Add stop when there is no stop for it, and not otherwise', () => {
@@ -91,14 +91,14 @@ describe('planTour', () => {
     const plan = planTour({ canChange: true, menu: null, setup: false, widget: 'widget:clock' })
 
     expect(ids(plan.page)).toEqual(['tour-edit', 'tour-move', 'tour-options', 'tour-done'])
-    expect(plan.total).toBe(6)
+    expect(plan.total).toBe(7)
   })
 
   it('leaves out the stops about a widget when the page has none (an empty Grid)', () => {
     const plan = planTour({ canChange: true, menu: 'menu:clock', setup: false, widget: null })
 
     expect(ids(plan.page)).toEqual(['tour-edit', 'tour-add', 'tour-done'])
-    expect(plan.total).toBe(5)
+    expect(plan.total).toBe(6)
   })
 
   it('says what the page is doing while each stop is up', () => {
@@ -128,7 +128,7 @@ describe('planTour', () => {
     })
 
     expect(plan.page.map(({ number }) => number)).toEqual([1, 2, 3, 4, 5])
-    expect(plan.settings).toHaveLength(2)
+    expect(plan.settings).toHaveLength(3)
     expect(plan.page.length + plan.settings.length).toBe(plan.total)
   })
 
@@ -144,8 +144,8 @@ describe('planTour', () => {
       const plan = planTour(readOnly)
 
       expect(ids(plan.page)).toEqual(['tour-edit', 'tour-done'])
-      expect(ids(plan.settings)).toEqual(['tour-photos', 'tour-general'])
-      expect(plan.total).toBe(4)
+      expect(ids(plan.settings)).toEqual(['tour-photos', 'tour-account', 'tour-general'])
+      expect(plan.total).toBe(5)
       expect(plan.page.map(({ number }) => number)).toEqual([1, 2])
     })
 

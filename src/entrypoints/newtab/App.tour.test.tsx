@@ -11,8 +11,8 @@ import { PAGE_SEEDS, seedPage } from '@/test/seed'
 import { App } from './App'
 
 // The guided tour a new install is offered by the welcome: Edit, move and resize, options, the
-// setup button when a widget is waiting for one, Add, Done, then Photos and Font in the settings
-// panel. Run through the whole page with the real storage items; the test DOM has no layout.
+// setup button when a widget is waiting for one, Add, Done, then Photos, Account and Font in the
+// settings panel. Run through the whole page with the real storage items; the test DOM has no layout.
 
 /** The seeds a tour starts from: a new install, which is the Clock alone. */
 const NEW_INSTALL = PAGE_SEEDS.newInstall
@@ -86,7 +86,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     await startTour()
 
     expect(title()).toBe('Edit your page')
-    expect(progress()).toBe('1 of 7')
+    expect(progress()).toBe('1 of 8')
     expect(note().classList.contains('callout--beside')).toBe(true)
     expect(note().dataset.side).toBe('above')
     expect(editing()).toBe(false)
@@ -128,13 +128,13 @@ describe('the guided tour, from the welcome of a new install', () => {
     }
 
     expect(seen).toEqual([
-      ['Edit your page', '1 of 7', false],
-      ['Move and resize', '2 of 7', true],
-      ['Options', '3 of 7', true],
-      ['Add a widget', '4 of 7', true],
-      ['When you are done', '5 of 7', true],
+      ['Edit your page', '1 of 8', false],
+      ['Move and resize', '2 of 8', true],
+      ['Options', '3 of 8', true],
+      ['Add a widget', '4 of 8', true],
+      ['When you are done', '5 of 8', true],
       // Done is Next's work: edit mode is left and the panel's own stops are next.
-      ['Photos', '6 of 7', false],
+      ['Photos', '6 of 8', false],
     ])
     expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy()
   })
@@ -226,7 +226,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(note().textContent).toContain('needs something from you')
   })
 
-  it('goes on to the settings panel on the last page stop: edit mode off, Photos then Font', async () => {
+  it('goes on to the settings panel on the last page stop: edit mode off, Photos, Account then Font', async () => {
     await startTour()
 
     await nextUntil('When you are done')
@@ -238,12 +238,17 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect(screen.getByRole('button', { name: 'Edit' }).getAttribute('aria-pressed')).toBe('false')
     // The page's note is gone; the panel draws its own.
     expect(screen.getAllByRole('note')).toHaveLength(1)
-    expect(within(settings).getByRole('note').textContent).toContain('6 of 7')
+    expect(within(settings).getByRole('note').textContent).toContain('6 of 8')
     expect(within(settings).getByRole('note').textContent).toContain('Photos')
 
     fireEvent.click(within(settings).getByRole('button', { name: 'Next' }))
     await act(async () => {})
-    expect(within(settings).getByRole('note').textContent).toContain('7 of 7')
+    expect(within(settings).getByRole('note').textContent).toContain('7 of 8')
+    expect(within(settings).getByRole('note').textContent).toContain('Account')
+
+    fireEvent.click(within(settings).getByRole('button', { name: 'Next' }))
+    await act(async () => {})
+    expect(within(settings).getByRole('note').textContent).toContain('8 of 8')
     expect(within(settings).getByRole('note').textContent).toContain('Font')
 
     fireEvent.click(within(settings).getByRole('button', { name: 'Done' }))
@@ -258,20 +263,22 @@ describe('the guided tour, from the welcome of a new install', () => {
     const settings = screen.getByRole('dialog', { name: 'Settings' })
     fireEvent.click(within(settings).getByRole('button', { name: 'Next' }))
     await act(async () => {})
+    fireEvent.click(within(settings).getByRole('button', { name: 'Next' }))
+    await act(async () => {})
     fireEvent.click(within(settings).getByRole('button', { name: 'Done' }))
     await act(async () => {})
 
     const stored = await fakeBrowser.storage.sync.get(null)
     expect(stored.layout).toBeUndefined()
     expect(stored.settings).toEqual(seeded.settings)
-    expect(stored.onboarding).toEqual({ dismissed: ['layout'], welcomed: true })
+    expect(stored.onboarding).toEqual({ dismissed: ['layout', 'accounts'], welcomed: true })
     expect(Object.keys(stored).sort()).toEqual(['onboarding', 'settings'])
   })
 
   it('makes no request while it runs', async () => {
     await startTour()
 
-    await nextUntil('Photos')
+    await nextUntil('Font')
 
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
@@ -291,7 +298,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     const stored = await fakeBrowser.storage.sync.get(null)
     expect(stored.layout).toBeUndefined()
     expect(stored.settings).toEqual(seeded.settings)
-    expect(stored.onboarding).toEqual({ dismissed: ['layout'], welcomed: true })
+    expect(stored.onboarding).toEqual({ dismissed: ['layout', 'accounts'], welcomed: true })
   })
 
   it('puts focus on the Edit button when it is dismissed from the keyboard', async () => {
@@ -437,6 +444,9 @@ describe('the guided tour, from the welcome of a new install', () => {
 
       fireEvent.click(within(panel).getByRole('button', { name: 'Next' }))
       await act(async () => {})
+      expect(title()).toBe('Account')
+      fireEvent.click(within(panel).getByRole('button', { name: 'Next' }))
+      await act(async () => {})
       expect(title()).toBe('Font')
       fireEvent.click(within(panel).getByRole('button', { name: 'Done' }))
       await act(async () => {})
@@ -468,7 +478,7 @@ describe('the guided tour, from the welcome of a new install', () => {
     await act(async () => {})
 
     expect(title()).toBe('Move and resize')
-    expect(progress()).toBe('2 of 7')
+    expect(progress()).toBe('2 of 8')
     // The person's edit mode is theirs: dismissing the tour leaves it on.
     fireEvent.click(within(note()).getByRole('button', { name: 'Dismiss' }))
     await act(async () => {})
@@ -541,14 +551,14 @@ describe('the tour for a page that has a widget waiting for setup', () => {
   it('has a stop of its own for the setup button, and the Add stop does not repeat it', async () => {
     await startTour(PAGE_SEEDS.tourWeatherWaiting)
 
-    expect(progress()).toBe('1 of 8')
+    expect(progress()).toBe('1 of 9')
     await nextUntil('Move and resize')
     await nextUntil('Set up a widget')
-    expect(progress()).toBe('4 of 8')
+    expect(progress()).toBe('4 of 9')
     expect(document.querySelector('[data-callout-target="setup"]')).not.toBeNull()
 
     await nextUntil('Add a widget')
-    expect(progress()).toBe('5 of 8')
+    expect(progress()).toBe('5 of 9')
     expect(note().textContent).not.toContain('needs something from you')
   })
 
@@ -580,6 +590,12 @@ describe('the tour for a page that has a widget waiting for setup', () => {
 
     expect(asked).toContain('Set up a widget')
     expect(title()).toBe('Photos')
+    press('Next')
+    await act(async () => {})
+    expect(title()).toBe('Account')
+    press('Next')
+    await act(async () => {})
+    expect(title()).toBe('Font')
     expect(optionsOpen()).toBe(false)
     expect(permission).not.toHaveBeenCalled()
     expect(phone.getCurrentPosition).not.toHaveBeenCalled()
@@ -614,7 +630,7 @@ describe('the tour for a page with the Clock and a Weather', () => {
   it('points the move and resize stop at the first widget in the order of the page, the Weather', async () => {
     await startTour(PAGE_SEEDS.tourClockAndWeather)
 
-    expect(progress()).toBe('1 of 7')
+    expect(progress()).toBe('1 of 8')
     await nextUntil('Move and resize')
     expect(document.querySelector('[data-callout-target="widget:weather"]')).not.toBeNull()
     expect(document.querySelector('[data-callout-target="setup"]')).toBeNull()
@@ -648,22 +664,26 @@ describe('the tour for a Layout that a newer version wrote, which cannot be chan
   it('has only the stops that do not tell the person to change anything, and says to update', async () => {
     await startNewer()
 
-    expect(progress()).toBe('1 of 4')
+    expect(progress()).toBe('1 of 5')
     expect(note().textContent).toContain('Update Lander to change it.')
 
     press('Next')
     await act(async () => {})
     expect(title()).toBe('When you are done')
-    expect(progress()).toBe('2 of 4')
+    expect(progress()).toBe('2 of 5')
     expect(editing()).toBe(true)
     // There is no Add stop to open the menu, and no Add menu.
     expect(addMenu()).toBeNull()
 
     press('Next')
     await act(async () => {})
-    expect(progress()).toBe('3 of 4')
+    expect(progress()).toBe('3 of 5')
     expect(title()).toBe('Photos')
     expect(editing()).toBe(false)
+    press('Next')
+    await act(async () => {})
+    expect(title()).toBe('Account')
+    expect(progress()).toBe('4 of 5')
     expect((await fakeBrowser.storage.sync.get('layout')).layout).toEqual(NEWER.layout)
   })
 })
@@ -672,15 +692,15 @@ describe('the tour for an empty Grid', () => {
   it('leaves out the stops about a widget, and counts the ones left', async () => {
     await startTour(PAGE_SEEDS.tourEmptyGrid)
 
-    expect(progress()).toBe('1 of 5')
+    expect(progress()).toBe('1 of 6')
     press('Next')
     await act(async () => {})
     expect(title()).toBe('Add a widget')
-    expect(progress()).toBe('2 of 5')
+    expect(progress()).toBe('2 of 6')
     await nextUntil('Photos')
     expect(
       within(screen.getByRole('dialog', { name: 'Settings' })).getByRole('note').textContent,
-    ).toContain('4 of 5')
+    ).toContain('4 of 6')
   })
 })
 

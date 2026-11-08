@@ -224,6 +224,8 @@ const OPTIONS_WEATHER_BESIDE: StoredLayout = {
  * the test that checks it cannot drift apart.
  */
 export const PAGE_SEEDS = {
+  /** Someone who had the extension before accounts arrived, with earlier news dismissed. */
+  accountNews: { onboarding: { dismissed: ['weather', 'layout'], welcomed: true } },
   /** Eight Widgets, the Widget limit, with room left: the Add menu says why it adds nothing. */
   addMenuAtLimit: {
     layout: EIGHT_WIDGETS,
