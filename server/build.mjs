@@ -13,4 +13,5 @@ await build({
   outdir: 'dist',
   platform: 'node',
   target: 'node24',
+  tsconfigRaw: { compilerOptions: { target: 'ES2023' } },
 })
