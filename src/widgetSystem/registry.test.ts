@@ -19,4 +19,13 @@ describe('the registry', () => {
     const types = WIDGETS.map((definition) => definition.type)
     expect(new Set(types).size).toBe(types.length)
   })
+
+  it('only has options depend on needs that the Widget has', () => {
+    for (const definition of WIDGETS) {
+      const needs = (definition.needs ?? []).map(({ id }) => id)
+      for (const option of definition.options) {
+        for (const id of option.needs ?? []) expect(needs).toContain(id)
+      }
+    }
+  })
 })

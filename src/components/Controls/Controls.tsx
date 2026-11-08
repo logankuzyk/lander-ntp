@@ -1,4 +1,10 @@
-import { useEffect } from 'preact/hooks'
+import { useEffect, useId, useState } from 'preact/hooks'
+
+import { AddMenu } from '@/components/AddMenu/AddMenu'
+import { useAddMenuControl } from '@/components/AddMenu/useAddMenuControl'
+import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
+import { useEditMode } from '@/components/EditMode/useEditMode'
+import type { Layout } from '@/layout/types'
 
 const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -9,12 +15,18 @@ const isEditable = (target: EventTarget | null) =>
  * the welcome, which is a modal: nothing behind it should answer.
  */
 const inPopover = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('.popover, dialog') !== null
+  target instanceof Element && target.closest('.popover, dialog, [role="menu"]') !== null
 
 type ControlsProps = {
   /** True while the photo being faded in is still loading. */
   busy?: boolean
   infoOpen?: boolean
+  /** The Layout, which the Add menu adds to. */
+  layout: Layout
+  /** Whether the stored Layout has arrived: until it has, nothing can be added. */
+  layoutLoaded: boolean
+  /** Saves the whole Layout (`useLayout`'s `commit`). */
+  onCommit: (next: Layout) => void
   onNext: () => void
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
@@ -22,15 +34,37 @@ type ControlsProps = {
   settingsOpen?: boolean
 }
 
-/** Bottom-right controls. The → and i keys do the same as the buttons. */
+/**
+ * Bottom-right controls. The → and i keys do the same as the buttons, E does what the Edit
+ * button does, and A opens the Add menu while editing. Escape leaves edit mode, but not when
+ * something else used it first: a menu, a popover or a dropdown closes on its Escape, ahead of
+ * this listener, so the innermost thing goes first.
+ */
 export function Controls({
   busy,
   infoOpen,
+  layout,
+  layoutLoaded,
+  onCommit,
   onNext,
   onToggleInfo,
   onToggleSettings,
   settingsOpen,
 }: ControlsProps) {
+  const { canChange, editing, enter, leave } = useEditMode()
+  const readOnlyId = useId()
+  // The menu's state is the page's when there is a handle on it (the tour opens the menu), else
+  // this component's own.
+  const shared = useAddMenuControl()
+  const [ownOpen, setOwnOpen] = useState(false)
+  const addOpen = shared ? shared.open : ownOpen
+  const setAddOpen = shared?.setOpen ?? setOwnOpen
+
+  // Edit mode ending takes the menu with it, so the next time it starts the menu is shut.
+  useEffect(() => {
+    if (!editing) setAddOpen(false)
+  }, [editing, setAddOpen])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -50,14 +84,87 @@ export function Controls({
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
+      } else if (event.key === 'e' && !event.repeat) {
+        // Not a held key's repeats: they would switch it on and off as long as it is down.
+        event.preventDefault()
+        if (editing) leave()
+        else enter()
+      } else if (event.key === 'a' && editing && !event.repeat) {
+        event.preventDefault()
+        setAddOpen(true)
+      } else if (event.key === 'Escape' && editing) {
+        event.preventDefault()
+        leave()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onNext, busy, onToggleInfo])
+  }, [onNext, busy, onToggleInfo, editing, enter, leave, setAddOpen])
 
   return (
     <div class="controls">
+      {/*
+        Add comes first while editing, beside Done and to its left, so that Done keeps the place
+        Edit had and the buttons that were already here stay put. */}
+      {editing && (
+        <AddMenu
+          focusOnOpen={!shared?.quiet}
+          layout={layout}
+          loaded={layoutLoaded}
+          onCommit={onCommit}
+          onOpenChange={setAddOpen}
+          open={addOpen}
+        />
+      )}
+      {/*
+        Before the buttons that were already here, so that they stay put when this one reads Done
+        and gets wider. It is one button throughout, so focus stays on it when it changes. The name
+        changes with the words, so that what is said is what is seen; aria-pressed says it is on.
+      */}
+      <button
+        // Beside it while the Layout cannot be changed: read with the button, not only found.
+        aria-describedby={editing && !canChange ? readOnlyId : undefined}
+        aria-label={editing ? 'Done' : 'Edit'}
+        aria-pressed={editing}
+        class={editing ? 'control control--done' : 'control'}
+        // What a callout points at (see onboarding/target).
+        data-callout-target="edit"
+        // Where focus goes when edit mode ends with a Widget's frame focused (see useEditMode).
+        data-edit-toggle
+        onClick={editing ? leave : enter}
+        // The settings panel's Edit button hands focus here while Enter may still be held, and a
+        // browser clicks a button on every Enter keydown, repeats included: edit mode would
+        // flicker. Only an Enter that went down on this button presses it.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && event.repeat) event.preventDefault()
+        }}
+        title={editing ? 'Done (E)' : 'Edit (E)'}
+        type="button"
+      >
+        {editing ? (
+          'Done'
+        ) : (
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="20"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="20"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        )}
+      </button>
+      {editing && !canChange && (
+        <span class="controls__readonly" id={readOnlyId}>
+          {READ_ONLY_UPDATE_NOTE}
+        </span>
+      )}
       <button
         aria-busy={busy === true}
         aria-label="Next photo"

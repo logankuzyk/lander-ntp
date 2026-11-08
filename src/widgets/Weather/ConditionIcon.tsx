@@ -39,7 +39,8 @@ const ICONS: Record<Condition, readonly [day: LucideIcon, night: LucideIcon]> = 
 type ConditionIconProps = {
   condition: Condition
   isDay: boolean
-  size: number
+  /** A CSS length, such as "1em". */
+  size: string
 }
 
 export function ConditionIcon({ condition, isDay, size }: ConditionIconProps) {

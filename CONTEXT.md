@@ -20,6 +20,18 @@ _Avoid_: Arrangement, dashboard
 The fixed strip along the bottom of the page holding the photo credit and the page's buttons. It belongs to the page, not to the user's layout.
 _Avoid_: Footer, controls, toolbar
 
+**Edit mode**:
+How the page is while the user arranges it: the Grid shows a dot at every cell corner and each widget sits in a frame with its name. Entered with the Edit button in the bottom bar or the E key, and left with Done, E or Escape. It belongs to the open tab and is never stored, so every new tab starts out of it.
+_Avoid_: Design mode, layout mode
+
+**Add menu**:
+The menu opened by Add in the Bottom bar while in Edit mode. It lists Widgets that can be added to the Grid and explains when an item is unavailable.
+_Avoid_: Widget picker
+
+**Options popover**:
+A Widget's options shown in a popover beside it. It opens from the Widget's options button in Edit mode or from its Setup button when a Need is unmet. Changes save as they are made.
+_Avoid_: Settings panel
+
 **Need**:
 Something that must be true before a widget can show anything, such as a granted permission, a chosen place, or a connected account. A widget lists its needs in order.
 _Avoid_: Requirement, prerequisite
@@ -36,6 +48,10 @@ _Avoid_: Provider, feed, data fetcher
 A setting shared by the whole page that widgets can show as one of their options, such as 12- or 24-hour time. Changing it on one widget changes it everywhere.
 _Avoid_: Global option, shared option
 
+**Waiting options**:
+Options carried over from the settings (or the defaults) for a Widget type that was off, used for the first one added. That Widget gets them, then they are removed from the waiting options.
+_Avoid_: Pending options
+
 **Widget limit**:
-The number of widgets a user may place on the grid at once.
+The number of widgets a user may place on the grid at once (8). Each widget the page draws counts as one, at any size; one that is kept but never drawn (malformed, or with no free place) does not, since it has no × to remove it by. A layout already over it loads whole; only adding stops.
 _Avoid_: Cap, quota
