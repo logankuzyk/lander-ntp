@@ -78,7 +78,7 @@ describe('moveSession, picking up', () => {
   })
 
   it('picks up a Widget of a type this version does not know', () => {
-    const unknown = layoutOf({ ...clock('futr0001', 1, 1), type: 'bookmarks' })
+    const unknown = layoutOf({ ...clock('futr0001', 1, 1), type: 'future-widget' })
     expect(pickUp(editable(unknown), 'futr0001', { col: 0.5, row: 0.5 })).not.toBeNull()
   })
 
@@ -259,7 +259,7 @@ describe('moveSession, dropping', () => {
 
   it('moves a Widget of a type this version does not know, and keeps what it holds', () => {
     const unknown = layoutOf(
-      { ...clock('futr0001', 1, 1, 2, 2), options: { colour: 'teal' }, type: 'bookmarks' },
+      { ...clock('futr0001', 1, 1, 2, 2), options: { colour: 'teal' }, type: 'future-widget' },
       clock('clock0001', 5, 4),
     )
     const session = move(held(unknown, 'futr0001'), { col: 2.1, row: 2.1 })
@@ -267,7 +267,7 @@ describe('moveSession, dropping', () => {
     expect(next && stored(next)).toEqual(
       stored(
         layoutOf(
-          { ...clock('futr0001', 3, 3, 2, 2), options: { colour: 'teal' }, type: 'bookmarks' },
+          { ...clock('futr0001', 3, 3, 2, 2), options: { colour: 'teal' }, type: 'future-widget' },
           clock('clock0001', 5, 4),
         ),
       ),

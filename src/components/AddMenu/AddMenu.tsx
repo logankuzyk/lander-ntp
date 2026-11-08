@@ -247,13 +247,13 @@ export function AddMenu({
             role="menu"
             tabIndex={-1}
           >
-            {WIDGETS.map(({ name, type }) => (
+            {WIDGETS.map(({ name, type, unavailable }) => (
               <MenuItem
                 key={type}
                 marked={newMarks.has(type === 'weather' ? 'weather-widget' : type)}
                 name={name}
                 onPick={() => pick(type, name)}
-                state={itemState(editable, type, name, note)}
+                state={itemState(editable, type, name, note, unavailable?.() ?? null)}
                 type={type}
               />
             ))}

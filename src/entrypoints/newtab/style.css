@@ -369,6 +369,60 @@ body {
   }
 }
 
+.bookmarks {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.bookmarks__folder {
+  flex: 0 0 calc(100% / var(--bookmarks-total-rows));
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks__items {
+  display: grid;
+  flex: 1;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(var(--bookmarks-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--bookmarks-rows), minmax(0, 1fr));
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.bookmarks__items a,
+.bookmarks__more {
+  color: inherit;
+  font-size: 0.8em;
+  line-height: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.18em 0.25em;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks__items a:hover,
+.bookmarks__items a:focus-visible {
+  text-decoration: underline;
+}
+
+.bookmarks__empty {
+  align-self: center;
+  margin: auto;
+}
+
 /*
  * A Widget of a type this version does not know, which it keeps and cannot draw, draws the shared panel below (.widget-state). Its words
  * are cut to four lines, and in a narrow box (a phone's two columns are about 56px) the panel

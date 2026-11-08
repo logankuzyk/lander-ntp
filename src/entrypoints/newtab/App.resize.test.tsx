@@ -248,11 +248,16 @@ describe('App, resizing a Widget', () => {
     await drawn({
       ...LAYOUT,
       widgets: [
-        { ...LAYOUT.widgets[0], id: 'futr0001', options: { colour: 'teal' }, type: 'bookmarks' },
+        {
+          ...LAYOUT.widgets[0],
+          id: 'futr0001',
+          options: { colour: 'teal' },
+          type: 'future-widget',
+        },
         LAYOUT.widgets[1],
       ],
     })
-    expect(box('bookmarks').querySelector('.widget-box__resize')).toBeNull()
+    expect(box('future-widget').querySelector('.widget-box__resize')).toBeNull()
     expect(handle('weather')).not.toBeNull()
   })
 })

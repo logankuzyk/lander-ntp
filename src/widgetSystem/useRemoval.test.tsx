@@ -32,8 +32,8 @@ const WITH_UNKNOWN = checkLayout({
   v: 1,
   widgets: [
     clock,
-    future('futr0001', 'bookmarks', 1),
-    future('futr0002', 'bookmarks', 3),
+    future('futr0001', 'future-widget', 1),
+    future('futr0002', 'future-widget', 3),
     future('futr0003', 'calendar', 7),
   ],
 })
@@ -155,6 +155,8 @@ describe('useRemovalController', () => {
 
     // Two of a type are told apart as they are on the page, by their order in the Layout.
     act(() => screen.getByRole('button', { name: 'remove futr0002' }).click())
-    expect(screen.getByTestId('notice').textContent).toBe('Unknown widget, bookmarks 2 removed.')
+    expect(screen.getByTestId('notice').textContent).toBe(
+      'Unknown widget, future-widget 2 removed.',
+    )
   })
 })

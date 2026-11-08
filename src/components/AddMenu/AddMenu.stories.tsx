@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { expect, waitFor } from 'storybook/test'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
 import { App } from '@/entrypoints/newtab/App'
 import { onboardingItem } from '@/onboarding/storage'
@@ -138,6 +139,22 @@ export const EmptyGrid: Story = {
 /** A newer Layout: every Add choice is unavailable with the update note. */
 export const NewerLayout: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.newerLayout),
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openAddMenu(canvas)
+  },
+}
+
+/** The Bookmarks choice explains when the browser does not support the optional API. */
+export const BookmarksUnsupported: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.addMenuOpen)
+    const { contains } = fakeBrowser.permissions
+    fakeBrowser.permissions.contains = undefined as never
+    return () => {
+      fakeBrowser.permissions.contains = contains
+    }
+  },
   play: async ({ canvasElement }) => {
     const canvas = await startEditing(canvasElement)
     await openAddMenu(canvas)

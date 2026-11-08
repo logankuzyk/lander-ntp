@@ -82,7 +82,7 @@ describe('resizeSession, picking up the handle', () => {
   })
 
   it('picks up nothing of a Widget of a type this version does not know: it has no sizes', () => {
-    const unknown = layoutOf({ ...clock('futr0001', 5, 4), type: 'bookmarks' })
+    const unknown = layoutOf({ ...clock('futr0001', 5, 4), type: 'future-widget' })
     expect(pickUp(editable(unknown), 'futr0001', { col: 5.5, row: 4.5 })).not.toBeNull()
     expect(pickUpResize(editable(unknown), 'futr0001', { col: 8, row: 6 })).toBeNull()
   })
