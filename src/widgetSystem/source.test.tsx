@@ -105,6 +105,40 @@ describe('useSource', () => {
     expect(read).toHaveBeenCalledTimes(2)
   })
 
+  it('reads again when changes arrive during an in-flight watched read', async () => {
+    let changed!: () => void
+    let finishInitial!: (value: number) => void
+    let reads = 0
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: () => {
+        reads++
+        return reads === 1
+          ? new Promise((resolve) => (finishInitial = resolve))
+          : Promise.resolve(9)
+      },
+      watch: (onChange) => {
+        changed = onChange
+        return () => undefined
+      },
+    }
+    render(<WatchedProbe options={{ folder: 'bookmarks' }} source={source} />)
+
+    await pass()
+    for (let i = 0; i < 50; i++) changed()
+    await pass(100)
+    expect(reads).toBe(1)
+
+    finishInitial(8)
+    await pass()
+    await pass(99)
+    expect(reads).toBe(1)
+    await pass(1)
+
+    expect(reads).toBe(2)
+    expect(screen.getByRole('status').textContent).toBe('ready:9')
+  })
+
   it('keeps the last reading visible while a watched source is being read again', async () => {
     let changed!: () => void
     let finish!: (value: number) => void
@@ -191,6 +225,50 @@ describe('useSource', () => {
 
     rendered.unmount()
     expect(listeners.size).toBe(0)
+  })
+
+  it('does not show the previous options reading while the new options are loading', async () => {
+    let finishSecond!: (value: number) => void
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: ({ folder }) =>
+        folder === 'first'
+          ? Promise.resolve(1)
+          : new Promise((resolve) => (finishSecond = resolve)),
+      watch: () => () => undefined,
+    }
+    const rendered = render(<WatchedProbe options={{ folder: 'first' }} source={source} />)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:1')
+
+    rendered.rerender(<WatchedProbe options={{ folder: 'second' }} source={source} />)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('loading:none')
+
+    finishSecond(2)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:2')
+  })
+
+  it('ignores a watched read for old options after the Widget switches to new options', async () => {
+    let finishFirst!: (value: number) => void
+    const source: WatchedSource<number, { folder: string }> = {
+      kind: 'watched',
+      read: ({ folder }) =>
+        folder === 'first' ? new Promise((resolve) => (finishFirst = resolve)) : Promise.resolve(2),
+      watch: () => () => undefined,
+    }
+    const rendered = render(<WatchedProbe options={{ folder: 'first' }} source={source} />)
+    await pass()
+
+    rendered.rerender(<WatchedProbe options={{ folder: 'second' }} source={source} />)
+    await pass()
+    expect(screen.getByRole('status').textContent).toBe('ready:2')
+
+    finishFirst(1)
+    await pass()
+
+    expect(screen.getByRole('status').textContent).toBe('ready:2')
   })
 
   it('reports a Need by name from a watched read', async () => {
