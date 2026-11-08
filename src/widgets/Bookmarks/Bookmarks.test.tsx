@@ -55,6 +55,24 @@ describe('the Bookmarks Widget', () => {
     expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain('Reading')
   })
 
+  it('shows the portable Bookmarks bar name before loading choices', () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Bookmarks bar"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{ folder: 'bar', openInNewTab: false, showFolderName: true }}
+        page={PAGE}
+      />,
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain('Bookmarks bar')
+  })
+
   it('labels a saved folder missing from this device in its options', async () => {
     const port = createFakeBookmarksPort({ granted: true, tree: TREE })
     render(
@@ -80,6 +98,26 @@ describe('the Bookmarks Widget', () => {
     expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain(
       'Reading (folder missing)',
     )
+  })
+
+  it('clearly labels a missing saved folder that has no stored title', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{ folder: 'gone', openInNewTab: false, showFolderName: true }}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+
+    expect(await screen.findByRole('option', { name: 'Folder missing' })).toBeTruthy()
   })
 
   it('lists the portable Bookmarks bar once, without a device-specific bar choice', async () => {
