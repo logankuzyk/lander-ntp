@@ -21,6 +21,31 @@ const box = (container: ParentNode) => {
 }
 
 describe('WidgetBox', () => {
+  it('tells the View the cells its box is drawn in', () => {
+    const received: unknown[] = []
+    const definition: WidgetDefinition<Record<string, never>> = {
+      name: 'Example',
+      options: [],
+      sizes: EXAMPLE_SIZES,
+      type: 'example',
+      View: (props) => {
+        received.push(props.cells)
+        return <p />
+      },
+    }
+
+    render(
+      <WidgetBox
+        definition={definition}
+        options={{}}
+        page={{ hour12: false }}
+        rect={{ col: 3, h: 5, row: 2, w: 7 }}
+      />,
+    )
+
+    expect(received).toEqual([{ h: 5, w: 7 }])
+  })
+
   it("draws the Widget's View with its options and the page's values", () => {
     const { container } = render(
       <WidgetBox
