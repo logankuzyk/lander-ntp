@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/logankuzyk/lander-ntp/compare/v0.2.3...v0.2.4) (2026-11-08)
+
+
+### Features
+
+* Widgets you can add, move, resize and remove ([#100](https://github.com/logankuzyk/lander-ntp/issues/100)) ([c6460d7](https://github.com/logankuzyk/lander-ntp/commit/c6460d77570d582d3606d33a46a12ed3c27bf611))
+
 ## [0.2.3](https://github.com/logankuzyk/lander-ntp/compare/v0.2.2...v0.2.3) (2026-10-04)
 
 
