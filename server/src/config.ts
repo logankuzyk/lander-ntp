@@ -13,6 +13,8 @@ const environmentSchema = v.object({
     'data/lander.sqlite',
   ),
   HEARTBEAT_URL: v.optional(v.pipe(v.string(), v.trim())),
+  MAIL_FROM: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
+  MAIL_REPLY_TO: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   NODE_ENV: v.optional(v.picklist(['development', 'production', 'test']), 'development'),
   OBJECT_STORE_DIR: v.optional(
     v.pipe(v.string(), v.trim(), v.minLength(1, 'OBJECT_STORE_DIR must not be empty')),
@@ -23,7 +25,19 @@ const environmentSchema = v.object({
   R2_ACCOUNT_ID: v.optional(v.pipe(v.string(), v.trim())),
   R2_BUCKET: v.optional(v.pipe(v.string(), v.trim())),
   R2_SECRET_ACCESS_KEY: v.optional(v.pipe(v.string(), v.trim())),
+  RESEND_API_KEY: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
+  REVIEWER_CODE: v.optional(
+    v.pipe(v.string(), v.regex(/^\d{6}$/, 'REVIEWER_CODE must be six digits')),
+  ),
+  REVIEWER_EMAIL: v.optional(v.pipe(v.string(), v.trim(), v.email())),
   TRUST_ANY_EXTENSION_ORIGIN: v.optional(v.picklist(['true', 'false']), 'false'),
+  TRUST_PROXY_HEADER: v.optional(
+    v.pipe(
+      v.string(),
+      v.trim(),
+      v.regex(/^[a-z0-9-]+$/i, 'TRUST_PROXY_HEADER must be a header name'),
+    ),
+  ),
   TRUSTED_EXTENSION_IDS: v.optional(v.string(), ''),
 })
 
@@ -48,12 +62,18 @@ export type ServerConfig = {
   authSecret: string
   databasePath: string
   heartbeatUrl?: string
+  mailFrom?: string
+  mailReplyTo?: string
   nodeEnv: 'development' | 'production' | 'test'
   objectStoreDirectory?: string
   port: number
   r2?: { accessKeyId: string; accountId: string; bucket: string; secretAccessKey: string }
+  resendApiKey?: string
+  reviewerCode?: string
+  reviewerEmail?: string
   trustAnyExtensionOrigin: boolean
   trustedExtensionIds: string[]
+  trustProxyHeader?: string
 }
 
 export type BackupConfig = {
@@ -146,6 +166,15 @@ export function loadConfig(
     throw new Error('PORT must be an integer between 1 and 65535')
   }
   const trustAnyExtensionOrigin = values.TRUST_ANY_EXTENSION_ORIGIN === 'true'
+  if (Boolean(values.REVIEWER_EMAIL) !== Boolean(values.REVIEWER_CODE)) {
+    throw new Error('REVIEWER_EMAIL and REVIEWER_CODE must be configured together')
+  }
+  if (
+    values.NODE_ENV === 'production' &&
+    (!values.RESEND_API_KEY || !values.MAIL_FROM || !values.MAIL_REPLY_TO)
+  ) {
+    throw new Error('RESEND_API_KEY, MAIL_FROM and MAIL_REPLY_TO are required in production')
+  }
   if (values.NODE_ENV === 'production' && trustAnyExtensionOrigin) {
     throw new Error(
       'Invalid server configuration: TRUST_ANY_EXTENSION_ORIGIN is not allowed in production',
@@ -158,6 +187,8 @@ export function loadConfig(
       values.DATABASE_PATH === ':memory:'
         ? values.DATABASE_PATH
         : resolve(dirname(fileURLToPath(import.meta.url)), '..', values.DATABASE_PATH),
+    mailFrom: values.MAIL_FROM,
+    mailReplyTo: values.MAIL_REPLY_TO,
     ...(values.HEARTBEAT_URL ? { heartbeatUrl: values.HEARTBEAT_URL } : {}),
     nodeEnv: values.NODE_ENV,
     objectStoreDirectory: resolve(
@@ -166,6 +197,9 @@ export function loadConfig(
       values.OBJECT_STORE_DIR,
     ),
     port,
+    resendApiKey: values.RESEND_API_KEY,
+    reviewerCode: values.REVIEWER_CODE,
+    reviewerEmail: values.REVIEWER_EMAIL?.toLowerCase(),
     ...(values.R2_ACCOUNT_ID &&
     values.R2_BUCKET &&
     values.R2_ACCESS_KEY_ID &&
@@ -188,5 +222,6 @@ export function loadConfig(
           .filter(Boolean),
       ]),
     ],
+    trustProxyHeader: values.TRUST_PROXY_HEADER?.toLowerCase(),
   }
 }

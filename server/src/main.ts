@@ -1,10 +1,11 @@
 import { serve } from '@hono/node-server'
+import { getConnInfo } from '@hono/node-server/conninfo'
 import { type Server as HttpServer } from 'node:http'
 import { type DatabaseSync } from 'node:sqlite'
 import { pathToFileURL } from 'node:url'
 
 import { createApp } from './app.js'
-import { createConsoleMailer } from './auth.js'
+import { createServerMailer } from './auth.js'
 import { Backups } from './backups.js'
 import { loadConfig, type ServerConfig } from './config.js'
 import { openDatabase } from './database.js'
@@ -83,7 +84,8 @@ export async function startServer(options: StartServerOptions = {}) {
     clock,
     config,
     db,
-    mailer: createConsoleMailer(config.nodeEnv),
+    getClientAddress: (context) => getConnInfo(context).remote.address,
+    mailer: createServerMailer(config),
     objectStore,
   })
   let stopBackupSchedule: () => void = () => undefined
