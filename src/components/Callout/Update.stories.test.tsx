@@ -59,6 +59,11 @@ describe('the phase three update stories', () => {
     const { container } = render(<App />)
     await startWalk()
 
+    await waitFor(() =>
+      expect(document.querySelector('[data-edit-toggle]')?.getAttribute('aria-pressed')).toBe(
+        'true',
+      ),
+    )
     const menu = await screen.findByRole('menu', { name: 'Add a widget' })
     await waitFor(() => expect(menu.querySelectorAll('.new-mark')).toHaveLength(6))
     for (const type of ['date', 'analog-clock', 'bookmarks', 'quick-dial']) {
@@ -87,6 +92,7 @@ describe('the phase three update stories', () => {
     const details = await screen.findByRole('dialog', { name: 'Photo details' })
     expect(details.querySelector('[data-callout-target="photo-heart"]')).toBeTruthy()
     expect(screen.getByRole('note').textContent).toContain('Favourite photos')
+    expect(document.querySelector('[data-edit-toggle]')?.getAttribute('aria-pressed')).toBe('false')
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
 

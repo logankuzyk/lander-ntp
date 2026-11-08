@@ -98,6 +98,8 @@ export function PageTour({
     if (wantEditing && !now.editing) {
       entered.current = true
       now.enter()
+    } else if (!wantEditing && now.editing) {
+      now.leave()
     }
     now.menu?.setOpen(adding, { quiet: true })
     if (wantInfo) now.openInfo?.()
