@@ -192,6 +192,87 @@ const WEATHER_OFF_BUT_SET_UP: Settings = {
 
 const VANCOUVER = makePlace({ latitude: 49.28, longitude: -123.12, name: 'Vancouver' })
 
+const EVERY_WIDGETS: StoredLayout = {
+  v: 1,
+  widgets: [
+    { ...clockAt('clock1aa', 1, 1, 4), row: 1 },
+    {
+      col: 6,
+      h: 2,
+      id: 'date0001',
+      options: {
+        format: 'short',
+        monthGrid: true,
+        showYear: false,
+        weekNumbers: false,
+        weekStartsOn: 'monday',
+      },
+      row: 1,
+      type: 'date',
+      w: 2,
+    },
+    {
+      col: 9,
+      h: 2,
+      id: 'analog01',
+      options: { face: 'ticks', showDate: true, showSeconds: true },
+      row: 1,
+      type: 'analog-clock',
+      w: 2,
+    },
+    {
+      col: 1,
+      h: 3,
+      id: 'bookmarks1',
+      options: { folder: 'bar', openInNewTab: false, showFolderName: true },
+      row: 5,
+      type: 'bookmarks',
+      w: 2,
+    },
+    weatherAt('weather1', 4, 5),
+    {
+      col: 8,
+      h: 1,
+      id: 'quickdial1',
+      options: { icon: null, label: '', newTab: false, url: '' },
+      row: 5,
+      type: 'quick-dial',
+      w: 1,
+    },
+  ],
+}
+
+const EVERY_WIDGETS_AT_LIMIT: StoredLayout = {
+  v: 1,
+  widgets: [
+    ...EVERY_WIDGETS.widgets,
+    {
+      col: 6,
+      h: 2,
+      id: 'date0002',
+      options: {
+        format: 'short',
+        monthGrid: true,
+        showYear: false,
+        weekNumbers: false,
+        weekStartsOn: 'monday',
+      },
+      row: 5,
+      type: 'date',
+      w: 2,
+    },
+    {
+      col: 10,
+      h: 2,
+      id: 'analog02',
+      options: { face: 'numerals', showDate: false, showSeconds: false },
+      row: 5,
+      type: 'analog-clock',
+      w: 2,
+    },
+  ],
+}
+
 /** Two Weathers for different places, side by side near the top: they differ only by name. */
 const TWO_WEATHERS: StoredLayout = {
   v: 1,
@@ -270,6 +351,44 @@ export const PAGE_SEEDS = {
   },
   colourWithSettingsOpen: {
     background: { colour: '#f2e8cf', favouritesOnly: false, kind: 'colour', v: 1 },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** Eight Widgets, including every type, for seeing the whole Grid at the Widget limit. */
+  everyWidgetAtTheLimit: {
+    layout: EVERY_WIDGETS_AT_LIMIT,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** Every Widget over a light preset, in Edit mode when its story enters it. */
+  everyWidgetEditingOnLightColour: {
+    background: { colour: '#f2e8cf', favouritesOnly: false, kind: 'colour', v: 1 },
+    layout: EVERY_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** Every Widget over the darkest preset. */
+  everyWidgetOnDarkColour: {
+    background: { colour: '#1d3557', favouritesOnly: false, kind: 'colour', v: 1 },
+    layout: EVERY_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** Every Widget over a light preset. */
+  everyWidgetOnLightColour: {
+    background: { colour: '#f2e8cf', favouritesOnly: false, kind: 'colour', v: 1 },
+    layout: EVERY_WIDGETS,
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  /** Every Widget over the story photo. */
+  everyWidgetOnPhoto: {
+    layout: EVERY_WIDGETS,
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },
     settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
