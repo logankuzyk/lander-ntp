@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { Backups, restoreDump } from './backups.js'
+import { Backups, publishDeletedIds, restoreDump } from './backups.js'
 import { createDirectoryObjectStore } from './objectStore.js'
 
 const directories: string[] = []
@@ -123,6 +123,99 @@ describe('Backups', () => {
     await expect(failing.runNightly()).rejects.toThrow('upload failed')
     expect(error).toHaveBeenCalled()
     expect(ping).not.toHaveBeenCalled()
+  })
+
+  it('continues the nightly dump and heartbeat when one inactive account cannot be deleted', async () => {
+    const { databasePath, db, store, userId } = fixture()
+    db.exec(`
+      ALTER TABLE user ADD COLUMN email TEXT;
+      ALTER TABLE user ADD COLUMN createdAt TEXT;
+      CREATE TABLE verification (id TEXT PRIMARY KEY, identifier TEXT);
+      CREATE TABLE session (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE, updatedAt TEXT);
+      CREATE TABLE account (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE);
+      CREATE TABLE settings_account (user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE, last_used_at INTEGER);
+      CREATE TABLE settings_item (user_id TEXT REFERENCES user(id) ON DELETE CASCADE, item TEXT);
+      INSERT INTO user (id, email, createdAt) VALUES ('broken', 'broken@example.test', '2024-01-01T00:00:00.000Z');
+      INSERT INTO user (id, email, createdAt) VALUES ('healthy', 'healthy@example.test', '2024-01-01T00:00:00.000Z');
+      INSERT INTO settings_account VALUES ('broken', 1);
+      INSERT INTO settings_account VALUES ('healthy', 1);
+      CREATE TRIGGER refuse_broken_delete BEFORE DELETE ON user WHEN OLD.id = 'broken'
+      BEGIN SELECT RAISE(ABORT, 'simulated delete failure'); END;
+    `)
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const heartbeat = vi.fn(async () => undefined)
+    const resilient = new Backups({
+      clock: { now: () => new Date('2026-01-31T03:17:00.000Z') },
+      databasePath,
+      db,
+      heartbeat,
+      objectStore: store,
+    })
+
+    await expect(resilient.runNightly()).resolves.toBe('dumps/lander-20260131T031700Z.db.gz')
+
+    expect(
+      (db.prepare('SELECT id FROM user ORDER BY id').all() as { id: string }[])
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual([userId, 'broken'].sort())
+    expect(await store.get('dumps/lander-20260131T031700Z.db.gz')).toBeDefined()
+    const deletedIds = await store.get('deleted-ids.json')
+    expect(JSON.parse(new TextDecoder().decode(deletedIds))).toEqual([
+      { deletedAt: '2026-01-31T03:17:00.000Z', id: 'healthy' },
+    ])
+    expect(heartbeat).toHaveBeenCalledOnce()
+    expect(errorLog).toHaveBeenCalledWith(
+      'Inactive account deletion failed',
+      'broken',
+      expect.any(Error),
+    )
+  })
+
+  it('serializes deleted-id publications so an older write cannot win last', async () => {
+    const { db } = fixture()
+    db.prepare('INSERT INTO deleted_account (user_id, deleted_at) VALUES (?, ?)').run(
+      'first',
+      '2026-01-01T00:00:00.000Z',
+    )
+    let releaseFirst: (() => void) | undefined
+    let startedFirst: (() => void) | undefined
+    const firstStarted = new Promise<void>((resolve) => {
+      startedFirst = resolve
+    })
+    let calls = 0
+    let stored = ''
+    const objectStore = {
+      delete: async () => undefined,
+      get: async () => undefined,
+      list: async () => [],
+      put: async (_key: string, value: Uint8Array) => {
+        calls += 1
+        if (calls === 1) {
+          startedFirst?.()
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve
+          })
+        }
+        stored = new TextDecoder().decode(value)
+      },
+    }
+
+    const olderPublish = publishDeletedIds(db, objectStore, new Date('2026-01-02T00:00:00.000Z'))
+    await firstStarted
+    db.prepare('INSERT INTO deleted_account (user_id, deleted_at) VALUES (?, ?)').run(
+      'second',
+      '2026-01-02T00:00:00.000Z',
+    )
+    const newerPublish = publishDeletedIds(db, objectStore, new Date('2026-01-03T00:00:00.000Z'))
+    await Promise.resolve()
+    releaseFirst?.()
+    await Promise.all([olderPublish, newerPublish])
+
+    expect(JSON.parse(stored)).toEqual([
+      { deletedAt: '2026-01-01T00:00:00.000Z', id: 'first' },
+      { deletedAt: '2026-01-02T00:00:00.000Z', id: 'second' },
+    ])
   })
 
   it('removes deleted users during restore and keeps the external deleted-ids list', async () => {

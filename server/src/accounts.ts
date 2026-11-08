@@ -55,9 +55,12 @@ export function deleteAccount(db: DatabaseSync, userId: string, now: Date): bool
       `INSERT INTO deleted_account (user_id, deleted_at) VALUES (?, ?)
        ON CONFLICT(user_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
     ).run(userId, now.toISOString())
-    db.prepare(
-      'DELETE FROM verification WHERE identifier = ? OR substr(identifier, -length(?)) = ?',
-    ).run(user.email, user.email, user.email)
+    const email = user.email.toLowerCase()
+    db.prepare('DELETE FROM verification WHERE identifier IN (?, ?, ?)').run(
+      `sign-in-otp-${email}`,
+      `email-verification-otp-${email}`,
+      `forget-password-otp-${email}`,
+    )
     db.prepare('DELETE FROM "user" WHERE id = ?').run(userId)
     db.exec('COMMIT')
     return true
@@ -75,19 +78,44 @@ export function deleteInactiveAccounts(
   db: DatabaseSync,
   now: Date,
   reviewerEmail?: string,
+  onDeleteError?: (userId: string, error: unknown) => void,
 ): number {
   const settingsTable = db
     .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'settings_account'")
     .get()
   if (!settingsTable) return 0
   const cutoff = now.getTime() - inactiveAccountAgeMs
-  const accounts = db
+  const users = db
     .prepare(
-      `SELECT user.id FROM user
-       JOIN settings_account ON settings_account.user_id = user.id
-       WHERE (settings_account.last_used_at IS NULL OR settings_account.last_used_at < ?)
-         AND (? IS NULL OR lower(user.email) != ?)`,
+      `SELECT user.id, user.createdAt, settings_account.user_id AS settingsUserId,
+              settings_account.last_used_at AS lastUsedAt, MAX(session.updatedAt) AS lastSessionUse
+       FROM user
+       LEFT JOIN settings_account ON settings_account.user_id = user.id
+       LEFT JOIN session ON session.userId = user.id
+       WHERE (? IS NULL OR lower(user.email) != ?)
+       GROUP BY user.id`,
     )
-    .all(cutoff, reviewerEmail ?? null, reviewerEmail ?? null) as { id: string }[]
-  return accounts.reduce((count, account) => count + Number(deleteAccount(db, account.id, now)), 0)
+    .all(reviewerEmail ?? null, reviewerEmail ?? null) as {
+    createdAt: string
+    id: string
+    lastSessionUse: string | null
+    lastUsedAt: number | null
+    settingsUserId: string | null
+  }[]
+  const accounts = users.filter((user) => {
+    const lastUsedAt =
+      user.settingsUserId !== null
+        ? user.lastUsedAt
+        : Date.parse(user.lastSessionUse ?? user.createdAt)
+    return lastUsedAt === null || lastUsedAt < cutoff
+  })
+  let deletedCount = 0
+  for (const account of accounts) {
+    try {
+      deletedCount += Number(deleteAccount(db, account.id, now))
+    } catch (error) {
+      onDeleteError?.(account.id, error)
+    }
+  }
+  return deletedCount
 }

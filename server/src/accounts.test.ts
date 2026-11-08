@@ -11,7 +11,7 @@ function makeDatabase() {
   databases.push(db)
   db.exec(`
     PRAGMA foreign_keys = ON;
-    CREATE TABLE user (id TEXT PRIMARY KEY, email TEXT NOT NULL);
+    CREATE TABLE user (id TEXT PRIMARY KEY, email TEXT NOT NULL, createdAt TEXT);
     CREATE TABLE session (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE);
     CREATE TABLE account (id TEXT PRIMARY KEY, userId TEXT REFERENCES user(id) ON DELETE CASCADE);
     CREATE TABLE verification (id TEXT PRIMARY KEY, identifier TEXT);
@@ -30,10 +30,13 @@ describe('account deletion', () => {
   it('records deletion and cascades all account data, and repeats as a no-op', () => {
     const db = makeDatabase()
     db.exec(`
-      INSERT INTO user VALUES ('u1', 'person@example.test');
+      INSERT INTO user (id, email) VALUES ('u1', 'B@X.COM');
       INSERT INTO session VALUES ('s1', 'u1');
       INSERT INTO account VALUES ('a1', 'u1');
-      INSERT INTO verification VALUES ('v1', 'sign-in-otp-person@example.test');
+      INSERT INTO verification VALUES ('v1', 'sign-in-otp-b@x.com');
+      INSERT INTO verification VALUES ('v2', 'email-verification-otp-b@x.com');
+      INSERT INTO verification VALUES ('v3', 'forget-password-otp-b@x.com');
+      INSERT INTO verification VALUES ('v4', 'sign-in-otp-bob@x.com');
       INSERT INTO settings_account VALUES ('u1', 1);
       INSERT INTO settings_item VALUES ('u1', 'layout');
     `)
@@ -43,7 +46,9 @@ describe('account deletion', () => {
     for (const table of ['user', 'session', 'account', 'settings_account', 'settings_item']) {
       expect(db.prepare(`SELECT * FROM ${table}`).all(), table).toEqual([])
     }
-    expect(db.prepare('SELECT * FROM verification').all()).toEqual([])
+    expect(db.prepare('SELECT id, identifier FROM verification').all()).toEqual([
+      { id: 'v4', identifier: 'sign-in-otp-bob@x.com' },
+    ])
     expect(db.prepare('SELECT user_id, deleted_at FROM deleted_account').all()).toEqual([
       { deleted_at: now.toISOString(), user_id: 'u1' },
     ])
@@ -51,16 +56,20 @@ describe('account deletion', () => {
 
   it('removes accounts unused for over twelve months and exempts the reviewer', () => {
     const db = makeDatabase()
+    db.exec('ALTER TABLE session ADD COLUMN updatedAt TEXT')
     const elevenMonthsAgo = new Date(now)
     elevenMonthsAgo.setUTCMonth(elevenMonthsAgo.getUTCMonth() - 11)
     const thirteenMonthsAgo = new Date(now)
     thirteenMonthsAgo.setUTCMonth(thirteenMonthsAgo.getUTCMonth() - 13)
     const stamp = (date: Date) => date.getTime()
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('recent', 'recent@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run('recent', 'recent@example.test')
     db.prepare('INSERT INTO settings_account VALUES (?, ?)').run('recent', stamp(elevenMonthsAgo))
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('stale', 'stale@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run('stale', 'stale@example.test')
     db.prepare('INSERT INTO settings_account VALUES (?, ?)').run('stale', stamp(thirteenMonthsAgo))
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('reviewer', 'reviewer@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run(
+      'reviewer',
+      'reviewer@example.test',
+    )
     db.prepare('INSERT INTO settings_account VALUES (?, ?)').run(
       'reviewer',
       stamp(thirteenMonthsAgo),
@@ -75,9 +84,13 @@ describe('account deletion', () => {
 
   it('keeps accounts without a settings record and accounts exactly at the cutoff', () => {
     const db = makeDatabase()
+    db.exec('ALTER TABLE session ADD COLUMN updatedAt TEXT')
     const cutoff = now.getTime() - 365 * 24 * 60 * 60 * 1000
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('no-settings', 'new@example.test')
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('boundary', 'boundary@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run('no-settings', 'new@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run(
+      'boundary',
+      'boundary@example.test',
+    )
     db.prepare('INSERT INTO settings_account VALUES (?, ?)').run('boundary', cutoff)
 
     expect(deleteInactiveAccounts(db, now)).toBe(0)
@@ -87,11 +100,37 @@ describe('account deletion', () => {
     ])
   })
 
+  it('uses account creation or latest session activity when settings are missing', () => {
+    const db = makeDatabase()
+    db.exec(`
+      ALTER TABLE session ADD COLUMN updatedAt TEXT;
+    `)
+    const oldDate = new Date(now.getTime() - 13 * 30 * 24 * 60 * 60 * 1000).toISOString()
+    db.prepare('INSERT INTO user (id, email, createdAt) VALUES (?, ?, ?)').run(
+      'old',
+      'old@example.test',
+      oldDate,
+    )
+    db.prepare('INSERT INTO user (id, email, createdAt) VALUES (?, ?, ?)').run(
+      'active',
+      'active@example.test',
+      oldDate,
+    )
+    db.prepare('INSERT INTO session (id, userId, updatedAt) VALUES (?, ?, ?)').run(
+      'recent-session',
+      'active',
+      now.toISOString(),
+    )
+
+    expect(deleteInactiveAccounts(db, now)).toBe(1)
+    expect(db.prepare('SELECT id FROM user').all()).toEqual([{ id: 'active' }])
+  })
+
   it('does not delete accounts when the settings table is unavailable', () => {
     const db = new DatabaseSync(':memory:')
     databases.push(db)
     db.exec('CREATE TABLE user (id TEXT PRIMARY KEY, email TEXT NOT NULL)')
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('u1', 'person@example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run('u1', 'person@example.test')
 
     expect(deleteInactiveAccounts(db, now)).toBe(0)
     expect(db.prepare('SELECT id FROM user').all()).toEqual([{ id: 'u1' }])
@@ -99,9 +138,13 @@ describe('account deletion', () => {
 
   it('cleans never-used settings rows and matches reviewer addresses without case sensitivity', () => {
     const db = makeDatabase()
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('never-used', 'never@example.test')
+    db.exec('ALTER TABLE session ADD COLUMN updatedAt TEXT')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run('never-used', 'never@example.test')
     db.prepare('INSERT INTO settings_account VALUES (?, NULL)').run('never-used')
-    db.prepare('INSERT INTO user VALUES (?, ?)').run('reviewer', 'Reviewer@Example.test')
+    db.prepare('INSERT INTO user (id, email) VALUES (?, ?)').run(
+      'reviewer',
+      'Reviewer@Example.test',
+    )
     db.prepare('INSERT INTO settings_account VALUES (?, ?)').run(
       'reviewer',
       now.getTime() - 13 * 30 * 24 * 60 * 60 * 1000,
@@ -115,7 +158,6 @@ describe('account deletion', () => {
     const db = makeDatabase()
     db.exec(`
       ALTER TABLE user ADD COLUMN name TEXT;
-      ALTER TABLE user ADD COLUMN createdAt TEXT;
       ALTER TABLE user ADD COLUMN updatedAt TEXT;
       ALTER TABLE session ADD COLUMN userAgent TEXT;
       ALTER TABLE session ADD COLUMN createdAt TEXT;
@@ -134,7 +176,6 @@ describe('account deletion', () => {
     const db = makeDatabase()
     db.exec(`
       ALTER TABLE user ADD COLUMN name TEXT;
-      ALTER TABLE user ADD COLUMN createdAt TEXT;
       ALTER TABLE user ADD COLUMN updatedAt TEXT;
       ALTER TABLE session ADD COLUMN userAgent TEXT;
       ALTER TABLE session ADD COLUMN ipAddress TEXT;

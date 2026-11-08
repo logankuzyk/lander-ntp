@@ -8,7 +8,7 @@ export type ObjectStore = {
   delete: (key: string) => Promise<void>
   get: (key: string) => Promise<Uint8Array | undefined>
   list: (prefix?: string) => Promise<StoredObject[]>
-  put: (key: string, value: Uint8Array) => Promise<void>
+  put: (key: string, value: Uint8Array, signal?: AbortSignal) => Promise<void>
 }
 
 function safePath(root: string, key: string): string {
@@ -54,10 +54,10 @@ export function createDirectoryObjectStore(root: string): ObjectStore {
       await mkdir(absoluteRoot, { recursive: true })
       return (await walk(absoluteRoot)).filter((object) => object.key.startsWith(prefix))
     },
-    put: async (key, value) => {
+    put: async (key, value, signal) => {
       const path = safePath(absoluteRoot, key)
       await mkdir(dirname(path), { recursive: true })
-      await writeFile(path, value)
+      await writeFile(path, value, { signal })
     },
   }
 }
@@ -78,7 +78,10 @@ function decodeXml(value: string): string {
     .replaceAll('&apos;', "'")
 }
 
-export function createR2ObjectStore(credentials: R2Credentials): ObjectStore {
+export function createR2ObjectStore(
+  credentials: R2Credentials,
+  requestTimeoutMs = 10_000,
+): ObjectStore {
   const client = new AwsClient({
     accessKeyId: credentials.accessKeyId,
     region: 'auto',
@@ -90,8 +93,21 @@ export function createR2ObjectStore(credentials: R2Credentials): ObjectStore {
   )}`
   const objectUrl = (key: string) =>
     `${endpoint}/${key.split('/').map(encodeURIComponent).join('/')}`
+  const fetchWithTimeout = async (url: string, init?: RequestInit) => {
+    const timeout = new AbortController()
+    const timer = setTimeout(
+      () => timeout.abort(new Error('Object store request timed out')),
+      requestTimeoutMs,
+    )
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal
+    try {
+      return await client.fetch(url, { ...init, signal })
+    } finally {
+      clearTimeout(timer)
+    }
+  }
   const request = async (url: string, init?: RequestInit) => {
-    const response = await client.fetch(url, init)
+    const response = await fetchWithTimeout(url, init)
     if (!response.ok) throw new Error(`R2 request failed with status ${response.status}`)
     return response
   }
@@ -101,7 +117,7 @@ export function createR2ObjectStore(credentials: R2Credentials): ObjectStore {
       await request(objectUrl(key), { method: 'DELETE' })
     },
     get: async (key) => {
-      const response = await client.fetch(objectUrl(key))
+      const response = await fetchWithTimeout(objectUrl(key))
       if (response.status === 404) return undefined
       if (!response.ok) throw new Error(`R2 request failed with status ${response.status}`)
       return new Uint8Array(await response.arrayBuffer())
@@ -133,8 +149,12 @@ export function createR2ObjectStore(credentials: R2Credentials): ObjectStore {
       } while (token)
       return objects
     },
-    put: async (key, value) => {
-      await request(objectUrl(key), { body: value.slice().buffer as ArrayBuffer, method: 'PUT' })
+    put: async (key, value, signal) => {
+      await request(objectUrl(key), {
+        body: value.slice().buffer as ArrayBuffer,
+        method: 'PUT',
+        signal,
+      })
     },
   }
 }

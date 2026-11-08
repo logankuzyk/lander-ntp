@@ -40,6 +40,7 @@ async function makeAuthApp(
   configOverrides: Partial<ServerConfig> = {},
   now: () => Date = () => new Date('2026-01-01T00:00:00.000Z'),
   objectStoreOverrides: Partial<ObjectStore> = {},
+  deletedIdsPublishTimeoutMs = 5_000,
 ) {
   const messages: MailMessage[] = []
   const publishedObjects: { key: string; value: Uint8Array }[] = []
@@ -59,6 +60,7 @@ async function makeAuthApp(
     clock: { now },
     config,
     db,
+    deletedIdsPublishTimeoutMs,
     getClientAddress: (context) => new URL(context.req.url).hostname,
     mailer: {
       send: async (message) => {
@@ -193,6 +195,60 @@ describe('createApp', () => {
     expect(response.status).toBe(204)
     expect(db.prepare('SELECT id FROM user WHERE email = ?').get(email)).toBeUndefined()
     expect(log).toHaveBeenCalledWith('Deleted account list publication failed', expect.any(Error))
+  })
+
+  it('returns 204 when deleted-id publication stalls, after aborting the store request', async () => {
+    let started: (() => void) | undefined
+    let aborted = false
+    const putStarted = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const { app, messages } = await makeAuthApp(
+      {},
+      undefined,
+      {
+        put: async (_key, _value, signal) =>
+          new Promise<void>((_resolve, reject) => {
+            started?.()
+            signal?.addEventListener(
+              'abort',
+              () => {
+                aborted = true
+                reject(signal.reason)
+              },
+              { once: true },
+            )
+          }),
+      },
+      10,
+    )
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'stalled-publication@example.com'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+
+    const responsePromise = app.request('/v1/account', {
+      headers: { authorization: `Bearer ${signedIn.headers.get('set-auth-token')}`, origin },
+      method: 'DELETE',
+    })
+    await putStarted
+    const response = await Promise.race([
+      responsePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 40)),
+    ])
+
+    expect(response).not.toBeNull()
+    expect(response?.status).toBe(204)
+    expect(aborted).toBe(true)
   })
 
   it('prints sign-in mail in development and refuses to send it in production', async () => {

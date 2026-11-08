@@ -13,6 +13,7 @@ const gunzipAsync = promisify(gunzip)
 const dumpPrefix = 'dumps/'
 const deletedIdsKey = 'deleted-ids.json'
 const retentionMs = 30 * 24 * 60 * 60 * 1000
+const deletedIdPublicationChains = new WeakMap<ObjectStore, Promise<void>>()
 
 export type DeletedAccount = { deletedAt: string; id: string }
 
@@ -72,16 +73,36 @@ export async function publishDeletedIds(
   db: DatabaseSync,
   objectStore: ObjectStore,
   now: Date,
+  signal?: AbortSignal,
 ): Promise<DeletedAccount[]> {
-  const cutoff = new Date(now.getTime() - retentionMs).toISOString()
-  db.prepare('DELETE FROM deleted_account WHERE deleted_at < ?').run(cutoff)
-  const rows = db
-    .prepare(
-      'SELECT user_id AS id, deleted_at AS deletedAt FROM deleted_account ORDER BY deleted_at',
-    )
-    .all() as DeletedAccount[]
-  await objectStore.put(deletedIdsKey, new TextEncoder().encode(JSON.stringify(rows)))
-  return rows
+  const previous = deletedIdPublicationChains.get(objectStore) ?? Promise.resolve()
+  let publishedRows: DeletedAccount[] = []
+  const publication = previous
+    .catch(() => undefined)
+    .then(async () => {
+      signal?.throwIfAborted()
+      const cutoff = new Date(now.getTime() - retentionMs).toISOString()
+      db.prepare('DELETE FROM deleted_account WHERE deleted_at < ?').run(cutoff)
+      publishedRows = db
+        .prepare(
+          'SELECT user_id AS id, deleted_at AS deletedAt FROM deleted_account ORDER BY deleted_at',
+        )
+        .all() as DeletedAccount[]
+      await objectStore.put(
+        deletedIdsKey,
+        new TextEncoder().encode(JSON.stringify(publishedRows)),
+        signal,
+      )
+    })
+  deletedIdPublicationChains.set(
+    objectStore,
+    publication.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
+  await publication
+  return publishedRows
 }
 
 export class Backups {
@@ -116,7 +137,9 @@ export class Backups {
     const now = clock.now()
     let temporaryDirectory: string | undefined
     try {
-      deleteInactiveAccounts(db, now, this.dependencies.reviewerEmail)
+      deleteInactiveAccounts(db, now, this.dependencies.reviewerEmail, (userId, error) => {
+        logger.error('Inactive account deletion failed', userId, error)
+      })
       await this.publishDeletedIds()
       temporaryDirectory = await mkdtemp(resolve(tmpdir(), 'lander-dump-'))
       const copyPath = resolve(temporaryDirectory, 'snapshot.sqlite')

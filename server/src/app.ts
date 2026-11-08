@@ -24,6 +24,7 @@ export type AppDependencies = {
   clock: { now: () => Date }
   config: ServerConfig
   db: DatabaseSync
+  deletedIdsPublishTimeoutMs?: number
   getClientAddress: (context: Context) => string | undefined
   mailer: Mailer
   objectStore: ObjectStore
@@ -226,10 +227,29 @@ export async function createApp(dependencies: AppDependencies) {
   app.delete('/v1/account', async (context) => {
     const deleted = deleteAccount(db, context.get('userId'), dependencies.clock.now())
     if (deleted) {
+      const controller = new AbortController()
+      let timeout: NodeJS.Timeout | undefined
       try {
-        await publishDeletedIds(db, dependencies.objectStore, dependencies.clock.now())
+        const timedOut = new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            const error = new Error('Deleted account list publication timed out')
+            controller.abort(error)
+            reject(error)
+          }, dependencies.deletedIdsPublishTimeoutMs ?? 5_000)
+        })
+        await Promise.race([
+          publishDeletedIds(
+            db,
+            dependencies.objectStore,
+            dependencies.clock.now(),
+            controller.signal,
+          ),
+          timedOut,
+        ])
       } catch (error) {
         console.error('Deleted account list publication failed', error)
+      } finally {
+        if (timeout) clearTimeout(timeout)
       }
     }
     return context.body(null, 204)
