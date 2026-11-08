@@ -378,6 +378,16 @@ describe('App', () => {
       expect(screen.queryByRole('note')).toBeNull()
     })
 
+    it('treats a stored session without consent as signed out for the accounts news', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      await browser.storage.local.set({ account: { email: 'person@example.test', token: 'test' } })
+      await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
+      render(<App />)
+
+      const note = await screen.findByRole('note')
+      expect(note.textContent).toContain('New: accounts')
+    })
+
     it('keeps the news dismissed', async () => {
       await onboardingItem.setValue({ dismissed: ['weather'], welcomed: true })
       const { unmount } = render(<App />)
