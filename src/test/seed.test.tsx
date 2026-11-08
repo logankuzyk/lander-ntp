@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
 import { App } from '@/entrypoints/newtab/App'
+import { MANIFEST_CACHE_SHAPE, manifestCache } from '@/photos/storage'
 
 import { STORY_PHOTOS } from './fixtures'
 import { device } from './permissions'
@@ -46,6 +47,13 @@ afterEach(() => {
 })
 
 describe('the page stories', () => {
+  it('seeds the current manifest cache shape so the page does not revalidate', async () => {
+    await seedPage()
+
+    expect((await manifestCache.getValue())?.shape).toBe(MANIFEST_CACHE_SHAPE)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('give a new install the welcome over the photo', async () => {
     await seedPage(PAGE_SEEDS.newInstall)
     render(<App />)

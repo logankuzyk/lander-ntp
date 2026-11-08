@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { expect, waitFor } from 'storybook/test'
 
 import { App } from '@/entrypoints/newtab/App'
+import { onboardingItem } from '@/onboarding/storage'
 import { makePlace, makeWeather } from '@/test/fixtures'
 import { PAGE_SEEDS, seedPage, seedReading } from '@/test/seed'
 import { weatherSource } from '@/weather/weatherSource'
@@ -34,6 +35,18 @@ function sendNothing() {
 /** A new install (the Clock alone, in the middle): the menu above the Add button, both items there. */
 export const Open: Story = {
   beforeEach: () => seedPage(PAGE_SEEDS.addMenuOpen),
+  play: async ({ canvasElement }) => {
+    const canvas = await startEditing(canvasElement)
+    await openAddMenu(canvas)
+  },
+}
+
+/** A previously seen page with the unseen Clock and Weather marks on its Add choices. */
+export const NewWidgetMarked: Story = {
+  beforeEach: async () => {
+    await seedPage(PAGE_SEEDS.addMenuOpen)
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+  },
   play: async ({ canvasElement }) => {
     const canvas = await startEditing(canvasElement)
     await openAddMenu(canvas)

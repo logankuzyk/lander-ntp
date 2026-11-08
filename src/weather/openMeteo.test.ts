@@ -2,7 +2,7 @@ import * as v from 'valibot'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ManifestSchema } from '@/photos/schema'
-import { manifestCache } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache } from '@/photos/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import { describeCode } from './conditions'
@@ -65,6 +65,7 @@ describe('fetchWeather', () => {
       },
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
 
     await fetchWeather(PLACE, 'celsius')
@@ -140,6 +141,7 @@ describe('endpoints from the manifest', () => {
       data: v.parse(ManifestSchema, { ...makeManifest([makePhoto('a')]), weather }),
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
 
   it('asks wherever the manifest says, keeping the address it leaves alone', async () => {

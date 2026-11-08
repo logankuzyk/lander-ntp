@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { MARKS } from './callouts'
 import { recordInstall } from './install'
 import { onboardingItem, pendingItem } from './storage'
 
@@ -19,7 +20,7 @@ describe('recordInstall', () => {
 
     // Kept back until the welcome is answered (see pendingItem), then synced.
     expect(await pendingItem.getValue()).toEqual({
-      dismissed: ['first', 'second'],
+      dismissed: ['first', 'second', ...MARKS],
       welcomed: false,
     })
   })

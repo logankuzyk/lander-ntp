@@ -27,6 +27,7 @@ const SizeSchema = v.object({
 
 const TagSchema = v.object({
   name: v.pipe(v.string(), v.minLength(1)),
+  optIn: v.optional(v.boolean(), false),
   slug: v.pipe(v.string(), v.minLength(1)),
 })
 

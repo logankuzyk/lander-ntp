@@ -24,10 +24,11 @@ import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
 import { useLayout } from '@/layout/useLayout'
 import { answerWelcome } from '@/onboarding/answerWelcome'
-import { NEWS } from '@/onboarding/callouts'
+import { MARKS, NEWS } from '@/onboarding/callouts'
 import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
+import { recordSeen } from '@/onboarding/useSeen'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
@@ -81,11 +82,37 @@ const PHASE_3_LAYOUT = {
 }
 
 /** Add a row here whenever phase 3 adds a synced write that a v0.3.0 device must survive. */
-const V030_LAYOUT_WRITES = [
+const V030_LAYOUT_WRITES: {
+  change?: Parameters<typeof saveLikeV030>[1]
+  name: string
+  rawSync?: Record<string, unknown>
+  write?: () => Promise<Awaited<ReturnType<typeof asV030>>>
+}[] = [
   {
     change: { col: 1, id: 'clock', kind: 'move', row: 7 } as const,
     name: 'a v0.3.0 Clock move keeps all four newer Widget types byte for byte',
     rawSync: { layout: PHASE_3_LAYOUT },
+  },
+  {
+    name: 'add an Analog clock through the page commit; v0.3.0 keeps it byte for byte',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue(SEED)
+      const page = {} as ReturnType<typeof useLayout>
+      function Probe() {
+        Object.assign(page, useLayout(SEED))
+        return null
+      }
+      render(h(Probe, {}))
+      await waitFor(() => expect(page.loaded).toBe(true))
+      const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'analog-clock')
+      if (!added.ok) throw new Error(`could not add Analog clock: ${added.reason}`)
+      await act(async () => page.commit(added.layout))
+      await waitFor(async () =>
+        expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
+      )
+      return asV030(await fakeBrowser.storage.sync.get(null))
+    },
   },
 ]
 
@@ -135,14 +162,25 @@ const PHASE_3_WRITES = [
 ]
 
 describe('the frozen v0.3.0 reader', () => {
-  it.each(V030_LAYOUT_WRITES)('$name', async ({ change, rawSync }) => {
-    const after = await saveLikeV030(rawSync, change)
+  it.each(V030_LAYOUT_WRITES)('$name', async ({ change, rawSync, write }) => {
+    const after = write ? await write() : await saveLikeV030(rawSync!, change!)
 
-    expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
-    expect(JSON.stringify(after.raw.layout.widgets.slice(1))).toBe(
-      JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
-    )
-    expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
+    if (write) {
+      const analog = after.raw.layout.widgets.find(
+        (widget) => (widget as { type?: string }).type === 'analog-clock',
+      )
+      expect(analog).toMatchObject({
+        options: { face: 'ticks', showDate: false, showSeconds: true },
+      })
+      expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+      expect(after.raw.settings).toEqual(SEED)
+    } else {
+      expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
+      expect(JSON.stringify(after.raw.layout.widgets.slice(1))).toBe(
+        JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
+      )
+      expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
+    }
   })
 
   it.each(PHASE_3_WRITES)('$name', async ({ key, write }) => {
@@ -361,6 +399,8 @@ type PhaseTwoWrite = {
    * there is no `sync:layout`, and the record has gained the one id and kept the rest.
    */
   onboardingOnly?: boolean
+  /** IDs added to onboarding by a New mark; a single call records all of them. */
+  seenIds?: string[]
   /**
    * The write must leave `v: 1` at the top of the settings, which stored settings from v0.2.3
    * (the row starts from those) do not have.
@@ -748,6 +788,14 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
     })),
   },
   {
+    name: 'see the Add menu marks (all unseen IDs gained in one onboarding write)',
+    onboardingOnly: true,
+    seenIds: MARKS.filter((id) => id === 'clock' || id === 'weather-widget'),
+    write: async () => {
+      await recordSeen(MARKS.filter((id) => id === 'clock' || id === 'weather-widget'))
+    },
+  },
+  {
     name: 'dismiss the update note about the Layout (W30; dismissNews, from the record v0.2.3 stored: one id gained)',
     onboardingOnly: true,
     write: async () => {
@@ -805,6 +853,7 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       fromNoRecord,
       layoutOnly,
       onboardingOnly,
+      seenIds,
       stampsVersion,
       welcomeOnly,
       write,
@@ -829,7 +878,7 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
         expect(stored.settings).toEqual(SEED)
         expect(stored.layout).toBeUndefined()
         expect(stored.onboarding).toEqual({
-          dismissed: [...SEED_ONBOARDING.dismissed, 'layout'],
+          dismissed: [...SEED_ONBOARDING.dismissed, ...(seenIds ?? ['layout'])],
           welcomed: SEED_ONBOARDING.welcomed,
         })
       }
@@ -858,6 +907,8 @@ describe('what phase 2 may write, read by the frozen v0.2.3 reader', () => {
       // And v0.2.3 draws everything that was written, with nothing dropped or added.
       expect(settings).toEqual(stored.settings)
       expect(onboarding).toEqual(stored.onboarding)
+      const newer = await asV030(stored)
+      expect(newer.onboarding).toEqual(stored.onboarding)
     },
   )
 })
