@@ -41,7 +41,7 @@ const newInstall = async () => {
 /** The welcome: "Show me around" starts the tour, Skip does not. */
 export const Welcome: Story = { beforeEach: newInstall }
 
-/** Stop 1 of 7: beside the Edit button, with the page not yet in edit mode. */
+/** Stop 1 of 8: beside the Edit button, with the page not yet in edit mode. */
 export const Edit: Story = {
   beforeEach: newInstall,
   play: async ({ canvasElement }) => {
@@ -96,7 +96,15 @@ export const Photos: Story = {
   },
 }
 
-/** Stop 7, the last: the font, in the settings panel. */
+/** Stop 7: the Account section in the settings panel. */
+export const Account: Story = {
+  beforeEach: newInstall,
+  play: async ({ canvasElement }) => {
+    await takeTour(canvasElement, 'Account')
+  },
+}
+
+/** Stop 8, the last: the font, in the settings panel. */
 export const Font: Story = {
   beforeEach: newInstall,
   play: async ({ canvasElement }) => {
@@ -131,7 +139,7 @@ export const DismissedMidTour: Story = {
 
 /**
  * A Weather waiting for a place, with its setup button on the page: the tour has a stop for it
- * (4 of 8), and the Add stop does not repeat it.
+ * (4 of 9), and the Add stop does not repeat it.
  */
 export const Setup: Story = {
   beforeEach: async () => {
@@ -154,7 +162,7 @@ export const ClockAndWeather: Story = {
   },
 }
 
-/** An empty Grid: no stops about a widget (2 of 5 is Add). */
+/** An empty Grid: no stops about a widget (2 of 6 is Add). */
 export const EmptyGrid: Story = {
   beforeEach: async () => {
     await seedPage(PAGE_SEEDS.tourEmptyGrid)
@@ -167,7 +175,7 @@ export const EmptyGrid: Story = {
 
 /**
  * A Layout that a newer version of the page wrote, which this one cannot change: the tour has
- * the Edit and Done stops and the panel's two (1 of 4), and the Edit stop says to update.
+ * the Edit and Done stops and the panel's three (1 of 5), and the Edit stop says to update.
  */
 export const NewerLayout: Story = {
   beforeEach: async () => {

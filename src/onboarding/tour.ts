@@ -23,7 +23,7 @@ export type PageFacts = {
 export type PlannedStop = {
   body: string
   id: string
-  /** Where it is in the whole tour, counting the settings panel's stops: "3 of 7". */
+  /** Where it is in the whole tour, counting the settings panel's stops: "3 of 8". */
   number: number
   /** What the page is doing while it is up. */
   show: PageState

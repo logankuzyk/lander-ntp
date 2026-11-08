@@ -92,7 +92,7 @@ export type TourStop = PageTourStop | SettingsStop
 /**
  * The tour a new install is offered after the welcome, in order: edit mode, moving and resizing
  * a Widget, a Widget's options, the setup button, the Add menu and Done on the page, then the
- * settings panel's Photos and Font (its own stops, drawn inside it: the Clock's and the
+ * settings panel's Photos, Account and Font (its own stops, drawn inside it: the Clock's and the
  * Weather's options are on their widgets). `planTour` picks the stops a page has. The words are
  * proposed, for the owner to review (LR-107).
  */
@@ -155,6 +155,12 @@ export const TOUR: readonly TourStop[] = [
     id: 'tour-photos',
     section: 'photos',
     title: 'Photos',
+  },
+  {
+    body: ACCOUNT_NEWS.body,
+    id: 'tour-account',
+    section: 'account',
+    title: ACCOUNT_NEWS.tourTitle,
   },
   {
     body: 'Set the font for the clock and everything around it.',

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { NEWS, type PageTourStop, TOUR } from './callouts'
 
 describe('the tour', () => {
-  it('goes from Edit to Done on the page, then Photos and the font in the settings panel', () => {
+  it('goes from Edit to Done on the page, then Photos, the account and the font in the settings panel', () => {
     expect(TOUR.map(({ id }) => id)).toEqual([
       'tour-edit',
       'tour-move',
@@ -12,14 +12,15 @@ describe('the tour', () => {
       'tour-add',
       'tour-done',
       'tour-photos',
+      'tour-account',
       'tour-general',
     ])
   })
 
-  it('has a stop in the panel for Photos and one for the font, and none for the Clock or the Weather', () => {
+  it('has a stop in the panel for Photos, one for the account and one for the font, and none for the Clock or the Weather', () => {
     expect(
       TOUR.filter(({ section }) => section !== undefined).map(({ section }) => section),
-    ).toEqual(['photos', 'general'])
+    ).toEqual(['photos', 'account', 'general'])
   })
 
   it('has a stop on the page only where it points at something', () => {

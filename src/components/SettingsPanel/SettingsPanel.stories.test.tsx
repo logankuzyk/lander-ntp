@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { describe, expect, it } from 'vitest'
 
 import meta, * as stories from './SettingsPanel.stories'
@@ -46,10 +46,20 @@ describe('settings panel stories', () => {
     expect(screen.getByText(/Keeping this photo/)).toBeTruthy()
   })
 
-  it('walks the tour in WithTheTour', () => {
+  it('walks the tour in WithTheTour', async () => {
     renderStory('WithTheTour')
 
-    expect(screen.getByText('1 of 2')).toBeTruthy()
+    const note = () => screen.getByRole('note')
+    expect(note().textContent).toContain('1 of 3')
+    expect(note().textContent).toContain('Photos')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(note().textContent).toContain('2 of 3'))
+    expect(note().textContent).toContain('Account')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(note().textContent).toContain('3 of 3'))
+    expect(note().textContent).toContain('Font')
   })
 
   it('says to update, and turns the section off, in FromNewerVersion', () => {

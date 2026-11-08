@@ -336,7 +336,7 @@ describe('App', () => {
       drawn.mockRestore()
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
       expect(note.textContent).toContain('Edit your page')
-      expect(note.textContent).toContain('1 of 7')
+      expect(note.textContent).toContain('1 of 8')
       // The settings come at the end of the tour, and the tour is not offered again from the gear.
       expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull()
       await waitFor(async () => expect((await onboardingItem.getValue())?.welcomed).toBe(true))
