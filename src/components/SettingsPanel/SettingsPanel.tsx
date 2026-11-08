@@ -8,6 +8,8 @@ import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { useGrowOnScroll } from '@/components/Popover/useGrowOnScroll'
 import { usePopover } from '@/components/Popover/usePopover'
 import type { SettingsStop } from '@/onboarding/callouts'
+import { NewMark } from '@/onboarding/NewMark'
+import { useSeen } from '@/onboarding/useSeen'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
@@ -225,6 +227,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const known = useKnownTags(settings, photos)
   const readOnlyId = useId()
+  const { markSeen: markPhotosSeen, seen: photosSeen } = useSeen('photos')
   // Carrying on from the tour on the page, focus is on the note's button, where the last stop had
   // it, and not on Close, which one more Enter would press.
   const carryingOn = tourProgress !== undefined && tour.length > 0
@@ -250,6 +253,10 @@ export function SettingsPanel({
     const index = tour.findIndex((callout) => callout.section === id)
     if (index !== -1) setStep((at) => (at === null ? null : index))
   }
+
+  useEffect(() => {
+    if (section === 'photos' && photosSeen === false) void markPhotosSeen()
+  }, [section, photosSeen, markPhotosSeen])
 
   // The tour ends with Done, or Dismiss: focus was on the note's button, which goes, so it goes to
   // the panel's Close button and not the page behind it.
@@ -343,6 +350,7 @@ export function SettingsPanel({
               type="button"
             >
               {label}
+              {id === 'photos' && photosSeen === false && <NewMark />}
             </button>
           ))}
         </div>

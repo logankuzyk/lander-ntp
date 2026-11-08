@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/pre
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from '@/entrypoints/newtab/App'
+import { onboardingItem } from '@/onboarding/storage'
 
 import * as stories from './AddMenu.stories'
 
@@ -36,6 +37,26 @@ async function openMenu() {
 }
 
 describe('the Add menu stories', () => {
+  it('shows new marks until the menu has been opened, then stores them in one onboarding record', async () => {
+    await seed('Open')
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+    const write = vi.spyOn(onboardingItem, 'setValue')
+    render(<App />)
+
+    const menu = await openMenu()
+
+    await waitFor(() => expect(menu.querySelectorAll('.new-mark')).toHaveLength(2))
+    await waitFor(async () =>
+      expect((await onboardingItem.getValue())?.dismissed).toEqual(['clock', 'weather-widget']),
+    )
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(menu.querySelectorAll('.new-mark')).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByRole('menu', { name: 'Add a widget' }).querySelector('.new-mark')).toBeNull()
+  })
+
   it('Open seeds a new install whose menu offers the Clock and the Weather', async () => {
     await seed('Open')
     render(<App />)

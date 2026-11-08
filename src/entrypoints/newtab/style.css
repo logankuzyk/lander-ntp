@@ -1893,6 +1893,20 @@ button.chip:hover {
   cursor: pointer;
 }
 
+.new-mark {
+  align-items: center;
+  background: var(--accent, #6a7f67);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1;
+  margin-inline-start: 0.45rem;
+  padding: 0.22rem 0.42rem;
+  vertical-align: middle;
+}
+
 /* The highlight shows where focus is, in place of an outline. */
 .add-menu__item:hover,
 .add-menu__item:focus-visible {
