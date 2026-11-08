@@ -17,11 +17,6 @@ describe('settings panel stories', () => {
   it.each([
     ['PhotosCycling', 'Photos'],
     ['PhotosKept', 'Photos'],
-    ['ClockOn', 'Clock'],
-    ['ClockOff', 'Clock'],
-    ['WeatherOff', 'Weather'],
-    ['WeatherOn', 'Weather'],
-    ['WeatherChoosingAPlace', 'Weather'],
     ['General', 'General'],
     ['WithTheTour', 'Photos'],
     ['AccountSignedOut', 'Account'],
@@ -37,6 +32,8 @@ describe('settings panel stories', () => {
     ['AccountSignedOutElsewhere', 'Account'],
     ['AccountPaused', 'Account'],
     ['AccountConsentRefused', 'Account'],
+
+    ['FromNewerVersion', 'Photos'],
   ] as const)('%s opens on %s', (name, tab) => {
     renderStory(name)
 
@@ -49,19 +46,25 @@ describe('settings panel stories', () => {
     expect(screen.getByText(/Keeping this photo/)).toBeTruthy()
   })
 
-  it('shows the place search in WeatherChoosingAPlace and the place in WeatherOn', () => {
-    const search = renderStory('WeatherChoosingAPlace')
-    expect(screen.getByRole('combobox', { name: 'Search for a place' })).toBeTruthy()
-    search.unmount()
-
-    renderStory('WeatherOn')
-    expect(screen.getByText('Victoria')).toBeTruthy()
-  })
-
   it('walks the tour in WithTheTour', () => {
     renderStory('WithTheTour')
 
-    expect(screen.getByText('1 of 4')).toBeTruthy()
+    expect(screen.getByText('1 of 2')).toBeTruthy()
+  })
+
+  it('says to update, and turns the section off, in FromNewerVersion', () => {
+    renderStory('FromNewerVersion')
+
+    expect(screen.getByText('Update Lander to change this.')).toBeTruthy()
+    expect(screen.getByRole('tabpanel').querySelector('fieldset[disabled]')).not.toBeNull()
+  })
+
+  it('points to Edit in General, and in no other story has anything of the Clock or the Weather', () => {
+    renderStory('General')
+
+    expect(screen.getByText('Clock and Weather options are on the widgets now.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: /clock|weather/i })).toBeNull()
   })
 
   it('shows the code field in AccountCodeSent', () => {
@@ -81,14 +84,14 @@ describe('settings panel stories', () => {
   })
 
   it('keeps the settings in state, so a switch responds', () => {
-    renderStory('ClockOn')
-    const showDate = screen.getByRole('switch', { name: 'Show date' }) as HTMLInputElement
-    expect(showDate.checked).toBe(false)
+    renderStory('PhotosCycling')
+    const dim = screen.getByRole('switch', { name: 'Dim the photo' }) as HTMLInputElement
+    expect(dim.checked).toBe(true)
 
-    fireEvent.click(showDate)
+    fireEvent.click(dim)
 
-    expect((screen.getByRole('switch', { name: 'Show date' }) as HTMLInputElement).checked).toBe(
-      true,
-    )
+    expect(
+      (screen.getByRole('switch', { name: 'Dim the photo' }) as HTMLInputElement).checked,
+    ).toBe(false)
   })
 })
