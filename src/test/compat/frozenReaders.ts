@@ -78,3 +78,10 @@ export async function readFrozenOnboarding(): Promise<Record<string, unknown> | 
   }
   return value as Record<string, unknown>
 }
+
+/** Read the Layout item without interpreting its version or widget values. */
+export async function readFrozenLayout(): Promise<Record<string, unknown> | null> {
+  const value: unknown = (await browser.storage.sync.get('layout')).layout
+  if (typeof value !== 'object' || value === null || !('v' in value)) return null
+  return value as Record<string, unknown>
+}

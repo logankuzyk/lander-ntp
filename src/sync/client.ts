@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { browser } from 'wxt/browser'
 import { storage } from 'wxt/utils/storage'
 
 import config from '@/account/config'
@@ -76,6 +77,10 @@ class SyncClient {
     const onboarding = mergeOnboarding(question.local.onboarding, question.remote.onboarding)
 
     if (choice === 'browser') {
+      if (selected.layout !== undefined) {
+        const saved = await this.#put(stored.token, 'layout', selected.layout)
+        if (!saved) return this.#pause()
+      }
       const saved = await this.#put(stored.token, 'settings', versionedSettings(selectedSettings))
       if (!saved) return this.#pause()
     }
@@ -87,6 +92,8 @@ class SyncClient {
       if (!saved) return this.#pause()
     }
 
+    if (selected.layout !== undefined) await browser.storage.sync.set({ layout: selected.layout })
+    else if (choice === 'account') await browser.storage.sync.remove('layout')
     await settingsItem.setValue(versionedSettings(selectedSettings))
     await onboardingItem.setValue(versionedOnboarding(onboarding))
     await choiceItem.setValue({ email: stored.email, state: 'complete', v: 1 })
@@ -140,6 +147,8 @@ class SyncClient {
     }
     const remoteItems = record(snapshot.items)
     const local: SyncValues = { settings: settingsContent(await settingsItem.getValue()) }
+    const storedLayout = (await browser.storage.sync.get('layout')).layout
+    if (storedLayout !== undefined) local.layout = storedLayout
     const localOnboarding = onboardingContent(await onboardingItem.getValue())
     if (localOnboarding) local.onboarding = localOnboarding
 
@@ -165,8 +174,15 @@ class SyncClient {
     if (action === 'download' && remote.settings) {
       await settingsItem.setValue(versionedSettings(remote.settings))
     } else if (action === 'upload') {
+      if (local.layout !== undefined) {
+        const saved = await this.#put(stored.token, 'layout', local.layout)
+        if (!saved) return this.#finish()
+      }
       const saved = await this.#put(stored.token, 'settings', versionedSettings(local.settings))
       if (!saved) return this.#finish()
+    }
+    if (action === 'download' && remote.layout !== undefined) {
+      await browser.storage.sync.set({ layout: remote.layout })
     }
     await this.#mergeOnboarding(stored.token, local.onboarding, remote.onboarding)
     await choiceItem.setValue({ email: stored.email, state: 'complete', v: 1 })

@@ -155,7 +155,11 @@ describe('SettingsPanel', () => {
       await account.initialize()
     })
 
-    const signInWithSnapshot = async (localSettings: Settings, remoteSettings: Settings) => {
+    const signInWithSnapshot = async (
+      localSettings: Settings,
+      remoteSettings: Settings,
+      remoteLayout?: unknown,
+    ) => {
       await settingsItem.setValue(localSettings)
       const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
         const path = new URL(String(input)).pathname
@@ -172,8 +176,12 @@ describe('SettingsPanel', () => {
           return jsonResponse({ devices: [], limit: 3, pending: false })
         }
         if (path === '/v1/sync') {
+          const items: Record<string, unknown> = {
+            settings: { v: 1, value: { ...remoteSettings, v: 1 } },
+          }
+          if (remoteLayout !== undefined) items.layout = { v: 1, value: remoteLayout }
           return jsonResponse({
-            items: { settings: { v: 1, value: { ...remoteSettings, v: 1 } } },
+            items,
             rev: 1,
           })
         }
@@ -447,6 +455,21 @@ describe('SettingsPanel', () => {
         ),
       ).toBe(true)
       expect(await settingsItem.getValue()).toEqual(localSettings)
+    })
+
+    it('keeps both Layouts untouched until the first-sign-in choice is picked', async () => {
+      const localLayout = { v: 1, widgets: ['clock', 'weather'] }
+      const accountLayout = { v: 1, widgets: ['photos'] }
+      await browser.storage.sync.set({ layout: localLayout })
+      await signInWithSnapshot(settings, settings, accountLayout)
+
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+      expect((await browser.storage.sync.get('layout')).layout).toEqual(localLayout)
+
+      fireEvent.click(screen.getByRole('button', { name: "Use your account's page" }))
+
+      await screen.findByText('Synced')
+      expect((await browser.storage.sync.get('layout')).layout).toEqual(accountLayout)
     })
   })
 

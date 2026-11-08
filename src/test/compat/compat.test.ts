@@ -9,6 +9,7 @@ import { syncedShapes } from '@/sync/shapes'
 
 import {
   readFrozenAccount,
+  readFrozenLayout,
   readFrozenOnboarding,
   readFrozenSettings,
   readFrozenSyncChoice,
@@ -26,6 +27,7 @@ const syncWrites: { assert: () => Promise<void>; commit: () => Promise<void>; na
     assert: async () => {
       expect(syncedShapes.settings.check(await readFrozenSettings())).toEqual({ ok: true, v: 1 })
       expect(await readFrozenSettings()).toMatchObject({ dim: false, v: 1 })
+      expect(await readFrozenLayout()).toEqual({ v: 1, widgets: ['clock', 'weather'] })
       expect(syncedShapes.onboarding.check(await readFrozenOnboarding())).toEqual({
         ok: true,
         v: 1,
@@ -42,17 +44,21 @@ const syncWrites: { assert: () => Promise<void>; commit: () => Promise<void>; na
     commit: async () => {
       const local = { ...DEFAULT_SETTINGS, dim: false, v: 1 }
       const remote = { ...DEFAULT_SETTINGS, font: 'geist', v: 1 }
+      const localLayout = { v: 1, widgets: ['clock', 'weather'] }
       await browser.storage.sync.set({
+        layout: localLayout,
         onboarding: { dismissed: ['browser-callout'], v: 1, welcomed: false },
       })
       await browser.storage.local.set({ account: { email: 'person@example.com', token: 'token' } })
       await syncChoice.setValue({
         email: 'person@example.com',
         local: {
+          layout: localLayout,
           onboarding: { dismissed: ['browser-callout'], welcomed: false },
           settings: local,
         },
         remote: {
+          layout: { v: 1, widgets: ['photos'] },
           onboarding: { dismissed: ['account-callout'], v: 1, welcomed: true },
           settings: remote,
         },
@@ -66,19 +72,20 @@ const syncWrites: { assert: () => Promise<void>; commit: () => Promise<void>; na
       )
       await syncClient.choose('browser')
     },
-    name: 'sync:settings, sync:onboarding and local:sync-choice from a browser choice',
+    name: 'sync:layout, sync:settings, sync:onboarding and local:sync-choice from a browser choice',
   },
   {
     assert: async () => {
       expect(await readFrozenSyncChoice()).toMatchObject({
         email: 'person@example.com',
-        local: { settings: { dim: false } },
+        local: { layout: { widgets: ['clock'] }, settings: { dim: false } },
         remote: { settings: { font: 'geist' } },
         rev: 1,
       })
     },
     commit: async () => {
       const local = { ...DEFAULT_SETTINGS, dim: false }
+      await browser.storage.sync.set({ layout: { v: 1, widgets: ['clock'] } })
       await settingsItem.setValue(local)
       await browser.storage.local.set({ account: { email: 'person@example.com', token: 'token' } })
       vi.stubGlobal(
@@ -95,6 +102,57 @@ const syncWrites: { assert: () => Promise<void>; commit: () => Promise<void>; na
       await syncClient.initialize()
     },
     name: 'local:sync-choice from a first-sign-in pause',
+  },
+  {
+    assert: async () => {
+      expect(await readFrozenLayout()).toEqual({ v: 1, widgets: ['photos'] })
+      expect(await readFrozenSyncChoice()).toEqual({
+        email: 'person@example.com',
+        state: 'complete',
+      })
+    },
+    commit: async () => {
+      const remoteLayout = { v: 1, widgets: ['photos'] }
+      await browser.storage.sync.set({ layout: { v: 1, widgets: ['clock'] } })
+      await browser.storage.local.set({ account: { email: 'person@example.com', token: 'token' } })
+      await syncChoice.setValue({
+        email: 'person@example.com',
+        local: { settings: { ...DEFAULT_SETTINGS, dim: false } },
+        remote: {
+          layout: remoteLayout,
+          settings: { ...DEFAULT_SETTINGS, font: 'geist' },
+        },
+        rev: 1,
+        state: 'needs-choice',
+        v: 1,
+      })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>().mockResolvedValue(json({ changed: true, rev: 2 })),
+      )
+      await syncClient.choose('account')
+    },
+    name: 'sync:layout and local:sync-choice from an account choice',
+  },
+  {
+    assert: async () => {
+      expect(await readFrozenLayout()).toEqual({ v: 1, widgets: ['photos'] })
+    },
+    commit: async () => {
+      await settingsItem.setValue(DEFAULT_SETTINGS)
+      await browser.storage.local.set({ account: { email: 'person@example.com', token: 'token' } })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>().mockResolvedValue(
+          json({
+            items: { layout: { v: 1, value: { v: 1, widgets: ['photos'] } } },
+            rev: 1,
+          }),
+        ),
+      )
+      await syncClient.initialize()
+    },
+    name: 'sync:layout download on an unarranged first sign-in',
   },
 ]
 
