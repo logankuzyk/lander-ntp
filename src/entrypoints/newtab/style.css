@@ -1174,6 +1174,23 @@ button.chip:hover {
   background: var(--color-fg);
 }
 
+.callout--first-sign-in {
+  top: 1rem;
+  right: 1.25rem;
+}
+
+.first-sign-in-choice__actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.first-sign-in-choice__actions .callout__action {
+  height: auto;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+  text-align: left;
+}
+
 /* Not currentColor: the action's own text is dark. */
 .callout :focus-visible,
 .welcome :focus-visible {
