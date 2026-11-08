@@ -103,7 +103,7 @@ describe('Controls, the Add menu', () => {
       within(menu())
         .getAllByRole('menuitem')
         .map((el) => el.textContent),
-    ).toEqual(['Clock', 'Date', 'Analog clock', 'Bookmarks', 'Weather'])
+    ).toEqual(['Clock', 'Date', 'Analog clock', 'Bookmarks', 'Weather', 'Quick dial'])
     expect(document.activeElement).toBe(item('Clock'))
     // Each is something a callout can point at.
     expect(item('Clock').getAttribute('data-callout-target')).toBe('menu:clock')
@@ -111,6 +111,7 @@ describe('Controls, the Add menu', () => {
     expect(item('Analog clock').getAttribute('data-callout-target')).toBe('menu:analog-clock')
     expect(item('Bookmarks').getAttribute('data-callout-target')).toBe('menu:bookmarks')
     expect(item('Weather').getAttribute('data-callout-target')).toBe('menu:weather')
+    expect(item('Quick dial').getAttribute('data-callout-target')).toBe('menu:quick-dial')
   })
 
   it('opens with the A key in edit mode, and not outside it', () => {
@@ -183,13 +184,15 @@ describe('Controls, the Add menu', () => {
     fireEvent.keyDown(item('Bookmarks'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Weather'))
     fireEvent.keyDown(item('Weather'), { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(item('Quick dial'))
+    fireEvent.keyDown(item('Quick dial'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Clock'))
     fireEvent.keyDown(item('Clock'), { key: 'ArrowUp' })
-    expect(document.activeElement).toBe(item('Weather'))
-    fireEvent.keyDown(item('Weather'), { key: 'Home' })
+    expect(document.activeElement).toBe(item('Quick dial'))
+    fireEvent.keyDown(item('Quick dial'), { key: 'Home' })
     expect(document.activeElement).toBe(item('Clock'))
     fireEvent.keyDown(item('Clock'), { key: 'End' })
-    expect(document.activeElement).toBe(item('Weather'))
+    expect(document.activeElement).toBe(item('Quick dial'))
   })
 
   it('does not change the photo, or anything else, from the arrow keys inside it', () => {

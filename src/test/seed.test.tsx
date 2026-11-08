@@ -86,6 +86,36 @@ describe('the page stories', () => {
     expect(screen.queryByRole('note')).toBeNull()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['dark', PAGE_SEEDS.colourDark, '#1d3557', 'light'],
+    ['mid', PAGE_SEEDS.colourMid, '#a8dadc', 'dark'],
+    ['light', PAGE_SEEDS.colourLight, '#f2e8cf', 'dark'],
+  ] as const)(
+    'draw the %s colour story from storage in Edit mode without requests',
+    async (_name, seed, colour, ink) => {
+      await seedPage(seed)
+      const { container } = render(<App />)
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+      await waitFor(() => expect(container.querySelector('.background')).not.toBeNull())
+
+      expect(container.querySelector('.background')?.getAttribute('style')).toContain(colour)
+      expect(container.querySelector('.grid--editing')).not.toBeNull()
+      expect(container.querySelector('time')).not.toBeNull()
+      expect(container.querySelector('[data-widget="weather"]')).not.toBeNull()
+      expect(container.querySelector('.app')?.getAttribute('data-ink')).toBe(ink)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps the Settings panel dark in the colour story', async () => {
+    await seedPage(PAGE_SEEDS.colourWithSettingsOpen)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
 })
 
 describe('the tour stories’ seeds', () => {

@@ -38,6 +38,14 @@ describe('Background', () => {
     expect(onLoad).toHaveBeenCalledOnce()
   })
 
+  it('draws a colour without creating photo layers or a dim wash', () => {
+    const { container } = render(<Background colour="#f2e8cf" />)
+
+    expect(container.querySelector('.background')?.getAttribute('style')).toContain('#f2e8cf')
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('.background--dim')).toBeNull()
+  })
+
   it('treats a photo without alt text as decorative', () => {
     const { container } = render(<Background photo={makePhoto('a', { alt: null })} />)
     const images = container.querySelectorAll('img')

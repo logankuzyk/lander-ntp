@@ -65,15 +65,15 @@ describe('the update note stories', () => {
     expect(container.querySelector('.widget-box')).toBeNull()
   })
 
-  it('AfterShowMe is reached by pressing Show me: edit mode, the note gone, Done focused', async () => {
-    await seed('AfterShowMe')
+  it('WalkFirstStop is reached by pressing Show me, without changing the page', async () => {
+    await seed('WalkFirstStop')
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Show me' }))
 
-    const done = await screen.findByRole('button', { name: 'Done' })
-    await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
-    expect(document.activeElement).toBe(done)
+    expect(await screen.findByText('Edit your page')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
   })
 
   it('NewInstallNoNote has the welcome and, once it is skipped, no note', async () => {

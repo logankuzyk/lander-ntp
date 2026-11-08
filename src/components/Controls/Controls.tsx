@@ -15,7 +15,8 @@ const isEditable = (target: EventTarget | null) =>
  * the welcome, which is a modal: nothing behind it should answer.
  */
 const inPopover = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('.popover, dialog, [role="menu"]') !== null
+  target instanceof Element &&
+  target.closest('.popover, dialog, [role="dialog"], [role="menu"]') !== null
 
 type ControlsProps = {
   /** True while the photo being faded in is still loading. */
@@ -27,7 +28,7 @@ type ControlsProps = {
   layoutLoaded: boolean
   /** Saves the whole Layout (`useLayout`'s `commit`). */
   onCommit: (next: Layout) => void
-  onNext: () => void
+  onNext?: () => void
   /** Omitted when the photo details widget is switched off. */
   onToggleInfo?: () => void
   onToggleSettings: () => void
@@ -78,9 +79,9 @@ export function Controls({
       ) {
         return
       }
-      if (event.key === 'ArrowRight') {
+      if (event.key === 'ArrowRight' && onNext) {
         event.preventDefault()
-        if (!busy) onNext()
+        if (!busy) onNext?.()
       } else if (event.key === 'i' && onToggleInfo) {
         event.preventDefault()
         onToggleInfo()
@@ -165,31 +166,33 @@ export function Controls({
           {READ_ONLY_UPDATE_NOTE}
         </span>
       )}
-      <button
-        aria-busy={busy === true}
-        aria-label="Next photo"
-        class={busy ? 'control control--busy' : 'control'}
-        // Ignored rather than disabled while the next photo loads: each press would stack
-        // another full-resolution image over the one the wait is already for. The button
-        // keeps its place in the Tab order so focus does not jump away mid-press.
-        onClick={busy ? undefined : onNext}
-        title="Next photo (→)"
-        type="button"
-      >
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="20"
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-          width="20"
+      {onNext && (
+        <button
+          aria-busy={busy === true}
+          aria-label="Next photo"
+          class={busy ? 'control control--busy' : 'control'}
+          // Ignored rather than disabled while the next photo loads: each press would stack
+          // another full-resolution image over the one the wait is already for. The button
+          // keeps its place in the Tab order so focus does not jump away mid-press.
+          onClick={busy ? undefined : onNext}
+          title="Next photo (→)"
+          type="button"
         >
-          <path d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
-      </button>
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="20"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            width="20"
+          >
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </button>
+      )}
       {onToggleInfo && (
         <button
           aria-expanded={infoOpen === true}

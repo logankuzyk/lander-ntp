@@ -1,5 +1,7 @@
 import { browser } from 'wxt/browser'
 
+import type { Background } from '@/backdrop/storage'
+import { backgroundItem } from '@/backdrop/storage'
 import { checkLayout } from '@/layout/check'
 import { COLS, type Rect } from '@/layout/geometry'
 import { layoutItem } from '@/layout/storage'
@@ -19,6 +21,7 @@ import { defaultOptions } from '@/widgetSystem/options'
 import { makeManifest, makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
 
 export type PageSeed = {
+  background?: Background
   /** What `sync:layout` holds. Without it the page works the Layout out from `settings`. */
   layout?: unknown
   /** The photo manifest's say over the weather: `{ enabled: false }` switches it off. */
@@ -58,6 +61,7 @@ export async function seedReading(
  * revalidate. Stories call it from `beforeEach`; tests call it before rendering.
  */
 export async function seedPage({
+  background,
   layout,
   manifestWeather,
   moreWeather = [],
@@ -89,6 +93,7 @@ export async function seedPage({
     shownAt: Date.now(),
   })
   await settingsItem.setValue(settings)
+  if (background) await backgroundItem.setValue(background)
   if (layout) await layoutItem.setValue(checkLayout(layout))
   if (rawLayout) await browser.storage.sync.set({ layout: rawLayout })
   if (weather) {
@@ -243,6 +248,30 @@ export const PAGE_SEEDS = {
   addMenuWaitingOptions: {
     onboarding: { dismissed: SEEN_NEWS, welcomed: true },
     settings: WEATHER_OFF_BUT_SET_UP,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  colourDark: {
+    background: { colour: '#1d3557', favouritesOnly: false, kind: 'colour', v: 1 },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  colourLight: {
+    background: { colour: '#f2e8cf', favouritesOnly: false, kind: 'colour', v: 1 },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  colourMid: {
+    background: { colour: '#a8dadc', favouritesOnly: false, kind: 'colour', v: 1 },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
+    weather: makeWeather({ temperature: 13.4 }),
+  },
+  colourWithSettingsOpen: {
+    background: { colour: '#f2e8cf', favouritesOnly: false, kind: 'colour', v: 1 },
+    onboarding: { dismissed: SEEN_NEWS, welcomed: true },
+    settings: GRID_WEATHER_SETTINGS,
     weather: makeWeather({ temperature: 13.4 }),
   },
   /** A Clock with seconds, which is wider. */

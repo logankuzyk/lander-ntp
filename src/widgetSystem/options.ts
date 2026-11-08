@@ -25,6 +25,8 @@ function fieldsOf(option: OptionDescription): Field[] {
           schema: v.picklist(option.choices.map((choice) => choice.value)),
         },
       ]
+    case 'icon':
+      return [{ default: option.default, key: option.id, schema: v.nullable(v.string()) }]
     case 'orderedList': {
       const ids = option.items.map((item) => item.id)
       return [
@@ -61,6 +63,8 @@ function fieldsOf(option: OptionDescription): Field[] {
       ]
     case 'switch':
       return [{ default: option.default, key: option.id, schema: v.boolean() }]
+    case 'text':
+      return [{ default: option.default, key: option.id, schema: v.string() }]
   }
 }
 

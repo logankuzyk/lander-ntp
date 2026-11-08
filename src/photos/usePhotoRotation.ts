@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { useBackground } from '@/backdrop/useBackground'
+import { useFavourites } from '@/backdrop/useFavourites'
+
 import { getManifest } from './manifest'
+import { poolFor } from './pool'
 import {
   msUntilAdvance,
   nextPhoto,
@@ -14,11 +18,15 @@ import {
 } from './rotation'
 import type { Manifest, Photo } from './schema'
 import { photoState } from './storage'
-import { poolIds } from './tags'
 
-const idsFor = (manifest: Manifest, tags: readonly string[]): PhotoIds => ({
+const idsFor = (
+  manifest: Manifest,
+  tags: readonly string[],
+  favourites: readonly string[],
+  favouritesOnly: boolean,
+): PhotoIds => ({
   all: manifest.photos.map((photo) => photo.id),
-  pool: poolIds(manifest.photos, tags),
+  pool: poolFor({ favourites, favouritesOnly, photos: manifest.photos, tags }).ids,
 })
 
 /**
@@ -30,6 +38,8 @@ const sharesPhoto = (pace: Pace) => pace !== 'every-visit'
 const NO_PHOTOS: Photo[] = []
 
 export type PhotoRotation = {
+  /** True when Favourites only is on but none of those photos are in the manifest. */
+  favouritesGone: boolean
   /** Move on to the next photo from the pool. Resolves with its id once it is shared. */
   next: () => Promise<string | null>
   photo: Photo | null
@@ -48,14 +58,20 @@ export type PhotoRotation = {
  * the photo on in every new tab, whatever the settings say.
  */
 export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation {
+  const background = useBackground()
+  const favourites = useFavourites()
   const [manifest, setManifest] = useState<Manifest | null>(null)
   const [state, setState] = useState<PhotoState | null>(null)
   const settingsRef = useRef(settings)
+  const backgroundRef = useRef(background.value)
+  const favouritesRef = useRef(favourites.value)
   const stateRef = useRef(state)
   const visited = useRef(false)
   const unmounted = useRef(false)
 
   settingsRef.current = settings
+  backgroundRef.current = background.value
+  favouritesRef.current = favourites.value
   stateRef.current = state
 
   const pace = settings ? paceOf(settings) : null
@@ -63,14 +79,15 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
   // A string, so the effect below only reruns when the tags themselves change.
   const tagKey = settings?.tags.join(' ') ?? ''
   const pinnedId = settings?.pinnedId ?? null
+  const favouritesOnly = background.value.favouritesOnly
 
   // Runs once, on the first known settings. Keyed on whether they are known rather than on
   // the settings object: App passes a new one on every settings write, and a change landing
   // mid-fetch must not cancel the only first visit this tab gets.
-  const settingsKnown = settings !== null
+  const settingsKnown = settings !== null && background.loaded && favourites.loaded
   useEffect(() => {
     const first = settingsRef.current
-    if (!first || visited.current) return
+    if (!first || !background.loaded || !favourites.loaded || visited.current) return
     visited.current = true
 
     void (async () => {
@@ -78,10 +95,12 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       const stored = await photoState.getValue()
       // The latest settings, in case they changed while the manifest loaded.
       const current = settingsRef.current ?? first
+      const currentBackground = backgroundRef.current
+      const currentFavourites = favouritesRef.current
       const visit = photoForSettings(
         current,
         stored,
-        idsFor(manifest, current.tags),
+        idsFor(manifest, current.tags, currentFavourites.ids, currentBackground.favouritesOnly),
         Date.now(),
         true,
       )
@@ -90,7 +109,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       setManifest(manifest)
       setState(visit)
     })()
-  }, [settingsKnown])
+  }, [background.loaded, favourites.loaded, settingsKnown])
 
   useEffect(
     () => () => {
@@ -104,12 +123,23 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
     const current = settingsRef.current
     const shown = stateRef.current
     if (!manifest || !current || !shown) return
-    const next = photoForSettings(current, shown, idsFor(manifest, current.tags), Date.now(), false)
+    const next = photoForSettings(
+      current,
+      shown,
+      idsFor(
+        manifest,
+        current.tags,
+        favouritesRef.current.ids,
+        backgroundRef.current.favouritesOnly,
+      ),
+      Date.now(),
+      false,
+    )
     if (next === shown) return
     setState(next)
     void photoState.setValue(next)
     // tagKey stands in for current.tags, which is read through the ref.
-  }, [manifest, mode, tagKey, pinnedId])
+  }, [manifest, mode, tagKey, pinnedId, favouritesOnly])
 
   /**
    * Draw the next photo from the pool. `onlyIfDue` is for the timer: another tab may have
@@ -126,7 +156,16 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
         return stored.currentId
       }
 
-      const advanced = nextPhoto(stored, idsFor(manifest, current.tags).pool, Date.now())
+      const advanced = nextPhoto(
+        stored,
+        idsFor(
+          manifest,
+          current.tags,
+          favouritesRef.current.ids,
+          backgroundRef.current.favouritesOnly,
+        ).pool,
+        Date.now(),
+      )
       setState(advanced)
       await photoState.setValue(advanced)
       return advanced.currentId
@@ -138,7 +177,7 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
 
   // Follow the shared photo: another tab's timer, or its next-photo button.
   useEffect(() => {
-    if (pace === null || !sharesPhoto(pace)) return
+    if (!settingsKnown || pace === null || !sharesPhoto(pace)) return
     let active = true
     void photoState.getValue().then((stored) => {
       if (active && stored) setState(stored)
@@ -150,30 +189,48 @@ export function usePhotoRotation(settings: PhotoSettings | null): PhotoRotation 
       active = false
       unwatch()
     }
-  }, [pace])
+  }, [pace, settingsKnown])
 
   useEffect(() => {
-    if (!state || pace === null) return
+    if (!settingsKnown || !manifest || !state || pace === null) return
     const delay = msUntilAdvance(pace, state, Date.now())
     if (delay === null) return
     const timer = setTimeout(() => {
       void advance({ onlyIfDue: true })
     }, delay)
     return () => clearTimeout(timer)
-  }, [pace, state, advance])
+  }, [manifest, pace, settingsKnown, state, advance])
 
   return useMemo(() => {
     const find = (id: string | null | undefined) =>
       manifest?.photos.find((photo) => photo.id === id) ?? null
     const photo = find(state?.currentId)
     // The bag can still hold photos from before the tags changed; the next draw skips them.
-    const pool = new Set(manifest ? poolIds(manifest.photos, tagKey ? tagKey.split(' ') : []) : [])
+    const pool = new Set(
+      manifest
+        ? poolFor({
+            favourites: favourites.value.ids,
+            favouritesOnly: background.value.favouritesOnly,
+            photos: manifest.photos,
+            tags: tagKey ? tagKey.split(' ') : [],
+          }).ids
+        : [],
+    )
+    const favouritesGone = manifest
+      ? poolFor({
+          favourites: favourites.value.ids,
+          favouritesOnly: background.value.favouritesOnly,
+          photos: manifest.photos,
+          tags: tagKey ? tagKey.split(' ') : [],
+        }).favouritesGone
+      : false
     const upcoming = mode === 'pinned' ? null : find(state?.bag.find((id) => pool.has(id)))
     return {
+      favouritesGone,
       next,
       photo,
       photos: manifest?.photos ?? NO_PHOTOS,
       upcoming: upcoming === photo ? null : upcoming,
     }
-  }, [manifest, state, mode, tagKey, next])
+  }, [manifest, state, mode, tagKey, next, favourites.value.ids, background.value.favouritesOnly])
 }

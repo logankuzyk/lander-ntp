@@ -593,10 +593,15 @@ describe('the Grid styles', () => {
     expect(rule('.grid--editing .widget-box')).toMatch(/position:\s*relative/)
   })
 
-  it('rings a focused frame in white with a dark line outside it, to show on a bright photo', () => {
+  it('rings a focused frame in page ink with a dark line outside it', () => {
     const focused = rule('.grid--editing .widget-box:focus-visible')
-    expect(focused).toMatch(/outline:\s*2px solid var\(--color-fg\)/)
+    expect(focused).toMatch(/outline:\s*2px solid var\(--page-fg\)/)
     expect(focused).toMatch(/box-shadow:\s*0 0 0 1px rgb\(0 0 0 \/ 60%\)/)
+  })
+
+  it('uses the page ink for the edit mode dot grid and frame', () => {
+    expect(rule('.grid__dots circle')).toContain('fill: var(--page-fg)')
+    expect(rule('.grid--editing .widget-box')).toContain('outline: 1px solid var(--page-fg)')
   })
 
   it('keeps a long credit clear of the buttons on a narrow window', () => {

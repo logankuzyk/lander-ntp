@@ -73,7 +73,7 @@ const PHASE_3_LAYOUT = {
       col: 6,
       h: 3,
       id: 'dial',
-      options: { links: [{ title: 'Example', url: 'https://example.com' }] },
+      options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com' },
       row: 4,
       type: 'quick-dial',
       w: 5,
@@ -108,6 +108,34 @@ const V030_LAYOUT_WRITES: {
       const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'analog-clock')
       if (!added.ok) throw new Error(`could not add Analog clock: ${added.reason}`)
       await act(async () => page.commit(added.layout))
+      await waitFor(async () =>
+        expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
+      )
+      return asV030(await fakeBrowser.storage.sync.get(null))
+    },
+  },
+  {
+    name: 'add and configure a Quick dial through the page commit; v0.3.0 keeps it byte for byte',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue(SEED)
+      const page = {} as ReturnType<typeof useLayout>
+      function Probe() {
+        Object.assign(page, useLayout(SEED))
+        return null
+      }
+      render(h(Probe, {}))
+      await waitFor(() => expect(page.loaded).toBe(true))
+      const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'quick-dial')
+      if (!added.ok) throw new Error(`could not add Quick dial: ${added.reason}`)
+      const configured = setOptions({ layout: added.layout, readOnly: false }, added.id, {
+        icon: null,
+        label: 'Example',
+        newTab: false,
+        url: 'https://example.com/',
+      })
+      if (!configured.ok) throw new Error(`could not configure Quick dial: ${configured.reason}`)
+      await act(async () => page.commit(configured.layout))
       await waitFor(async () =>
         expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
       )
@@ -166,12 +194,18 @@ describe('the frozen v0.3.0 reader', () => {
     const after = write ? await write() : await saveLikeV030(rawSync!, change!)
 
     if (write) {
-      const analog = after.raw.layout.widgets.find(
-        (widget) => (widget as { type?: string }).type === 'analog-clock',
-      )
-      expect(analog).toMatchObject({
-        options: { face: 'ticks', showDate: false, showSeconds: true },
-      })
+      const added = after.raw.layout.widgets.find((widget) =>
+        ['analog-clock', 'quick-dial'].includes((widget as { type?: string }).type ?? ''),
+      ) as { type?: string } | undefined
+      if (added?.type === 'quick-dial') {
+        expect(added).toMatchObject({
+          options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com/' },
+        })
+      } else {
+        expect(added).toMatchObject({
+          options: { face: 'ticks', showDate: false, showSeconds: true },
+        })
+      }
       expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
       expect(after.raw.settings).toEqual(SEED)
     } else {

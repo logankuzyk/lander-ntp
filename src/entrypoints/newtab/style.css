@@ -2,6 +2,7 @@
   --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --color-bg: #111;
   --color-fg: #fff;
+  --page-fg: var(--color-fg);
   /* Barely there: the scrim over the photo does the work of keeping text legible. */
   --text-shadow: 0 1px 5px rgb(0 0 0 / 10%);
   /* Photo cross-fade. --photo-fade is mirrored by FADE_MS in components/Background. */
@@ -24,7 +25,7 @@ body,
 
 body {
   background: var(--color-bg);
-  color: var(--color-fg);
+  color: var(--page-fg);
   font-family: var(--font-display);
   /* Instrument Serif ships one weight; render it as drawn rather than faux-bolding it. */
   font-synthesis-weight: none;
@@ -34,7 +35,19 @@ body {
   position: relative;
   isolation: isolate;
   height: 100%;
+  color: var(--page-fg);
   text-shadow: var(--text-shadow);
+}
+
+.app[data-ink='dark'],
+:root[data-ink='dark'] {
+  --page-fg: #111;
+  --text-shadow: none;
+}
+
+.app[data-ink='light'] {
+  --page-fg: #fff;
+  --text-shadow: 0 1px 5px rgb(0 0 0 / 10%);
 }
 
 /*
@@ -101,10 +114,10 @@ body {
   animation: edit-appear 200ms ease-out;
 }
 
-/* A dark ring round each dot, so it shows on a bright photo as well as a dark one. */
+/* The page ink fills each dot and draws the frame over either a photo or a solid colour. */
 .grid__dots circle {
-  fill: rgb(255 255 255 / 95%);
-  stroke: rgb(0 0 0 / 40%);
+  fill: var(--page-fg);
+  stroke: var(--page-fg);
   stroke-width: 1px;
 }
 
@@ -124,12 +137,12 @@ body {
   border-radius: 0.5rem;
   background: rgb(255 255 255 / 6%);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 35%);
-  outline: 1px solid rgb(255 255 255 / 45%);
+  outline: 1px solid var(--page-fg);
   outline-offset: -1px;
 }
 
 .grid--editing .widget-box:focus-visible {
-  outline: 2px solid var(--color-fg);
+  outline: 2px solid var(--page-fg);
   outline-offset: -2px;
   /* A dark line outside the white ring, so it shows on a bright photo too. */
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
@@ -276,7 +289,7 @@ body {
 
 .widget-box__options:focus-visible,
 .widget-box__remove:focus-visible {
-  outline: 2px solid var(--color-fg);
+  outline: 2px solid var(--page-fg);
   outline-offset: 1px;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
@@ -518,7 +531,7 @@ body {
 }
 
 .widget-setup:focus-visible {
-  outline: 2px solid var(--color-fg);
+  outline: 2px solid var(--page-fg);
   outline-offset: 2px;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
@@ -739,6 +752,10 @@ body {
   );
 }
 
+.background--colour::after {
+  display: none;
+}
+
 /*
  * The scrim only reaches the top and bottom edges, leaving the clock over bare photo. This
  * lays a wash over the whole thing so light text keeps its footing on a bright one.
@@ -882,6 +899,7 @@ body {
   background: rgb(0 0 0 / 55%);
   backdrop-filter: blur(12px);
   text-shadow: none;
+  color: #fff;
 }
 
 /*
@@ -1107,6 +1125,7 @@ body {
   --popover-gap: 0.5rem;
   --popover-block: 1rem;
   line-height: var(--popover-line);
+  color: #fff;
 }
 
 .popover h2,
@@ -1442,6 +1461,59 @@ body {
 .settings__input::placeholder {
   color: inherit;
   opacity: 0.5;
+}
+
+.settings__row--text {
+  align-items: center;
+}
+
+.settings__row--text .settings__input {
+  max-width: 65%;
+}
+
+.quick-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18em;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+  font-size: min(18cqw, 18cqh);
+}
+
+.quick-dial__icon {
+  display: grid;
+  flex: 0 0 1.7em;
+  width: 1.7em;
+  height: 1.7em;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 0.35em;
+  color: white;
+  font-weight: 600;
+}
+
+.quick-dial__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.quick-dial__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (min-aspect-ratio: 3 / 2) {
+  .quick-dial {
+    flex-direction: row;
+    gap: 0.45em;
+  }
 }
 
 .settings__note a {
@@ -2021,7 +2093,7 @@ button.chip:hover {
   padding: 0 1rem;
   border-radius: 999px;
   background: rgb(255 255 255 / 90%);
-  color: var(--color-bg);
+  color: #111;
   font: inherit;
   font-size: 0.875rem;
   font-weight: 500;
@@ -2031,12 +2103,12 @@ button.chip:hover {
 
 .control--done:hover,
 .control--done:focus-visible {
-  background: var(--color-fg);
+  background: var(--page-fg);
 }
 
 /* Not currentColor: its text is dark, and the ring is on the photo. */
 .control--done:focus-visible {
-  outline-color: var(--color-fg);
+  outline-color: var(--page-fg);
 }
 
 /*
@@ -2067,6 +2139,7 @@ button.chip:hover {
   background: rgb(24 24 24 / 94%);
   box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 40%);
   text-shadow: none;
+  color: #fff;
 }
 
 /*
@@ -2267,6 +2340,7 @@ button.chip:hover {
   font-size: 0.85rem;
   line-height: 1.25rem;
   text-shadow: none;
+  color: #fff;
 }
 
 .callout p {
@@ -2304,20 +2378,20 @@ button.chip:hover {
   border: 0;
   border-radius: 0.375rem;
   background: rgb(255 255 255 / 90%);
-  color: var(--color-bg);
+  color: #111;
   font: inherit;
   font-weight: 500;
   cursor: pointer;
 }
 
 .callout__action:hover {
-  background: var(--color-fg);
+  background: #fff;
 }
 
 /* Not currentColor: the action's own text is dark. */
 .callout :focus-visible,
 .welcome :focus-visible {
-  outline: 2px solid var(--color-fg);
+  outline: 2px solid #fff;
   outline-offset: 2px;
 }
 

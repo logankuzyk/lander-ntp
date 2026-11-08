@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'preact/hooks'
 
+import { readableInk } from '@/backdrop/readableInk'
+import { displayKind } from '@/backdrop/storage'
+import { useBackground } from '@/backdrop/useBackground'
 import { AddMenuControlProvider } from '@/components/AddMenu/useAddMenuControl'
 import { Background } from '@/components/Background/Background'
 import { Callout } from '@/components/Callout/Callout'
@@ -15,11 +18,13 @@ import { type SectionId, SettingsPanel } from '@/components/SettingsPanel/Settin
 import { Welcome } from '@/components/Welcome/Welcome'
 import { useLayout } from '@/layout/useLayout'
 import { answerWelcome } from '@/onboarding/answerWelcome'
+import type { SettingsStop } from '@/onboarding/callouts'
 import { dismissNews } from '@/onboarding/dismissNews'
 import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
 import { useNews } from '@/onboarding/useNews'
 import { preloadNext } from '@/photos/image'
+import { usePhotoCatalog } from '@/photos/usePhotoCatalog'
 import { usePhotoRotation } from '@/photos/usePhotoRotation'
 import { fontStack } from '@/settings/fonts'
 import { settingsItem } from '@/settings/storage'
@@ -37,7 +42,10 @@ type Popover = 'info' | 'settings' | null
  * How the settings were opened: on which section, and whether with the last stops of the tour
  * (where the tour has got to on the page, for the count).
  */
-type SettingsEntry = { section: SectionId; tour: { before: number; total: number } | false }
+type SettingsEntry = {
+  section: SectionId
+  tour: { before: number; stops?: readonly SettingsStop[]; total: number } | false
+}
 
 const FROM_GEAR: SettingsEntry = { section: 'photos', tour: false }
 
@@ -61,6 +69,7 @@ export function App() {
     settingsItem,
     saveOutcome,
   )
+  const background = useBackground(saveOutcome)
   // The Layout is the stored one, or worked out from the settings while there is none. Only
   // right once the stored settings have loaded, as the hook starts from the defaults.
   const {
@@ -93,15 +102,25 @@ export function App() {
   // Whether the guided tour of the page is running: started by the welcome's "Show me around", in
   // this tab only. Nothing about it is stored; the welcome's answer is the one thing written.
   const [touring, setTouring] = useState(false)
+  const [walkingNews, setWalkingNews] = useState(false)
+  const [quietInfo, setQuietInfo] = useState(false)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
+  const photoBackground = background.loaded && displayKind(background.value) === 'photo'
   const { next, photo, photos, upcoming } = usePhotoRotation(
-    settingsLoaded ? settings.photos : null,
+    settingsLoaded && photoBackground ? settings.photos : null,
   )
+  const catalog = usePhotoCatalog(popover === 'settings' && !photoBackground)
+  const availablePhotos = photoBackground ? photos : catalog
 
-  const toggle = (which: Exclude<Popover, null>) =>
+  const toggle = (which: Exclude<Popover, null>) => {
+    setQuietInfo(false)
     setPopover((open) => (open === which ? null : which))
-  const close = useCallback(() => setPopover(null), [])
+  }
+  const close = useCallback(() => {
+    setQuietInfo(false)
+    setPopover(null)
+  }, [])
   const openSettings = (how: SettingsEntry) => {
     setEntry(how)
     setPopover('settings')
@@ -113,11 +132,17 @@ export function App() {
     if (popover === 'settings') setTouring(false)
   }, [popover])
 
+  useEffect(() => {
+    if (!photoBackground && popover === 'info') setPopover(null)
+  }, [photoBackground, popover])
+
   // Out of the way while a popover has the corner, and until the welcome has been answered.
   // A note at a thing on the page is placed by the Layout, so it waits for it as the Grid does.
   // Not alongside the tour, which is the one note a new install sees.
   const news = useNews(
-    popover === null && layoutLoaded && !touring ? onboarding : null,
+    (popover === null || (walkingNews && popover === 'info')) && layoutLoaded && !touring
+      ? onboarding
+      : null,
     settingsLoaded ? settings : null,
   )
   const dismiss = (id: string) => {
@@ -162,8 +187,20 @@ export function App() {
   return (
     <EditModeProvider canChange={!layoutReadOnly}>
       <AddMenuControlProvider>
-        <main class="app">
-          {photo && (
+        <main
+          class="app"
+          data-ink={
+            photoBackground
+              ? 'light'
+              : background.loaded
+                ? readableInk(background.value.colour) === '#111'
+                  ? 'dark'
+                  : 'light'
+                : undefined
+          }
+        >
+          {background.loaded && !photoBackground && <Background colour={background.value.colour} />}
+          {photoBackground && photo && (
             <Background
               dim={settings.dim}
               onLoad={() => {
@@ -196,7 +233,23 @@ export function App() {
               title={news.title}
             />
           )}
-          {news?.target !== undefined && <PageNews dismiss={dismiss} layout={layout} news={news} />}
+          {news?.target !== undefined && (
+            <PageNews
+              closeInfo={() => {
+                setQuietInfo(false)
+                setPopover((open) => (open === 'info' ? null : open))
+              }}
+              dismiss={dismiss}
+              layout={layout}
+              news={news}
+              onWalkChange={setWalkingNews}
+              openInfo={() => {
+                setQuietInfo(true)
+                setPopover('info')
+              }}
+              openSettings={(section, tour) => openSettings({ section, tour })}
+            />
+          )}
           {/*
           The guided tour of the page, in the same place in the document as the news, so with the
           same Tab order; its notes take no focus either. It waits for the Layout, as the news
@@ -204,6 +257,10 @@ export function App() {
         */}
           {touring && settingsLoaded && layoutLoaded && popover !== 'settings' && (
             <PageTour
+              closeInfo={() => {
+                setQuietInfo(false)
+                setPopover((open) => (open === 'info' ? null : open))
+              }}
               layout={layout}
               onEnd={() => setTouring(false)}
               onFinish={(plan) => {
@@ -212,6 +269,10 @@ export function App() {
                   section: 'photos',
                   tour: { before: plan.page.length, total: plan.total },
                 })
+              }}
+              openInfo={() => {
+                setQuietInfo(true)
+                setPopover('info')
               }}
             />
           )}
@@ -239,21 +300,21 @@ export function App() {
               )}
             </RemovalProvider>
           </OptionsPopoverProvider>
-          {photo && <PhotoCredit photo={photo} />}
-          {photo && popover === 'info' && (
-            <PhotoInfo onClose={close} photo={photo} saveOutcome={saveOutcome} />
+          {photoBackground && photo && <PhotoCredit photo={photo} />}
+          {photoBackground && photo && popover === 'info' && (
+            <PhotoInfo onClose={close} photo={photo} quiet={quietInfo} saveOutcome={saveOutcome} />
           )}
           {popover === 'settings' && (
             <SettingsPanel
-              currentId={photo?.id ?? null}
+              currentId={photoBackground ? (photo?.id ?? null) : null}
               initialSection={entry.section}
               onChange={setSettings}
               onClose={close}
-              photos={photos}
+              photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}
               settings={settings}
-              tour={entry.tour ? SETTINGS_TOUR : undefined}
+              tour={entry.tour ? (entry.tour.stops ?? SETTINGS_TOUR) : undefined}
               tourProgress={entry.tour || undefined}
             />
           )}
@@ -281,8 +342,8 @@ export function App() {
             layout={layout}
             layoutLoaded={settingsLoaded && layoutLoaded}
             onCommit={commit}
-            onNext={showNext}
-            onToggleInfo={photo ? () => toggle('info') : undefined}
+            onNext={photoBackground ? showNext : undefined}
+            onToggleInfo={photoBackground && photo ? () => toggle('info') : undefined}
             onToggleSettings={() => {
               setEntry(FROM_GEAR)
               toggle('settings')

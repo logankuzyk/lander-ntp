@@ -33,13 +33,14 @@ export type SettingsStop = CalloutBase & {
  * ones behind it back (like one that is `available`), so that they keep their order.
  */
 export type PageCallout = CalloutBase & {
+  /** Label for starting a walk attached to this note. */
+  actionLabel?: string
   section?: undefined
-  /**
-   * Its one button is "Show me" instead of "Got it", and goes into edit mode as it dismisses the
-   * note. Page state only: nothing is stored for it.
-   */
+  /** For a one-step note, "Show me" goes into edit mode as it dismisses the note. */
   showMe?: 'edit'
   target: CalloutTarget
+  /** The stops shown after its action is pressed. */
+  walk?: readonly TourStop[]
 }
 
 export type CalloutInfo = PageCallout | SettingsStop
@@ -50,6 +51,8 @@ export type PageState = {
   adding: boolean
   /** The page is in edit mode. */
   editing: boolean
+  /** Photo details are open without taking focus from the callout. */
+  info?: boolean
 }
 
 /**
@@ -162,6 +165,19 @@ export const TOUR: readonly TourStop[] = [
   },
 ]
 
+/** The update note's walk, including the photo-details stop that only makes sense on the page. */
+const NEWS_WALK: readonly TourStop[] = [
+  ...TOUR.slice(0, 1),
+  {
+    body: 'Open photo details to see the camera settings and location for this photo.',
+    id: 'news-photo-details',
+    show: { adding: false, editing: false, info: true },
+    target: 'edit',
+    title: 'Photo details',
+  },
+  ...TOUR.slice(1),
+]
+
 /**
  * Shown once, one at a time and in this order, to people who had the extension before the
  * feature arrived. A new install never sees these (`recordInstall` records them as seen): the
@@ -178,11 +194,12 @@ export const TOUR: readonly TourStop[] = [
  */
 export const NEWS: readonly CalloutInfo[] = [
   {
+    actionLabel: 'Show me',
     body: 'Move, resize and add widgets in edit mode. Clock and Weather options are on the widgets now, and Add brings back any you had off.',
     id: 'layout',
-    showMe: 'edit',
     target: 'edit',
     title: 'You can edit your page now',
+    walk: NEWS_WALK,
   },
 ]
 
