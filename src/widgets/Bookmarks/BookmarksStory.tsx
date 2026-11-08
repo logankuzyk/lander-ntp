@@ -4,6 +4,9 @@ import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { createBookmarksDefinition } from './definition'
 
+const STORY_ICON =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"%3E%3Crect width="16" height="16" rx="3" fill="%235b7cfa"/%3E%3C/svg%3E'
+
 export type StoryMode =
   'allow' | 'choose' | 'empty' | 'failed' | 'loading' | 'ready' | 'unsupported'
 
@@ -68,7 +71,7 @@ export function BookmarksStory({
   openInNewTab?: boolean
   showFolderName?: boolean
 }) {
-  const definition = createBookmarksDefinition(portFor(mode))
+  const definition = createBookmarksDefinition(portFor(mode), () => STORY_ICON)
   const options = {
     folder: mode === 'choose' ? JSON.stringify({ id: 'another-profile', title: 'Reading' }) : 'bar',
     openInNewTab,

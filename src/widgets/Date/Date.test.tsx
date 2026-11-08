@@ -51,21 +51,53 @@ describe('Date Widget', () => {
 
   it('shows or hides the year in the month grid heading', () => {
     const { container, rerender } = render(
-      <Date cells={cells(3, 3)} {...options} locale="en-US" showYear />,
+      <Date cells={cells(3, 3)} {...options} format="long" locale="en-US" showYear />,
     )
     expect(container.querySelector('.date__month')?.textContent).toBe('October 2025')
 
-    rerender(<Date cells={cells(3, 3)} {...options} locale="en-US" showYear={false} />)
+    rerender(
+      <Date cells={cells(3, 3)} {...options} format="long" locale="en-US" showYear={false} />,
+    )
     expect(container.querySelector('.date__month')?.textContent).toBe('October')
+  })
+
+  it('uses the chosen format in the month grid heading and weekday labels', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(3, 3)} {...options} format="short" locale="en-US" />,
+    )
+    expect(container.querySelector('.date__month')?.textContent).toBe('Oct')
+    expect([...container.querySelectorAll('.date__weekday')].map((day) => day.textContent)).toEqual(
+      ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+    )
+
+    rerender(<Date cells={cells(3, 3)} {...options} format="long" locale="en-US" />)
+    expect(container.querySelector('.date__month')?.textContent).toBe('October')
+    expect([...container.querySelectorAll('.date__weekday')].map((day) => day.textContent)).toEqual(
+      ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    )
+  })
+
+  it('uses the chosen format in the day card', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(2, 2)} {...options} format="short" locale="en-US" />,
+    )
+    expect(container.querySelector('.date__card-weekday')?.textContent).toBe('Sat')
+    expect(container.querySelector('.date__card-month')?.textContent).toBe('Oct')
+
+    rerender(<Date cells={cells(2, 2)} {...options} format="long" locale="en-US" />)
+    expect(container.querySelector('.date__card-weekday')?.textContent).toBe('Saturday')
+    expect(container.querySelector('.date__card-month')?.textContent).toBe('October')
   })
 
   it('shows or hides the year in the day card month label', () => {
     const { container, rerender } = render(
-      <Date cells={cells(2, 2)} {...options} locale="en-US" showYear />,
+      <Date cells={cells(2, 2)} {...options} format="long" locale="en-US" showYear />,
     )
     expect(container.querySelector('.date__card-month')?.textContent).toBe('October 2025')
 
-    rerender(<Date cells={cells(2, 2)} {...options} locale="en-US" showYear={false} />)
+    rerender(
+      <Date cells={cells(2, 2)} {...options} format="long" locale="en-US" showYear={false} />,
+    )
     expect(container.querySelector('.date__card-month')?.textContent).toBe('October')
   })
 
@@ -77,6 +109,17 @@ describe('Date Widget', () => {
     expect(currentDay?.getAttribute('datetime')).toBe(
       new globalThis.Date(2025, 9, 18, 12).toISOString(),
     )
+  })
+
+  it('keeps week-strip weekdays compact in Short and the month label full', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(5, 1)} {...options} format="short" locale="en-US" />,
+    )
+    expect(container.querySelector('.date--week')?.getAttribute('aria-label')).toBe('October 2025')
+    expect(container.querySelector('.date__week-day span')?.textContent).toBe('M')
+
+    rerender(<Date cells={cells(5, 1)} {...options} format="long" locale="en-US" />)
+    expect(container.querySelector('.date__week-day span')?.textContent).toBe('Monday')
   })
 
   it('shows the ISO week number and marks today in the month grid', () => {

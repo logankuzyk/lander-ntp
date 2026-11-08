@@ -92,9 +92,14 @@ export function formatDateLine(
   }).format(date)
 }
 
-export function formatMonth(date: Date, locale?: string, showYear = true): string {
+export function formatMonth(
+  date: Date,
+  locale?: string,
+  showYear = true,
+  width: 'long' | 'short' = 'long',
+): string {
   return new Intl.DateTimeFormat(locale, {
-    month: 'long',
+    month: width,
     ...(showYear ? { year: 'numeric' as const } : {}),
   }).format(date)
 }
@@ -106,7 +111,7 @@ export function formatDay(date: Date, locale?: string): string {
 export function formatWeekday(
   date: Date,
   locale?: string,
-  width: 'narrow' | 'short' = 'short',
+  width: 'long' | 'narrow' | 'short' = 'short',
 ): string {
   return new Intl.DateTimeFormat(locale, { weekday: width }).format(date)
 }

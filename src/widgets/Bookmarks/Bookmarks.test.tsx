@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createFakeBookmarksPort } from '@/bookmarks/fake'
 import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode'
+import { OptionsPopover } from '@/widgetSystem/OptionsPopover'
 import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { createBookmarksDefinition } from './definition'
@@ -32,6 +33,93 @@ afterEach(() => {
 })
 
 describe('the Bookmarks Widget', () => {
+  it('shows the stored folder name as soon as its options open', () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Reading"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{
+          folder: JSON.stringify({ id: 'reading', title: 'Reading' }),
+          openInNewTab: false,
+          showFolderName: true,
+        }}
+        page={PAGE}
+      />,
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain('Reading')
+  })
+
+  it('shows the portable Bookmarks bar name before loading choices', () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Bookmarks bar"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{ folder: 'bar', openInNewTab: false, showFolderName: true }}
+        page={PAGE}
+      />,
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain('Bookmarks bar')
+  })
+
+  it('labels a saved folder missing from this device in its options', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks, Reading"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{
+          folder: JSON.stringify({ id: 'gone', title: 'Reading' }),
+          openInNewTab: false,
+          showFolderName: true,
+        }}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+
+    expect(await screen.findByRole('option', { name: 'Reading (folder missing)' })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Folder' }).textContent).toContain(
+      'Reading (folder missing)',
+    )
+  })
+
+  it('clearly labels a missing saved folder that has no stored title', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <OptionsPopover
+        box={() => null}
+        definition={createBookmarksDefinition(port)}
+        name="Bookmarks"
+        onChange={() => undefined}
+        onClose={() => undefined}
+        onPageValueChange={() => undefined}
+        options={{ folder: 'gone', openInNewTab: false, showFolderName: true }}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+
+    expect(await screen.findByRole('option', { name: 'Folder missing' })).toBeTruthy()
+  })
+
   it('lists the portable Bookmarks bar once, without a device-specific bar choice', async () => {
     const port = createFakeBookmarksPort({
       granted: true,
@@ -85,6 +173,25 @@ describe('the Bookmarks Widget', () => {
       '--bookmarks-columns: 3; --bookmarks-rows: 7',
     )
     expect(screen.getByText('Bookmarks bar')).toBeTruthy()
+  })
+
+  it('draws each bookmark with the Quick dial icon tile and label style', async () => {
+    const port = createFakeBookmarksPort({ granted: true, tree: TREE })
+    render(
+      <WidgetBox
+        definition={createBookmarksDefinition(port)}
+        options={{ folder: 'bar', openInNewTab: false, showFolderName: false }}
+        page={PAGE}
+        rect={RECT}
+      />,
+    )
+
+    const link = await screen.findByRole('link', { name: 'One bookmark' })
+    expect(link.classList.contains('quick-dial')).toBe(true)
+    expect(link.querySelector('.quick-dial__icon img')?.getAttribute('src')).toBe(
+      'https://example.com/favicon.ico',
+    )
+    expect(link.querySelector('.quick-dial__label')?.textContent).toBe('One bookmark')
   })
 
   it('opens links in a new tab when that option is on', async () => {
