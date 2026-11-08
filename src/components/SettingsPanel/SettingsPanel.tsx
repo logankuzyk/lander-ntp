@@ -12,7 +12,7 @@ import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
 import { FONT_IDS, type FontId, FONTS } from '@/settings/fonts'
 import type { Settings, WeatherSettings } from '@/settings/schema'
-import { allowLocation } from '@/weather/consent'
+import { allowLocation, locationConsented } from '@/weather/consent'
 import { CURRENT_LOCATION, devicePosition, locate } from '@/weather/deviceLocation'
 import { placeName } from '@/weather/placeName'
 
@@ -203,6 +203,7 @@ function WeatherSection({ onChange, settings }: SectionProps) {
   const current = settings.weather
   const [changingPlace, setChangingPlace] = useState(false)
   const [locateFailed, setLocateFailed] = useState(false)
+  const [consentNeeded, setConsentNeeded] = useState(false)
   const [, setRefused] = useState(0)
 
   // `follow` and `enable` wait on the browser's prompts, and the settings can change meanwhile:
@@ -221,8 +222,23 @@ function WeatherSection({ onChange, settings }: SectionProps) {
     locating.current = true
     setLocateFailed(false)
     try {
-      const position = await locate()
+      // Start geolocation on the click: waiting for Firefox's asynchronous consent check first
+      // can lose the browser's user activation. The position stays local until consent is known.
+      const consent = locationConsented()
+      const positionRequest = locate()
+      if (!(await consent)) {
+        setConsentNeeded(true)
+        return
+      }
+      setConsentNeeded(false)
+      const position = await positionRequest
       if (!position) return setLocateFailed(true)
+      // Consent can be withdrawn while the browser is waiting for the position. Check again at
+      // the point where this path would send it to the reverse geocoder.
+      if (import.meta.env.BROWSER === 'firefox' && !(await locationConsented())) {
+        setConsentNeeded(true)
+        return
+      }
       await devicePosition.setValue({ ...position, name: await placeName(position) })
       setChangingPlace(false)
       weather({ followDevice: true })
@@ -259,13 +275,20 @@ function WeatherSection({ onChange, settings }: SectionProps) {
           ) : (
             <PlaceSearch
               locateFailed={locateFailed}
+              onConsentNeeded={setConsentNeeded}
               onLocate={() => void follow()}
               onSelect={(place) => {
+                setConsentNeeded(false)
                 setChangingPlace(false)
                 weather({ followDevice: false, place })
               }}
             />
           ))}
+        {current.enabled && consentNeeded && (
+          <p class="settings__note">
+            Firefox data consent is needed to search places or follow your location.
+          </p>
+        )}
         {current.enabled && (
           <>
             <Choice<WeatherSettings['unit']>

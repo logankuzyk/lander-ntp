@@ -32,9 +32,12 @@ export default defineConfig({
     ...(browser === 'firefox' && {
       browser_specific_settings: {
         gecko: {
-          // Firefox requires this. Nothing is collected unless the weather widget is switched
-          // on, which sends the chosen place to the forecast service and asks for this first.
-          data_collection_permissions: { optional: ['locationInfo'], required: ['none'] },
+          // Sending a place for the forecast and sending an email for account sync are both
+          // consented. Required stays none, so install and update do not prompt.
+          data_collection_permissions: {
+            optional: ['locationInfo', 'personallyIdentifyingInfo', 'authenticationInfo'],
+            required: ['none'],
+          },
           id: 'lander-ntp@logankuzyk.com',
           strict_min_version: '140.0',
         },

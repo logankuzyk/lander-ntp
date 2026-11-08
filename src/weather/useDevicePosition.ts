@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
+import { locationConsented } from './consent'
 import {
   devicePosition,
   type DevicePosition,
@@ -25,10 +26,12 @@ export function useDevicePosition(follow: boolean): DevicePosition | null {
     let last: DevicePosition | null = null
 
     const update = async () => {
+      if (!(await locationConsented())) return
       const found = (await locationAllowed()) ? await locate() : null
       if (!active) return
       // Somewhere new, or somewhere whose name couldn't be had last time.
       if (found && !(last?.name && near(last, found))) {
+        if (!(await locationConsented())) return
         const name = await placeName(found)
         if (!active) return
         // Still the same place for the forecast: only the name is news.

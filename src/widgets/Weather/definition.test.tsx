@@ -598,6 +598,23 @@ describe('the Weather on Firefox', () => {
     await waitFor(() => expect(shown()).toBe('12'))
   })
 
+  it('does not fetch a synced place if consent is withdrawn after the Need is met', async () => {
+    vi.stubEnv('BROWSER', 'firefox')
+    await weatherCache.removeValue()
+    const contains = vi
+      .spyOn(browser.permissions, 'contains')
+      .mockResolvedValueOnce(true as never)
+      .mockResolvedValueOnce(false as never)
+    const fetch = vi.fn().mockResolvedValue(forecast(12))
+    vi.stubGlobal('fetch', fetch)
+
+    render(<Probe settings={ON} />)
+    await waitFor(() => expect(contains).toHaveBeenCalledTimes(2))
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(shown()).toBe('none')
+  })
+
   it('asks the device nothing and looks up no name before the user has agreed, even when following it', async () => {
     const getCurrentPosition = vi.fn()
     vi.stubGlobal('navigator', {
@@ -615,6 +632,33 @@ describe('the Weather on Firefox', () => {
     })
 
     expect(getCurrentPosition).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('stops device updates before reverse-geocoding when consent is withdrawn', async () => {
+    vi.stubEnv('BROWSER', 'firefox')
+    await devicePosition.removeValue()
+    await weatherCache.removeValue()
+    expect(await devicePosition.getValue()).toBeNull()
+    let consented = true
+    const contains = vi
+      .spyOn(browser.permissions, 'contains')
+      .mockImplementation((() => Promise.resolve(consented)) as never)
+    const getCurrentPosition = vi.fn((done: (position: unknown) => void) => {
+      consented = false
+      done({ coords: { latitude: 48.43, longitude: -123.37 } })
+    })
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition },
+      language: 'en-CA',
+      permissions: { query: () => Promise.resolve({ state: 'granted' }) },
+    })
+    const fetch = vi.fn().mockResolvedValue(forecast(12))
+    vi.stubGlobal('fetch', fetch)
+
+    render(<Probe settings={{ ...ON, followDevice: true, place: null }} />)
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(contains).toHaveBeenCalledTimes(3))
     expect(fetch).not.toHaveBeenCalled()
   })
 
