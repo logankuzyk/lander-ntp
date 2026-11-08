@@ -11,6 +11,22 @@ export function flattenFolders(nodes: readonly BookmarkNode[]): BookmarkFolder[]
   return folders
 }
 
+/** Folder choices leave out the device-specific folder represented by the portable `bar` value. */
+export function selectableFolders(nodes: readonly BookmarkNode[]): BookmarkFolder[] {
+  const folders = flattenFolders(nodes)
+  const foldersWithRole: BookmarkNode[] = []
+  const collect = (items: readonly BookmarkNode[]) => {
+    for (const item of items) {
+      if (item.children !== undefined) foldersWithRole.push(item)
+      collect(item.children ?? [])
+    }
+  }
+  collect(nodes)
+  const portableBarId =
+    foldersWithRole.find((node) => node.folderType === 'bookmarks-bar')?.id ?? folders[0]?.id
+  return folders.filter((folder) => folder.id !== portableBarId)
+}
+
 export function resolveFolder(
   tree: readonly BookmarkNode[],
   choice: BookmarkFolderChoice,

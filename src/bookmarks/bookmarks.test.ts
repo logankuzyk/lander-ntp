@@ -46,10 +46,7 @@ describe('bookmarksSource', () => {
       folderTitle: 'Reading',
       items: [{ id: 'a', title: 'A', url: 'https://example.com/a' }],
     })
-    await expect(port.folders()).resolves.toEqual([
-      { depth: 0, id: 'folder', title: 'Reading' },
-      { depth: 1, id: 'nested', title: 'Nested' },
-    ])
+    await expect(port.folders()).resolves.toEqual([{ depth: 1, id: 'nested', title: 'Nested' }])
   })
 
   it('asks to choose a folder when its id or recorded title is no longer on this device', async () => {
@@ -69,6 +66,25 @@ describe('bookmarksSource', () => {
     })
   })
 
+  it('reads a saved folder choice encoded with its portable id and title', async () => {
+    const port = createFakeBookmarksPort({
+      granted: true,
+      tree: [
+        {
+          children: [{ children: [], id: 'reading-id', title: 'Reading' }],
+          id: 'root',
+          title: '',
+        },
+      ],
+    })
+
+    await expect(
+      bookmarksSource(port).read({
+        folder: JSON.stringify({ id: 'reading-id', title: 'Reading' }),
+      }),
+    ).resolves.toEqual({ folderTitle: 'Reading', items: [] })
+  })
+
   it('does not try to read bookmarks until the permission is granted', async () => {
     const port = createFakeBookmarksPort({ granted: false })
     const read = vi.spyOn(port, 'read')
@@ -81,7 +97,18 @@ describe('bookmarksSource', () => {
 
   it('gets folder choices from the granted browser tree', async () => {
     const nodes: BookmarkNode[] = [
-      { children: [{ children: [], id: 'saved', title: 'Saved' }], id: 'bar', title: 'Toolbar' },
+      {
+        children: [
+          {
+            children: [{ children: [], id: 'saved', title: 'Saved' }],
+            folderType: 'bookmarks-bar',
+            id: 'bar',
+            title: 'Toolbar',
+          },
+        ],
+        id: 'root',
+        title: '',
+      },
     ]
     const event = { addListener: vi.fn(), removeListener: vi.fn() }
     const permissions = {
@@ -105,7 +132,7 @@ describe('bookmarksSource', () => {
     }
     const port = createBookmarksPort({ bookmarks: () => bookmarks, permissions })
 
-    await expect(port.folders()).resolves.toEqual([{ depth: 0, id: 'saved', title: 'Saved' }])
+    await expect(port.folders()).resolves.toEqual([{ depth: 1, id: 'saved', title: 'Saved' }])
     expect(bookmarks.getTree).toHaveBeenCalledTimes(1)
   })
 

@@ -32,6 +32,40 @@ afterEach(() => {
 })
 
 describe('the Bookmarks Widget', () => {
+  it('lists the portable Bookmarks bar once, without a device-specific bar choice', async () => {
+    const port = createFakeBookmarksPort({
+      granted: true,
+      tree: [
+        {
+          children: [
+            {
+              children: [{ children: [], id: 'reading', title: 'Reading' }],
+              folderType: 'bookmarks-bar',
+              id: 'bar-device-id',
+              title: 'Bookmarks bar',
+            },
+          ],
+          id: 'root',
+          title: '',
+        },
+      ],
+    })
+    const [folderOption] = createBookmarksDefinition(port).options
+    if (folderOption?.control !== 'pick') throw new Error('Folder is a pick option')
+
+    const choices = await folderOption.load()
+
+    expect(choices.filter(({ value }) => value === 'bar')).toEqual([
+      { label: 'Bookmarks bar', value: 'bar' },
+    ])
+    expect(
+      choices.some(
+        ({ value }) => value === JSON.stringify({ id: 'bar-device-id', title: 'Bookmarks bar' }),
+      ),
+    ).toBe(false)
+    expect(choices.map(({ label }) => label)).toContain('Reading')
+  })
+
   it('draws links in rows before columns and uses the URL as their title', async () => {
     const port = createFakeBookmarksPort({ granted: true, tree: TREE })
     render(
@@ -212,6 +246,16 @@ describe('the Bookmarks Widget', () => {
     await screen.findAllByRole('link')
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
     const link = container.querySelector('a')!
+    const arrow = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowDown',
+    })
+    link.dispatchEvent(arrow)
+    expect(arrow.defaultPrevented).toBe(false)
+    const enterKey = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' })
+    link.dispatchEvent(enterKey)
+    expect(enterKey.defaultPrevented).toBe(true)
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     link.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)

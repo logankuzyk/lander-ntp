@@ -1,4 +1,4 @@
-import { bookmarkItems, flattenFolders, resolveFolder } from './tree'
+import { bookmarkItems, resolveFolder, selectableFolders } from './tree'
 import type { BookmarkFolderChoice, BookmarkNode, BookmarksPort } from './types'
 
 type FakeOptions = {
@@ -31,7 +31,7 @@ export function createFakeBookmarksPort({
       notify()
     },
     contains: async () => supported && hasGrant,
-    folders: async () => (supported && hasGrant ? flattenFolders(roots()) : []),
+    folders: async () => (supported && hasGrant ? selectableFolders(roots()) : []),
     isSupported: () => supported,
     read: async (choice: BookmarkFolderChoice) => {
       if (!supported || !hasGrant) return { need: 'folder' as const }
