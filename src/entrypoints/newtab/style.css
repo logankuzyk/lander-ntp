@@ -1084,6 +1084,16 @@ body {
   text-align: left;
 }
 
+.date--grid.date--long .date__weekday {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .date__calendar {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

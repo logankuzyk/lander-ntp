@@ -93,7 +93,7 @@ export function Date({
   if (isMonthGrid) {
     const weeks = monthWeeks(today, weekStartsOn)
     return (
-      <div class="date date--grid">
+      <div class={`date date--grid${format === 'long' ? ' date--long' : ''}`}>
         <strong class="date__month">
           {formatMonth(today, locale, showYear, format === 'short' ? 'short' : 'long')}
         </strong>
@@ -104,7 +104,11 @@ export function Date({
             </span>
           )}
           {weeks[0]!.map((day) => (
-            <span class="date__weekday" key={`weekday-${day.getDay()}`}>
+            <span
+              class="date__weekday"
+              key={`weekday-${day.getDay()}`}
+              title={format === 'long' ? formatWeekday(day, locale, 'long') : undefined}
+            >
               {formatWeekday(day, locale, format === 'short' ? 'narrow' : 'long')}
             </span>
           ))}

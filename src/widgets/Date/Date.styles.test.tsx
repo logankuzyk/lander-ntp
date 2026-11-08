@@ -22,7 +22,18 @@ describe('Date styles', () => {
     expect(rule('.analog-clock__date-window')).toMatch(/stroke-width:\s*1(?:;|$)/)
   })
 
+  it('centres the Analog Clock date text vertically in its window', () => {
+    expect(rule('.analog-clock__date')).toMatch(/dominant-baseline:\s*middle(?:;|$)/)
+  })
+
   it('aligns the month heading with the calendar grid', () => {
     expect(rule('.date__month')).toMatch(/text-align:\s*left(?:;|$)/)
+  })
+
+  it('clips full weekday names to their month-grid columns', () => {
+    const weekday = rule('.date--grid.date--long .date__weekday')
+    expect(weekday).toContain('overflow: hidden')
+    expect(weekday).toContain('text-overflow: ellipsis')
+    expect(weekday).toContain('white-space: nowrap')
   })
 })

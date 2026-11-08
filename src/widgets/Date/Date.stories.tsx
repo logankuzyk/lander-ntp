@@ -81,6 +81,26 @@ export const WeekStrip: Story = {
     </div>
   ),
 }
+export const LongWeekStrip: Story = {
+  args: { ...meta.args, cells: { h: 1, w: 5 }, format: 'long' },
+  decorators: [withPage],
+  render: (args) => (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <div
+        class="widget-box"
+        style={{ height: 'calc((100vh - 88px) / 8)', width: 'calc(5 * (100vw - 40px) / 12)' }}
+      >
+        <Date {...args} />
+      </div>
+      <div
+        class="widget-box"
+        style={{ height: 'calc(2 * (100vh - 88px) / 8)', width: 'calc(5 * (100vw - 40px) / 12)' }}
+      >
+        <Date {...args} cells={{ h: 2, w: 5 }} />
+      </div>
+    </div>
+  ),
+}
 export const MonthWeekNumbers: Story = {
   args: { ...meta.args, cells: largest, weekNumbers: true },
   parameters: { box: centred(largest) },

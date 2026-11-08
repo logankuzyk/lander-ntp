@@ -111,6 +111,17 @@ describe('Date Widget', () => {
     )
   })
 
+  it('keeps week-strip weekdays compact in Short and the month label full', () => {
+    const { container, rerender } = render(
+      <Date cells={cells(5, 1)} {...options} format="short" locale="en-US" />,
+    )
+    expect(container.querySelector('.date--week')?.getAttribute('aria-label')).toBe('October 2025')
+    expect(container.querySelector('.date__week-day span')?.textContent).toBe('M')
+
+    rerender(<Date cells={cells(5, 1)} {...options} format="long" locale="en-US" />)
+    expect(container.querySelector('.date__week-day span')?.textContent).toBe('Monday')
+  })
+
   it('shows the ISO week number and marks today in the month grid', () => {
     const { container } = render(<Date cells={cells(3, 3)} {...options} showYear weekNumbers />)
     expect(container.querySelectorAll('.date__week-number').length).toBe(5)
