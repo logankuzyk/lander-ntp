@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '../server/src/app.js'
 import type { ServerConfig } from '../server/src/config.js'
 import type { ObjectStore } from '../server/src/objectStore.js'
+import { exampleLayout } from '../src/layout/fixtures.js'
+import type { StoredLayout } from '../src/layout/types.js'
 import { planFirstSignIn } from '../src/sync/planning.js'
 
 type SyncItem = { v: number; value: unknown }
@@ -19,6 +21,10 @@ type Device = {
 
 const databases: DatabaseSync[] = []
 const extensionOrigin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+const layoutValue = (type: 'clock' | 'weather' = 'clock'): StoredLayout => {
+  const layout = exampleLayout()
+  return { ...layout, widgets: layout.widgets.filter((widget) => widget.type === type) }
+}
 
 async function makeServer(options: { reviewer?: boolean } = {}) {
   const db = new DatabaseSync(':memory:')
@@ -135,24 +141,25 @@ describe('two devices against the server app', () => {
     await first.signIn(email)
     await second.signIn(email)
 
-    const saved = { layout: { v: 1, value: { widgets: ['clock'] } } }
+    const storedLayoutValue = layoutValue()
+    const saved = { layout: { v: 1, value: storedLayoutValue } }
     first.browserStorage.set('layout', saved.layout)
-    expect((await first.put('layout', saved.layout)).status).toBe(200)
+    expect((await first.put('layout', storedLayoutValue)).status).toBe(200)
     const snapshot = (await (await second.get('/v1/sync')).json()) as {
       items: Record<string, SyncItem>
     }
     const layout = snapshot.items.layout
     expect(layout).toBeDefined()
-    second.browserStorage.set('layout', layout!.value)
+    second.browserStorage.set('layout', { v: layout!.v, value: layout!.value })
 
     expect(second.browserStorage.get('layout')).toEqual(saved.layout)
     expect(first.browserStorage).not.toBe(second.browserStorage)
-    expect(snapshot.items.layout).toEqual({ v: 1, value: saved.layout })
+    expect(snapshot.items.layout).toEqual({ v: 1, value: storedLayoutValue })
 
-    const unchanged = await second.put('layout', saved.layout)
+    const unchanged = await second.put('layout', storedLayoutValue)
     expect(await unchanged.json()).toEqual({ changed: false, rev: 1 })
 
-    const later = { v: 1, value: { widgets: ['weather'] } }
+    const later = layoutValue('weather')
     expect(await (await second.put('layout', later)).json()).toEqual({ changed: true, rev: 2 })
     const latest = (await (await first.get('/v1/sync')).json()) as {
       items: Record<string, SyncItem>
@@ -163,14 +170,14 @@ describe('two devices against the server app', () => {
   it.each([
     { local: {}, remote: {}, result: 'nothing', when: 'neither side is arranged' },
     {
-      local: { layout: { v: 1, value: { widgets: ['clock'] } } },
+      local: { layout: { v: 1, value: layoutValue() } },
       remote: {},
       result: 'upload',
       when: 'only this browser has a Layout',
     },
     {
       local: {},
-      remote: { layout: { v: 1, value: { widgets: ['clock'] } } },
+      remote: { layout: { v: 1, value: layoutValue() } },
       result: 'download',
       when: 'only the account has a Layout',
     },
@@ -221,16 +228,18 @@ describe('two devices against the server app', () => {
     const second = makeDevice(app, mail, 'second')
     await first.signIn('person@example.com')
     await second.signIn('person@example.com')
-    first.browserStorage.set('layout', { v: 1, value: { widgets: ['clock'] } })
-    second.browserStorage.set('layout', { v: 1, value: { widgets: ['weather'] } })
+    const clockLayout = layoutValue()
+    const weatherLayout = layoutValue('weather')
+    first.browserStorage.set('layout', { v: 1, value: clockLayout })
+    second.browserStorage.set('layout', { v: 1, value: weatherLayout })
 
     expect(
       (await request(app, '/v1/account', first.account?.token, { method: 'DELETE' })).status,
     ).toBe(204)
     expect((await first.get('/v1/sync')).status).toBe(401)
     expect((await second.get('/v1/sync')).status).toBe(401)
-    expect(first.browserStorage.get('layout')).toEqual({ v: 1, value: { widgets: ['clock'] } })
-    expect(second.browserStorage.get('layout')).toEqual({ v: 1, value: { widgets: ['weather'] } })
+    expect(first.browserStorage.get('layout')).toEqual({ v: 1, value: clockLayout })
+    expect(second.browserStorage.get('layout')).toEqual({ v: 1, value: weatherLayout })
   })
 
   it('keeps a device local page while the server is down and resumes sync when it returns', async () => {
@@ -238,19 +247,19 @@ describe('two devices against the server app', () => {
     let serverIsUp = true
     const device = makeDevice(app, mail, 'returning', () => serverIsUp)
     await device.signIn('person@example.com')
-    const layout = { v: 1, value: { widgets: ['clock'] } }
+    const layout = { v: 1, value: layoutValue() }
     device.browserStorage.set('layout', layout)
 
     serverIsUp = false
-    await expect(device.put('layout', layout)).rejects.toThrow('The server is unavailable')
+    await expect(device.put('layout', layout.value)).rejects.toThrow('The server is unavailable')
     expect(device.browserStorage.get('layout')).toEqual(layout)
 
     serverIsUp = true
-    expect((await device.put('layout', layout)).status).toBe(200)
+    expect((await device.put('layout', layout.value)).status).toBe(200)
     const snapshot = (await (await device.get('/v1/sync')).json()) as {
       items: Record<string, SyncItem>
     }
-    expect(snapshot.items.layout).toEqual({ v: 1, value: layout })
+    expect(snapshot.items.layout).toEqual({ v: 1, value: layout.value })
   })
 
   it('refuses oversized and lower-version Layout writes and admits the reviewer sign-in', async () => {
@@ -258,26 +267,21 @@ describe('two devices against the server app', () => {
     const device = makeDevice(app, mail, 'reviewer')
     await device.signIn('reviewer@example.com')
 
-    expect(
-      (
-        await device.put('layout', {
-          v: 1,
-          value: { widgets: ['clock'] },
-        })
-      ).status,
-    ).toBe(200)
-    expect((await device.put('layout', { v: 2, value: { widgets: [] } })).status).toBe(200)
-    expect((await device.put('layout', { v: 1, value: { widgets: [] } })).status).toBe(409)
+    expect((await device.put('layout', layoutValue())).status).toBe(200)
+    const newerLayout = { ...layoutValue(), v: 2 as const }
+    expect((await device.put('layout', newerLayout)).status).toBe(200)
+    expect((await device.put('layout', layoutValue())).status).toBe(409)
     let payloadLength = 0
-    let boundaryValue = { v: 2, value: 'x'.repeat(payloadLength) }
+    let boundaryValue = { ...newerLayout, padding: 'x'.repeat(payloadLength) }
     while (new TextEncoder().encode(`layout${JSON.stringify(boundaryValue)}`).length < 8192) {
       payloadLength += 1
-      boundaryValue = { v: 2, value: 'x'.repeat(payloadLength) }
+      boundaryValue = { ...newerLayout, padding: 'x'.repeat(payloadLength) }
     }
     expect(new TextEncoder().encode(`layout${JSON.stringify(boundaryValue)}`).length).toBe(8192)
     expect((await device.put('layout', boundaryValue)).status).toBe(200)
     expect(
-      (await device.put('layout', { v: 2, value: 'x'.repeat(payloadLength + 1) })).status,
+      (await device.put('layout', { ...newerLayout, padding: 'x'.repeat(payloadLength + 1) }))
+        .status,
     ).toBe(413)
     expect((await device.get('/v1/me')).status).toBe(200)
   })
