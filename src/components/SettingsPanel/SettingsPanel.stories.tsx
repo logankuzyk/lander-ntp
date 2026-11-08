@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { useEffect, useState } from 'preact/hooks'
 import { fn, userEvent, within } from 'storybook/test'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
@@ -74,6 +75,7 @@ const meta = {
     onBackgroundChange: fn(),
     onChange: fn(),
     onClose: fn(),
+    onSelectPhoto: fn(),
     photos: STORY_PHOTOS,
     settings: SETTINGS,
   },
@@ -88,12 +90,44 @@ type Story = StoryObj<typeof meta>
 
 export const PhotosCycling: Story = {}
 
-export const PhotosKept: Story = {
+export const FavouritesOnlyOff: Story = {
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [STORY_PHOTOS[0]!.id], v: 1 })
+  },
+}
+
+export const FavouritesOnlyOn: Story = {
+  args: { background: { ...DEFAULT_BACKGROUND, favouritesOnly: true } },
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [STORY_PHOTOS[0]!.id], v: 1 })
+  },
+}
+
+export const NoFavourites: Story = {
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [], v: 1 })
+  },
+}
+
+export const FavouritesGone: Story = {
+  args: {
+    background: { ...DEFAULT_BACKGROUND, favouritesOnly: true },
+    photos: STORY_PHOTOS.slice(1),
+  },
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [STORY_PHOTOS[0]!.id], v: 1 })
+  },
+}
+
+export const PhotoHeld: Story = {
   args: {
     settings: {
       ...SETTINGS,
       photos: { ...SETTINGS.photos, mode: 'pinned', pinnedId: STORY_PHOTOS[0]?.id ?? null },
     },
+  },
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [STORY_PHOTOS[0]!.id], v: 1 })
   },
 }
 

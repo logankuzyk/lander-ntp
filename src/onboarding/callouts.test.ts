@@ -33,11 +33,16 @@ describe('the tour', () => {
       'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
     )
     expect(background).toMatchObject({
-      body: 'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
       id: 'tour-photos',
       section: 'photos',
       title: 'Background',
     })
+    expect(background?.body).toContain('how often the photo changes')
+    expect(background?.body).toContain('which tags to draw from')
+    expect(background?.body).toContain('solid colour')
+    expect(background?.body).toContain('Pick a photo from the gallery to show it now')
+    expect(background?.body).toContain('The heart in photo details keeps favourites')
+    expect(background?.body).toContain('Favourites only cycles just those')
   })
 
   it('has a stop in the panel for Background and one for the font, and none for the Clock or the Weather', () => {

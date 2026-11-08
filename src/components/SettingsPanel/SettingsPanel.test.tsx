@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import { type Background, DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import type { SettingsStop } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
@@ -37,6 +39,7 @@ const renderPanel = ({
 } = {}) => {
   const onChange = vi.fn()
   const onBackgroundChange = vi.fn()
+  const onSelectPhoto = vi.fn()
   const onPreviewColour = vi.fn()
   const onClose = vi.fn()
   const view = render(
@@ -49,11 +52,12 @@ const renderPanel = ({
       onChange={onChange}
       onClose={onClose}
       onPreviewColour={onPreviewColour}
+      onSelectPhoto={onSelectPhoto}
       photos={photos}
       settings={{ ...settings, ...overrides }}
     />,
   )
-  return { ...view, onBackgroundChange, onChange, onClose, onPreviewColour }
+  return { ...view, onBackgroundChange, onChange, onClose, onPreviewColour, onSelectPhoto }
 }
 
 const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
@@ -64,6 +68,131 @@ const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
 const openSection = (name: string) => fireEvent.click(screen.getByRole('tab', { name }))
 
 describe('SettingsPanel', () => {
+  describe('Favourites only', () => {
+    it('can turn Favourites only on while a photo is held', async () => {
+      await fakeBrowser.storage.sync.clear()
+      const { onBackgroundChange } = renderPanel({
+        overrides: withPhotos({ mode: 'pinned', pinnedId: 'a' }),
+      })
+
+      const toggle = (await screen.findByRole('switch', {
+        name: 'Favourites only',
+      })) as HTMLInputElement
+      expect(await screen.findByText('Mark photos with the heart to use this.')).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
+      await act(async () => {
+        await favouritesItem.setValue({ ids: ['a'], v: 1 })
+      })
+      await waitFor(() => expect(toggle.disabled).toBe(false))
+      fireEvent.click(toggle)
+
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        favouritesOnly: true,
+      })
+    })
+
+    it('needs an on-site favourite, hides Tags while on, and reports when favourites leave the site', async () => {
+      await fakeBrowser.storage.sync.clear()
+      const { onBackgroundChange, rerender } = renderPanel()
+
+      const toggle = (await screen.findByRole('switch', {
+        name: 'Favourites only',
+      })) as HTMLInputElement
+      expect(await screen.findByText('Mark photos with the heart to use this.')).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
+      expect(screen.getByRole('combobox', { name: 'Tags' })).toBeTruthy()
+
+      await act(async () => {
+        await fakeBrowser.storage.sync.set({ favourites: { ids: ['a'], v: 1 } })
+      })
+      await waitFor(() => expect(toggle.disabled).toBe(false))
+      fireEvent.click(toggle)
+      expect(onBackgroundChange).toHaveBeenCalledWith({
+        ...DEFAULT_BACKGROUND,
+        favouritesOnly: true,
+      })
+      rerender(
+        <SettingsPanel
+          background={{ ...DEFAULT_BACKGROUND, favouritesOnly: true }}
+          currentId="a"
+          onBackgroundChange={onBackgroundChange}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+        />,
+      )
+      expect(screen.queryByRole('combobox', { name: 'Tags' })).toBeNull()
+      fireEvent.click(screen.getByRole('switch', { name: 'Favourites only' }))
+      rerender(
+        <SettingsPanel
+          currentId="a"
+          onBackgroundChange={onBackgroundChange}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={PHOTOS}
+          settings={settings}
+        />,
+      )
+      expect(screen.getByRole('combobox', { name: 'Tags' })).toBeTruthy()
+
+      rerender(
+        <SettingsPanel
+          background={{ ...DEFAULT_BACKGROUND, favouritesOnly: true }}
+          currentId="a"
+          onBackgroundChange={onBackgroundChange}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          photos={[PHOTOS[1]!]}
+          settings={settings}
+        />,
+      )
+      expect(
+        screen.getByText(
+          'None of your favourites are on the site right now, so every photo is cycled.',
+        ),
+      ).toBeTruthy()
+      expect(await favouritesItem.getValue()).toEqual({ ids: ['a'], v: 1 })
+    })
+
+    it('keeps the missing-favourites note off for the bundled fallback photo', async () => {
+      await fakeBrowser.storage.sync.clear()
+      await fakeBrowser.storage.sync.set({ favourites: { ids: [], v: 1 } })
+      const photos = [{ ...PHOTOS[0]!, id: 'fallback' }]
+      const { container } = renderPanel({
+        background: { ...DEFAULT_BACKGROUND, favouritesOnly: true },
+        photos,
+      })
+
+      const panel = within(container as HTMLElement)
+      const toggle = (await panel.findByRole('switch', {
+        name: 'Favourites only',
+      })) as HTMLInputElement
+      await waitFor(() => expect(toggle.disabled).toBe(false))
+      expect(
+        within(panel.getByRole('dialog', { name: 'Settings' }) as HTMLElement).queryByText(
+          /None of your favourites are on the site/,
+        ),
+      ).toBeNull()
+    })
+
+    it('explains that matching Tags remain in use when favourites are gone', async () => {
+      await fakeBrowser.storage.sync.clear()
+      await fakeBrowser.storage.sync.set({ favourites: { ids: ['gone'], v: 1 } })
+      renderPanel({
+        background: { ...DEFAULT_BACKGROUND, favouritesOnly: true },
+        overrides: withPhotos({ tags: ['water'] }),
+      })
+
+      expect(
+        await screen.findByText(
+          'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.',
+        ),
+      ).toBeTruthy()
+    })
+  })
+
   it('opens as a labelled popover with the close button focused', () => {
     renderPanel()
 
@@ -128,11 +257,11 @@ describe('SettingsPanel', () => {
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Background')
     })
 
-    it('has no favourites', () => {
+    it('prompts the user to mark a photo when none are favourites', async () => {
       renderPanel()
 
       expect(screen.queryByRole('tab', { name: 'Favourites' })).toBeNull()
-      expect(screen.queryByText(/favourite/i)).toBeNull()
+      expect(await screen.findByText('Mark photos with the heart to use this.')).toBeTruthy()
     })
   })
 
@@ -240,12 +369,13 @@ describe('SettingsPanel', () => {
       )
     })
 
-    it('pins a photo picked from the gallery', () => {
-      const { onChange } = renderPanel()
+    it('shows a photo picked from the gallery without changing cycling settings', () => {
+      const { onChange, onSelectPhoto } = renderPanel()
 
       fireEvent.click(screen.getByRole('button', { name: 'Tide pools' }))
 
-      expect(onChange).toHaveBeenCalledWith(withPhotos({ mode: 'pinned', pinnedId: 'b' }))
+      expect(onSelectPhoto).toHaveBeenCalledWith('b')
+      expect(onChange).not.toHaveBeenCalled()
     })
 
     it('reads tags no photo has as all photos, and clears them on the next change', () => {

@@ -25,6 +25,14 @@ function fieldsOf(option: OptionDescription): Field[] {
           schema: v.picklist(option.choices.map((choice) => choice.value)),
         },
       ]
+    case 'colour':
+      return [
+        {
+          default: option.default,
+          key: option.id,
+          schema: v.pipe(v.string(), v.regex(/^#[0-9a-fA-F]{6}$/)),
+        },
+      ]
     case 'icon':
       return [{ default: option.default, key: option.id, schema: v.nullable(v.string()) }]
     case 'orderedList': {

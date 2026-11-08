@@ -55,6 +55,11 @@ const preview: Preview = {
           styles: { height: '800px', width: '390px' },
           type: 'mobile',
         },
+        phone390x780: {
+          name: '390 by 780',
+          styles: { height: '780px', width: '390px' },
+          type: 'mobile',
+        },
         short1366: {
           name: '1366 by 400',
           styles: { height: '400px', width: '1366px' },

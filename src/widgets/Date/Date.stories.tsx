@@ -45,8 +45,44 @@ export const GridOff: Story = {
   args: { ...meta.args, cells: { h: 3, w: 3 }, monthGrid: false },
   parameters: { box: centred({ h: 3, w: 3 }) },
 }
+export const ShortCard: Story = {
+  args: { ...meta.args, cells: { h: 2, w: 2 }, format: 'short' },
+  parameters: { box: centred({ h: 2, w: 2 }) },
+}
+export const LongCard: Story = {
+  args: { ...meta.args, cells: { h: 2, w: 2 }, format: 'long' },
+  parameters: { box: centred({ h: 2, w: 2 }) },
+}
+export const ShortMonthGrid: Story = {
+  args: { ...meta.args, cells: { h: 3, w: 3 }, format: 'short' },
+  parameters: { box: centred({ h: 3, w: 3 }) },
+}
+export const LongMonthGrid: Story = {
+  args: { ...meta.args, cells: { h: 3, w: 3 }, format: 'long' },
+  parameters: { box: centred({ h: 3, w: 3 }) },
+}
 export const WeekStrip: Story = {
   args: { ...meta.args, cells: { h: 1, w: 5 } },
+  decorators: [withPage],
+  render: (args) => (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <div
+        class="widget-box"
+        style={{ height: 'calc((100vh - 88px) / 8)', width: 'calc(5 * (100vw - 40px) / 12)' }}
+      >
+        <Date {...args} />
+      </div>
+      <div
+        class="widget-box"
+        style={{ height: 'calc(2 * (100vh - 88px) / 8)', width: 'calc(5 * (100vw - 40px) / 12)' }}
+      >
+        <Date {...args} cells={{ h: 2, w: 5 }} />
+      </div>
+    </div>
+  ),
+}
+export const LongWeekStrip: Story = {
+  args: { ...meta.args, cells: { h: 1, w: 5 }, format: 'long' },
   decorators: [withPage],
   render: (args) => (
     <div style={{ display: 'grid', gap: '1rem' }}>

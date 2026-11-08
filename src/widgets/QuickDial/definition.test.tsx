@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/preact'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
+import { describe, expect, it, vi } from 'vitest'
 
 import { accessibleName } from '@/widgetSystem/name'
 import { readOptions } from '@/widgetSystem/options'
+import { OptionsForm } from '@/widgetSystem/OptionsForm'
 import { WidgetBox } from '@/widgetSystem/WidgetBox'
 
 import { quickDialDefinition } from './definition'
@@ -20,27 +21,45 @@ describe('the Quick dial definition', () => {
       starting: expect.any(Function),
     })
     expect(
-      quickDialDefinition.sizes.starting({ icon: null, label: '', newTab: false, url: '' }),
+      quickDialDefinition.sizes.starting({
+        colour: '#ffffff',
+        icon: null,
+        label: '',
+        newTab: false,
+        showIcon: true,
+        url: '',
+      }),
     ).toEqual({ h: 1, w: 1 })
   })
 
   it('uses the label or host as its summary and treats an unsafe stored URL as unset', () => {
     expect(
-      quickDialDefinition.summary?.({ icon: null, label: '', newTab: false, url: 'github.com' }),
+      quickDialDefinition.summary?.({
+        colour: '#ffffff',
+        icon: null,
+        label: '',
+        newTab: false,
+        showIcon: true,
+        url: 'github.com',
+      }),
     ).toBe('github.com')
     expect(
       quickDialDefinition.summary?.({
+        colour: '#ffffff',
         icon: null,
         label: 'My link',
         newTab: false,
+        showIcon: true,
         url: 'github.com',
       }),
     ).toBe('My link')
     expect(
       quickDialDefinition.needs?.[0]?.met({
+        colour: '#ffffff',
         icon: null,
         label: '',
         newTab: false,
+        showIcon: true,
         url: 'javascript:alert(1)',
       }),
     ).toBe(false)
@@ -54,23 +73,48 @@ describe('the Quick dial definition', () => {
       url: 'https://example.com/reading',
     }
 
-    expect(readOptions(quickDialDefinition, options)).toEqual(options)
+    expect(readOptions(quickDialDefinition, options)).toEqual({
+      ...options,
+      colour: '#ffffff',
+      showIcon: true,
+    })
+  })
+
+  it('saves a Quick dial colour from the shared colour picker', () => {
+    const onChange = vi.fn()
+    render(
+      <OptionsForm
+        definition={quickDialDefinition}
+        onChange={onChange}
+        onPageValueChange={() => {}}
+        options={{ icon: null, label: 'Example', newTab: false, url: 'example.com' }}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Colour 5' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ colour: '#1d3557' }))
   })
 
   it('gives two Quick dials different accessible names from their labels', () => {
     expect(
       accessibleName(quickDialDefinition, {
+        colour: '#ffffff',
         icon: null,
         label: 'Work',
         newTab: false,
+        showIcon: true,
         url: 'https://example.com',
       }),
     ).toBe('Quick dial, Work')
     expect(
       accessibleName(quickDialDefinition, {
+        colour: '#ffffff',
         icon: null,
         label: 'Reading',
         newTab: false,
+        showIcon: true,
         url: 'https://example.com',
       }),
     ).toBe('Quick dial, Reading')
@@ -81,7 +125,14 @@ describe('the Quick dial definition', () => {
       <WidgetBox
         definition={quickDialDefinition}
         id="quickd01"
-        options={{ icon: null, label: '', newTab: false, url: 'javascript:alert(1)' }}
+        options={{
+          colour: '#ffffff',
+          icon: null,
+          label: '',
+          newTab: false,
+          showIcon: true,
+          url: 'javascript:alert(1)',
+        }}
         page={PAGE}
         rect={RECT}
       />,

@@ -1,13 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
-import { parseColour } from '@/backdrop/colour'
-import {
-  type Background,
-  BACKGROUND_COLOURS,
-  DEFAULT_BACKGROUND,
-  displayKind,
-} from '@/backdrop/storage'
+import { presentFavourites } from '@/backdrop/favourites'
+import { type Background, DEFAULT_BACKGROUND, displayKind } from '@/backdrop/storage'
+import { useFavourites } from '@/backdrop/useFavourites'
 import { Callout } from '@/components/Callout/Callout'
+import { ColourPicker } from '@/components/ColourPicker/ColourPicker'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
@@ -17,6 +14,7 @@ import { usePopover } from '@/components/Popover/usePopover'
 import type { SettingsStop } from '@/onboarding/callouts'
 import { NewMark } from '@/onboarding/NewMark'
 import { useSeen } from '@/onboarding/useSeen'
+import { poolFor } from '@/photos/pool'
 import { FREQUENCIES, type Frequency, type PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { availableTags } from '@/photos/tags'
@@ -55,8 +53,11 @@ const SECTIONS = [
 export type SectionId = (typeof SECTIONS)[number][0]
 
 type PhotosSectionProps = {
+  background: Background
   currentId: string | null
+  onBackgroundChange: (background: Background) => void
   onChange: (settings: Settings) => void
+  onSelectPhoto: (id: string) => void
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
   settings: Settings
@@ -67,6 +68,7 @@ type BackgroundSectionProps = {
   currentId: string | null
   onChange: (background: Background) => void
   onPreviewColour?: (colour: string | null) => void
+  onSelectPhoto: (id: string) => void
   onSettingsChange: (settings: Settings) => void
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
@@ -78,41 +80,13 @@ function BackgroundSection({
   currentId,
   onChange,
   onPreviewColour,
+  onSelectPhoto,
   onSettingsChange,
   photos,
   saveOutcome,
   settings,
 }: BackgroundSectionProps) {
   const colourMode = displayKind(background) === 'colour'
-  const [hex, setHex] = useState(background.colour.replace('#', ''))
-  const [pickerColour, setPickerColour] = useState(background.colour)
-  const [hexError, setHexError] = useState(false)
-  const picker = useRef<HTMLInputElement>(null)
-  const custom = !BACKGROUND_COLOURS.some(
-    (colour) => colour.toLowerCase() === background.colour.toLowerCase(),
-  )
-  useEffect(() => {
-    setHex(background.colour.replace('#', ''))
-    setPickerColour(background.colour)
-  }, [background.colour])
-  const setColour = (colour: string, save: boolean) => {
-    setPickerColour(colour)
-    setHex(colour.replace('#', ''))
-    setHexError(false)
-    onPreviewColour?.(colour)
-    if (save) {
-      onChange({ ...background, colour })
-      onPreviewColour?.(null)
-    }
-  }
-  const commitHex = () => {
-    const colour = parseColour(hex)
-    if (!colour) {
-      setHexError(true)
-      return
-    }
-    setColour(colour, true)
-  }
 
   return (
     <>
@@ -135,77 +109,19 @@ function BackgroundSection({
         />
       </section>
       {colourMode ? (
-        <section aria-label="Background colour">
-          <div aria-label="Background colour" class="background-swatches" role="radiogroup">
-            {BACKGROUND_COLOURS.map((colour, index) => (
-              <label class="background-swatch" key={colour} title={`Colour ${index + 1}`}>
-                <input
-                  aria-label={`Colour ${index + 1}`}
-                  checked={!custom && background.colour.toLowerCase() === colour.toLowerCase()}
-                  name="background-colour"
-                  onChange={() => setColour(colour, true)}
-                  type="radio"
-                  value={colour}
-                />
-                <span aria-hidden="true" style={{ backgroundColor: colour }} />
-              </label>
-            ))}
-            <label class="background-swatch" title="Custom colour">
-              <input
-                aria-label="Custom colour"
-                checked={custom}
-                name="background-colour"
-                onChange={() => picker.current?.click()}
-                type="radio"
-              />
-              <span aria-hidden="true" class="background-swatch__custom">
-                +
-              </span>
-            </label>
-          </div>
-          <input
-            aria-label="Choose custom colour"
-            class="background-colour-picker"
-            onCancel={() => {
-              setPickerColour(background.colour)
-              setHex(background.colour.replace('#', ''))
-              setHexError(false)
-              onPreviewColour?.(null)
-            }}
-            onChange={(event) => setColour(event.currentTarget.value, true)}
-            onInput={(event) => setColour(event.currentTarget.value, false)}
-            ref={picker}
-            type="color"
-            value={pickerColour}
-          />
-          <label class="settings__row settings__row--text">
-            <span>Hex colour</span>
-            <input
-              aria-describedby={hexError ? 'background-hex-error' : undefined}
-              aria-invalid={hexError}
-              class="settings__input"
-              maxLength={7}
-              onBlur={commitHex}
-              onInput={(event) => {
-                setHex(event.currentTarget.value.replace(/^#/, ''))
-                setHexError(false)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') commitHex()
-              }}
-              value={hex}
-            />
-          </label>
-          {hexError && (
-            <p class="settings__note" id="background-hex-error">
-              Use six digits, like 1a2b3c
-            </p>
-          )}
-        </section>
+        <ColourPicker
+          label="Background colour"
+          onChange={(colour) => onChange({ ...background, colour })}
+          onPreview={onPreviewColour}
+          value={background.colour}
+        />
       ) : (
         <PhotosSection
+          background={background}
           currentId={currentId}
+          onBackgroundChange={onChange}
           onChange={onSettingsChange}
+          onSelectPhoto={onSelectPhoto}
           photos={photos}
           saveOutcome={saveOutcome}
           settings={settings}
@@ -215,10 +131,31 @@ function BackgroundSection({
   )
 }
 
-function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: PhotosSectionProps) {
+function PhotosSection({
+  background,
+  currentId,
+  onBackgroundChange,
+  onChange,
+  onSelectPhoto,
+  photos,
+  saveOutcome,
+  settings,
+}: PhotosSectionProps) {
   const cycling = settings.photos
   const pinned = cycling.mode === 'pinned'
   const tags = useMemo(() => availableTags(photos), [photos])
+  const favourites = useFavourites(saveOutcome)
+  const fallback = photos.length === 1 && photos[0]?.id === 'fallback'
+  const hasFavourite = fallback
+    ? favourites.value.ids.length > 0
+    : presentFavourites(favourites.value.ids, photos).length > 0
+  const pool = poolFor({
+    favourites: favourites.value.ids,
+    favouritesOnly: background.favouritesOnly,
+    photos,
+    tags: cycling.tags,
+  })
+  const favouritesGone = favourites.loaded && pool.favouritesGone
 
   const tagsLabel = useId()
 
@@ -242,8 +179,8 @@ function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: P
           }
           value={pinned ? NEVER : cycling.frequency}
         />
-        {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
-        {!pinned && tags.length > 0 && (
+        {/* Tags are kept while a photo is held with Never, for when cycling resumes. */}
+        {!pinned && !background.favouritesOnly && tags.length > 0 && (
           <div class="settings__row settings__row--wrap">
             <span id={tagsLabel}>Tags</span>
             <MultiSelect
@@ -257,10 +194,26 @@ function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: P
         )}
         {pinned && (
           <p class="settings__note">
-            Keeping this photo.{' '}
+            This photo is held.{' '}
             <button class="settings__link" onClick={() => update({ mode: 'cycle' })} type="button">
               Resume cycling
             </button>
+          </p>
+        )}
+        <Switch
+          checked={background.favouritesOnly}
+          disabled={!favourites.loaded || (!hasFavourite && !background.favouritesOnly)}
+          label="Favourites only"
+          onChange={(favouritesOnly) => onBackgroundChange({ ...background, favouritesOnly })}
+        />
+        {!hasFavourite && !background.favouritesOnly && favourites.loaded && (
+          <p class="settings__note">Mark photos with the heart to use this.</p>
+        )}
+        {favouritesGone && (
+          <p class="settings__note">
+            {pool.source === 'tags'
+              ? 'None of your favourites are on the site right now, so photos matching your selected Tags are cycled.'
+              : 'None of your favourites are on the site right now, so every photo is cycled.'}
           </p>
         )}
         <Switch
@@ -277,7 +230,7 @@ function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: P
           initialTag={cycling.tags.length === 1 ? (cycling.tags[0] ?? null) : null}
           // Remounted when the cycled tags change, so the filter follows them.
           key={cycling.tags.join(' ')}
-          onSelect={(id) => update({ mode: 'pinned', pinnedId: id })}
+          onSelect={onSelectPhoto}
           photos={photos}
           saveOutcome={saveOutcome}
         />
@@ -363,6 +316,7 @@ type SettingsPanelProps = {
   onChange: (settings: Settings) => void
   onClose: () => void
   onPreviewColour?: (colour: string | null) => void
+  onSelectPhoto?: (id: string) => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
   /**
@@ -393,6 +347,7 @@ export function SettingsPanel({
   onChange,
   onClose,
   onPreviewColour,
+  onSelectPhoto = () => {},
   photos,
   readOnly = false,
   saveOutcome,
@@ -560,6 +515,7 @@ export function SettingsPanel({
                   if (backgroundLoaded) onBackgroundChange(next)
                 }}
                 onPreviewColour={onPreviewColour}
+                onSelectPhoto={onSelectPhoto}
                 onSettingsChange={onChange}
                 photos={photos}
                 saveOutcome={saveOutcome}

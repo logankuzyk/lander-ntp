@@ -151,7 +151,7 @@ export const TOUR: readonly TourStop[] = [
     title: 'When you are done',
   },
   {
-    body: 'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
+    body: 'Choose how often the photo changes, which tags to draw from, or a solid colour. Pick a photo from the gallery to show it now. The heart in photo details keeps favourites, and Favourites only cycles just those.',
     id: 'tour-photos',
     section: 'photos',
     title: 'Background',

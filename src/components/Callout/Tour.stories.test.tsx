@@ -91,7 +91,7 @@ describe('the tour stories', () => {
       }
       if (name === 'BackgroundStop') {
         expect(screen.getByRole('note').textContent).toContain(
-          'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
+          'Choose how often the photo changes, which tags to draw from, or a solid colour. Pick a photo from the gallery to show it now. The heart in photo details keeps favourites, and Favourites only cycles just those.',
         )
       }
       expect(fetchSpy).not.toHaveBeenCalled()

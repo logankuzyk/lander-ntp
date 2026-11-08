@@ -1,7 +1,12 @@
 import type { ComponentChildren } from 'preact'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from 'preact/hooks'
 
+import { ColourPicker } from '@/components/ColourPicker/ColourPicker'
+import { siteIconUrl as defaultSiteIconUrl } from '@/quickDial/siteIconUrl'
+import { tidyUrl } from '@/quickDial/tidyUrl'
+
 import { Choice } from './controls/Choice'
+import { IconControl } from './controls/IconControl'
 import { OrderedListControl } from './controls/OrderedListControl'
 import { PickFromList } from './controls/PickFromList'
 import { PlaceControl } from './controls/PlaceControl'
@@ -135,8 +140,10 @@ type OptionsFormProps = {
    * take focus on, such as the place search for a Weather that has no place.
    */
   focusOption?: string
+  /** Injectable site icon address, so stories never make a request. */
+  iconUrl?: (host: string) => string
   /** The Widget's whole options, with the change made: one call, and so one save, per change. */
-  onChange: (options: Record<string, unknown>) => void
+  onChange: (options: Record<string, unknown>) => Promise<unknown> | void
   /** A page-wide value changed. It is the page's, so it does not go through `onChange`. */
   onPageValueChange: <N extends PageValueName>(name: N, value: PageValues[N]) => void
   /**
@@ -162,6 +169,7 @@ export function OptionsForm({
   definition,
   disabled = false,
   focusOption,
+  iconUrl = defaultSiteIconUrl,
   onChange,
   onPageValueChange,
   options,
@@ -179,8 +187,8 @@ export function OptionsForm({
   latest.current = { disabled, options, pageValuesDisabled }
 
   const change = (changes: Record<string, unknown>) => {
-    if (latest.current.disabled) return
-    onChange(writeOptions(definition, latest.current.options, changes))
+    if (latest.current.disabled) return Promise.resolve(false)
+    return onChange(writeOptions(definition, latest.current.options, changes))
   }
 
   // Only when the form appears. The controls know nothing of their option's id, so each option
@@ -226,14 +234,27 @@ export function OptionsForm({
             value={read[option.id] as string}
           />
         )
+      case 'colour':
+        return (
+          <ColourPicker
+            disabled={off}
+            label={option.label}
+            onChange={(value) => change({ [option.id]: value })}
+            value={read[option.id] as string}
+          />
+        )
       case 'icon':
         return (
-          <div class="settings__row">
-            <span>{option.label}</span>
-            <span class="settings__note">
-              {read[option.id] ? 'Uploaded icon' : read.url ? "The site's own icon" : 'A letter'}
-            </span>
-          </div>
+          <IconControl
+            disabled={off}
+            onChange={(value) => change({ [option.id]: value })}
+            siteIcon={
+              typeof read.url === 'string' && tidyUrl(read.url)
+                ? iconUrl(new URL(tidyUrl(read.url)!).hostname)
+                : ''
+            }
+            value={read[option.id] as string | null}
+          />
         )
       case 'orderedList': {
         const heading = `${headings}-${option.id}`
@@ -258,9 +279,11 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             multiple
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string[]}
+            valueLabel={option.valueLabel}
           />
         ) : (
           <PickFromList
@@ -269,8 +292,10 @@ export function OptionsForm({
             failedText={option.failedText}
             label={option.label}
             load={option.load}
+            missingLabel={option.missingLabel}
             onChange={(value) => change({ [option.id]: value })}
             value={read[option.id] as string}
+            valueLabel={option.valueLabel}
           />
         )
       case 'place':

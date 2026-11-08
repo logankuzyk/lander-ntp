@@ -6,6 +6,7 @@ import { removeWidget, restoreWidget, settle } from '@/layout/ops'
 import type { Layout, PlacedWidget } from '@/layout/types'
 
 import { accessibleName, unknownWidgetName } from './name'
+import { widgetDefinition } from './registry'
 
 /** What a Widget's box needs of removal: whether there is any, and how to ask for it. */
 export type RemovalControls = {
@@ -118,6 +119,10 @@ export function useRemovalController({
 
   const available = loaded && !readOnly
 
+  const discard = useCallback((removed: PlacedWidget) => {
+    widgetDefinition(removed.type)?.onDiscard?.(removed.options)
+  }, [])
+
   const remove = useCallback(
     (id: string) => {
       if (!available) return
@@ -129,6 +134,7 @@ export function useRemovalController({
       const focus: FocusAfter = next === null ? 'controls' : { id: next }
       focusAfter.current = focus
       undone.current = null
+      if (pending) discard(pending.removed)
       latest.current = result.layout
       commit(result.layout)
       count.current += 1
@@ -139,7 +145,7 @@ export function useRemovalController({
         removed: result.removed,
       })
     },
-    [available, commit],
+    [available, commit, discard, pending],
   )
 
   const undo = useCallback(() => {
@@ -166,8 +172,9 @@ export function useRemovalController({
     // With focus on the notice, the notice taking itself away drops focus to the page, and the
     // frame it would have gone back to is the Widget that was removed.
     if (document.activeElement?.closest('.notice')) focusAfter.current = pending?.focus ?? null
+    if (pending) discard(pending.removed)
     setPending(null)
-  }, [pending])
+  }, [discard, pending])
 
   // A newer version wrote the Layout while the notice was up: nothing may be put back, so the
   // notice, and the Widget it holds, go rather than leave an Undo that does nothing.
