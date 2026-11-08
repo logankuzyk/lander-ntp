@@ -1,3 +1,4 @@
+import { act, renderHook, waitFor } from '@testing-library/preact'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
@@ -17,6 +18,7 @@ import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
 import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
+import { useLayout } from '@/layout/useLayout'
 import { answerWelcome } from '@/onboarding/answerWelcome'
 import { NEWS } from '@/onboarding/callouts'
 import { dismissNews } from '@/onboarding/dismissNews'
@@ -26,6 +28,7 @@ import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
 import { weatherDefinition } from '@/widgets/Weather/definition'
+import type { DefinitionOf } from '@/widgetSystem/definition'
 import { writeOptions } from '@/widgetSystem/options'
 
 import { asV023, asV030, saveLikeV023, saveLikeV030 } from './compat'
@@ -520,6 +523,51 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
       return changed.layout
     }),
+  },
+  {
+    layoutOnly: true,
+    name: 'pick from a Widget list (OptionsForm change through writeOptions, setOptions and sync:layout)',
+    write: async () => {
+      await storeExampleLayout()
+      const { result, unmount } = renderHook(() => useLayout(SEED))
+      await waitFor(() => expect(result.current.loaded).toBe(true))
+      const layout = result.current.layout
+      const weather = layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.type === 'weather',
+      )
+      if (weather?.kind !== 'known') throw new Error('the example Layout has a Weather')
+      const definition = {
+        ...weatherDefinition,
+        options: [
+          ...weatherDefinition.options,
+          {
+            control: 'pick' as const,
+            default: 'bar',
+            emptyText: 'No folders',
+            failedText: 'Could not load folders',
+            id: 'folder',
+            label: 'Folder',
+            load: async () => [{ label: 'Bookmarks bar', value: 'bar' }],
+          },
+        ],
+      }
+      const options = writeOptions(
+        definition as unknown as DefinitionOf<Record<string, unknown>>,
+        weather.placed.options,
+        { folder: 'bar' },
+      )
+      const changed = setOptions({ layout, readOnly: false }, weather.placed.id, options)
+      if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
+      act(() => result.current.commit(changed.layout))
+      await waitFor(async () => {
+        const saved = await layoutItem.getValue()
+        const savedWeather = saved?.widgets.find(
+          (widget) => widget.kind === 'known' && widget.placed.type === 'weather',
+        )
+        expect(savedWeather?.kind === 'known' && savedWeather.placed.options.folder).toBe('bar')
+      })
+      unmount()
+    },
   },
   {
     layoutOnly: true,

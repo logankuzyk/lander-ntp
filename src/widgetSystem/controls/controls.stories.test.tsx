@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import choice, * as choiceStories from './Choice.stories'
 import list, * as listStories from './OrderedListControl.stories'
+import pick, * as pickStories from './PickFromList.stories'
 import place, * as placeStories from './PlaceControl.stories'
 import toggle, * as switchStories from './Switch.stories'
 
@@ -43,6 +44,22 @@ describe('control stories', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Change photo' }))
 
     expect(screen.getAllByRole('option')).toHaveLength(10)
+  })
+
+  it('PickFromList stories show loading, a missing value, and several picks', async () => {
+    draw(pick, pickStories.Loading)
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+    expect(screen.getByText('Loading…')).toBeTruthy()
+    screen.getByRole('combobox').closest('.settings__row')?.remove()
+
+    draw(pick, pickStories.ValueMissing)
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+    expect(await screen.findByRole('option', { name: 'Not on this device' })).toBeTruthy()
+    screen.getByRole('combobox').closest('.settings__row')?.remove()
+
+    draw(pick, pickStories.Many)
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+    expect(await screen.findByRole('option', { name: 'Personal' })).toBeTruthy()
   })
 
   it.each([

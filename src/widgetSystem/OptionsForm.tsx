@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from 
 
 import { Choice } from './controls/Choice'
 import { OrderedListControl } from './controls/OrderedListControl'
+import { PickFromList } from './controls/PickFromList'
 import { PlaceControl } from './controls/PlaceControl'
 import { Switch } from './controls/Switch'
 import type {
@@ -240,6 +241,29 @@ export function OptionsForm({
           </>
         )
       }
+      case 'pick':
+        return option.multiple ? (
+          <PickFromList
+            disabled={off}
+            emptyText={option.emptyText}
+            failedText={option.failedText}
+            label={option.label}
+            load={option.load}
+            multiple
+            onChange={(value) => change({ [option.id]: value })}
+            value={read[option.id] as string[]}
+          />
+        ) : (
+          <PickFromList
+            disabled={off}
+            emptyText={option.emptyText}
+            failedText={option.failedText}
+            label={option.label}
+            load={option.load}
+            onChange={(value) => change({ [option.id]: value })}
+            value={read[option.id] as string}
+          />
+        )
       case 'place':
         return (
           <PlaceControl
