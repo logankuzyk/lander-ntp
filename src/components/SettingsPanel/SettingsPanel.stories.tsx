@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 import { useEffect, useState } from 'preact/hooks'
-import { fn } from 'storybook/test'
+import { fn, userEvent, within } from 'storybook/test'
 
+import { DEFAULT_BACKGROUND } from '@/backdrop/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { SETTINGS_TOUR } from '@/onboarding/tour'
 import type { Settings } from '@/settings/schema'
@@ -42,14 +43,20 @@ type Props = Parameters<typeof SettingsPanel>[0]
  * The panel keeps nothing itself: the page owns the settings. Here a little state does, so
  * switches and choices respond in a published Storybook as they do on the page.
  */
-function Stateful({ onChange, settings: initial, ...props }: Props) {
+function Stateful({ onBackgroundChange, onChange, settings: initial, ...props }: Props) {
   const [settings, setSettings] = useState(initial)
+  const [background, setBackground] = useState(props.background ?? DEFAULT_BACKGROUND)
   // Follow the Controls panel when it hands over new settings.
   useEffect(() => setSettings(initial), [initial])
 
   return (
     <SettingsPanel
       {...props}
+      background={background}
+      onBackgroundChange={(next) => {
+        setBackground(next)
+        onBackgroundChange?.(next)
+      }}
       onChange={(next) => {
         setSettings(next)
         onChange(next)
@@ -61,8 +68,10 @@ function Stateful({ onChange, settings: initial, ...props }: Props) {
 
 const meta = {
   args: {
+    background: DEFAULT_BACKGROUND,
     currentId: STORY_PHOTOS[0]?.id ?? null,
     initialSection: 'photos',
+    onBackgroundChange: fn(),
     onChange: fn(),
     onClose: fn(),
     photos: STORY_PHOTOS,
@@ -71,6 +80,7 @@ const meta = {
   component: SettingsPanel,
   decorators: [withPage],
   render: (args) => <Stateful {...args} />,
+  title: 'SettingsPanel/Background',
 } satisfies Meta<typeof SettingsPanel>
 export default meta
 
@@ -104,11 +114,31 @@ export const TabNew: Story = {
  */
 export const FromNewerVersion: Story = {
   args: {
-    readOnly: true,
+    background: { ...DEFAULT_BACKGROUND, colour: '#123456', kind: 'colour' },
+    backgroundReadOnly: true,
     settings: {
       ...SETTINGS,
       photos: { ...SETTINGS.photos, mode: 'pinned', pinnedId: STORY_PHOTOS[0]?.id ?? null },
     },
+  },
+}
+
+export const Photo: Story = { args: { background: { ...DEFAULT_BACKGROUND, kind: 'photo' } } }
+
+export const Colour: Story = { args: { background: { ...DEFAULT_BACKGROUND, kind: 'colour' } } }
+
+export const ColourCustom: Story = {
+  args: { background: { ...DEFAULT_BACKGROUND, colour: '#7357d6', kind: 'colour' } },
+}
+
+export const ColourHexError: Story = {
+  args: { background: { ...DEFAULT_BACKGROUND, colour: '#7357d6', kind: 'colour' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const hex = await canvas.findByRole('textbox', { name: 'Hex colour' })
+    await userEvent.clear(hex)
+    await userEvent.type(hex, '12345g')
+    await userEvent.keyboard('{Enter}')
   },
 }
 

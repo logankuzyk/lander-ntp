@@ -104,6 +104,7 @@ export function App() {
   const [touring, setTouring] = useState(false)
   const [walkingNews, setWalkingNews] = useState(false)
   const [quietInfo, setQuietInfo] = useState(false)
+  const [previewColour, setPreviewColour] = useState<string | null>(null)
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
   const photoBackground = background.loaded && displayKind(background.value) === 'photo'
@@ -193,13 +194,15 @@ export function App() {
             photoBackground
               ? 'light'
               : background.loaded
-                ? readableInk(background.value.colour) === '#111'
+                ? readableInk(previewColour ?? background.value.colour) === '#111'
                   ? 'dark'
                   : 'light'
                 : undefined
           }
         >
-          {background.loaded && !photoBackground && <Background colour={background.value.colour} />}
+          {background.loaded && !photoBackground && (
+            <Background colour={previewColour ?? background.value.colour} />
+          )}
           {photoBackground && photo && (
             <Background
               dim={settings.dim}
@@ -306,10 +309,14 @@ export function App() {
           )}
           {popover === 'settings' && (
             <SettingsPanel
+              background={background.value}
+              backgroundReadOnly={background.readOnly}
               currentId={photoBackground ? (photo?.id ?? null) : null}
               initialSection={entry.section}
+              onBackgroundChange={background.set}
               onChange={setSettings}
               onClose={close}
+              onPreviewColour={setPreviewColour}
               photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}

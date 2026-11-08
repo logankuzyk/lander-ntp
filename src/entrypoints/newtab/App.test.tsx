@@ -153,6 +153,8 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
     const panel = await screen.findByRole('dialog', { name: 'Settings' })
+    fireEvent.click(within(panel).getByRole('combobox', { name: 'Background' }))
+    fireEvent.click(within(panel).getByRole('option', { name: 'Photo' }))
     expect(await within(panel).findByRole('heading', { name: 'Gallery' })).toBeTruthy()
     fireEvent.click(within(panel).getByRole('button', { name: 'Forest' }))
 
@@ -723,7 +725,7 @@ describe('App, in edit mode', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     const settings = await screen.findByRole('dialog', { name: 'Settings' })
 
-    fireEvent.keyDown(within(settings).getByRole('tab', { name: 'Photos' }), { key: 'e' })
+    fireEvent.keyDown(within(settings).getByRole('tab', { name: 'Background' }), { key: 'e' })
 
     expect(editButton()).toBeTruthy()
   })

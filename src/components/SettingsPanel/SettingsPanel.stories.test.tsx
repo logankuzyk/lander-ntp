@@ -17,11 +17,15 @@ const selectedTab = () => screen.getByRole('tab', { selected: true }).textConten
 
 describe('settings panel stories', () => {
   it.each([
-    ['PhotosCycling', 'Photos'],
-    ['PhotosKept', 'Photos'],
+    ['Photo', 'Background'],
+    ['Colour', 'Background'],
+    ['ColourCustom', 'Background'],
+    ['ColourHexError', 'Background'],
+    ['PhotosCycling', 'Background'],
+    ['PhotosKept', 'Background'],
     ['General', 'General'],
-    ['WithTheTour', 'Photos'],
-    ['FromNewerVersion', 'Photos'],
+    ['WithTheTour', 'Background'],
+    ['FromNewerVersion', 'Background'],
   ] as const)('%s opens on %s', (name, tab) => {
     renderStory(name)
 
@@ -67,17 +71,19 @@ describe('settings panel stories', () => {
     ).toBe(false)
   })
 
-  it('marks the Photos tab as new until it is selected', async () => {
+  it('marks the Background tab as new until it is selected', async () => {
     await onboardingItem.setValue({ dismissed: [], welcomed: true })
     renderStory('TabNew')
 
     await waitFor(() =>
-      expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeTruthy(),
+      expect(
+        screen.getByRole('tab', { name: /Background/ }).querySelector('.new-mark'),
+      ).toBeTruthy(),
     )
     expect((await onboardingItem.getValue())?.dismissed).not.toContain('photos')
-    fireEvent.click(screen.getByRole('tab', { name: 'Photos' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Background' }))
     await waitFor(() =>
-      expect(screen.getByRole('tab', { name: /Photos/ }).querySelector('.new-mark')).toBeNull(),
+      expect(screen.getByRole('tab', { name: /Background/ }).querySelector('.new-mark')).toBeNull(),
     )
     await waitFor(async () =>
       expect((await onboardingItem.getValue())?.dismissed).toContain('photos'),

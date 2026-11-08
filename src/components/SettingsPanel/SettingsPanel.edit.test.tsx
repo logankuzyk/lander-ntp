@@ -59,7 +59,7 @@ describe('SettingsPanel, now the Clock and the Weather are on their widgets', ()
 
   it('has the pointer line in General only', () => {
     open()
-    fireEvent.click(screen.getByRole('tab', { name: 'Photos' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Background' }))
 
     expect(screen.queryByText(/options are on the widgets now/)).toBeNull()
   })
@@ -103,7 +103,7 @@ describe('SettingsPanel, now the Clock and the Weather are on their widgets', ()
   it('has no section, switch or control for the Clock or the Weather, even with the Weather on', () => {
     open()
 
-    for (const name of ['Photos', 'General']) {
+    for (const name of ['Background', 'General']) {
       fireEvent.click(screen.getByRole('tab', { name }))
       const section = within(screen.getByRole('tabpanel'))
       for (const label of [

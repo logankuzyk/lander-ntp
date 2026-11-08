@@ -1,5 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
+import { parseColour } from '@/backdrop/colour'
+import {
+  type Background,
+  BACKGROUND_COLOURS,
+  DEFAULT_BACKGROUND,
+  displayKind,
+} from '@/backdrop/storage'
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
@@ -41,7 +48,7 @@ const NEVER = 'never'
 
 /** The Clock and the Weather are set up on their widgets (edit mode), not here. */
 const SECTIONS = [
-  ['photos', 'Photos'],
+  ['photos', 'Background'],
   ['general', 'General'],
 ] as const
 
@@ -53,6 +60,153 @@ type PhotosSectionProps = {
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
   settings: Settings
+}
+
+type BackgroundSectionProps = {
+  background: Background
+  currentId: string | null
+  onChange: (background: Background) => void
+  onPreviewColour?: (colour: string | null) => void
+  onSettingsChange: (settings: Settings) => void
+  photos: readonly Photo[]
+  saveOutcome?: StorageItemOptions
+  settings: Settings
+}
+
+function BackgroundSection({
+  background,
+  currentId,
+  onChange,
+  onPreviewColour,
+  onSettingsChange,
+  photos,
+  saveOutcome,
+  settings,
+}: BackgroundSectionProps) {
+  const colourMode = displayKind(background) === 'colour'
+  const [hex, setHex] = useState(background.colour.replace('#', ''))
+  const [pickerColour, setPickerColour] = useState(background.colour)
+  const [hexError, setHexError] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
+  const custom = !BACKGROUND_COLOURS.some(
+    (colour) => colour.toLowerCase() === background.colour.toLowerCase(),
+  )
+  useEffect(() => {
+    setHex(background.colour.replace('#', ''))
+    setPickerColour(background.colour)
+  }, [background.colour])
+  const setColour = (colour: string, save: boolean) => {
+    setPickerColour(colour)
+    setHex(colour.replace('#', ''))
+    setHexError(false)
+    onPreviewColour?.(colour)
+    if (save) {
+      onChange({ ...background, colour })
+      onPreviewColour?.(null)
+    }
+  }
+  const commitHex = () => {
+    const colour = parseColour(hex)
+    if (!colour) {
+      setHexError(true)
+      return
+    }
+    setColour(colour, true)
+  }
+
+  return (
+    <>
+      <section>
+        <Choice<'colour' | 'photo'>
+          choices={[
+            { label: 'Photo', value: 'photo' },
+            { label: 'Colour', value: 'colour' },
+          ]}
+          label="Background"
+          onChange={(kind) => {
+            onPreviewColour?.(null)
+            onChange({
+              ...background,
+              colour: background.colour || DEFAULT_BACKGROUND.colour,
+              kind,
+            })
+          }}
+          value={displayKind(background)}
+        />
+      </section>
+      {colourMode ? (
+        <section aria-label="Background colour">
+          <div aria-label="Background colour" class="background-swatches" role="radiogroup">
+            {BACKGROUND_COLOURS.map((colour, index) => (
+              <label class="background-swatch" key={colour} title={`Colour ${index + 1}`}>
+                <input
+                  aria-label={`Colour ${index + 1}`}
+                  checked={!custom && background.colour.toLowerCase() === colour.toLowerCase()}
+                  name="background-colour"
+                  onChange={() => setColour(colour, true)}
+                  type="radio"
+                  value={colour}
+                />
+                <span aria-hidden="true" style={{ backgroundColor: colour }} />
+              </label>
+            ))}
+            <label class="background-swatch" title="Custom colour">
+              <input
+                aria-label="Custom colour"
+                checked={custom}
+                name="background-colour"
+                onChange={() => picker.current?.click()}
+                type="radio"
+              />
+              <span aria-hidden="true" class="background-swatch__custom">
+                +
+              </span>
+            </label>
+          </div>
+          <input
+            aria-label="Choose custom colour"
+            class="background-colour-picker"
+            onChange={(event) => setColour(event.currentTarget.value, true)}
+            onInput={(event) => setColour(event.currentTarget.value, false)}
+            ref={picker}
+            type="color"
+            value={pickerColour}
+          />
+          <label class="settings__row settings__row--text">
+            <span>Hex colour</span>
+            <input
+              aria-describedby={hexError ? 'background-hex-error' : undefined}
+              aria-invalid={hexError}
+              class="settings__input"
+              maxLength={7}
+              onBlur={commitHex}
+              onInput={(event) => {
+                setHex(event.currentTarget.value.replace(/^#/, ''))
+                setHexError(false)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitHex()
+              }}
+              value={hex}
+            />
+          </label>
+          {hexError && (
+            <p class="settings__note" id="background-hex-error">
+              Use six digits, like 1a2b3c
+            </p>
+          )}
+        </section>
+      ) : (
+        <PhotosSection
+          currentId={currentId}
+          onChange={onSettingsChange}
+          photos={photos}
+          saveOutcome={saveOutcome}
+          settings={settings}
+        />
+      )}
+    </>
+  )
 }
 
 function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: PhotosSectionProps) {
@@ -193,11 +347,15 @@ function useKnownTags(settings: Settings, photos: readonly Photo[]): Settings {
 }
 
 type SettingsPanelProps = {
+  background?: Background
+  backgroundReadOnly?: boolean
   currentId: string | null
   /** The section to open on, when there is no tour to say. */
   initialSection?: SectionId
+  onBackgroundChange?: (background: Background) => void
   onChange: (settings: Settings) => void
   onClose: () => void
+  onPreviewColour?: (colour: string | null) => void
   /** Every photo in the manifest, for the gallery. */
   photos: readonly Photo[]
   /**
@@ -219,10 +377,14 @@ type SettingsPanelProps = {
 
 /** Settings, in the popover corner above the controls. Opened with the gear button. */
 export function SettingsPanel({
+  background = DEFAULT_BACKGROUND,
+  backgroundReadOnly = false,
   currentId,
   initialSection = 'photos',
+  onBackgroundChange = () => {},
   onChange,
   onClose,
+  onPreviewColour,
   photos,
   readOnly = false,
   saveOutcome,
@@ -368,15 +530,25 @@ export function SettingsPanel({
           role="tabpanel"
         >
           {/* Switches every control in the section off at once; the tabs stay, to look around. */}
+          {section === 'photos' && backgroundReadOnly && !readOnly && (
+            <p class="settings__note settings__readonly" id={readOnlyId}>
+              {UPDATE_TO_CHANGE}
+            </p>
+          )}
           <fieldset
-            aria-describedby={readOnly ? readOnlyId : undefined}
+            aria-describedby={
+              readOnly || (section === 'photos' && backgroundReadOnly) ? readOnlyId : undefined
+            }
             class="settings__fieldset"
-            disabled={readOnly}
+            disabled={readOnly || (section === 'photos' && backgroundReadOnly)}
           >
             {section === 'photos' && (
-              <PhotosSection
+              <BackgroundSection
+                background={background}
                 currentId={currentId}
-                onChange={onChange}
+                onChange={onBackgroundChange}
+                onPreviewColour={onPreviewColour}
+                onSettingsChange={onChange}
                 photos={photos}
                 saveOutcome={saveOutcome}
                 settings={known}
