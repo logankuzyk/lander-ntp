@@ -141,6 +141,16 @@ describe('readOptions', () => {
     expect(readOptions(definition, stored)).toEqual(stored)
   })
 
+  it('accepts six-digit colours and defaults a colour that has only five digits', () => {
+    const colourDefinition: WidgetDefinition<Record<string, unknown>> = {
+      ...definition,
+      options: [{ control: 'colour', default: '#ffffff', id: 'colour', label: 'Colour' }],
+    }
+
+    expect(readOptions(colourDefinition, { colour: '#1a2b3c' })).toEqual({ colour: '#1a2b3c' })
+    expect(readOptions(colourDefinition, { colour: '#12345' })).toEqual({ colour: '#ffffff' })
+  })
+
   it('gives a missing key its default and keeps the rest', () => {
     const withoutFlag = without(stored, 'flag')
     const withoutRowsAndSize = without(stored, 'rows', 'size')
