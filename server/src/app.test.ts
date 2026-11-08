@@ -55,6 +55,7 @@ async function makeAuthApp(configOverrides: Partial<ServerConfig> = {}) {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   for (const db of databases.splice(0)) {
     try {
       db.close()
@@ -130,6 +131,70 @@ describe('createApp', () => {
     })
     expect(afterSignOut.status).toBe(401)
     expect(await afterSignOut.json()).toEqual({ error: 'signed_out' })
+  })
+
+  it('accepts an OTP just before expiry and rejects it after expiry', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    const { app, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const sendCode = (email: string) =>
+      app.request('/api/auth/email-otp/send-verification-otp', {
+        body: JSON.stringify({ email, type: 'sign-in' }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+    const signIn = (email: string, otp: string | undefined) =>
+      app.request('/api/auth/sign-in/email-otp', {
+        body: JSON.stringify({ email, otp }),
+        headers: { 'content-type': 'application/json', origin },
+        method: 'POST',
+      })
+
+    const beforeExpiryEmail = 'before-expiry@example.com'
+    expect((await sendCode(beforeExpiryEmail)).status).toBe(200)
+    const beforeExpiryOtp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    vi.setSystemTime(new Date('2026-01-01T00:04:59.000Z'))
+    expect((await signIn(beforeExpiryEmail, beforeExpiryOtp)).status).toBe(200)
+
+    const expiredEmail = 'expired@example.com'
+    expect((await sendCode(expiredEmail)).status).toBe(200)
+    const expiredOtp = messages[1]?.text.match(/\b\d{6}\b/)?.[0]
+    vi.setSystemTime(new Date('2026-01-01T00:10:00.000Z'))
+    expect((await signIn(expiredEmail, expiredOtp)).status).not.toBe(200)
+  })
+
+  it('keeps a session until just before 60 days and expires it just after', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+    const { app, messages } = await makeAuthApp()
+    const email = 'session-expiry@example.com'
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signIn.headers.get('set-auth-token')
+    expect(signIn.status).toBe(200)
+    expect(token).toBeTruthy()
+
+    const checkSession = () =>
+      app.request('/api/auth/get-session?disableRefresh=true', {
+        headers: { authorization: `Bearer ${token}`, origin },
+      })
+    vi.setSystemTime(new Date('2026-03-01T23:59:59.000Z'))
+    expect((await checkSession()).status).toBe(200)
+    expect(await (await checkSession()).json()).not.toBeNull()
+
+    vi.setSystemTime(new Date('2026-03-02T00:00:01.000Z'))
+    expect(await (await checkSession()).json()).toBeNull()
   })
 
   it('rejects untrusted origins and accepts distinct Firefox extension origins', async () => {
