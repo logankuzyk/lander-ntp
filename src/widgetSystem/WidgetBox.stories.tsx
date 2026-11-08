@@ -3,17 +3,25 @@ import type { JSX } from 'preact'
 
 import { COLS, ROWS } from '@/layout/geometry'
 import { EXAMPLE_SIZES } from '@/test/fixtures'
+import { PAGE_SEEDS, seedPage } from '@/test/seed'
 
 import { withPage } from '../../.storybook/withPage'
 import type { WidgetDefinition } from './definition'
-import type { Reading, ReadingCache, Source } from './source'
+import type { Need } from './needs'
+import {
+  type Reading,
+  type ReadingCache,
+  reportNeed,
+  type Source,
+  type WatchedSource,
+} from './source'
 import { WidgetBox } from './WidgetBox'
 
 // A made-up Widget in each state its box can draw instead of its View, side by side on the Grid,
 // each in a box of 3 by 3 cells. Nothing here asks the network: the source's request either
 // never answers or fails, and a switched-off source is not asked at all. The loading box
 // appears after about 400 ms. The Weather's own are in Weather/Loading, Failed and Off.
-const meta = { decorators: [withPage], title: 'WidgetBox' } satisfies Meta
+const meta = { decorators: [withPage], title: 'WidgetBox/States' } satisfies Meta
 export default meta
 
 type Story = StoryObj<typeof meta>
@@ -57,7 +65,7 @@ const OFF = exampleDefinition(() => Promise.resolve(1), false)
 const PAGE = { hour12: false }
 
 /** Loading, failed and switched off, left to right. */
-export const States: Story = {
+export const Timed: Story = {
   render: () => (
     <div
       class="grid"
@@ -76,6 +84,74 @@ export const States: Story = {
         rect={{ col: 5, h: 3, row: 3, w: 3 }}
       />
       <WidgetBox definition={OFF} options={{}} page={PAGE} rect={{ col: 9, h: 3, row: 3, w: 3 }} />
+    </div>
+  ),
+}
+
+const watchedSource: WatchedSource<number, Options> = {
+  kind: 'watched',
+  read: async () => 42,
+  watch: () => () => undefined,
+}
+
+const WATCHED: WidgetDefinition<Options, number, undefined> = {
+  name: 'Example',
+  options: [],
+  sizes: EXAMPLE_SIZES,
+  source: { kind: 'watched', source: watchedSource },
+  type: 'example',
+  View: ({ reading }) => <p>{reading}</p>,
+}
+
+const connectionNeed: Need<Options> = {
+  action: { kind: 'ask', run: () => undefined },
+  id: 'connect',
+  label: 'Connect source',
+  met: () => true,
+}
+
+const NEED_REPORTED: WidgetDefinition<Options, number, undefined> = {
+  ...WATCHED,
+  needs: [connectionNeed],
+  source: {
+    kind: 'watched',
+    source: { ...watchedSource, read: async () => reportNeed('connect') },
+  },
+}
+
+const seed = () => seedPage(PAGE_SEEDS.gridEmpty)
+
+export const Watched: Story = {
+  beforeEach: seed,
+  render: () => (
+    <div
+      class="grid"
+      style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
+    >
+      <WidgetBox
+        definition={WATCHED}
+        options={{}}
+        page={PAGE}
+        rect={{ col: 5, h: 3, row: 3, w: 3 }}
+      />
+    </div>
+  ),
+}
+
+export const NeedReportedWhileRunning: Story = {
+  beforeEach: seed,
+  render: () => (
+    <div
+      class="grid"
+      style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
+    >
+      <WidgetBox
+        definition={NEED_REPORTED}
+        id="example-id"
+        options={{}}
+        page={PAGE}
+        rect={{ col: 5, h: 3, row: 3, w: 3 }}
+      />
     </div>
   ),
 }
