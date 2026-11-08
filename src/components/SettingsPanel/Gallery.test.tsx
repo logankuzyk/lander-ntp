@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { favouritesItem } from '@/backdrop/favourites'
 import type { Photo } from '@/photos/schema'
 import { makePhoto } from '@/test/fixtures'
 
@@ -29,7 +31,9 @@ const renderGallery = ({
 }
 
 const photoButtons = () =>
-  within(screen.getByRole('list')).getAllByRole('button') as HTMLButtonElement[]
+  (within(screen.getByRole('list')).getAllByRole('button') as HTMLButtonElement[]).filter(
+    (button) => button.classList.contains('gallery__photo'),
+  )
 
 const photoNames = () => photoButtons().map((button) => button.querySelector('img')?.alt)
 
@@ -41,6 +45,62 @@ const pressed = () =>
     .find((chip) => chip.getAttribute('aria-pressed') === 'true')?.textContent
 
 describe('Gallery', () => {
+  it('does not offer a heart for the bundled fallback photo', () => {
+    renderGallery({ photos: [makePhoto('fallback')] })
+
+    expect(screen.queryByRole('button', { name: 'Favourite Photo 1 to favourites' })).toBeNull()
+  })
+
+  it('filters to present favourites newest first, and a heart does not pick its photo', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await favouritesItem.setValue({ ids: ['d', 'c', 'a', 'gone'], v: 1 })
+    const photos = [
+      ...PHOTOS,
+      makePhoto('d', {
+        alt: 'Pattern',
+        tags: [{ name: 'Pattern', optIn: true, slug: 'pattern' }],
+      }),
+    ]
+    const { onSelect } = renderGallery({ photos })
+
+    const filter = await screen.findByRole('button', { name: 'Favourites' })
+    fireEvent.click(filter)
+    expect(photoNames()).toEqual(['Pattern', 'Old growth', 'Waterfall'])
+
+    fireEvent.click(filters().getByRole('button', { name: 'Forest' }))
+    expect(photoNames()).toEqual(['Waterfall', 'Old growth'])
+    fireEvent.click(filters().getByRole('button', { name: 'Favourites' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Old growth from favourites' }))
+    expect(onSelect).not.toHaveBeenCalled()
+    await waitFor(async () =>
+      expect((await favouritesItem.getValue()).ids).toEqual(['d', 'a', 'gone']),
+    )
+  })
+
+  it('hides the Favourites chip when no favourite is on the site', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await favouritesItem.setValue({ ids: ['gone'], v: 1 })
+    renderGallery()
+
+    await waitFor(() => expect(screen.getByRole('group', { name: 'Filter photos' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Favourites' })).toBeNull()
+  })
+
+  it('disables gallery hearts when favourites were written by a newer version', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await fakeBrowser.storage.sync.set({ favourites: { ids: ['a'], v: 2 } })
+    renderGallery()
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: 'Remove Waterfall from favourites' })
+          .hasAttribute('disabled'),
+      ).toBe(true),
+    )
+  })
+
   it('shows every photo as a small thumbnail', () => {
     renderGallery()
 
