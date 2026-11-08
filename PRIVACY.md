@@ -6,9 +6,7 @@ Lander is a browser extension that replaces your new tab page with photography f
 
 ## Without an account
 
-Without an account, Lander stores nothing about you. Weather asks Open-Meteo for your chosen place's forecast.
-
-Without an account, Lander stores nothing about you. Your Layout, settings, photo list cache, current photo and weather cache stay in your browser. If browser sync is enabled, the browser vendor may sync extension settings under its own privacy policy. Lander does not receive those settings unless you choose to sign in and sync them through a Lander account.
+Without an account, Lander sends no account data to its server. It still stores your Layout, settings, photo list cache, current photo and weather cache in your browser. If browser sync is enabled, the browser vendor may sync extension settings under its own privacy policy. Lander does not receive those settings unless you choose to sign in and sync them through a Lander account.
 
 The extension downloads the photo list from `https://logankuzyk.com/new-tab/photos.json` and loads the photo images listed there. It caches the list and images for loading and offline use. Photo details may link to logankuzyk.com or a print page; no request to those pages is made until you follow a link.
 

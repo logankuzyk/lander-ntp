@@ -10,8 +10,9 @@ describe('privacy copy', () => {
     expect(policy).toContain('## Without an account')
     expect(policy).toContain('## If you sign in')
     expect(policy).toContain(
-      "Without an account, Lander stores nothing about you. Weather asks Open-Meteo for your chosen place's forecast.",
+      'Without an account, Lander sends no account data to its server. It still stores your Layout, settings, photo list cache, current photo and weather cache in your browser.',
     )
+    expect(policy).not.toContain('Without an account, Lander stores nothing about you.')
     expect(policy).not.toContain('Lander does not collect, sell or share any personal information.')
   })
 
@@ -19,7 +20,7 @@ describe('privacy copy', () => {
     const readme = read('../README.md')
 
     expect(readme).toContain(
-      'No account needed: without one, Lander collects nothing. An optional account stores your email and settings to sync them.',
+      'No account needed: without one, Lander sends no account data to its server. It still stores your Layout and settings in your browser.',
     )
     expect(readme).toContain('optional account')
     expect(readme).toContain('server/README.md')

@@ -73,4 +73,4 @@ Each key is optional. A replacement address must be https, answer the same query
 
 ## Privacy
 
-No account needed: without one, Lander collects nothing. An optional account stores your email and settings to sync them. The optional weather widget sends the place you pick to [Open-Meteo](https://open-meteo.com/) for its forecast. See [PRIVACY.md](PRIVACY.md) for details about account sync and other data handling.
+No account needed: without one, Lander sends no account data to its server. It still stores your Layout and settings in your browser. An optional account sends your email and settings to Lander to sync them. The optional weather widget sends the place you pick to [Open-Meteo](https://open-meteo.com/) for its forecast. See [PRIVACY.md](PRIVACY.md) for details about account sync and other data handling.
