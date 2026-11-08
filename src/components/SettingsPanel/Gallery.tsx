@@ -55,7 +55,7 @@ export function Gallery({ currentId, initialTag, onSelect, photos, saveOutcome }
     <section aria-labelledby="gallery-heading" class="gallery">
       <h3 id="gallery-heading">Gallery</h3>
 
-      {(tags.length > 0 || presentIds.length > 0) && (
+      {(tags.length > 0 || presentIds.length > 0 || favouritesOnly) && (
         <div aria-label="Filter photos" class="gallery__tags" role="group">
           <Chip
             label="All"

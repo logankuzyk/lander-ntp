@@ -78,6 +78,33 @@ describe('Gallery', () => {
     )
   })
 
+  it('keeps an All control when the last untagged favourite is removed', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await favouritesItem.setValue({ ids: ['solo'], v: 1 })
+    renderGallery({ photos: [makePhoto('solo', { alt: 'Solo photo' })] })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Favourites' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Solo photo from favourites' }))
+    await waitFor(async () => expect((await favouritesItem.getValue()).ids).toEqual([]))
+
+    expect(screen.getByRole('button', { name: 'All' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(photoNames()).toEqual(['Solo photo'])
+  })
+
+  it('turns the Favourites filter off again and clears the previous tag filter', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await favouritesItem.setValue({ ids: ['b'], v: 1 })
+    renderGallery({ initialTag: 'forest' })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Favourites' }))
+    expect(photoNames()).toEqual(['Tide pools'])
+    fireEvent.click(screen.getByRole('button', { name: 'Favourites' }))
+
+    expect(photoNames()).toEqual(['Waterfall', 'Tide pools', 'Old growth'])
+    expect(pressed()).toBe('All')
+  })
+
   it('hides the Favourites chip when no favourite is on the site', async () => {
     await fakeBrowser.storage.sync.clear()
     await favouritesItem.setValue({ ids: ['gone'], v: 1 })
