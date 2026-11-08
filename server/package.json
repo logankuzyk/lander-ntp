@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "node build.mjs",
+    "export-account": "npm run build && node dist/accountCli.js export-account",
+    "delete-account": "npm run build && node dist/accountCli.js delete-account",
     "lint": "eslint .",
     "restore": "npm run build && node dist/restore.js",
     "test": "vitest run",

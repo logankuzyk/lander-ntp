@@ -94,6 +94,66 @@ afterEach(() => {
 })
 
 describe('createApp', () => {
+  it('deletes the signed-in account and revokes every session', async () => {
+    const { app, db, messages } = await makeAuthApp()
+    const origin = 'chrome-extension://ocglhjclnhfbgbccffinhioaangigioa'
+    const email = 'delete-me@example.com'
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const otp = messages[0]?.text.match(/\b\d{6}\b/)?.[0]
+    const signedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const token = signedIn.headers.get('set-auth-token')
+    await app.request('/api/auth/email-otp/send-verification-otp', {
+      body: JSON.stringify({ email, type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const secondOtp = messages.at(-1)?.text.match(/\b\d{6}\b/)?.[0]
+    const secondSignedIn = await app.request('/api/auth/sign-in/email-otp', {
+      body: JSON.stringify({ email, otp: secondOtp }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST',
+    })
+    const secondToken = secondSignedIn.headers.get('set-auth-token')
+    const user = db.prepare('SELECT id FROM user WHERE email = ?').get(email) as
+      { id: string } | undefined
+    if (!user) throw new Error('Expected the signed-in user')
+
+    const deleted = await app.request('/v1/account', {
+      headers: { authorization: `Bearer ${token}`, origin },
+      method: 'DELETE',
+    })
+
+    expect(deleted.status).toBe(204)
+    expect(db.prepare('SELECT id FROM user WHERE id = ?').get(user.id)).toBeUndefined()
+    expect(
+      db.prepare('SELECT user_id FROM deleted_account WHERE user_id = ?').get(user.id),
+    ).toBeDefined()
+    expect(
+      (await app.request('/v1/me', { headers: { authorization: `Bearer ${token}`, origin } }))
+        .status,
+    ).toBe(401)
+    expect(
+      (await app.request('/v1/me', { headers: { authorization: `Bearer ${secondToken}`, origin } }))
+        .status,
+    ).toBe(401)
+    expect(
+      (
+        await app.request('/v1/account', {
+          headers: { authorization: `Bearer ${token}`, origin },
+          method: 'DELETE',
+        })
+      ).status,
+    ).toBe(401)
+  })
+
   it('prints sign-in mail in development and refuses to send it in production', async () => {
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const message = {

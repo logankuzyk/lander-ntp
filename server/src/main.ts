@@ -79,6 +79,7 @@ export async function startServer(options: StartServerOptions = {}) {
         }
       : {}),
     objectStore,
+    reviewerEmail: config.reviewerEmail,
   })
   const app = await createApp({
     clock,

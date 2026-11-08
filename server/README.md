@@ -24,3 +24,16 @@ successful dump.
 The separate `deleted-ids.json` object is kept outside the database so deletion records survive
 restoring an older dump. Entries contain only a random user id and its deletion time and are
 pruned after 30 days.
+
+## Account requests
+
+Run account tools inside the server container with the account email:
+
+```bash
+docker compose exec server npm run export-account -- person@example.com
+docker compose exec server npm run delete-account -- person@example.com
+```
+
+The export prints the account's synced settings and reduced device list. It does not include IP
+addresses or authentication tokens. Deletion removes the account and publishes its id to
+`deleted-ids.json` for restored backups.
