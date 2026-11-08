@@ -96,6 +96,19 @@ describe('defineGuardedItem', () => {
     expect(await stored()).toEqual(newer)
   })
 
+  it('refuses to write raw data over a newer value, and leaves it as it is', async () => {
+    const newer = { name: 'from the future', v: 2 }
+    await fakeBrowser.storage.sync.set({ thing: newer })
+    const set = vi.spyOn(fakeBrowser.storage.sync, 'set')
+
+    await expect(thing().writeRaw({ name: 'pulled', v: 1 })).rejects.toBeInstanceOf(
+      NewerVersionError,
+    )
+
+    expect(set).not.toHaveBeenCalled()
+    expect(await stored()).toEqual(newer)
+  })
+
   it('refuses a value it cannot read the version of', async () => {
     await fakeBrowser.storage.sync.set({ thing: { name: 'odd', v: 'two' } })
 

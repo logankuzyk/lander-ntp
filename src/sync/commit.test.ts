@@ -32,4 +32,18 @@ describe('committing an item pulled from the account', () => {
     expect(await fakeBrowser.storage.sync.get(null)).toEqual({ layout })
     expect(await layoutItem.read()).toMatchObject({ newer: true })
   })
+
+  it('reports a guarded conflict with a newer local Layout as refused', async () => {
+    await fakeBrowser.storage.sync.set({ layout: { v: 2, widgets: [] } })
+
+    await expect(commitPulledItem('layout', { v: 1, widgets: [] })).resolves.toBe('refused')
+    expect(await fakeBrowser.storage.sync.get('layout')).toEqual({ layout: { v: 2, widgets: [] } })
+  })
+
+  it('refuses an unreadable pulled Layout without writing it', async () => {
+    await expect(commitPulledItem('layout', { v: 1, widgets: 'not a list' })).resolves.toBe(
+      'refused',
+    )
+    expect(await fakeBrowser.storage.sync.get('layout')).toEqual({})
+  })
 })

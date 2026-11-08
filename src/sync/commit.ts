@@ -3,14 +3,23 @@ import * as v from 'valibot'
 import { layoutItem } from '@/layout/storage'
 import { onboardingItem } from '@/onboarding/storage'
 import { settingsItem } from '@/settings/storage'
+import { NewerVersionError } from '@/storage/guard'
 import { createWriteQueue, type SaveResult } from '@/storage/writeQueue'
 
 import { hasNewerVersion, type SyncedItemKey, syncedShapes } from './shapes'
 
+const isVersionRefusal = (error: unknown): boolean => error instanceof NewerVersionError
+
 const queues = {
-  layout: createWriteQueue((value: unknown) => layoutItem.setRemoteValue(value)),
-  onboarding: createWriteQueue((value: unknown) => onboardingItem.setValue(value as never)),
-  settings: createWriteQueue((value: unknown) => settingsItem.setValue(value as never)),
+  layout: createWriteQueue((value: unknown) => layoutItem.setRemoteValue(value), isVersionRefusal),
+  onboarding: createWriteQueue(
+    (value: unknown) => onboardingItem.setValue(value as never),
+    isVersionRefusal,
+  ),
+  settings: createWriteQueue(
+    (value: unknown) => settingsItem.setValue(value as never),
+    isVersionRefusal,
+  ),
 } satisfies Record<SyncedItemKey, ReturnType<typeof createWriteQueue<unknown>>>
 
 /** Commit one server item through its ordinary storage item, serially and with latest-wins writes. */

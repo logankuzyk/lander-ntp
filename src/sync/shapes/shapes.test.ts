@@ -58,6 +58,7 @@ describe('synced stored shapes', () => {
 
   it('rejects an unreadable or newer Layout shape', () => {
     expect(syncedShapes.layout.check({ v: 1 })).toEqual({ ok: false })
+    expect(syncedShapes.layout.check({ v: 1, widgets: 'not a list' })).toEqual({ ok: false })
     expect(syncedShapes.layout.check({ v: 2, widgets: [] })).toEqual({ ok: false })
   })
 
