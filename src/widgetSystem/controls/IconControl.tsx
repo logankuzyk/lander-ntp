@@ -1,3 +1,4 @@
+import { Pencil, X } from 'lucide-preact'
 import { useRef, useState } from 'preact/hooks'
 
 import { canvasIconEncoder, encodeIcon } from '@/quickDial/icon'
@@ -47,10 +48,10 @@ export function IconControl({
   return (
     <div class="settings__row settings__row--icon">
       <span>Icon</span>
-      <div>
+      <div class="quick-dial-icon-editor">
         <input
           accept="image/*"
-          aria-label="Upload an icon"
+          aria-label="Choose an icon image"
           hidden
           onChange={async (event) => {
             const file = event.currentTarget.files?.[0]
@@ -67,23 +68,28 @@ export function IconControl({
           ref={input}
           type="file"
         />
-        {pending && <img alt="Icon preview" class="settings__icon-preview" src={pending} />}
-        {!pending && (
-          <span class="settings__note">
-            {uploaded ? 'Uploaded icon' : siteIcon ? 'The site’s own icon' : 'A letter'}
+        {preview ? (
+          <img alt="" class="settings__icon-preview" src={preview} />
+        ) : (
+          <span aria-hidden="true" class="settings__icon-preview quick-dial-icon-editor__letter">
+            A
           </span>
         )}
-        <div class="settings__icon-actions">
-          <button disabled={disabled} onClick={() => input.current?.click()} type="button">
-            Upload
+        <div class="quick-dial-icon-editor__actions">
+          <button
+            aria-label="Change icon"
+            class="quick-dial-icon-editor__button"
+            disabled={disabled}
+            onClick={() => input.current?.click()}
+            title="Change icon"
+            type="button"
+          >
+            <Pencil aria-hidden="true" size={14} />
           </button>
-          {pending && (
-            <button disabled={disabled || saving} onClick={() => void confirm()} type="button">
-              Use this icon
-            </button>
-          )}
           {value && (
             <button
+              aria-label="Remove uploaded icon"
+              class="quick-dial-icon-editor__button"
               disabled={disabled}
               onClick={async () => {
                 setError('')
@@ -95,18 +101,23 @@ export function IconControl({
                   setError(cause instanceof Error ? cause.message : 'Could not save this icon.')
                 }
               }}
+              title="Use the site’s favicon"
               type="button"
             >
-              Use the site’s icon
+              <X aria-hidden="true" size={14} />
             </button>
           )}
         </div>
+        {pending && (
+          <button disabled={disabled || saving} onClick={() => void confirm()} type="button">
+            Use this icon
+          </button>
+        )}
         {error && (
           <p class="settings__error" role="alert">
             {error}
           </p>
         )}
-        {preview && !pending && <img alt="" class="settings__icon-preview" src={preview} />}
       </div>
     </div>
   )
