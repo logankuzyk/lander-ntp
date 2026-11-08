@@ -1,3 +1,4 @@
+import { analogClockDefinition } from '@/widgets/AnalogClock/definition'
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 
@@ -13,7 +14,11 @@ import type { DefinitionOf } from './definition'
 export type AnyWidgetDefinition = DefinitionOf<any>
 
 /** Every Widget there is. */
-export const WIDGETS: readonly AnyWidgetDefinition[] = [clockDefinition, weatherDefinition]
+export const WIDGETS: readonly AnyWidgetDefinition[] = [
+  clockDefinition,
+  analogClockDefinition,
+  weatherDefinition,
+]
 
 /** The Widget stored under `type`, or nothing when this version does not know it. */
 export const widgetDefinition = (type: string): AnyWidgetDefinition | undefined =>

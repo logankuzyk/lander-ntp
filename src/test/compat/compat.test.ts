@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/preact'
+import { act, render, renderHook, waitFor } from '@testing-library/preact'
+import { h } from 'preact'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
@@ -77,23 +78,60 @@ const PHASE_3_LAYOUT = {
 }
 
 /** Add a row here whenever phase 3 adds a synced write that a v0.3.0 device must survive. */
-const PHASE_3_WRITES = [
+const PHASE_3_WRITES: {
+  change?: Parameters<typeof saveLikeV030>[1]
+  name: string
+  rawSync?: Record<string, unknown>
+  write?: () => Promise<Awaited<ReturnType<typeof asV030>>>
+}[] = [
   {
     change: { col: 1, id: 'clock', kind: 'move', row: 7 } as const,
     name: 'a v0.3.0 Clock move keeps all four newer Widget types byte for byte',
     rawSync: { layout: PHASE_3_LAYOUT },
   },
+  {
+    name: 'add an Analog clock through the page commit; v0.3.0 keeps it byte for byte',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      await settingsItem.setValue(SEED)
+      const page = {} as ReturnType<typeof useLayout>
+      function Probe() {
+        Object.assign(page, useLayout(SEED))
+        return null
+      }
+      render(h(Probe, {}))
+      await waitFor(() => expect(page.loaded).toBe(true))
+      const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'analog-clock')
+      if (!added.ok) throw new Error(`could not add Analog clock: ${added.reason}`)
+      await act(async () => page.commit(added.layout))
+      await waitFor(async () =>
+        expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
+      )
+      return asV030(await fakeBrowser.storage.sync.get(null))
+    },
+  },
 ]
 
 describe('the frozen v0.3.0 reader', () => {
-  it.each(PHASE_3_WRITES)('$name', async ({ change, rawSync }) => {
-    const after = await saveLikeV030(rawSync, change)
+  it.each(PHASE_3_WRITES)('$name', async ({ change, rawSync, write }) => {
+    const after = write ? await write() : await saveLikeV030(rawSync!, change!)
 
-    expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
-    expect(JSON.stringify(after.raw.layout.widgets.slice(1))).toBe(
-      JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
-    )
-    expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
+    if (write) {
+      const analog = after.raw.layout.widgets.find(
+        (widget) => (widget as { type?: string }).type === 'analog-clock',
+      )
+      expect(analog).toMatchObject({
+        options: { face: 'ticks', showDate: false, showSeconds: true },
+      })
+      expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+      expect(after.raw.settings).toEqual(SEED)
+    } else {
+      expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
+      expect(JSON.stringify(after.raw.layout.widgets.slice(1))).toBe(
+        JSON.stringify(PHASE_3_LAYOUT.widgets.slice(1)),
+      )
+      expect(after.raw.layout.widgets[0]).toMatchObject({ col: 1, id: 'clock', row: 7 })
+    }
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {
