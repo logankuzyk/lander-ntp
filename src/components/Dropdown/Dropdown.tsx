@@ -14,6 +14,8 @@ type DropdownProps = {
   disabled?: boolean
   /** Id of the visible label, which names the field and its menu. */
   labelId: string
+  /** Called when the field opens, so a control can load its menu contents. */
+  onOpen?: () => void
   /** `listbox` when the menu is only options; `dialog` when it has other controls as well. */
   popup: 'dialog' | 'listbox'
   /** What the closed field shows. */
@@ -31,6 +33,7 @@ export function Dropdown({
   chips = false,
   disabled = false,
   labelId,
+  onOpen,
   popup,
   value,
 }: DropdownProps) {
@@ -89,6 +92,7 @@ export function Dropdown({
   const onFieldKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
+      if (!open) onOpen?.()
       setOpen(true)
     }
   }
@@ -136,7 +140,10 @@ export function Dropdown({
         aria-labelledby={labelId}
         class={chips ? 'dropdown__field dropdown__field--chips' : 'dropdown__field'}
         disabled={disabled}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => {
+          if (!open) onOpen?.()
+          setOpen((was) => !was)
+        }}
         onKeyDown={onFieldKeyDown}
         ref={field}
         role="combobox"

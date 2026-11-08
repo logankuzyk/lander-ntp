@@ -98,6 +98,44 @@ afterEach(() => {
 })
 
 describe('OptionsForm', () => {
+  it('draws a pick option, focuses its trigger, and saves one picked value with unknown keys', async () => {
+    const definition: WidgetDefinition<Record<string, unknown>> = {
+      ...example,
+      options: [
+        {
+          control: 'pick',
+          default: 'work',
+          emptyText: 'No folders',
+          failedText: 'Could not load folders',
+          id: 'folder',
+          label: 'Folder',
+          load: async () => [
+            { label: 'Work', value: 'work' },
+            { label: 'Personal', value: 'personal' },
+          ],
+        },
+      ],
+    }
+    const onChange = vi.fn()
+    render(
+      <OptionsForm
+        definition={definition}
+        focusOption="folder"
+        onChange={onChange}
+        onPageValueChange={vi.fn()}
+        options={{ folder: 'missing', future: { retained: true } }}
+        page={PAGE}
+      />,
+    )
+
+    const trigger = screen.getByRole('combobox', { name: 'Folder' })
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: 'Personal' }))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith({ folder: 'personal', future: { retained: true } })
+  })
+
   describe('draws each kind of control from the description', () => {
     it('a switch, on or off as stored', () => {
       draw()
