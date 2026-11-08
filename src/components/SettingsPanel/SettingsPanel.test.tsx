@@ -8,6 +8,8 @@ import type { CalloutInfo } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
+import { settingsItem } from '@/settings/storage'
+import { syncClient } from '@/sync/client'
 import { makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
 
@@ -39,7 +41,7 @@ const renderPanel = ({
 } = {}) => {
   const onChange = vi.fn()
   const onClose = vi.fn()
-  render(
+  const view = render(
     <SettingsPanel
       accountPreview={accountPreview}
       currentId="a"
@@ -50,7 +52,7 @@ const renderPanel = ({
       settings={{ ...settings, ...overrides }}
     />,
   )
-  return { onChange, onClose }
+  return { ...view, onChange, onClose }
 }
 
 const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
@@ -141,8 +143,9 @@ describe('SettingsPanel', () => {
 
   describe('account', () => {
     const openAccount = () => {
-      renderPanel()
+      const panel = renderPanel()
       openSection('Account')
+      return panel
     }
 
     beforeEach(async () => {
@@ -151,6 +154,46 @@ describe('SettingsPanel', () => {
       await browser.storage.local.clear()
       await account.initialize()
     })
+
+    const signInWithSnapshot = async (localSettings: Settings, remoteSettings: Settings) => {
+      await settingsItem.setValue(localSettings)
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/email-otp/send-verification-otp')) {
+          return jsonResponse({ success: true })
+        }
+        if (path.endsWith('/sign-in/email-otp')) {
+          return jsonResponse({ token: 'token', user: { email: 'person@example.com' } })
+        }
+        if (path === '/v1/me') {
+          return jsonResponse({ email: 'person@example.com', pending: false })
+        }
+        if (path === '/v1/devices') {
+          return jsonResponse({ devices: [], limit: 3, pending: false })
+        }
+        if (path === '/v1/sync') {
+          return jsonResponse({
+            items: { settings: { v: 1, value: { ...remoteSettings, v: 1 } } },
+            rev: 1,
+          })
+        }
+        return jsonResponse({ changed: true, rev: 2 })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const panel = openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), {
+        target: { value: 'person@example.com' },
+      })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      const code = await screen.findByLabelText('Code')
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement,
+      )
+      return { fetch, panel }
+    }
 
     it('shows the disclosure and policy before sending a code, then asks for the six-digit code', async () => {
       const fetch = vi
@@ -315,24 +358,95 @@ describe('SettingsPanel', () => {
     })
 
     it('shows the signed-in address and signs out through the account client', async () => {
-      const fetch = vi
-        .fn<typeof globalThis.fetch>()
-        .mockResolvedValueOnce(
-          jsonResponse({ token: 'token', user: { email: 'person@example.com' } }),
-        )
-        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
-        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
-        .mockResolvedValueOnce(jsonResponse({ devices: [], limit: 3, pending: false }))
-        .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/sign-in/email-otp')) {
+          return jsonResponse({ token: 'token', user: { email: 'person@example.com' } })
+        }
+        if (path === '/v1/me') {
+          return jsonResponse({ email: 'person@example.com', pending: false })
+        }
+        if (path === '/v1/devices') {
+          return jsonResponse({ devices: [], limit: 3, pending: false })
+        }
+        if (path === '/v1/sync') return jsonResponse({ items: {}, rev: 0 })
+        if (path === '/api/auth/sign-out') return new Response(null, { status: 204 })
+        return jsonResponse({ changed: true, rev: 1 })
+      })
       vi.stubGlobal('fetch', fetch)
       await account.verify('person@example.com', '123456')
       openAccount()
 
       expect(await screen.findByText('person@example.com')).toBeTruthy()
-      expect(screen.getByText('Not synced yet')).toBeTruthy()
+      await screen.findByText('Synced')
       fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
       await waitFor(() => expect(screen.queryByText('person@example.com')).toBeNull())
-      expect(fetch).toHaveBeenCalledTimes(5)
+      expect(fetch).toHaveBeenCalledTimes(8)
+    })
+
+    it('shows the first-sign-in choice without writing either side until picked', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch, panel } = await signInWithSnapshot(localSettings, {
+        ...settings,
+        font: 'geist',
+      })
+
+      expect(await screen.findByRole('region', { name: 'Choose which page to keep' })).toBeTruthy()
+      expect(await settingsItem.getValue()).toEqual(localSettings)
+      expect(screen.getByText('Sync is paused until you choose a page.')).toBeTruthy()
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+      fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+      expect(panel.onClose).toHaveBeenCalledOnce()
+      expect(await settingsItem.getValue()).toEqual(localSettings)
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+      panel.unmount()
+      syncClient.reset()
+      openAccount()
+      expect(await screen.findByRole('region', { name: 'Choose which page to keep' })).toBeTruthy()
+      expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/sync'))).toHaveLength(1)
+    })
+
+    it('asks nothing when first sign-in finds identical Settings', async () => {
+      const sameSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch } = await signInWithSnapshot(sameSettings, sameSettings)
+
+      await waitFor(() => expect(screen.getByText('Synced')).toBeTruthy())
+      expect(screen.queryByRole('region', { name: 'Choose which page to keep' })).toBeNull()
+      expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/sync'))).toHaveLength(1)
+      expect(await settingsItem.getValue()).toEqual(sameSettings)
+    })
+
+    it('applies the selected copy only after the user chooses it', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const remoteSettings: Settings = { ...settings, font: 'geist' }
+      const { fetch } = await signInWithSnapshot(localSettings, remoteSettings)
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+
+      fireEvent.click(screen.getByRole('button', { name: "Use your account's page" }))
+
+      await screen.findByText('Synced')
+      expect(await settingsItem.getValue()).toEqual({ ...remoteSettings, v: 1 })
+      expect(
+        fetch.mock.calls.some(
+          ([url, init]) => String(url).endsWith('/v1/sync/settings') && init?.method === 'PUT',
+        ),
+      ).toBe(false)
+    })
+
+    it('uploads this browser’s Settings only after that choice is picked', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch } = await signInWithSnapshot(localSettings, { ...settings, font: 'geist' })
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+
+      fireEvent.click(screen.getByRole('button', { name: "Keep this browser's" }))
+
+      await screen.findByText('Synced')
+      expect(
+        fetch.mock.calls.some(
+          ([url, init]) => String(url).endsWith('/v1/sync/settings') && init?.method === 'PUT',
+        ),
+      ).toBe(true)
+      expect(await settingsItem.getValue()).toEqual(localSettings)
     })
   })
 

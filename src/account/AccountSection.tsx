@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 
+import { syncClient, useSyncStatus } from '@/sync/client'
+import { FirstSignInChoice } from '@/sync/FirstSignInChoice'
+
 import { account, useAccount } from './account'
 import type { AccountState } from './account'
 import { ACCOUNT_DATA_DISCLOSURE } from './copy'
@@ -30,6 +33,8 @@ export function AccountSection({
 }: AccountSectionProps = {}) {
   const currentState = useAccount()
   const state = stateOverride ?? currentState
+  const signedInEmail = state.status === 'signed-in' ? state.email : null
+  const syncStatus = useSyncStatus()
   const [email, setEmail] = useState('')
   const latestEmail = useRef('')
   const [code, setCode] = useState('')
@@ -38,6 +43,12 @@ export function AccountSection({
   const [devices, setDevices] = useState(state.status === 'signed-in' ? (state.devices ?? []) : [])
   const [deleteOpen, setDeleteOpen] = useState(deleteOpenInitially)
   const [deleted, setDeleted] = useState(false)
+
+  useEffect(() => {
+    if (stateOverride) return
+    if (state.status === 'signed-in') void syncClient.initialize()
+    else syncClient.reset()
+  }, [signedInEmail, state.status, stateOverride])
 
   useEffect(() => {
     if (state.status === 'pending-device') setDevices(state.devices)
@@ -127,7 +138,19 @@ export function AccountSection({
             </>
           ) : (
             <>
-              <p>Not synced yet</p>
+              {syncStatus.needsChoice ? (
+                <p role="status">Sync is paused until you choose a page.</p>
+              ) : (
+                <p>
+                  {syncStatus.syncing ? 'Syncing…' : syncStatus.ready ? 'Synced' : 'Not synced yet'}
+                </p>
+              )}
+              {syncStatus.needsChoice && (
+                <FirstSignInChoice
+                  choose={(choice) => void syncClient.choose(choice)}
+                  syncStatus={syncStatus}
+                />
+              )}
               <p>Up to 3 devices</p>
               <DeviceList devices={devices} onSignOut={signOutDevice} />
               <button class="settings__button" onClick={signOut} type="button">
