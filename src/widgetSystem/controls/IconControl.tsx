@@ -4,6 +4,9 @@ import { canvasIconEncoder, encodeIcon } from '@/quickDial/icon'
 import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { useIcon } from '@/quickDial/useIcon'
 
+const saveSucceeded = (result: unknown) =>
+  result === true || result === 'saved' || result === 'superseded'
+
 /** A Quick dial icon chooser; selection stays local until the person confirms it. */
 export function IconControl({
   disabled,
@@ -29,7 +32,7 @@ export function IconControl({
     try {
       const id = await saveIcon(pending)
       const outcome = await onChange(id)
-      if (outcome === false) {
+      if (!saveSucceeded(outcome)) {
         await deleteIcon(id)
         throw new Error("Couldn't save that Layout change.")
       }
@@ -83,8 +86,14 @@ export function IconControl({
             <button
               disabled={disabled}
               onClick={async () => {
-                const outcome = await onChange(null)
-                if (outcome !== false) await deleteIcon(value)
+                setError('')
+                try {
+                  const outcome = await onChange(null)
+                  if (saveSucceeded(outcome)) await deleteIcon(value)
+                  else setError("Couldn't save that Layout change.")
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : 'Could not save this icon.')
+                }
               }}
               type="button"
             >

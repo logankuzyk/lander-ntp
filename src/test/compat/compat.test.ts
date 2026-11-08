@@ -29,7 +29,7 @@ import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { recordSeen } from '@/onboarding/useSeen'
-import { saveIcon } from '@/quickDial/iconStorage'
+import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
@@ -180,6 +180,18 @@ const PHASE_3_SYNC_ITEM_WRITES = [
     },
   },
   {
+    expectedPresent: false,
+    key: 'icon:abcdefgh',
+    name: 'delete a Quick dial icon through its guarded path; frozen readers leave it removed',
+    write: async () => {
+      await fakeBrowser.storage.sync.set({
+        'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+      })
+      await deleteIcon('abcdefgh')
+      return 'icon:abcdefgh'
+    },
+  },
+  {
     key: 'favourites',
     name: 'save favourites through their commit path',
     write: async () => {
@@ -235,7 +247,7 @@ describe('the frozen v0.3.0 reader', () => {
     }
   })
 
-  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ key, write }) => {
+  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ expectedPresent = true, key, write }) => {
     await fakeBrowser.storage.sync.clear()
     await settingsItem.setValue(SEED)
     const settingsBefore = JSON.stringify((await fakeBrowser.storage.sync.get('settings')).settings)
@@ -243,16 +255,21 @@ describe('the frozen v0.3.0 reader', () => {
     const writtenKey = (await write()) ?? key
     const stored = await fakeBrowser.storage.sync.get(null)
 
-    expect(
-      Object.keys(stored).some(
-        (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
-      ),
-    ).toBe(true)
+    const present = Object.keys(stored).some(
+      (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+    )
+    expect(present).toBe(expectedPresent)
     expect(JSON.stringify(stored.settings)).toBe(settingsBefore)
     expect((await asV023(stored)).settings).toEqual(stored.settings)
     const frozen = await asV030(stored)
     expect(frozen.settings).toEqual(stored.settings)
     expect(frozen.layout.widgets).toEqual([])
+    const afterFrozenReads = await fakeBrowser.storage.sync.get(null)
+    expect(
+      Object.keys(afterFrozenReads).some(
+        (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+      ),
+    ).toBe(expectedPresent)
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {

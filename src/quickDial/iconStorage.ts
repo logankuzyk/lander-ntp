@@ -1,5 +1,3 @@
-import { storage } from 'wxt/utils/storage'
-
 import { ICON_DATA_URL_LIMIT } from '@/quickDial/icon'
 import { defineGuardedItem, NewerVersionError } from '@/storage/guard'
 import { createWriteQueue } from '@/storage/writeQueue'
@@ -30,8 +28,8 @@ function makeItem(id: string) {
     unreadable: (raw) => !isRecord(raw) || !dataUrl(raw.data),
     version: 1,
   })
-  const queue = createWriteQueue(
-    (value: StoredIcon) => guarded.write(value),
+  const queue = createWriteQueue<StoredIcon | null>(
+    (value) => (value === null ? guarded.remove() : guarded.write(value)),
     (error) => error instanceof NewerVersionError,
   )
   const write = async (value: StoredIcon) => {
@@ -39,11 +37,13 @@ function makeItem(id: string) {
     if (result === 'refused') throw new NewerVersionError(guarded.key)
     if (result !== 'saved') throw new Error('The icon could not be saved.')
   }
+  const remove = () => queue.save(null)
   return {
     fallback: guarded.fallback,
     getValue: async () => (await guarded.read()).value,
     key: guarded.key,
     read: guarded.read,
+    remove,
     setValue: write,
     watch: (callback: (value: StoredIcon | null, newer?: boolean) => void) =>
       guarded.watch((read) => callback(read?.value ?? null, read?.newer)),
@@ -76,6 +76,7 @@ export async function saveIcon(data: string): Promise<string> {
 
 /** Removes an icon after no Widget or Undo notice refers to it. */
 export async function deleteIcon(id: string): Promise<void> {
-  await storage.removeItem(`sync:icon:${id}`)
-  items.delete(id)
+  const result = await iconItem(id).remove()
+  if (result === 'saved') items.delete(id)
+  if (result === 'rejected') throw new Error('The icon could not be deleted.')
 }

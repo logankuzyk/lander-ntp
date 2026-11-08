@@ -32,6 +32,8 @@ export type GuardedItem<T> = {
   key: `sync:${string}`
   /** The stored value checked into `T` (the fallback when there is none), and whether it is newer. */
   read: () => Promise<GuardedRead<T>>
+  /** Removes the stored value unless what is stored right now is newer. */
+  remove: () => Promise<void>
   /** Called with what is stored each time it changes, or null when it is removed. */
   watch: (callback: (read: GuardedRead<T> | null) => void) => () => void
   /**
@@ -90,6 +92,10 @@ export function defineGuardedItem<T>({
     fallback,
     key,
     read: async () => readOf(await raw.getValue()),
+    remove: async () => {
+      if (newerThanKnown(await raw.getValue())) throw new NewerVersionError(key)
+      await raw.removeValue()
+    },
     watch: (callback) => raw.watch((stored) => callback(stored === null ? null : readOf(stored))),
     write: async (value) => {
       if (newerThanKnown(await raw.getValue())) throw new NewerVersionError(key)

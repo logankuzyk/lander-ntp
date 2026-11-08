@@ -52,4 +52,14 @@ describe('Quick dial icon storage', () => {
       v: 2,
     })
   })
+
+  it('leaves a newer icon item intact when asked to delete it', async () => {
+    const newer = { data: 'data:image/png;base64,YQ==', v: 2 }
+    await fakeBrowser.storage.sync.set({ 'icon:abcdefgh': newer })
+
+    await deleteIcon('abcdefgh')
+
+    expect((await fakeBrowser.storage.sync.get('icon:abcdefgh'))['icon:abcdefgh']).toEqual(newer)
+    expect((await iconItem('abcdefgh').read()).newer).toBe(true)
+  })
 })

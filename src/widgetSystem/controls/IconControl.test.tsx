@@ -14,21 +14,40 @@ import { IconControl } from './IconControl'
 beforeEach(async () => fakeBrowser.storage.sync.clear())
 
 describe('Quick dial icon control', () => {
-  it('keeps the old synced icon when the Layout refuses the uploaded icon', async () => {
+  it.each(['rejected', 'refused'])(
+    'keeps the old synced icon and removes the new one when the Layout save is %s',
+    async (saveResult) => {
+      await iconItem('oldicon1').setValue({ data: 'data:image/webp;base64,Yg==', v: 1 })
+      const onChange = vi.fn(async () => saveResult)
+      render(
+        <IconControl disabled={false} onChange={onChange} siteIcon="/site.ico" value="oldicon1" />,
+      )
+
+      fireEvent.change(screen.getByLabelText('Upload an icon'), {
+        target: { files: [new File(['source'], 'icon.png', { type: 'image/png' })] },
+      })
+      fireEvent.click(await screen.findByRole('button', { name: 'Use this icon' }))
+      await screen.findByRole('alert')
+
+      const stored = await fakeBrowser.storage.sync.get(null)
+      expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^[a-z\d]{8}$/))
+      expect(stored).toEqual({ 'icon:oldicon1': { data: 'data:image/webp;base64,Yg==', v: 1 } })
+    },
+  )
+
+  it('keeps the uploaded icon when using the site icon fails to save the Layout', async () => {
     await iconItem('oldicon1').setValue({ data: 'data:image/webp;base64,Yg==', v: 1 })
-    const onChange = vi.fn(async () => false)
+    const onChange = vi.fn(async () => 'refused')
     render(
       <IconControl disabled={false} onChange={onChange} siteIcon="/site.ico" value="oldicon1" />,
     )
 
-    fireEvent.change(screen.getByLabelText('Upload an icon'), {
-      target: { files: [new File(['source'], 'icon.png', { type: 'image/png' })] },
-    })
-    fireEvent.click(await screen.findByRole('button', { name: 'Use this icon' }))
-    await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: 'Use the site’s icon' }))
 
-    const stored = await fakeBrowser.storage.sync.get(null)
-    expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^[a-z\d]{8}$/))
-    expect(stored).toEqual({ 'icon:oldicon1': { data: 'data:image/webp;base64,Yg==', v: 1 } })
+    await screen.findByRole('alert')
+    expect(onChange).toHaveBeenCalledWith(null)
+    expect(await fakeBrowser.storage.sync.get('icon:oldicon1')).toEqual({
+      'icon:oldicon1': { data: 'data:image/webp;base64,Yg==', v: 1 },
+    })
   })
 })
