@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { V023ManifestSchema } from '@/test/compat/v0.2.3/manifest'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
-import { FETCH_TIMEOUT_MS, getManifest, MANIFEST_URL, MAX_AGE_MS } from './manifest'
+import {
+  FETCH_TIMEOUT_MS,
+  getManifest,
+  MANIFEST_URL,
+  MAX_AGE_MS,
+  revalidateManifest,
+} from './manifest'
 import type { Photo } from './schema'
 import { MANIFEST_CACHE_SHAPE, manifestCache, type ManifestCache } from './storage'
 
@@ -271,6 +277,21 @@ describe('getManifest', () => {
         fetchedAt: NOW,
         shape: MANIFEST_CACHE_SHAPE,
       })
+    })
+
+    it('does not treat a 304 as validation for a cache from an older shape', async () => {
+      const legacy = { data: manifest, etag: '"old"', fetchedAt: NOW - 1 }
+      await manifestCache.setValue(legacy)
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }))
+
+      const result = await revalidateManifest(legacy, NOW)
+
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
+      expect(result).toBeNull()
+      expect(await manifestCache.getValue()).toEqual(legacy)
     })
 
     it('ignores a cache that no longer matches the schema', async () => {
