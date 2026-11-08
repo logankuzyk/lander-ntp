@@ -1,14 +1,19 @@
+import type { ComponentChildren } from 'preact'
+
 import { Chip } from '@/components/Chip/Chip'
 
 import { Dropdown } from './Dropdown'
 
-export type MultiSelectOption = { label: string; value: string }
+export type MultiSelectOption = { depth?: number; label: string; value: string }
 
 type MultiSelectProps = {
   /** What the field says when nothing is chosen. */
   allLabel: string
+  disabled?: boolean
+  emptyContent?: ComponentChildren
   labelId: string
   onChange: (value: string[]) => void
+  onOpen?: () => void
   options: readonly MultiSelectOption[]
   /** The chosen values, in the order they were chosen. Empty means all of them. */
   value: readonly string[]
@@ -18,7 +23,16 @@ type MultiSelectProps = {
  * Pick any number of options, like a Notion multi-select: the field shows them as chips, and
  * its menu has the chosen ones (each with a ×), the rest to add, and a reset back to all.
  */
-export function MultiSelect({ allLabel, labelId, onChange, options, value }: MultiSelectProps) {
+export function MultiSelect({
+  allLabel,
+  disabled,
+  emptyContent,
+  labelId,
+  onChange,
+  onOpen,
+  options,
+  value,
+}: MultiSelectProps) {
   const byValue = new Map(options.map((option) => [option.value, option]))
   // Chosen values the options no longer have (a tag taken off the site) are left out of view.
   const chosen = value.flatMap((id) => byValue.get(id) ?? [])
@@ -29,7 +43,9 @@ export function MultiSelect({ allLabel, labelId, onChange, options, value }: Mul
   return (
     <Dropdown
       chips
+      disabled={disabled}
       labelId={labelId}
+      onOpen={onOpen}
       popup="dialog"
       value={
         chosen.length > 0 ? (
@@ -54,6 +70,7 @@ export function MultiSelect({ allLabel, labelId, onChange, options, value }: Mul
             </div>
           )}
           <div aria-multiselectable="true" class="dropdown__options" role="listbox">
+            {emptyContent}
             {rest.map((option) => (
               <button
                 aria-selected={false}
@@ -61,6 +78,11 @@ export function MultiSelect({ allLabel, labelId, onChange, options, value }: Mul
                 key={option.value}
                 onClick={() => onChange([...value, option.value])}
                 role="option"
+                style={
+                  option.depth
+                    ? { paddingInlineStart: `calc(0.5rem + ${option.depth * 16}px)` }
+                    : undefined
+                }
                 tabIndex={-1}
                 type="button"
               >

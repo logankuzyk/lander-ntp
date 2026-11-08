@@ -71,6 +71,53 @@ describe('defaultOptions', () => {
   })
 })
 
+describe('a list loaded for a pick option', () => {
+  const pick: WidgetDefinition<Record<string, unknown>> = {
+    ...definition,
+    options: [
+      {
+        control: 'pick',
+        default: 'work',
+        emptyText: 'No folders',
+        failedText: 'Could not load folders',
+        id: 'folder',
+        label: 'Folder',
+        load: async () => [],
+      },
+      {
+        control: 'pick',
+        default: ['work'],
+        emptyText: 'No calendars',
+        failedText: 'Could not load calendars',
+        id: 'calendars',
+        label: 'Calendars',
+        load: async () => [],
+        multiple: true,
+      },
+    ],
+  }
+
+  it('accepts one string or a list of strings and keeps unknown keys when writing', () => {
+    const stored = { calendars: ['one', 'two'], folder: 'team', newer: { kept: true } }
+    expect(readOptions(pick, stored)).toEqual(stored)
+    expect(readOptions(pick, { ...stored, folder: 4 })).toEqual({
+      calendars: ['work'],
+      folder: 'work',
+      newer: { kept: true },
+    })
+    expect(readOptions(pick, { ...stored, calendars: ['one', 2] })).toEqual({
+      calendars: ['work'],
+      folder: 'work',
+      newer: { kept: true },
+    })
+    expect(writeOptions(pick, stored, { folder: 'personal' })).toEqual({
+      calendars: ['one', 'two'],
+      folder: 'personal',
+      newer: { kept: true },
+    })
+  })
+})
+
 const VICTORIA = { latitude: 48.43, longitude: -123.37, name: 'Victoria' }
 
 const stored = {
