@@ -76,7 +76,7 @@ type OpenOptions = {
 type OptionsPopoverProviderProps = {
   children?: ComponentChildren
   /** Saves the whole Layout (`useLayout`'s `commit`), once for each change made. */
-  commit: (next: Layout) => void
+  commit: (next: Layout) => Promise<unknown> | void
   /** The Layout, as `useLayout` gives it. */
   layout: Layout
   /** Whether the stored Layout has arrived: until it has, nothing is committed (see `useLayout`). */
@@ -164,18 +164,26 @@ export function OptionsPopoverProvider({
   // before the page has drawn the first still has it. Each render brings it up to date.
   const latest = useRef(layout)
   latest.current = layout
-  const change = (id: string, next: Record<string, unknown>) => {
-    if (!loaded) return
+  const change = (id: string, next: Record<string, unknown>): Promise<boolean> => {
+    if (!loaded) return Promise.resolve(false)
     const base = latest.current
     const settled = settle(base)
     const result = setOptions({ layout: settled, readOnly: !canChange }, id, next)
-    if (!result.ok) return
+    if (!result.ok) return Promise.resolve(false)
     // Nothing to save: no Widget moves to where it is drawn, and no option is different.
     const was = placedIn(settled, id)?.options
     const now = placedIn(result.layout, id)?.options
-    if (settled === base && same(was, now)) return
+    if (settled === base && same(was, now)) return Promise.resolve(true)
     latest.current = result.layout
-    commit(result.layout)
+    const outcome = commit(result.layout)
+    return outcome && typeof (outcome as Promise<unknown>).then === 'function'
+      ? (outcome as Promise<string>).then((saved) => {
+          if (saved !== 'saved' && saved !== 'superseded' && latest.current === result.layout) {
+            latest.current = base
+          }
+          return saved === 'saved' || saved === 'superseded'
+        })
+      : Promise.resolve(true)
   }
 
   const controls = useMemo<OptionsPopoverControls>(

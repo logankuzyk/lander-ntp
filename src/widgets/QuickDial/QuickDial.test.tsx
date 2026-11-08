@@ -6,6 +6,24 @@ import { EditModeProvider, useEditMode } from '@/components/EditMode/useEditMode
 import { QuickDial } from './QuickDial'
 
 describe('Quick dial', () => {
+  it('shows its uploaded icon first and falls back to the site icon if it fails', () => {
+    const { container } = render(
+      <QuickDial
+        iconUrl={() => '/site.ico'}
+        label="Example"
+        newTab={false}
+        uploadedIcon="data:image/webp;base64,YQ=="
+        url="example.com"
+      />,
+    )
+    const image = container.querySelector('img')!
+    expect(image.getAttribute('src')).toBe('data:image/webp;base64,YQ==')
+
+    fireEvent.error(image)
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('/site.ico')
+  })
+
   it('uses a site icon first and shows the host initial after it fails', () => {
     const { container } = render(
       <QuickDial iconUrl={() => '/stub.ico'} label="" newTab={false} url="example.com" />,

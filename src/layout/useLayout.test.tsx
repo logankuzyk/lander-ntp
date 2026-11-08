@@ -36,7 +36,10 @@ function mount(options?: { onRejected?: () => void }, settings: Settings = SETTI
   }
   const { rerender } = render(<Probe settings={settings} />)
   return {
-    commit: (next: Layout) => act(() => api.commit(next)),
+    commit: (next: Layout) =>
+      act(() => {
+        void api.commit(next)
+      }),
     current: () => api,
     /** The page is given other settings, as when they change in another tab. */
     withSettings: (next: Settings) => rerender(<Probe settings={next} />),

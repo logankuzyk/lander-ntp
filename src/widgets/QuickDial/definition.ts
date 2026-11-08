@@ -1,6 +1,8 @@
 import { h } from 'preact'
 
+import { deleteIcon } from '@/quickDial/iconStorage'
 import { tidyUrl } from '@/quickDial/tidyUrl'
+import { useIcon } from '@/quickDial/useIcon'
 import type { WidgetDefinition, WidgetViewProps } from '@/widgetSystem/definition'
 import type { Need } from '@/widgetSystem/needs'
 
@@ -9,7 +11,13 @@ import { QuickDial } from './QuickDial'
 export type QuickDialOptions = { icon: string | null; label: string; newTab: boolean; url: string }
 
 function QuickDialView({ options }: WidgetViewProps<QuickDialOptions>) {
-  return h(QuickDial, { label: options.label, newTab: options.newTab, url: options.url })
+  const uploadedIcon = useIcon(options.icon)
+  return h(QuickDial, {
+    label: options.label,
+    newTab: options.newTab,
+    uploadedIcon,
+    url: options.url,
+  })
 }
 
 const site: Need<QuickDialOptions> = {
@@ -22,6 +30,9 @@ const site: Need<QuickDialOptions> = {
 export const quickDialDefinition: WidgetDefinition<QuickDialOptions> = {
   name: 'Quick dial',
   needs: [site],
+  onDiscard: (options) => {
+    if (typeof options.icon === 'string') void deleteIcon(options.icon)
+  },
   options: [
     { control: 'text', default: '', id: 'url', label: 'Site', placeholder: 'example.com' },
     { control: 'text', default: '', id: 'label', label: 'Label' },

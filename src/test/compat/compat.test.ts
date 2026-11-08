@@ -29,6 +29,7 @@ import { dismissNews } from '@/onboarding/dismissNews'
 import { recordInstall } from '@/onboarding/install'
 import { type Onboarding, onboardingItem } from '@/onboarding/storage'
 import { recordSeen } from '@/onboarding/useSeen'
+import { deleteIcon, saveIcon } from '@/quickDial/iconStorage'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
 import { createWriteQueue } from '@/storage/writeQueue'
@@ -73,7 +74,7 @@ const PHASE_3_LAYOUT = {
       col: 6,
       h: 3,
       id: 'dial',
-      options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com' },
+      options: { icon: 'abcdefgh', label: 'Example', newTab: false, url: 'https://example.com' },
       row: 4,
       type: 'quick-dial',
       w: 5,
@@ -107,7 +108,9 @@ const V030_LAYOUT_WRITES: {
       await waitFor(() => expect(page.loaded).toBe(true))
       const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'analog-clock')
       if (!added.ok) throw new Error(`could not add Analog clock: ${added.reason}`)
-      await act(async () => page.commit(added.layout))
+      await act(async () => {
+        await page.commit(added.layout)
+      })
       await waitFor(async () =>
         expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
       )
@@ -129,13 +132,15 @@ const V030_LAYOUT_WRITES: {
       const added = addWidget({ layout: page.layout, readOnly: page.readOnly }, 'quick-dial')
       if (!added.ok) throw new Error(`could not add Quick dial: ${added.reason}`)
       const configured = setOptions({ layout: added.layout, readOnly: false }, added.id, {
-        icon: null,
+        icon: 'abcdefgh',
         label: 'Example',
         newTab: false,
         url: 'https://example.com/',
       })
       if (!configured.ok) throw new Error(`could not configure Quick dial: ${configured.reason}`)
-      await act(async () => page.commit(configured.layout))
+      await act(async () => {
+        await page.commit(configured.layout)
+      })
       await waitFor(async () =>
         expect(await fakeBrowser.storage.sync.get('layout')).toHaveProperty('layout'),
       )
@@ -164,6 +169,26 @@ const PHASE_3_SYNC_ITEM_WRITES = [
           favouritesOnly: true,
         }),
       )
+    },
+  },
+  {
+    key: 'icon:',
+    name: 'save a Quick dial icon item; frozen readers leave Layout and settings alone',
+    write: async () => {
+      const id = await saveIcon('data:image/webp;base64,YQ==')
+      return `icon:${id}`
+    },
+  },
+  {
+    expectedPresent: false,
+    key: 'icon:abcdefgh',
+    name: 'delete a Quick dial icon through its guarded path; frozen readers leave it removed',
+    write: async () => {
+      await fakeBrowser.storage.sync.set({
+        'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+      })
+      await deleteIcon('abcdefgh')
+      return 'icon:abcdefgh'
     },
   },
   {
@@ -199,7 +224,12 @@ describe('the frozen v0.3.0 reader', () => {
       ) as { type?: string } | undefined
       if (added?.type === 'quick-dial') {
         expect(added).toMatchObject({
-          options: { icon: null, label: 'Example', newTab: false, url: 'https://example.com/' },
+          options: {
+            icon: 'abcdefgh',
+            label: 'Example',
+            newTab: false,
+            url: 'https://example.com/',
+          },
         })
       } else {
         expect(added).toMatchObject({
@@ -217,21 +247,30 @@ describe('the frozen v0.3.0 reader', () => {
     }
   })
 
-  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ key, write }) => {
+  it.each(PHASE_3_SYNC_ITEM_WRITES)('$name', async ({ expectedPresent = true, key, write }) => {
     await fakeBrowser.storage.sync.clear()
     await settingsItem.setValue(SEED)
     const settingsBefore = JSON.stringify((await fakeBrowser.storage.sync.get('settings')).settings)
 
-    await write()
+    const writtenKey = (await write()) ?? key
     const stored = await fakeBrowser.storage.sync.get(null)
 
-    expect(stored[key]).toBeDefined()
+    const present = Object.keys(stored).some(
+      (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+    )
+    expect(present).toBe(expectedPresent)
     expect(JSON.stringify(stored.settings)).toBe(settingsBefore)
     expect((await asV023(stored)).settings).toEqual(stored.settings)
     const frozen = await asV030(stored)
     expect(frozen.settings).toEqual(stored.settings)
     expect(frozen.layout.widgets).toEqual([])
     expect(frozen.raw.background).toEqual(stored.background)
+    const afterFrozenReads = await fakeBrowser.storage.sync.get(null)
+    expect(
+      Object.keys(afterFrozenReads).some(
+        (itemKey) => itemKey === writtenKey || itemKey.startsWith(writtenKey),
+      ),
+    ).toBe(expectedPresent)
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {
@@ -833,7 +872,9 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       )
       const changed = setOptions({ layout, readOnly: false }, weather.placed.id, options)
       if (!changed.ok) throw new Error(`the change was refused: ${changed.reason}`)
-      act(() => result.current.commit(changed.layout))
+      act(() => {
+        void result.current.commit(changed.layout)
+      })
       await waitFor(async () => {
         const saved = await layoutItem.getValue()
         const savedWeather = saved?.widgets.find(

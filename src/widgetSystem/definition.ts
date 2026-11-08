@@ -228,6 +228,8 @@ export type WidgetDefinition<O, R = undefined, C = undefined> = {
    * all are, it draws nothing. Defined once, not rebuilt on each render.
    */
   needs?: readonly Need<O>[]
+  /** Called when a removed Widget’s Undo notice expires or is dismissed. */
+  onDiscard?: (options: Record<string, unknown>) => void
   options: readonly OptionDescription[]
   /** How big it may be on the Grid, and how big it starts. */
   sizes: WidgetSizes<O>
