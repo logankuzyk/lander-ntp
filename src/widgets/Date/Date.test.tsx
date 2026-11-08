@@ -92,9 +92,7 @@ describe('Date Widget', () => {
       const { container } = render(
         <Date cells={cells(3, 3)} {...options} weekNumbers weekStartsOn={weekStartsOn} />,
       )
-      expect(container.querySelector('.date__week-number')?.textContent).toBe(
-        '53',
-      )
+      expect(container.querySelector('.date__week-number')?.textContent).toBe('53')
       const firstDay = container.querySelector('.date__weekday')?.textContent
       expect(firstDay).toBe(weekStartsOn === 'monday' ? 'M' : 'S')
     },
