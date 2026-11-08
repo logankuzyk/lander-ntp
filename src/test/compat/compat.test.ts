@@ -233,7 +233,7 @@ describe('the frozen v0.3.0 reader', () => {
         })
       } else {
         expect(added).toMatchObject({
-          options: { face: 'ticks', showDate: false, showSeconds: true },
+          options: { face: 'minimal', showDate: false, showSeconds: true },
         })
       }
       expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
