@@ -98,6 +98,77 @@ afterEach(() => {
 })
 
 describe('OptionsForm', () => {
+  it('draws a pick option, focuses its trigger, and saves one picked value with unknown keys', async () => {
+    const definition: WidgetDefinition<Record<string, unknown>> = {
+      ...example,
+      options: [
+        {
+          control: 'pick',
+          default: 'work',
+          emptyText: 'No folders',
+          failedText: 'Could not load folders',
+          id: 'folder',
+          label: 'Folder',
+          load: async () => [
+            { label: 'Work', value: 'work' },
+            { label: 'Personal', value: 'personal' },
+          ],
+        },
+      ],
+    }
+    const onChange = vi.fn()
+    render(
+      <OptionsForm
+        definition={definition}
+        focusOption="folder"
+        onChange={onChange}
+        onPageValueChange={vi.fn()}
+        options={{ folder: 'missing', future: { retained: true } }}
+        page={PAGE}
+      />,
+    )
+
+    const trigger = screen.getByRole('combobox', { name: 'Folder' })
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+    fireEvent.click(trigger)
+    fireEvent.click(await screen.findByRole('option', { name: 'Personal' }))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith({ folder: 'personal', future: { retained: true } })
+  })
+
+  it('loads choices for a multiple pick option when its menu opens', async () => {
+    const load = vi.fn(async () => [{ label: 'Work', value: 'work' }])
+    const definition: WidgetDefinition<Record<string, unknown>> = {
+      ...example,
+      options: [
+        {
+          control: 'pick',
+          default: [],
+          emptyText: 'No calendars',
+          failedText: 'Could not load calendars',
+          id: 'calendars',
+          label: 'Calendars',
+          load,
+          multiple: true,
+        },
+      ],
+    }
+    render(
+      <OptionsForm
+        definition={definition}
+        onChange={vi.fn()}
+        onPageValueChange={vi.fn()}
+        options={{}}
+        page={PAGE}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Calendars' }))
+
+    expect(await screen.findByRole('option', { name: 'Work' })).toBeTruthy()
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
   describe('draws each kind of control from the description', () => {
     it('a switch, on or off as stored', () => {
       draw()

@@ -1,10 +1,18 @@
+import * as v from 'valibot'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { V023ManifestSchema } from '@/test/compat/v0.2.3/manifest'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
-import { FETCH_TIMEOUT_MS, getManifest, MANIFEST_URL, MAX_AGE_MS } from './manifest'
+import {
+  FETCH_TIMEOUT_MS,
+  getManifest,
+  MANIFEST_URL,
+  MAX_AGE_MS,
+  revalidateManifest,
+} from './manifest'
 import type { Photo } from './schema'
-import { manifestCache, type ManifestCache } from './storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache, type ManifestCache } from './storage'
 
 const NOW = Date.parse('2026-09-11T12:00:00Z')
 const manifest = makeManifest([makePhoto('a'), makePhoto('b')])
@@ -26,7 +34,7 @@ const json = (body: unknown, etag = '"v2"') =>
   })
 
 const seed = (fetchedAt: number): Promise<void> =>
-  manifestCache.setValue({ data: manifest, etag: '"v1"', fetchedAt })
+  manifestCache.setValue({ data: manifest, etag: '"v1"', fetchedAt, shape: MANIFEST_CACHE_SHAPE })
 
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
@@ -57,6 +65,7 @@ describe('getManifest', () => {
         data: manifest,
         etag: '"v2"',
         fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
       })
     })
 
@@ -95,15 +104,40 @@ describe('getManifest', () => {
     })
 
     it('reads photo tags, and gives photos from a manifest without them none', async () => {
-      const tagged = makePhoto('a', { tags: [{ name: 'Water', slug: 'water' }] })
+      const tagged = makePhoto('a', {
+        tags: [{ name: 'Water', slug: 'water' }] as unknown as Photo['tags'],
+      })
       fetchMock.mockResolvedValueOnce(json(makeManifest([tagged, withoutTags(makePhoto('b'))])))
 
       const { manifest: result } = await getManifest(NOW)
 
       expect(result.photos.map((photo) => photo.tags)).toEqual([
-        [{ name: 'Water', slug: 'water' }],
+        [{ name: 'Water', optIn: false, slug: 'water' }],
         [],
       ])
+    })
+
+    it('keeps the website manifest version at 1 and defaults an absent optIn flag to false', async () => {
+      const body = {
+        ...makeManifest([]),
+        photos: [{ ...makePhoto('ordinary'), tags: [{ name: 'Water', slug: 'water' }] }],
+      }
+      fetchMock.mockResolvedValueOnce(json(body))
+
+      const result = await getManifest(NOW)
+
+      expect(result.manifest.version).toBe(1)
+      expect(result.manifest.photos[0]?.tags[0]?.optIn).toBe(false)
+    })
+
+    it('keeps a manifest with the optIn field readable by the frozen v0.2.3 schema', () => {
+      const body = makeManifest([
+        makePhoto('pattern', {
+          tags: [{ name: 'Pattern', optIn: true, slug: 'pattern' }],
+        }),
+      ])
+
+      expect(v.safeParse(V023ManifestSchema, body).success).toBe(true)
     })
 
     it('sorts sizes ascending', async () => {
@@ -145,6 +179,7 @@ describe('getManifest', () => {
         data: manifest,
         etag: '"v1"',
         fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
       })
     })
 
@@ -160,6 +195,7 @@ describe('getManifest', () => {
         data: updated,
         etag: '"v3"',
         fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
       })
     })
 
@@ -176,7 +212,12 @@ describe('getManifest', () => {
       await result.revalidation
 
       expect(result.manifest).toEqual(manifest)
-      expect(await manifestCache.getValue()).toEqual({ data: manifest, etag: '"v1"', fetchedAt })
+      expect(await manifestCache.getValue()).toEqual({
+        data: manifest,
+        etag: '"v1"',
+        fetchedAt,
+        shape: MANIFEST_CACHE_SHAPE,
+      })
     })
 
     it('gives photos in a cache from before tags none', async () => {
@@ -184,12 +225,73 @@ describe('getManifest', () => {
         data: makeManifest([withoutTags(makePhoto('a'))]),
         etag: '"v1"',
         fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
       })
 
       const result = await getManifest(NOW)
 
       expect(result.source).toBe('cache')
       expect(result.manifest.photos[0]?.tags).toEqual([])
+    })
+
+    it('revalidates a cache from an older shape without its ETag', async () => {
+      await manifestCache.setValue({ data: manifest, etag: '"old"', fetchedAt: NOW - MAX_AGE_MS })
+      const tagged = makeManifest([
+        makePhoto('pattern', { tags: [{ name: 'Pattern', optIn: true, slug: 'pattern' }] }),
+      ])
+      fetchMock.mockResolvedValueOnce(json(tagged, '"new"'))
+
+      const result = await getManifest(NOW)
+      await result.revalidation
+
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
+      expect(await manifestCache.getValue()).toEqual({
+        data: tagged,
+        etag: '"new"',
+        fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
+      })
+    })
+
+    it('revalidates a fresh cache from an older shape without its ETag', async () => {
+      await manifestCache.setValue({ data: manifest, etag: '"old"', fetchedAt: NOW - 1 })
+      const tagged = makeManifest([
+        makePhoto('pattern', { tags: [{ name: 'Pattern', optIn: true, slug: 'pattern' }] }),
+      ])
+      fetchMock.mockResolvedValueOnce(json(tagged, '"new"'))
+
+      const result = await getManifest(NOW)
+      await result.revalidation
+
+      expect(result.manifest).toEqual(manifest)
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
+      expect(await manifestCache.getValue()).toEqual({
+        data: tagged,
+        etag: '"new"',
+        fetchedAt: NOW,
+        shape: MANIFEST_CACHE_SHAPE,
+      })
+    })
+
+    it('does not treat a 304 as validation for a cache from an older shape', async () => {
+      const legacy = { data: manifest, etag: '"old"', fetchedAt: NOW - 1 }
+      await manifestCache.setValue(legacy)
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }))
+
+      const result = await revalidateManifest(legacy, NOW)
+
+      expect(fetchMock).toHaveBeenCalledWith(MANIFEST_URL, {
+        headers: {},
+        signal: expect.any(AbortSignal),
+      })
+      expect(result).toBeNull()
+      expect(await manifestCache.getValue()).toEqual(legacy)
     })
 
     it('ignores a cache that no longer matches the schema', async () => {

@@ -4,7 +4,7 @@ import { browser } from 'wxt/browser'
 
 import { Grid } from '@/components/Grid/Grid'
 import { deriveLayout } from '@/layout/derive'
-import { manifestCache } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache } from '@/photos/storage'
 import { DEFAULT_SETTINGS, type Settings, type WeatherSettings } from '@/settings/schema'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { devicePosition } from '@/weather/deviceLocation'
@@ -470,6 +470,7 @@ describe('the Weather', () => {
       data: { ...makeManifest([makePhoto('a')]), weather: { enabled: false } },
       etag: null,
       fetchedAt: Date.now(),
+      shape: MANIFEST_CACHE_SHAPE,
     })
     await weatherSource.cache.set(cacheKey(PLACE, ON.unit), {
       data: READING,

@@ -15,19 +15,25 @@ export function availableTags(photos: readonly Photo[]): Tag[] {
     .map(({ tag }) => tag)
 }
 
-/** The photos carrying a tag, or all of them for null. */
+/** The photos carrying a tag, or the unflagged photos for null. */
 export function filterByTag(photos: readonly Photo[], slug: string | null): readonly Photo[] {
   return slug === null
-    ? photos
+    ? unflaggedPhotos(photos)
     : photos.filter((photo) => photo.tags.some((tag) => tag.slug === slug))
 }
 
+const isFlagged = (photo: Photo) => photo.tags.some((tag) => tag.optIn)
+const unflaggedPhotos = (photos: readonly Photo[]) => photos.filter((photo) => !isFlagged(photo))
+
 /**
- * Ids of the photos to cycle: those with any of the tags, or every photo when there are no
- * tags or no photo has one of them.
+ * Ids of the photos to cycle: matching any chosen tag, or unflagged photos for All and when
+ * no chosen tag matches. If every photo is flagged, keep the pool usable by falling back to all.
  */
 export function poolIds(photos: readonly Photo[], slugs: readonly string[]): string[] {
   const wanted = new Set(slugs)
   const tagged = photos.filter((photo) => photo.tags.some(({ slug }) => wanted.has(slug)))
-  return (tagged.length > 0 ? tagged : photos).map((photo) => photo.id)
+  const ordinary = unflaggedPhotos(photos)
+  return (tagged.length > 0 ? tagged : ordinary.length > 0 ? ordinary : photos).map(
+    (photo) => photo.id,
+  )
 }

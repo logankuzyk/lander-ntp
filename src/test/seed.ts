@@ -7,7 +7,7 @@ import type { StoredLayout } from '@/layout/types'
 import { NEWS } from '@/onboarding/callouts'
 import type { Onboarding } from '@/onboarding/storage'
 import { onboardingItem, pendingItem } from '@/onboarding/storage'
-import { manifestCache, photoState } from '@/photos/storage'
+import { MANIFEST_CACHE_SHAPE, manifestCache, photoState } from '@/photos/storage'
 import type { Place, Settings } from '@/settings/schema'
 import { DEFAULT_SETTINGS } from '@/settings/schema'
 import { settingsItem } from '@/settings/storage'
@@ -80,6 +80,7 @@ export async function seedPage({
     },
     etag: null,
     fetchedAt: Date.now(),
+    shape: MANIFEST_CACHE_SHAPE,
   })
   // The rotation draws from this bag, so the first photo is always the same one, not a random one.
   await photoState.setValue({

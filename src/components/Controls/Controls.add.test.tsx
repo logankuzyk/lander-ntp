@@ -103,11 +103,12 @@ describe('Controls, the Add menu', () => {
       within(menu())
         .getAllByRole('menuitem')
         .map((el) => el.textContent),
-    ).toEqual(['Clock', 'Date', 'Weather'])
+    ).toEqual(['Clock', 'Date', 'Analog clock', 'Weather'])
     expect(document.activeElement).toBe(item('Clock'))
     // Each is something a callout can point at.
     expect(item('Clock').getAttribute('data-callout-target')).toBe('menu:clock')
     expect(item('Date').getAttribute('data-callout-target')).toBe('menu:date')
+    expect(item('Analog clock').getAttribute('data-callout-target')).toBe('menu:analog-clock')
     expect(item('Weather').getAttribute('data-callout-target')).toBe('menu:weather')
   })
 
@@ -175,6 +176,8 @@ describe('Controls, the Add menu', () => {
     fireEvent.keyDown(item('Clock'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Date'))
     fireEvent.keyDown(item('Date'), { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(item('Analog clock'))
+    fireEvent.keyDown(item('Analog clock'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Weather'))
     fireEvent.keyDown(item('Weather'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Clock'))

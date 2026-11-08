@@ -581,6 +581,86 @@ body {
   opacity: 0.9;
 }
 
+/* The SVG viewBox keeps the dial square inside a wide or tall Widget box. */
+.analog-clock {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+.analog-clock__dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.analog-clock__rim,
+.analog-clock__date-window {
+  fill: rgb(0 0 0 / 18%);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.analog-clock__tick {
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.2;
+}
+
+.analog-clock__numeral {
+  fill: currentColor;
+  font-size: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analog-clock__hand {
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.analog-clock__hand--hour {
+  stroke-width: 3.5;
+}
+
+.analog-clock__hand--minute {
+  stroke-width: 2.4;
+}
+
+.analog-clock__hand--second {
+  animation: analog-tick 180ms ease-out;
+  stroke-width: 0.8;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.analog-clock__pin {
+  fill: currentColor;
+}
+
+.analog-clock__date {
+  fill: currentColor;
+  font-size: 6px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes analog-tick {
+  from {
+    scale: 1.08;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analog-clock__hand--second {
+    animation: none;
+  }
+}
+
 /* Background photo */
 
 .background {
@@ -1620,6 +1700,16 @@ button.chip:hover {
   flex: none;
 }
 
+.dropdown__empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  opacity: 0.8;
+  white-space: normal;
+}
+
 .dropdown__option,
 .dropdown__reset {
   display: flex;
@@ -1927,6 +2017,20 @@ button.chip:hover {
   font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
+}
+
+.new-mark {
+  align-items: center;
+  background: var(--accent, #6a7f67);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1;
+  margin-inline-start: 0.45rem;
+  padding: 0.22rem 0.42rem;
+  vertical-align: middle;
 }
 
 /* The highlight shows where focus is, in place of an outline. */

@@ -87,9 +87,9 @@ export const STORY_PHOTOS: Photo[] = [
     pageUrl: '#story-coast',
     sizes: [{ url: '/story-photos/beach.webp', width: 300 }],
     tags: [
-      { name: 'Water', slug: 'water' },
-      { name: 'People', slug: 'people' },
-      { name: 'Beach', slug: 'beach' },
+      { name: 'Water', optIn: false, slug: 'water' },
+      { name: 'People', optIn: false, slug: 'people' },
+      { name: 'Beach', optIn: false, slug: 'beach' },
     ],
     width: 4242,
   }),
@@ -109,8 +109,8 @@ export const STORY_PHOTOS: Photo[] = [
     pageUrl: '#story-forest',
     sizes: [{ url: '/story-photos/forest.webp', width: 300 }],
     tags: [
-      { name: 'Plants', slug: 'plants' },
-      { name: 'Forest', slug: 'forest' },
+      { name: 'Plants', optIn: false, slug: 'plants' },
+      { name: 'Forest', optIn: false, slug: 'forest' },
     ],
     width: 4242,
   }),
@@ -129,7 +129,7 @@ export const STORY_PHOTOS: Photo[] = [
     location: 'Strathcona Provincial Park',
     pageUrl: '#story-mountain',
     sizes: [{ url: '/story-photos/mountain.webp', width: 300 }],
-    tags: [{ name: 'Mountains', slug: 'mountains' }],
+    tags: [{ name: 'Mountains', optIn: false, slug: 'mountains' }],
     width: 4242,
   }),
 ]

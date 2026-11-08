@@ -1,3 +1,4 @@
+import { analogClockDefinition } from '@/widgets/AnalogClock/definition'
 import { clockDefinition } from '@/widgets/Clock/definition'
 import { dateDefinition } from '@/widgets/Date/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
@@ -17,6 +18,7 @@ export type AnyWidgetDefinition = DefinitionOf<any>
 export const WIDGETS: readonly AnyWidgetDefinition[] = [
   clockDefinition,
   dateDefinition,
+  analogClockDefinition,
   weatherDefinition,
 ]
 

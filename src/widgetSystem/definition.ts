@@ -3,7 +3,7 @@ import type { ComponentType } from 'preact'
 import type { Place } from '@/settings/schema'
 
 import type { Need } from './needs'
-import type { Query, Source } from './source'
+import type { Query, Source, WatchedSource } from './source'
 
 /**
  * The page-wide values a Widget may read: settings shared by the whole page, not kept in any
@@ -42,6 +42,28 @@ export type ChoiceOption = OptionBase & {
   control: 'choice'
   /** A function is evaluated when a Widget is added, so a locale-derived choice is captured. */
   default: (() => string) | string
+}
+
+/** A choice whose values come from this device when the menu opens. */
+export type PickChoice = { depth?: number; label: string; value: string }
+
+type PickOptionBase = OptionBase & {
+  control: 'pick'
+  emptyText: string
+  failedText: string
+  load: () => Promise<readonly PickChoice[]>
+}
+
+/** One value from a list loaded by the Widget. */
+export type PickOption = PickOptionBase & {
+  default: string
+  multiple?: false
+}
+
+/** Several values from a list loaded by the Widget. */
+export type MultiPickOption = PickOptionBase & {
+  default: readonly string[]
+  multiple: true
 }
 
 /** What a place option holds. */
@@ -90,7 +112,13 @@ export type PageValueOption = OptionBase & {
 
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
-  ChoiceOption | OrderedListOption | PageValueOption | PlaceOption | SwitchOption
+  | ChoiceOption
+  | MultiPickOption
+  | OrderedListOption
+  | PageValueOption
+  | PickOption
+  | PlaceOption
+  | SwitchOption
 
 /** A size on the Grid, in whole cells. */
 export type Cells = { h: number; w: number }
@@ -130,7 +158,9 @@ export type SourceQuery<R, C> = {
 }
 
 /** Where a Widget's data comes from, and what to ask of it for these options. */
-export type WidgetSource<O, R, C> = {
+export type TimedWidgetSource<O, R, C> = {
+  /** Left out for existing timed Sources; a new declaration may say it explicitly. */
+  kind?: 'timed'
   source: Source<R>
   /**
    * Works out what to load from the options. A hook, so it can follow things that change on
@@ -139,6 +169,14 @@ export type WidgetSource<O, R, C> = {
    */
   useQuery: (options: O) => SourceQuery<R, C>
 }
+
+/** A Source that reads local data again when its watch says that data changed. */
+export type WatchedWidgetSource<O, R> = {
+  kind: 'watched'
+  source: WatchedSource<R, O>
+}
+
+export type WidgetSource<O, R, C> = TimedWidgetSource<O, R, C> | WatchedWidgetSource<O, R>
 
 /** A line of thanks that links to where the Widget's data comes from. */
 export type Credit = {

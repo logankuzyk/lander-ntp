@@ -1,4 +1,4 @@
-import { NEWS } from './callouts'
+import { MARKS, NEWS } from './callouts'
 import { onboardingItem, pendingItem } from './storage'
 
 /**
@@ -15,7 +15,10 @@ export async function recordInstall(reason: string): Promise<void> {
   if (await onboardingItem.getValue()) return
   // Not synced until the welcome is answered: see pendingItem.
   if (reason === 'install') {
-    await pendingItem.setValue({ dismissed: NEWS.map(({ id }) => id), welcomed: false })
+    await pendingItem.setValue({
+      dismissed: [...NEWS.map(({ id }) => id), ...MARKS],
+      welcomed: false,
+    })
   } else {
     await onboardingItem.setValue({ dismissed: [], welcomed: true })
   }

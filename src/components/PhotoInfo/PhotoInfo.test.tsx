@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/preact'
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact'
 import { describe, expect, it, vi } from 'vitest'
+import { fakeBrowser } from 'wxt/testing/fake-browser'
 
+import { onboardingItem } from '@/onboarding/storage'
 import type { Photo } from '@/photos/schema'
 import { makePhoto } from '@/test/fixtures'
 
@@ -28,6 +30,17 @@ const renderInfo = (photo: Photo) => {
 }
 
 describe('PhotoInfo', () => {
+  it('shows the heart New mark while details are open, and records it for the next opening', async () => {
+    await fakeBrowser.storage.sync.clear()
+    await onboardingItem.setValue({ dismissed: [], welcomed: true })
+    renderInfo(makePhoto('heart'))
+
+    await waitFor(() => expect(screen.getByRole('dialog').querySelector('.new-mark')).toBeTruthy())
+    await waitFor(async () =>
+      expect((await onboardingItem.getValue())?.dismissed).toContain('photo-heart'),
+    )
+  })
+
   it('shows every camera setting, with the date in the viewer’s locale', () => {
     const { container } = renderInfo(
       makePhoto('a', { exif: FULL_EXIF, location: 'Victoria, British Columbia, Canada' }),

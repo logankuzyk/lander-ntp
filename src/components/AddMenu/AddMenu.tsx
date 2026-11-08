@@ -3,6 +3,10 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import { addWidget } from '@/layout/ops'
 import type { Layout } from '@/layout/types'
+import { MARKS } from '@/onboarding/callouts'
+import { NewMark } from '@/onboarding/NewMark'
+import { onboardingItem } from '@/onboarding/storage'
+import { recordSeen } from '@/onboarding/useSeen'
 import { widgetBox } from '@/widgetSystem/focusBox'
 import { WIDGETS } from '@/widgetSystem/registry'
 
@@ -66,6 +70,7 @@ export function AddMenu({
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const [said, setSaid] = useState<{ n: number; text: string } | null>(null)
+  const [newMarks, setNewMarks] = useState<ReadonlySet<string>>(new Set())
   // The Widget just added, until its line has gone; `seen` once the Layout has had it.
   const added = useRef<{ id: string; seen: boolean } | null>(null)
 
@@ -79,6 +84,24 @@ export function AddMenu({
     if (open && focusOnOpen) menu.current?.querySelector<HTMLElement>(ITEM)?.focus()
     // Only when it opens: `focusOnOpen` changing under an open menu is not a reason to move focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      setNewMarks(new Set())
+      return
+    }
+    let active = true
+    const ids = MARKS.filter((id) => id === 'clock' || id === 'weather-widget')
+    void onboardingItem.getValue().then(async (record) => {
+      if (!active || !record) return
+      const unseen = ids.filter((id) => !record.dismissed.includes(id))
+      setNewMarks(new Set(unseen))
+      await recordSeen(unseen)
+    })
+    return () => {
+      active = false
+    }
   }, [open])
 
   // A press elsewhere closes it. The button toggles it itself.
@@ -227,6 +250,7 @@ export function AddMenu({
             {WIDGETS.map(({ name, type }) => (
               <MenuItem
                 key={type}
+                marked={newMarks.has(type === 'weather' ? 'weather-widget' : type)}
                 name={name}
                 onPick={() => pick(type, name)}
                 state={itemState(editable, type, name, note)}
@@ -245,11 +269,13 @@ export function AddMenu({
 }
 
 function MenuItem({
+  marked,
   name,
   onPick,
   state,
   type,
 }: {
+  marked: boolean
   name: string
   onPick: () => void
   state: ItemState
@@ -268,7 +294,10 @@ function MenuItem({
       tabIndex={-1}
       type="button"
     >
-      <span>{name}</span>
+      <span>
+        {name}
+        {marked && <NewMark />}
+      </span>
       {reason !== null && <span class="add-menu__reason">{reason}</span>}
     </button>
   )

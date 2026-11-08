@@ -6,9 +6,9 @@ import { makePhoto } from '@/test/fixtures'
 
 import { Gallery } from './Gallery'
 
-const FOREST = { name: 'Forest', slug: 'forest' }
-const WATER = { name: 'Water', slug: 'water' }
-const BEACH = { name: 'Beach', slug: 'beach' }
+const FOREST = { name: 'Forest', optIn: false, slug: 'forest' }
+const WATER = { name: 'Water', optIn: false, slug: 'water' }
+const BEACH = { name: 'Beach', optIn: false, slug: 'beach' }
 
 const PHOTOS = [
   makePhoto('a', { alt: 'Waterfall', tags: [WATER, FOREST] }),
@@ -49,6 +49,33 @@ describe('Gallery', () => {
     const image = photoButtons()[0]?.querySelector('img')
     expect(image?.getAttribute('src')).toBe('https://media.logankuzyk.com/photos/a/pic-300.webp')
     expect(image?.getAttribute('loading')).toBe('lazy')
+  })
+
+  it('shows unflagged photos under All and keeps flagged tags available', () => {
+    const photos = [
+      makePhoto('ordinary', { alt: 'Ordinary' }),
+      makePhoto('pattern', {
+        alt: 'Pattern',
+        tags: [{ name: 'Pattern', optIn: true, slug: 'pattern' }],
+      }),
+      makePhoto('mixed', {
+        alt: 'Mixed',
+        tags: [
+          { name: 'Pattern', optIn: true, slug: 'pattern' },
+          { name: 'Water', optIn: false, slug: 'water' },
+        ],
+      }),
+    ]
+    renderGallery({ photos })
+
+    expect(photoNames()).toEqual(['Ordinary'])
+    expect(filters().getByRole('button', { name: 'Pattern' })).toBeTruthy()
+
+    fireEvent.click(filters().getByRole('button', { name: 'Pattern' }))
+    expect(photoNames()).toEqual(['Pattern', 'Mixed'])
+
+    fireEvent.click(filters().getByRole('button', { name: 'Water' }))
+    expect(photoNames()).toEqual(['Mixed'])
   })
 
   it('marks the photo on screen', () => {

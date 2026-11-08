@@ -42,6 +42,14 @@ function fieldsOf(option: OptionDescription): Field[] {
         },
       ]
     }
+    case 'pick':
+      return [
+        {
+          default: option.default,
+          key: option.id,
+          schema: option.multiple ? v.array(v.string()) : v.string(),
+        },
+      ]
     case 'place':
       return [
         {
