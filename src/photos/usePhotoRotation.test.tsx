@@ -1,6 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/preact'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { favouritesItem } from '@/backdrop/favourites'
+import { backgroundItem } from '@/backdrop/storage'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 
 import type { Frequency, PhotoSettings } from './rotation'
@@ -104,10 +106,14 @@ describe('usePhotoRotation', () => {
     try {
       await seed()
       const { result } = renderRotation(cycle('30s'))
-      // Async variant: it settles the storage promises between timers.
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0)
-      })
+      // The first draw waits for the Background and Favourites storage reads too.
+      // Each newly loaded storage item adds an async turn before the first photo is ready.
+      for (let turn = 0; turn < 10 && result.current.photo?.id !== 'a'; turn++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0)
+          await Promise.resolve()
+        })
+      }
       expect(result.current.photo?.id).toBe('a')
 
       await act(async () => {
@@ -225,5 +231,69 @@ describe('usePhotoRotation', () => {
 
     await waitFor(() => expect(result.current.photo?.id).toBe('a'))
     expect(result.current.upcoming?.id).toBe('b')
+  })
+
+  it('keeps an unmarked current photo on screen and skips it on the next draw', async () => {
+    await seed('a')
+    await backgroundItem.setValue({
+      colour: '#ffffff',
+      favouritesOnly: true,
+      kind: 'photo',
+      v: 1,
+    })
+    await favouritesItem.setValue({ ids: ['a', 'c'], v: 1 })
+    const { result } = renderRotation(cycle('daily', ['water']))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    await act(async () => favouritesItem.setValue({ ids: ['c'], v: 1 }))
+
+    expect(result.current.photo?.id).toBe('a')
+    let shown: string | null = null
+    await act(async () => {
+      shown = await result.current.next()
+    })
+    expect(shown).toBe('c')
+    expect(result.current.photo?.id).toBe('c')
+  })
+
+  it('moves into the favourites pool when Favourites only is turned on', async () => {
+    await seed('a')
+    await favouritesItem.setValue({ ids: ['c'], v: 1 })
+    const { rerender, result } = renderRotation(cycle('daily'))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    await act(async () =>
+      backgroundItem.setValue({
+        colour: '#ffffff',
+        favouritesOnly: true,
+        kind: 'photo',
+        v: 1,
+      }),
+    )
+
+    await waitFor(() => expect(result.current.photo?.id).toBe('c'))
+    rerender(cycle('daily'))
+    expect(result.current.photo?.id).toBe('c')
+  })
+
+  it('keeps a pinned photo and makes the next-photo button draw from favourites', async () => {
+    await seed('a')
+    await backgroundItem.setValue({
+      colour: '#ffffff',
+      favouritesOnly: true,
+      kind: 'photo',
+      v: 1,
+    })
+    await favouritesItem.setValue({ ids: ['c'], v: 1 })
+    const { result } = renderRotation(pinned('a'))
+    await waitFor(() => expect(result.current.photo?.id).toBe('a'))
+
+    let shown: string | null = null
+    await act(async () => {
+      shown = await result.current.next()
+    })
+
+    expect(shown).toBe('c')
+    expect(result.current.photo?.id).toBe('c')
   })
 })
