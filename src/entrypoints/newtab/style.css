@@ -1392,6 +1392,48 @@ body {
   gap: 8px;
 }
 
+.quick-dial-icon-editor {
+  position: relative;
+}
+
+.quick-dial-icon-editor__letter {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 600;
+}
+
+.quick-dial-icon-editor__actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 3px;
+  padding: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.quick-dial-icon-editor:hover .quick-dial-icon-editor__actions,
+.quick-dial-icon-editor:focus-within .quick-dial-icon-editor__actions {
+  opacity: 1;
+}
+
+.quick-dial-icon-editor__button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #111;
+  background: #fff;
+  box-shadow: 0 1px 4px #0005;
+  cursor: pointer;
+}
+
 .settings__icon-preview {
   width: 48px;
   height: 48px;

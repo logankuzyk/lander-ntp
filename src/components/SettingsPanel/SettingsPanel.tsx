@@ -1,15 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
-import { parseColour } from '@/backdrop/colour'
 import { presentFavourites } from '@/backdrop/favourites'
-import {
-  type Background,
-  BACKGROUND_COLOURS,
-  DEFAULT_BACKGROUND,
-  displayKind,
-} from '@/backdrop/storage'
+import { type Background, DEFAULT_BACKGROUND, displayKind } from '@/backdrop/storage'
 import { useFavourites } from '@/backdrop/useFavourites'
 import { Callout } from '@/components/Callout/Callout'
+import { ColourPicker } from '@/components/ColourPicker/ColourPicker'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
@@ -89,35 +84,6 @@ function BackgroundSection({
   settings,
 }: BackgroundSectionProps) {
   const colourMode = displayKind(background) === 'colour'
-  const [hex, setHex] = useState(background.colour.replace('#', ''))
-  const [pickerColour, setPickerColour] = useState(background.colour)
-  const [hexError, setHexError] = useState(false)
-  const picker = useRef<HTMLInputElement>(null)
-  const custom = !BACKGROUND_COLOURS.some(
-    (colour) => colour.toLowerCase() === background.colour.toLowerCase(),
-  )
-  useEffect(() => {
-    setHex(background.colour.replace('#', ''))
-    setPickerColour(background.colour)
-  }, [background.colour])
-  const setColour = (colour: string, save: boolean) => {
-    setPickerColour(colour)
-    setHex(colour.replace('#', ''))
-    setHexError(false)
-    onPreviewColour?.(colour)
-    if (save) {
-      onChange({ ...background, colour })
-      onPreviewColour?.(null)
-    }
-  }
-  const commitHex = () => {
-    const colour = parseColour(hex)
-    if (!colour) {
-      setHexError(true)
-      return
-    }
-    setColour(colour, true)
-  }
 
   return (
     <>
@@ -140,73 +106,12 @@ function BackgroundSection({
         />
       </section>
       {colourMode ? (
-        <section aria-label="Background colour">
-          <div aria-label="Background colour" class="background-swatches" role="radiogroup">
-            {BACKGROUND_COLOURS.map((colour, index) => (
-              <label class="background-swatch" key={colour} title={`Colour ${index + 1}`}>
-                <input
-                  aria-label={`Colour ${index + 1}`}
-                  checked={!custom && background.colour.toLowerCase() === colour.toLowerCase()}
-                  name="background-colour"
-                  onChange={() => setColour(colour, true)}
-                  type="radio"
-                  value={colour}
-                />
-                <span aria-hidden="true" style={{ backgroundColor: colour }} />
-              </label>
-            ))}
-            <label class="background-swatch" title="Custom colour">
-              <input
-                aria-label="Custom colour"
-                checked={custom}
-                name="background-colour"
-                onChange={() => picker.current?.click()}
-                type="radio"
-              />
-              <span aria-hidden="true" class="background-swatch__custom">
-                +
-              </span>
-            </label>
-          </div>
-          <input
-            aria-label="Choose custom colour"
-            class="background-colour-picker"
-            onCancel={() => {
-              setPickerColour(background.colour)
-              setHex(background.colour.replace('#', ''))
-              setHexError(false)
-              onPreviewColour?.(null)
-            }}
-            onChange={(event) => setColour(event.currentTarget.value, true)}
-            onInput={(event) => setColour(event.currentTarget.value, false)}
-            ref={picker}
-            type="color"
-            value={pickerColour}
-          />
-          <label class="settings__row settings__row--text">
-            <span>Hex colour</span>
-            <input
-              aria-describedby={hexError ? 'background-hex-error' : undefined}
-              aria-invalid={hexError}
-              class="settings__input"
-              maxLength={7}
-              onBlur={commitHex}
-              onInput={(event) => {
-                setHex(event.currentTarget.value.replace(/^#/, ''))
-                setHexError(false)
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') commitHex()
-              }}
-              value={hex}
-            />
-          </label>
-          {hexError && (
-            <p class="settings__note" id="background-hex-error">
-              Use six digits, like 1a2b3c
-            </p>
-          )}
-        </section>
+        <ColourPicker
+          label="Background colour"
+          onChange={(colour) => onChange({ ...background, colour })}
+          onPreview={onPreviewColour}
+          value={background.colour}
+        />
       ) : (
         <PhotosSection
           background={background}

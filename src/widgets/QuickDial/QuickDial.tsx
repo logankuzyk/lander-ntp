@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'preact/hooks'
 
+import { readableInk } from '@/backdrop/readableInk'
 import { useEditMode } from '@/components/EditMode/useEditMode'
 import { siteIconUrl } from '@/quickDial/siteIconUrl'
 import { tidyUrl } from '@/quickDial/tidyUrl'
 
 export type QuickDialProps = {
+  colour?: string
   iconUrl?: (host: string) => string
   label: string
   newTab: boolean
+  showIcon?: boolean
   uploadedIcon?: string | null
   url: string
 }
 
-function colourFor(host: string): string {
-  let hash = 0
-  for (const character of host) hash = (hash * 31 + character.charCodeAt(0)) | 0
-  return `hsl(${Math.abs(hash) % 360} 48% 38%)`
-}
-
 export function QuickDial({
+  colour = '#ffffff',
   iconUrl = siteIconUrl,
   label,
   newTab,
+  showIcon = true,
   uploadedIcon,
   url,
 }: QuickDialProps) {
@@ -50,20 +49,25 @@ export function QuickDial({
       rel={newTab ? 'noreferrer' : undefined}
       target={newTab ? '_blank' : undefined}
     >
-      <span class="quick-dial__icon" style={{ backgroundColor: colourFor(host) }}>
-        {host && !failed ? (
-          <img
-            alt=""
-            onError={() =>
-              uploadedIcon && !uploadedFailed ? setUploadedFailed(true) : setFailed(true)
-            }
-            referrerPolicy="no-referrer"
-            src={uploadedIcon && !uploadedFailed ? uploadedIcon : iconUrl(host)}
-          />
-        ) : (
-          <span aria-hidden="true">{host.charAt(0).toUpperCase()}</span>
-        )}
-      </span>
+      {showIcon && (
+        <span
+          class="quick-dial__icon"
+          style={failed ? { backgroundColor: colour, color: readableInk(colour) } : undefined}
+        >
+          {host && !failed ? (
+            <img
+              alt=""
+              onError={() =>
+                uploadedIcon && !uploadedFailed ? setUploadedFailed(true) : setFailed(true)
+              }
+              referrerPolicy="no-referrer"
+              src={uploadedIcon && !uploadedFailed ? uploadedIcon : iconUrl(host)}
+            />
+          ) : (
+            <span aria-hidden="true">{host.charAt(0).toUpperCase()}</span>
+          )}
+        </span>
+      )}
       <span class="quick-dial__label">{title}</span>
     </a>
   )

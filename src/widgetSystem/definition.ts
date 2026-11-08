@@ -49,6 +49,12 @@ export type IconOption = OptionBase & {
   default: string | null
 }
 
+/** A six digit colour chosen with the shared Background colour picker. */
+export type ColourOption = OptionBase & {
+  control: 'colour'
+  default: string
+}
+
 /** One of the listed values. */
 export type ChoiceOption = OptionBase & {
   choices: readonly { label: string; value: string }[]
@@ -126,6 +132,7 @@ export type PageValueOption = OptionBase & {
 /** One option, described as data. The controls are a fixed set; new kinds join it. */
 export type OptionDescription =
   | ChoiceOption
+  | ColourOption
   | IconOption
   | MultiPickOption
   | OrderedListOption

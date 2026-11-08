@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef } from 'preact/hooks'
 
+import { ColourPicker } from '@/components/ColourPicker/ColourPicker'
 import { siteIconUrl as defaultSiteIconUrl } from '@/quickDial/siteIconUrl'
 import { tidyUrl } from '@/quickDial/tidyUrl'
 
@@ -227,6 +228,15 @@ export function OptionsForm({
         return (
           <Choice<string>
             choices={option.choices}
+            disabled={off}
+            label={option.label}
+            onChange={(value) => change({ [option.id]: value })}
+            value={read[option.id] as string}
+          />
+        )
+      case 'colour':
+        return (
+          <ColourPicker
             disabled={off}
             label={option.label}
             onChange={(value) => change({ [option.id]: value })}

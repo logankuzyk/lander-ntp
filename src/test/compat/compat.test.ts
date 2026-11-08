@@ -503,7 +503,75 @@ const PHASE_3_WRITES = [
       return { after: await fakeBrowser.storage.sync.get(null), before }
     },
   },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: {
+      colour: '#123456',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: true,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'choose a Quick dial colour through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ colour: '#123456' }),
+  },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: {
+      colour: '#ffffff',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: false,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'turn off a Quick dial icon through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ showIcon: false }),
+  },
+  {
+    expectedChangedKeys: ['icon:abcdefgh', 'layout'],
+    expectedOptions: {
+      colour: '#ffffff',
+      icon: null,
+      label: 'Example',
+      newTab: false,
+      showIcon: true,
+      url: 'https://example.com/',
+    },
+    expectedType: 'quick-dial',
+    name: 'remove a Quick dial icon through its page commit path; v0.2.3 settings stay byte-equal',
+    write: () => writeQuickDialOptions({ icon: null }, true),
+  },
 ]
+
+async function writeQuickDialOptions(changes: Record<string, unknown>, removeStoredIcon = false) {
+  await settingsItem.setValue(SEED)
+  await onboardingItem.setValue(SEED_ONBOARDING)
+  if (removeStoredIcon)
+    await fakeBrowser.storage.sync.set({
+      'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+    })
+  const layout = await storeExampleLayout()
+  const added = addWidget({ layout, readOnly: false }, 'quick-dial')
+  if (!added.ok) throw new Error(`could not add Quick dial: ${added.reason}`)
+  const configured = setOptions({ layout: added.layout, readOnly: false }, added.id, {
+    colour: '#ffffff',
+    icon: removeStoredIcon ? 'abcdefgh' : null,
+    label: 'Example',
+    newTab: false,
+    showIcon: true,
+    url: 'https://example.com/',
+    ...changes,
+  })
+  if (!configured.ok) throw new Error(`could not configure Quick dial: ${configured.reason}`)
+  const before = await fakeBrowser.storage.sync.get(null)
+  await commitThroughPage(configured.layout, 'quick-dial')
+  if (removeStoredIcon) await deleteIcon('abcdefgh')
+  return { after: await fakeBrowser.storage.sync.get(null), before }
+}
 
 describe('phase 3 synced writes', () => {
   it.each(PHASE_3_WRITES)('$name', async (row) => {
