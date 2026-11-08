@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_SETTINGS } from '@/settings/schema'
+
 import { canon, mergeOnboarding, planFirstSignIn, planPull } from './planning'
 
 describe('sync planning', () => {
@@ -15,6 +17,17 @@ describe('sync planning', () => {
 
   it('downloads an arranged account copy when this browser has nothing arranged', () => {
     expect(planFirstSignIn({}, { settings: { dim: false } })).toBe('download')
+  })
+
+  it('treats v0.2.3 default settings as unarranged when their version is absent', () => {
+    const legacyDefaults = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS).filter(([key]) => key !== 'v'),
+    )
+
+    expect(planFirstSignIn({ settings: legacyDefaults }, {})).toBe('nothing')
+    expect(planFirstSignIn({ settings: legacyDefaults }, { layout: { v: 1, widgets: [] } })).toBe(
+      'download',
+    )
   })
 
   it('merges differing onboarding without asking when arranged settings match', () => {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 
 import { account } from '@/account/account'
@@ -7,6 +7,8 @@ import type { SettingsStop } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
 import type { Photo } from '@/photos/schema'
 import { DEFAULT_SETTINGS, type Settings } from '@/settings/schema'
+import { settingsItem } from '@/settings/storage'
+import { syncClient } from '@/sync/client'
 import { makePhoto } from '@/test/fixtures'
 
 import { SettingsPanel } from './SettingsPanel'
@@ -36,7 +38,7 @@ const renderPanel = ({
 } = {}) => {
   const onChange = vi.fn()
   const onClose = vi.fn()
-  render(
+  const view = render(
     <SettingsPanel
       accountPreview={accountPreview}
       currentId="a"
@@ -47,7 +49,7 @@ const renderPanel = ({
       settings={{ ...settings, ...overrides }}
     />,
   )
-  return { onChange, onClose }
+  return { ...view, onChange, onClose }
 }
 
 const withPhotos = (changes: Partial<PhotoSettings>): Settings => ({
@@ -61,6 +63,14 @@ const jsonResponse = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' }, status })
 
 describe('SettingsPanel', () => {
+  beforeEach(async () => {
+    syncClient.reset()
+    // fakeBrowser.reset() clears storage but the account client keeps its in-memory state.
+    // Refresh it before rendering so a prior sign-in cannot mask the email/code form.
+    await browser.storage.local.clear()
+    await account.initialize()
+  })
+
   it('opens as a labelled popover with the close button focused', () => {
     renderPanel()
 
@@ -101,10 +111,341 @@ describe('SettingsPanel', () => {
     renderPanel()
 
     openSection('General')
-
     expect(screen.getByRole('tabpanel', { name: 'General' })).toBeTruthy()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeTruthy()
     expect(screen.queryByLabelText('Change photo')).toBeNull()
+  })
+
+  describe('account', () => {
+    beforeEach(() => {
+      vi.stubEnv('BROWSER', 'firefox')
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(true as never)
+      vi.spyOn(browser.permissions, 'request').mockResolvedValue(true as never)
+    })
+    afterEach(() => vi.unstubAllEnvs())
+
+    const openAccount = () => {
+      const panel = renderPanel()
+      openSection('Account')
+      return panel
+    }
+    const signInWithSnapshot = async (
+      localSettings: Settings,
+      remoteSettings: Settings,
+      remoteLayout?: unknown,
+    ) => {
+      await settingsItem.setValue(localSettings)
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/email-otp/send-verification-otp')) {
+          return jsonResponse({ success: true })
+        }
+        if (path.endsWith('/sign-in/email-otp')) {
+          return jsonResponse({ token: 'token', user: { email: 'person@example.com' } })
+        }
+        if (path === '/v1/me') {
+          return jsonResponse({ email: 'person@example.com', pending: false })
+        }
+        if (path === '/v1/devices') {
+          return jsonResponse({ devices: [], limit: 3, pending: false })
+        }
+        if (path === '/v1/sync') {
+          const items: Record<string, unknown> = {
+            settings: { v: 1, value: { ...remoteSettings, v: 1 } },
+          }
+          if (remoteLayout !== undefined) items.layout = { v: 1, value: remoteLayout }
+          return jsonResponse({
+            items,
+            rev: 1,
+          })
+        }
+        return jsonResponse({ changed: true, rev: 2 })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const panel = openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), {
+        target: { value: 'person@example.com' },
+      })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      const code = await screen.findByLabelText('Code')
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement,
+      )
+      return { fetch, panel }
+    }
+
+    it('shows the disclosure and policy before sending a code, then asks for the six-digit code', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(jsonResponse({ success: true }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+
+      const disclosure = screen.getByText(/your email address.*OVH behind Cloudflare.*Resend/i)
+      const policy = screen.getByRole('link', { name: 'Privacy policy' })
+      expect(
+        disclosure.compareDocumentPosition(policy) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+      expect(policy.getAttribute('href')).toContain('PRIVACY.md')
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect(await screen.findByLabelText('Code')).toBeTruthy()
+      expect(fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows a plain error for a wrong or expired code', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse({ success: true }))
+        .mockResolvedValueOnce(jsonResponse({ message: 'invalid otp' }, 400))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+      const code = await screen.findByLabelText('Code')
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('wrong or has expired')
+    })
+
+    it('can request a fresh code or change the email after the code step starts', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockImplementation(async () => jsonResponse({ success: true }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByLabelText('Code')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+      expect(fetch.mock.calls[1]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', type: 'sign-in' }),
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change email' }))
+      const email = screen.getByLabelText('Email') as HTMLInputElement
+      expect(email.value).toBe('person@example.com')
+      fireEvent.input(email, { target: { value: 'other@example.com' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByLabelText('Code')
+      expect(fetch.mock.calls[2]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'other@example.com', type: 'sign-in' }),
+      )
+    })
+
+    it('sends a trimmed email address for both code requests and verification', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse({ success: true }))
+        .mockResolvedValueOnce(
+          jsonResponse({ token: 'token', user: { email: 'person@example.com' } }),
+        )
+        .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), {
+        target: { value: ' person@example.com ' },
+      })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Send code' }).closest('form') as HTMLFormElement,
+      )
+      const code = await screen.findByLabelText('Code')
+      expect(fetch.mock.calls[0]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', type: 'sign-in' }),
+      )
+
+      fireEvent.input(code, { target: { value: '123456' } })
+      fireEvent.submit(
+        screen.getByRole('button', { name: 'Sign in' }).closest('form') as HTMLFormElement,
+      )
+      await screen.findByText('person@example.com')
+      expect(fetch.mock.calls[1]?.[1]?.body).toBe(
+        JSON.stringify({ email: 'person@example.com', otp: '123456' }),
+      )
+    })
+
+    it('shows the signed-in account while a device is pending', () => {
+      renderPanel({
+        accountPreview: {
+          state: {
+            devices: [],
+            email: 'person@example.com',
+            notice: 'none',
+            status: 'pending-device',
+          },
+        },
+        initialSection: 'account',
+      })
+
+      expect(screen.getByText('person@example.com')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+    })
+
+    it('shows the signed-out-elsewhere notice distinctly from the paused notice', () => {
+      renderPanel({
+        accountPreview: {
+          state: { notice: 'signed-out-elsewhere', status: 'signed-out' },
+        },
+        initialSection: 'account',
+      })
+
+      expect(screen.getByRole('status').textContent).toBe('Signed out on another device')
+    })
+
+    it('shows too many tries in plain words', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof globalThis.fetch>().mockResolvedValue(jsonResponse({}, 429)),
+      )
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Too many tries')
+    })
+
+    it('explains when the connection is unavailable', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError('offline')),
+      )
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Check your connection')
+    })
+
+    it('explains when consent is refused', async () => {
+      vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+      vi.spyOn(browser.permissions, 'request').mockResolvedValue(false as never)
+      const fetch = vi.fn<typeof globalThis.fetch>()
+      vi.stubGlobal('fetch', fetch)
+      openAccount()
+      fireEvent.input(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+
+      expect((await screen.findByRole('alert')).textContent).toContain('Lander needs your OK')
+      expect(fetch).not.toHaveBeenCalled()
+    })
+
+    it('shows the signed-in address and signs out through the account client', async () => {
+      const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+        const path = new URL(String(input)).pathname
+        if (path.endsWith('/sign-in/email-otp')) {
+          return jsonResponse({ token: 'token', user: { email: 'person@example.com' } })
+        }
+        if (path === '/v1/me') {
+          return jsonResponse({ email: 'person@example.com', pending: false })
+        }
+        if (path === '/v1/devices') {
+          return jsonResponse({ devices: [], limit: 3, pending: false })
+        }
+        if (path === '/v1/sync') return jsonResponse({ items: {}, rev: 0 })
+        if (path === '/api/auth/sign-out') return new Response(null, { status: 204 })
+        return jsonResponse({ changed: true, rev: 1 })
+      })
+      vi.stubGlobal('fetch', fetch)
+      await account.verify('person@example.com', '123456')
+      openAccount()
+
+      expect(await screen.findByText('person@example.com')).toBeTruthy()
+      await screen.findByText('Synced')
+      fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+      await waitFor(() => expect(screen.queryByText('person@example.com')).toBeNull())
+      expect(fetch).toHaveBeenCalledTimes(8)
+    })
+
+    it('shows the first-sign-in choice without writing either side until picked', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch, panel } = await signInWithSnapshot(localSettings, {
+        ...settings,
+        font: 'geist',
+      })
+
+      expect(await screen.findByRole('region', { name: 'Choose which page to keep' })).toBeTruthy()
+      expect(await settingsItem.getValue()).toEqual(localSettings)
+      expect(screen.getByText('Sync is paused until you choose a page.')).toBeTruthy()
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+      fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+      expect(panel.onClose).toHaveBeenCalledOnce()
+      expect(await settingsItem.getValue()).toEqual(localSettings)
+      expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
+      panel.unmount()
+      syncClient.reset()
+      openAccount()
+      expect(await screen.findByRole('region', { name: 'Choose which page to keep' })).toBeTruthy()
+      expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/sync'))).toHaveLength(1)
+    })
+
+    it('asks nothing when first sign-in finds identical Settings', async () => {
+      const sameSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch } = await signInWithSnapshot(sameSettings, sameSettings)
+
+      await waitFor(() => expect(screen.getByText('Synced')).toBeTruthy())
+      expect(screen.queryByRole('region', { name: 'Choose which page to keep' })).toBeNull()
+      expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/v1/sync'))).toHaveLength(1)
+      expect(await settingsItem.getValue()).toEqual(sameSettings)
+    })
+
+    it('applies the selected copy only after the user chooses it', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const remoteSettings: Settings = { ...settings, font: 'geist' }
+      const { fetch } = await signInWithSnapshot(localSettings, remoteSettings)
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+
+      fireEvent.click(screen.getByRole('button', { name: "Use your account's page" }))
+
+      await screen.findByText('Synced')
+      expect(await settingsItem.getValue()).toEqual({ ...remoteSettings, v: 1 })
+      expect(
+        fetch.mock.calls.some(
+          ([url, init]) => String(url).endsWith('/v1/sync/settings') && init?.method === 'PUT',
+        ),
+      ).toBe(false)
+    })
+
+    it('uploads this browser’s Settings only after that choice is picked', async () => {
+      const localSettings = { ...settings, dim: false, v: 1 } as Settings
+      const { fetch } = await signInWithSnapshot(localSettings, { ...settings, font: 'geist' })
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+
+      fireEvent.click(screen.getByRole('button', { name: "Keep this browser's" }))
+
+      await screen.findByText('Synced')
+      expect(
+        fetch.mock.calls.some(
+          ([url, init]) => String(url).endsWith('/v1/sync/settings') && init?.method === 'PUT',
+        ),
+      ).toBe(true)
+      expect(await settingsItem.getValue()).toEqual(localSettings)
+    })
+
+    it('keeps both Layouts untouched until the first-sign-in choice is picked', async () => {
+      const localLayout = { v: 1, widgets: ['clock', 'weather'] }
+      const accountLayout = { v: 1, widgets: ['photos'] }
+      await browser.storage.sync.set({ layout: localLayout })
+      await signInWithSnapshot(settings, settings, accountLayout)
+
+      await screen.findByRole('region', { name: 'Choose which page to keep' })
+      expect((await browser.storage.sync.get('layout')).layout).toEqual(localLayout)
+
+      fireEvent.click(screen.getByRole('button', { name: "Use your account's page" }))
+
+      await screen.findByText('Synced')
+      expect((await browser.storage.sync.get('layout')).layout).toEqual(accountLayout)
+    })
   })
 
   it('moves between sections with the arrow keys', () => {
@@ -306,27 +647,6 @@ describe('account', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('Lander needs your OK')
     expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('shows the signed-in address and signs out through the account client', async () => {
-    const fetch = vi
-      .fn<typeof globalThis.fetch>()
-      .mockResolvedValueOnce(
-        jsonResponse({ token: 'token', user: { email: 'person@example.com' } }),
-      )
-      .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
-      .mockResolvedValueOnce(jsonResponse({ email: 'person@example.com', pending: false }))
-      .mockResolvedValueOnce(jsonResponse({ devices: [], limit: 3, pending: false }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-    vi.stubGlobal('fetch', fetch)
-    await account.verify('person@example.com', '123456')
-    openAccount()
-
-    expect(await screen.findByText('person@example.com')).toBeTruthy()
-    expect(screen.getByText('Not synced yet')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await waitFor(() => expect(screen.queryByText('person@example.com')).toBeNull())
-    expect(fetch).toHaveBeenCalledTimes(5)
   })
 })
 
