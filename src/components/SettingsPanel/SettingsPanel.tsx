@@ -1,12 +1,14 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks'
 
 import { parseColour } from '@/backdrop/colour'
+import { presentFavourites } from '@/backdrop/favourites'
 import {
   type Background,
   BACKGROUND_COLOURS,
   DEFAULT_BACKGROUND,
   displayKind,
 } from '@/backdrop/storage'
+import { useFavourites } from '@/backdrop/useFavourites'
 import { Callout } from '@/components/Callout/Callout'
 import { MultiSelect } from '@/components/Dropdown/MultiSelect'
 import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
@@ -55,7 +57,9 @@ const SECTIONS = [
 export type SectionId = (typeof SECTIONS)[number][0]
 
 type PhotosSectionProps = {
+  background: Background
   currentId: string | null
+  onBackgroundChange: (background: Background) => void
   onChange: (settings: Settings) => void
   photos: readonly Photo[]
   saveOutcome?: StorageItemOptions
@@ -204,7 +208,9 @@ function BackgroundSection({
         </section>
       ) : (
         <PhotosSection
+          background={background}
           currentId={currentId}
+          onBackgroundChange={onChange}
           onChange={onSettingsChange}
           photos={photos}
           saveOutcome={saveOutcome}
@@ -215,10 +221,25 @@ function BackgroundSection({
   )
 }
 
-function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: PhotosSectionProps) {
+function PhotosSection({
+  background,
+  currentId,
+  onBackgroundChange,
+  onChange,
+  photos,
+  saveOutcome,
+  settings,
+}: PhotosSectionProps) {
   const cycling = settings.photos
   const pinned = cycling.mode === 'pinned'
   const tags = useMemo(() => availableTags(photos), [photos])
+  const favourites = useFavourites(saveOutcome)
+  const fallback = photos.length === 1 && photos[0]?.id === 'fallback'
+  const hasFavourite = fallback
+    ? favourites.value.ids.length > 0
+    : presentFavourites(favourites.value.ids, photos).length > 0
+  const favouritesGone =
+    favourites.loaded && background.favouritesOnly && !fallback && !hasFavourite
 
   const tagsLabel = useId()
 
@@ -243,7 +264,7 @@ function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: P
           value={pinned ? NEVER : cycling.frequency}
         />
         {/* Only while cycling. The tags are kept while a photo is pinned, for when it resumes. */}
-        {!pinned && tags.length > 0 && (
+        {!pinned && !background.favouritesOnly && tags.length > 0 && (
           <div class="settings__row settings__row--wrap">
             <span id={tagsLabel}>Tags</span>
             <MultiSelect
@@ -262,6 +283,24 @@ function PhotosSection({ currentId, onChange, photos, saveOutcome, settings }: P
               Resume cycling
             </button>
           </p>
+        )}
+        {!pinned && (
+          <>
+            <Switch
+              checked={background.favouritesOnly}
+              disabled={!favourites.loaded || (!hasFavourite && !background.favouritesOnly)}
+              label="Favourites only"
+              onChange={(favouritesOnly) => onBackgroundChange({ ...background, favouritesOnly })}
+            />
+            {!hasFavourite && !background.favouritesOnly && favourites.loaded && (
+              <p class="settings__note">Mark photos with the heart to use this.</p>
+            )}
+            {favouritesGone && (
+              <p class="settings__note">
+                None of your favourites are on the site right now, so every photo is cycled.
+              </p>
+            )}
+          </>
         )}
         <Switch
           checked={settings.dim}

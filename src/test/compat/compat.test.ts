@@ -148,7 +148,7 @@ const V030_LAYOUT_WRITES: {
 const PHASE_3_SYNC_ITEM_WRITES = [
   {
     key: 'background',
-    name: 'save the background choice through its commit path',
+    name: 'save Favourites only through its commit path and keep it byte for byte for v0.3.0',
     write: async () => {
       let commit = (_value: typeof DEFAULT_BACKGROUND) => {}
       function Commit() {
@@ -158,10 +158,10 @@ const PHASE_3_SYNC_ITEM_WRITES = [
       }
       const page = render(h(Commit, null))
       await waitFor(() => expect(page.container.textContent).toBe('true'))
-      await act(async () => commit({ ...DEFAULT_BACKGROUND, colour: '#123456', kind: 'colour' }))
+      await act(async () => commit({ ...DEFAULT_BACKGROUND, favouritesOnly: true }))
       await waitFor(async () =>
         expect((await fakeBrowser.storage.sync.get('background')).background).toMatchObject({
-          kind: 'colour',
+          favouritesOnly: true,
         }),
       )
     },
@@ -231,6 +231,7 @@ describe('the frozen v0.3.0 reader', () => {
     const frozen = await asV030(stored)
     expect(frozen.settings).toEqual(stored.settings)
     expect(frozen.layout.widgets).toEqual([])
+    expect(frozen.raw.background).toEqual(stored.background)
   })
 
   it('keeps unknown Widget types when removing a different Widget', async () => {
