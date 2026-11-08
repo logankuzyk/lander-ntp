@@ -30,7 +30,91 @@ describe('PickFromList', () => {
     resolve(CHOICES)
 
     expect(await screen.findByRole('option', { name: 'Work' })).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('option', { name: 'Work' }))
     expect(screen.getByRole('option', { name: 'Team' }).getAttribute('style')).toContain('16px')
+    fireEvent.click(screen.getByRole('combobox', { name: 'Folder' }))
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads and focuses choices when Arrow Down opens the menu', async () => {
+    const load = vi.fn(async () => CHOICES)
+    render(
+      <PickFromList
+        emptyText="No lists"
+        failedText="Could not load lists"
+        label="Folder"
+        load={load}
+        onChange={vi.fn()}
+        value="work"
+      />,
+    )
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Folder' }), { key: 'ArrowDown' })
+
+    const work = await screen.findByRole('option', { name: 'Work' })
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(work)
+  })
+
+  it('ignores a stale successful load after a newer request completes', async () => {
+    const pending: ((choices: readonly { label: string; value: string }[]) => void)[] = []
+    const load = vi.fn(
+      () =>
+        new Promise<readonly { label: string; value: string }[]>((resolve) =>
+          pending.push(resolve),
+        ),
+    )
+    render(
+      <PickFromList
+        emptyText="No lists"
+        failedText="Could not load lists"
+        label="Folder"
+        load={load}
+        onChange={vi.fn()}
+        value="new"
+      />,
+    )
+    const trigger = screen.getByRole('combobox', { name: 'Folder' })
+    fireEvent.click(trigger)
+    fireEvent.click(trigger)
+    fireEvent.click(trigger)
+
+    pending[1]?.([{ label: 'New choice', value: 'new' }])
+    expect(await screen.findByRole('option', { name: 'New choice' })).toBeTruthy()
+    pending[0]?.([{ label: 'Old choice', value: 'old' }])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByRole('option', { name: 'Old choice' })).toBeNull()
+    expect(screen.getByRole('option', { name: 'New choice' })).toBeTruthy()
+  })
+
+  it('ignores a stale failure after a newer request succeeds', async () => {
+    let rejectFirst!: (reason: Error) => void
+    let resolveSecond!: (choices: typeof CHOICES) => void
+    const load = vi
+      .fn<() => Promise<typeof CHOICES>>()
+      .mockImplementationOnce(() => new Promise((_, reject) => (rejectFirst = reject)))
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveSecond = resolve)))
+    render(
+      <PickFromList
+        emptyText="No lists"
+        failedText="Could not load lists"
+        label="Folder"
+        load={load}
+        onChange={vi.fn()}
+        value="work"
+      />,
+    )
+    const trigger = screen.getByRole('combobox', { name: 'Folder' })
+    fireEvent.click(trigger)
+    fireEvent.click(trigger)
+    fireEvent.click(trigger)
+
+    resolveSecond(CHOICES)
+    expect(await screen.findByRole('option', { name: 'Work' })).toBeTruthy()
+    rejectFirst(new Error('stale failure'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByText('Could not load lists')).toBeNull()
+    expect(screen.getByRole('option', { name: 'Work' })).toBeTruthy()
   })
 
   it('shows an empty row when loading succeeds without choices', async () => {
@@ -104,7 +188,9 @@ describe('PickFromList', () => {
       />,
     )
     fireEvent.click(screen.getByRole('combobox', { name: 'Calendars' }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Team' }))
+    const team = await screen.findByRole('option', { name: 'Team' })
+    expect(team.getAttribute('style')).toContain('16px')
+    fireEvent.click(team)
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith(['work', 'team'])
     rerender(

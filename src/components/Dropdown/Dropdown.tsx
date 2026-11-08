@@ -41,6 +41,8 @@ export function Dropdown({
   const [open, setOpen] = useState(false)
   const field = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
+  /** The menu opened before choices arrived, so focus the first choice when they do. */
+  const waitingForOptions = useRef(false)
   /** Which option last had focus, to land near it when a choice removes that option. */
   const lastOption = useRef(0)
 
@@ -55,19 +57,34 @@ export function Dropdown({
 
   // Into the menu on open: the chosen option, else the first one, else whatever can take it.
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      waitingForOptions.current = false
+      return
+    }
     const el = menu.current
     const target =
       el?.querySelector<HTMLElement>(`${OPTION}[aria-selected="true"]`) ??
       el?.querySelector<HTMLElement>(OPTION) ??
-      el?.querySelector<HTMLElement>('button')
-    target?.focus()
+      null
+    waitingForOptions.current = target === null
+    const focusTarget = target ?? el?.querySelector<HTMLElement>('button')
+    focusTarget?.focus()
   }, [open])
 
   // Keep focus in the menu when a choice removes the focused option (a multi-select adding a
   // tag, say): land on the option now in its place.
   useLayoutEffect(() => {
     if (!open) return
+    if (waitingForOptions.current) {
+      const list = options()
+      const target =
+        list.find((option) => option.getAttribute('aria-selected') === 'true') ?? list[0]
+      if (target) {
+        waitingForOptions.current = false
+        target.focus()
+        return
+      }
+    }
     // Only when focus has dropped to the page; anywhere else it went on purpose.
     const focused = document.activeElement
     if (focused && focused !== document.body) return
