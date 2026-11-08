@@ -47,7 +47,12 @@ Photos come from `https://logankuzyk.com/new-tab/photos.json` (photos with **Sho
 
 ```bash
 WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
+WXT_SERVER_URL=http://localhost:3000
 ```
+
+`WXT_SERVER_URL` overrides the account server address. For local account development, run the
+server on port 3000 and set this value in `.env.local`; the extension uses the production HTTPS
+address otherwise.
 
 The weather widget asks [Open-Meteo](https://open-meteo.com/) directly. If that ever has to change, the same manifest can carry an optional `weather` block, which installed versions pick up with their next manifest refresh:
 
