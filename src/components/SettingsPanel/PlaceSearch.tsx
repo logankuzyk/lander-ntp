@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'preact/hooks'
 
 import { usePlacement } from '@/components/Dropdown/usePlacement'
 import type { Place } from '@/settings/schema'
+import { locationConsented } from '@/weather/consent'
 import { CURRENT_LOCATION } from '@/weather/deviceLocation'
 import { type PlaceResult, searchPlaces } from '@/weather/openMeteo'
 
@@ -12,6 +13,8 @@ const MIN_LENGTH = 2
 
 type PlaceSearchProps = {
   locateFailed: boolean
+  /** Show or clear the shared weather consent-needed state. */
+  onConsentNeeded: (needed: boolean) => void
   /** Follow the device instead of a place searched for. */
   onLocate: () => void
   onSelect: (place: Place) => void
@@ -23,7 +26,12 @@ type PlaceSearchProps = {
  * text so far. The arrow keys move through them, putting each in the box, and Enter takes the
  * one there.
  */
-export function PlaceSearch({ locateFailed, onLocate, onSelect }: PlaceSearchProps) {
+export function PlaceSearch({
+  locateFailed,
+  onConsentNeeded,
+  onLocate,
+  onSelect,
+}: PlaceSearchProps) {
   const listId = useId()
   const [query, setQuery] = useState('')
   /** Null with nothing to search for; 'failed' when the search itself didn't go through. */
@@ -42,17 +50,30 @@ export function PlaceSearch({ locateFailed, onLocate, onSelect }: PlaceSearchPro
   const name = query.trim()
   useEffect(() => {
     const mine = ++request.current
-    if (name.length < MIN_LENGTH) return setResults(null)
+    if (name.length < MIN_LENGTH) {
+      setResults(null)
+      onConsentNeeded(false)
+      return
+    }
     const timer = setTimeout(() => {
-      void searchPlaces(name).then((found) => {
+      void locationConsented().then((consented) => {
         if (mine !== request.current) return
-        setResults(found ?? 'failed')
-        // The suggestions have changed under the arrow keys: back to the text as typed.
-        setActive(null)
+        onConsentNeeded(!consented)
+        if (!consented) {
+          setResults(null)
+          setActive(null)
+          return
+        }
+        void searchPlaces(name).then((found) => {
+          if (mine !== request.current) return
+          setResults(found ?? 'failed')
+          // The suggestions have changed under the arrow keys: back to the text as typed.
+          setActive(null)
+        })
       })
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [name])
+  }, [name, onConsentNeeded])
 
   const found = results !== 'failed' && results ? results : []
   const suggestions =

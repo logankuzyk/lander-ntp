@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact'
 import { useState } from 'preact/hooks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { browser } from 'wxt/browser'
 
 import type { CalloutInfo } from '@/onboarding/callouts'
 import type { PhotoSettings } from '@/photos/rotation'
@@ -398,6 +399,9 @@ describe('SettingsPanel', () => {
 
     afterEach(() => {
       vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+      vi.restoreAllMocks()
+      vi.useRealTimers()
     })
 
     it('offers only the switch while the widget is off', () => {
@@ -521,6 +525,26 @@ describe('SettingsPanel', () => {
         expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain('name=Vic')
       })
 
+      it('does not search for a place on Firefox without location consent', async () => {
+        vi.useFakeTimers()
+        vi.stubEnv('BROWSER', 'firefox')
+        const contains = vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+        const fetch = vi.fn()
+        vi.stubGlobal('fetch', fetch)
+        renderWeather({ enabled: true })
+        fireEvent.input(screen.getByRole('combobox', { name: 'Search for a place' }), {
+          target: { value: 'Victoria' },
+        })
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(300)
+        })
+
+        expect(screen.getByText(/consent/i)).toBeTruthy()
+        expect(contains).toHaveBeenCalled()
+        expect(fetch).not.toHaveBeenCalled()
+      })
+
       it('offers the current location only until there are places to show', async () => {
         const { box } = await searched()
         expect(screen.queryByRole('option', { name: 'Current location' })).toBeNull()
@@ -622,7 +646,73 @@ describe('SettingsPanel', () => {
         })
       })
 
+      it('does not locate or reverse-geocode on Firefox without location consent', async () => {
+        vi.stubEnv('BROWSER', 'firefox')
+        const contains = vi.spyOn(browser.permissions, 'contains').mockResolvedValue(false as never)
+        const getCurrentPosition = vi.fn((done: (position: unknown) => void) =>
+          done({ coords: { latitude: 48.4359, longitude: -123.35155 } }),
+        )
+        vi.stubGlobal('navigator', {
+          geolocation: { getCurrentPosition },
+          language: 'en-CA',
+        })
+        const fetch = vi.fn()
+        vi.stubGlobal('fetch', fetch)
+        const { onChange } = renderWeather({ enabled: true })
+
+        currentLocation()
+
+        await act(async () => {
+          await Promise.resolve()
+          await Promise.resolve()
+        })
+
+        expect(screen.getByText(/consent/i)).toBeTruthy()
+        expect(contains).toHaveBeenCalled()
+        expect(getCurrentPosition).toHaveBeenCalledTimes(1)
+        expect(fetch).not.toHaveBeenCalled()
+        expect(onChange).not.toHaveBeenCalled()
+      })
+
+      it('does not reverse-geocode if Firefox consent is withdrawn while locating', async () => {
+        vi.stubEnv('BROWSER', 'firefox')
+        const contains = vi
+          .spyOn(browser.permissions, 'contains')
+          .mockResolvedValueOnce(true as never)
+          .mockResolvedValueOnce(false as never)
+        let found: (position: unknown) => void = () => {}
+        const getCurrentPosition = vi.fn((done: typeof found) => {
+          found = done
+        })
+        vi.stubGlobal('navigator', { geolocation: { getCurrentPosition }, language: 'en-CA' })
+        const fetch = vi.fn()
+        vi.stubGlobal('fetch', fetch)
+        const { onChange } = renderWeather({ enabled: true })
+
+        currentLocation()
+        await act(async () => {
+          await Promise.resolve()
+          await Promise.resolve()
+        })
+        found({ coords: { latitude: 48.4359, longitude: -123.35155 } })
+        await act(async () => {
+          await Promise.resolve()
+          await Promise.resolve()
+        })
+
+        expect(getCurrentPosition).toHaveBeenCalledTimes(1)
+        expect(contains).toHaveBeenCalledTimes(2)
+        expect(screen.getByText(/consent/i)).toBeTruthy()
+        expect(fetch).not.toHaveBeenCalled()
+        expect(onChange).not.toHaveBeenCalled()
+      })
+
       it('keeps a setting changed while the browser was asked, and asks only once', async () => {
+        vi.stubEnv('BROWSER', 'firefox')
+        let answerConsent: (consented: boolean) => void = () => {}
+        vi.spyOn(browser.permissions, 'contains').mockReturnValue(
+          new Promise<boolean>((resolve) => (answerConsent = resolve)) as never,
+        )
         let found: (position: unknown) => void = () => {}
         const getCurrentPosition = vi.fn((done: typeof found) => {
           found = done
@@ -649,8 +739,10 @@ describe('SettingsPanel', () => {
 
         currentLocation()
         currentLocation()
+        expect(getCurrentPosition).toHaveBeenCalledTimes(1)
         rerender(panel({ enabled: true, unit: 'fahrenheit' }))
         found({ coords: { latitude: 48.4359, longitude: -123.35155 } })
+        answerConsent(true)
 
         await waitFor(() =>
           expect(onChange).toHaveBeenCalledWith(
