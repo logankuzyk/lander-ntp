@@ -45,14 +45,26 @@ const OnboardingSchema = v.looseObject({
   welcomed: v.boolean(),
 })
 
+const CURRENT_ITEM_VERSION = 1
+
 type ShapeCheck = { ok: false } | { ok: true; v: number }
+
+/** Whether this item carries a numeric version newer than the one the caller understands. */
+export const hasNewerVersion = (value: unknown, supportedVersion: number): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  'v' in value &&
+  typeof value.v === 'number' &&
+  value.v > supportedVersion
 
 const check = (schema: v.GenericSchema, value: unknown): ShapeCheck => {
   if (!v.safeParse(schema, value).success) return { ok: false }
   if (typeof value !== 'object' || value === null) return { ok: false }
   const version = 'v' in value ? value.v : undefined
   const itemVersion = version ?? 1
-  return typeof itemVersion === 'number' && Number.isSafeInteger(itemVersion) && itemVersion >= 1
+  return typeof itemVersion === 'number' &&
+    Number.isSafeInteger(itemVersion) &&
+    itemVersion === CURRENT_ITEM_VERSION
     ? { ok: true, v: itemVersion }
     : { ok: false }
 }
@@ -63,11 +75,13 @@ export const syncedShapes = {
     check: (value: unknown): ShapeCheck => check(OnboardingSchema, value),
     key: 'onboarding',
     schema: OnboardingSchema,
+    version: CURRENT_ITEM_VERSION,
   },
   settings: {
     check: (value: unknown): ShapeCheck => check(SettingsSchema, value),
     key: 'settings',
     schema: SettingsSchema,
+    version: CURRENT_ITEM_VERSION,
   },
 } as const
 

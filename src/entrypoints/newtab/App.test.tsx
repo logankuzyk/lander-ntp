@@ -275,7 +275,7 @@ describe('App', () => {
         'Geist Sans',
       ),
     )
-    expect((await settingsItem.getValue()).font).toBe('geist')
+    await waitFor(async () => expect((await settingsItem.getValue()).font).toBe('geist'))
   })
 
   it('closes the settings panel with Escape', async () => {
@@ -308,7 +308,12 @@ describe('App', () => {
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
       expect(screen.queryByRole('note')).toBeNull()
-      expect(await onboardingItem.getValue()).toEqual({ dismissed: ['weather'], welcomed: true })
+      await waitFor(async () =>
+        expect(await onboardingItem.getValue()).toEqual({
+          dismissed: ['weather'],
+          welcomed: true,
+        }),
+      )
     })
 
     it('opens the settings on the tour from the welcome', async () => {
@@ -320,7 +325,7 @@ describe('App', () => {
       const settings = await screen.findByRole('dialog', { name: 'Settings' })
       expect(screen.queryByRole('dialog', { name: 'Welcome to Lander' })).toBeNull()
       expect(within(settings).getByRole('note').textContent).toContain('1 of 4')
-      expect((await onboardingItem.getValue())?.welcomed).toBe(true)
+      await waitFor(async () => expect((await onboardingItem.getValue())?.welcomed).toBe(true))
 
       // Opened again from the gear, it is just the settings.
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
@@ -341,7 +346,9 @@ describe('App', () => {
       await screen.findByRole('dialog', { name: 'Settings' })
       expect(screen.getByRole('tab', { selected: true }).textContent).toBe('Weather')
       expect(screen.queryByRole('note')).toBeNull()
-      expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather'])
+      await waitFor(async () =>
+        expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather']),
+      )
     })
 
     it('keeps the news dismissed', async () => {
@@ -351,7 +358,9 @@ describe('App', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }))
 
       await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
-      expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather'])
+      await waitFor(async () =>
+        expect((await onboardingItem.getValue())?.dismissed).toEqual(['weather']),
+      )
 
       unmount()
       const { container } = render(<App />)

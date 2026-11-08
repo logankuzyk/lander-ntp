@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { storage } from 'wxt/utils/storage'
 
-import { syncedShapes } from '@/sync/shapes'
+import { hasNewerVersion, syncedShapes } from '@/sync/shapes'
 
 import { DEFAULT_SETTINGS, type Settings } from './schema'
 
@@ -27,7 +27,11 @@ export const settingsItem = {
   fallback: DEFAULT_SETTINGS,
   getValue: async (): Promise<Settings> => current(await stored.getValue()),
   key: stored.key,
-  setValue: (value: Settings): Promise<void> => stored.setValue(value),
+  setValue: async (value: Settings): Promise<void> => {
+    const existing = await stored.getValue()
+    if (hasNewerVersion(existing, syncedShapes.settings.version)) return
+    await stored.setValue(value)
+  },
   watch: (callback: (value: Settings | null) => void): (() => void) =>
     stored.watch((value) => callback(value === null ? null : current(value))),
 }

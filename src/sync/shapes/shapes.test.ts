@@ -53,6 +53,22 @@ describe('synced stored shapes', () => {
     })
   })
 
+  it('rejects versions this extension cannot read', () => {
+    const settings = {
+      clock: { enabled: true, hour12: false, showDate: false, showSeconds: false },
+      dim: true,
+      font: 'system',
+      photos: { frequency: 'every-visit', mode: 'cycle', pinnedId: null, tags: [] },
+    }
+
+    expect(syncedShapes.settings.check({ ...settings, v: 2 })).toEqual({ ok: false })
+    expect(syncedShapes.onboarding.check({ dismissed: [], v: 2, welcomed: true })).toEqual({
+      ok: false,
+    })
+    expect(syncedShapes.settings.check({ ...settings, v: 0 })).toEqual({ ok: false })
+    expect(syncedShapes.settings.check({ ...settings, v: 1.5 })).toEqual({ ok: false })
+  })
+
   it('counts UTF-8 bytes for a place name in the serialized item', () => {
     const item = { place: 'Québec' }
     expect(itemBytes('settings', item)).toBe(

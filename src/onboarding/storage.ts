@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { storage } from 'wxt/utils/storage'
 
-import { syncedShapes } from '@/sync/shapes'
+import { hasNewerVersion, syncedShapes } from '@/sync/shapes'
 
 export type Onboarding = {
   /** Ids of the news callouts that have been seen off, or never needed showing; see ./callouts. */
@@ -37,7 +37,11 @@ export const onboardingItem = {
   fallback: null,
   getValue: async (): Promise<Onboarding | null> =>
     current(await stored.getValue()) ?? current(await pendingItem.getValue()),
-  setValue: (value: Onboarding | null): Promise<void> => stored.setValue(value),
+  setValue: async (value: Onboarding | null): Promise<void> => {
+    const existing = await stored.getValue()
+    if (hasNewerVersion(existing, syncedShapes.onboarding.version)) return
+    await stored.setValue(value)
+  },
   watch: (callback: (value: Onboarding | null) => void): (() => void) => {
     const notify = () => void onboardingItem.getValue().then(callback)
     const unwatchStored = stored.watch(notify)
