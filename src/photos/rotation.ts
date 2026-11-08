@@ -39,6 +39,8 @@ export type PhotoState = {
    */
   bag: string[]
   currentId: string | null
+  /** A gallery selection stays visible until its scheduled advance, even outside the pool. */
+  pickedByUser?: true
   /** Epoch ms when the current photo was first shown. */
   shownAt: number
 }
@@ -195,6 +197,14 @@ export function photoForSettings(
       return choosePhoto(state, pinnedId, ids.all, now, random) ?? nextPhoto(state, ids.all, now)
     }
     return photoForVisit('off', state, ids.all, now, random)
+  }
+  if (
+    state?.pickedByUser &&
+    state.currentId !== null &&
+    ids.all.includes(state.currentId) &&
+    (!visit || !shouldAdvance(photos.frequency, state, now))
+  ) {
+    return state
   }
   if (visit) return photoForVisit(photos.frequency, state, ids.pool, now, random)
   const current = state?.currentId

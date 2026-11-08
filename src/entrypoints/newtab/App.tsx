@@ -108,7 +108,7 @@ export function App() {
   // Wait for the stored settings: the fallback is every-visit, which would move the photo on
   // in every new tab regardless of the setting.
   const photoBackground = background.loaded && displayKind(background.value) === 'photo'
-  const { next, photo, photos, upcoming } = usePhotoRotation(
+  const { next, photo, photos, select, upcoming } = usePhotoRotation(
     settingsLoaded && photoBackground ? settings.photos : null,
   )
   const catalog = usePhotoCatalog(popover === 'settings' && !photoBackground)
@@ -159,6 +159,19 @@ export function App() {
       const latest = await settingsItem.getValue()
       if (id && latest.photos.mode === 'pinned' && latest.photos.pinnedId !== id) {
         setSettings({ ...latest, photos: { ...latest.photos, pinnedId: id } })
+      }
+    })()
+  }
+
+  // Picking a photo always returns to cycling. Without this, a photo picked while held would
+  // appear only in this tab and the next tab would restore the held `pinnedId`.
+  const selectPhoto = (id: string) => {
+    void (async () => {
+      await select(id)
+      if (settingsReadOnly) return
+      const latest = await settingsItem.getValue()
+      if (latest.photos.mode === 'pinned') {
+        setSettings({ ...latest, photos: { ...latest.photos, mode: 'cycle' } })
       }
     })()
   }
@@ -318,6 +331,7 @@ export function App() {
               onChange={setSettings}
               onClose={close}
               onPreviewColour={setPreviewColour}
+              onSelectPhoto={selectPhoto}
               photos={availablePhotos}
               readOnly={settingsReadOnly}
               saveOutcome={saveOutcome}

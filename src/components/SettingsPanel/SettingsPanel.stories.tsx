@@ -75,6 +75,7 @@ const meta = {
     onBackgroundChange: fn(),
     onChange: fn(),
     onClose: fn(),
+    onSelectPhoto: fn(),
     photos: STORY_PHOTOS,
     settings: SETTINGS,
   },
@@ -118,12 +119,15 @@ export const FavouritesGone: Story = {
   },
 }
 
-export const PhotosKept: Story = {
+export const PhotoHeld: Story = {
   args: {
     settings: {
       ...SETTINGS,
       photos: { ...SETTINGS.photos, mode: 'pinned', pinnedId: STORY_PHOTOS[0]?.id ?? null },
     },
+  },
+  beforeEach: async () => {
+    await favouritesItem.setValue({ ids: [STORY_PHOTOS[0]!.id], v: 1 })
   },
 }
 
