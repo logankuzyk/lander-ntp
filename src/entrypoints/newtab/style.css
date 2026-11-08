@@ -928,6 +928,132 @@ body {
   margin-left: 0.375em;
 }
 
+/* Date: type scales with the Widget's cells, centred above the photo without a box. */
+.date {
+  max-width: 100cqw;
+  text-shadow: var(--text-shadow);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.date--line {
+  display: block;
+  width: max-content;
+  max-width: 100cqw;
+  font-size: clamp(0.85rem, min(28cqw, 45cqh), 3rem);
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.date--long {
+  font-size: clamp(0.75rem, min(24cqw, 40cqh), 2.5rem);
+}
+
+.date--card {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.02em;
+  font-size: clamp(0.85rem, min(24cqw, 22cqh), 3rem);
+  line-height: 1.05;
+}
+
+.date__card-weekday,
+.date__card-month {
+  font-size: 0.55em;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.date__card-day {
+  font-family: var(--font-serif, 'Instrument Serif', serif);
+  font-size: 2.8em;
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.date--week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  font-size: clamp(0.75rem, min(13cqw, 35cqh), 2rem);
+  text-align: center;
+}
+
+.date__week-day {
+  display: grid;
+  justify-items: center;
+  gap: 0.35em;
+  padding: 0.25em 0;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.date__week-day[aria-current='date'] strong,
+.date__grid-day[aria-current='date'] {
+  outline: 0.08em solid currentColor;
+  outline-offset: 0.12em;
+  border-radius: 50%;
+}
+
+.date__week-day[aria-current='date'] {
+  opacity: 1;
+}
+
+.date__week-day strong {
+  display: grid;
+  place-items: center;
+  width: 1.8em;
+  aspect-ratio: 1;
+  font-weight: 500;
+}
+
+.date--grid {
+  display: grid;
+  align-content: center;
+  gap: 0.6em;
+  width: 100%;
+  font-size: clamp(0.65rem, min(14cqw, 8cqh), 1.8rem);
+}
+
+.date__month {
+  font-size: 1.15em;
+  font-weight: 500;
+  text-align: center;
+}
+
+.date__calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  justify-items: center;
+  gap: 0.45em 0.2em;
+  text-align: center;
+}
+
+.date__calendar--weeks {
+  grid-template-columns: 1.5em repeat(7, minmax(0, 1fr));
+}
+
+.date__grid-day {
+  display: grid;
+  place-items: center;
+  width: 1.6em;
+  aspect-ratio: 1;
+}
+
+.date__grid-day--outside,
+.date__week-number,
+.date__week-number-label {
+  opacity: 0.48;
+}
+
+.date__week-number,
+.date__week-number-label {
+  font-size: 0.75em;
+}
+
 /* Popovers: settings and photo details share the corner above the controls. */
 
 .popover {
@@ -982,6 +1108,30 @@ body {
 .popover__close:hover,
 .popover__close:focus-visible {
   opacity: 1;
+}
+
+.photo-info__favourite {
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin-left: auto;
+  padding: 0.25rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.photo-info__favourite:hover,
+.photo-info__favourite:focus-visible {
+  opacity: 1;
+}
+
+.photo-info__favourite:disabled,
+.gallery__favourite:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 /* Photo details */
@@ -1687,6 +1837,35 @@ button.chip:hover {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.gallery__item {
+  position: relative;
+  min-width: 0;
+}
+
+.gallery__favourite {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.gallery__item:hover .gallery__favourite,
+.gallery__item:focus-within .gallery__favourite,
+.gallery__favourite[aria-pressed='true'] {
+  opacity: 1;
 }
 
 .gallery__photo {

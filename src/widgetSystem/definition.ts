@@ -40,7 +40,8 @@ export type SwitchOption = OptionBase & {
 export type ChoiceOption = OptionBase & {
   choices: readonly { label: string; value: string }[]
   control: 'choice'
-  default: string
+  /** A function is evaluated when a Widget is added, so a locale-derived choice is captured. */
+  default: (() => string) | string
 }
 
 /** A choice whose values come from this device when the menu opens. */
