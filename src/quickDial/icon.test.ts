@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { encodeIcon, ICON_DATA_URL_LIMIT } from './icon'
+import { canvasIconEncoder, encodeIcon, ICON_DATA_URL_LIMIT } from './icon'
 import type { IconEncoder } from './icon'
 
 const webp = (bytes: number) => new Blob([new Uint8Array(bytes)], { type: 'image/webp' })
@@ -9,6 +9,8 @@ const encoder: IconEncoder = { encode: vi.fn(async () => webp(100)) }
 const file = (type = 'image/jpeg') => new File(['source'], 'source.jpg', { type })
 
 describe('encodeIcon', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it('encodes the whole image as a 64 pixel WebP icon and returns a data URL', async () => {
     const encode = vi.fn(async () => webp(100))
     const source = file()
@@ -40,5 +42,21 @@ describe('encodeIcon', () => {
     await expect(encodeIcon(file(), { encode: async () => png })).rejects.toThrow(
       "This browser can't make this image small enough for sync.",
     )
+  })
+
+  it('fits a wide image inside the square and leaves transparent padding above and below', async () => {
+    const image = { close: vi.fn(), height: 64, width: 128 }
+    const drawImage = vi.fn()
+    const canvas = {
+      getContext: () => ({ drawImage }),
+      toBlob: (done: BlobCallback) => done(new Blob(['icon'], { type: 'image/webp' })),
+    }
+    vi.stubGlobal('createImageBitmap', async () => image)
+    vi.spyOn(document, 'createElement').mockReturnValue(canvas as unknown as HTMLCanvasElement)
+
+    await canvasIconEncoder.encode(file(), 64, 'image/webp', 0.8)
+
+    expect(drawImage).toHaveBeenCalledWith(image, 0, 16, 64, 32)
+    expect(image.close).toHaveBeenCalledOnce()
   })
 })

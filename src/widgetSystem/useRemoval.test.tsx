@@ -175,8 +175,32 @@ const dialLayout = checkLayout({
   ],
 })
 
-function DialRemovalProbe() {
-  const [layout, setLayout] = useState(dialLayout)
+const dialWithClock = checkLayout({
+  v: 1,
+  widgets: [
+    {
+      col: 1,
+      h: 1,
+      id: 'dial0001',
+      options: { icon: 'abcdefgh', label: 'Example', newTab: false, url: 'example.com' },
+      row: 1,
+      type: 'quick-dial',
+      w: 1,
+    },
+    {
+      col: 3,
+      h: 2,
+      id: 'clock0aa',
+      options: { showDate: false, showSeconds: false },
+      row: 1,
+      type: 'clock',
+      w: 4,
+    },
+  ],
+})
+
+function DialRemovalProbe({ withClock = false }: { withClock?: boolean }) {
+  const [layout, setLayout] = useState(withClock ? dialWithClock : dialLayout)
   const { controls, notice } = useRemovalController({
     commit: setLayout,
     layout,
@@ -194,6 +218,9 @@ function DialRemovalProbe() {
       </button>
       <button onClick={() => notice?.onDismiss()} type="button">
         Dismiss notice
+      </button>
+      <button onClick={() => controls.remove('clock0aa')} type="button">
+        Remove Clock
       </button>
     </>
   )
@@ -219,5 +246,20 @@ describe('Quick dial icon discard', () => {
       expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toEqual({}),
     )
     unmount()
+  })
+
+  it('discards the previous Quick dial icon when a second removal replaces its Undo notice', async () => {
+    await fakeBrowser.storage.sync.set({
+      'icon:abcdefgh': { data: 'data:image/webp;base64,YQ==', v: 1 },
+    })
+    render(<DialRemovalProbe withClock />)
+
+    act(() => screen.getByRole('button', { name: 'Remove dial' }).click())
+    act(() => screen.getByRole('button', { name: 'Remove Clock' }).click())
+
+    await waitFor(async () =>
+      expect(await fakeBrowser.storage.sync.get('icon:abcdefgh')).toEqual({}),
+    )
+    expect(screen.getByRole('button', { name: 'Undo dial' })).toBeTruthy()
   })
 })

@@ -51,7 +51,7 @@ export function QuickDial({
       target={newTab ? '_blank' : undefined}
     >
       <span class="quick-dial__icon" style={{ backgroundColor: colourFor(host) }}>
-        {host && !(failed || (uploadedIcon && uploadedFailed)) ? (
+        {host && !failed ? (
           <img
             alt=""
             onError={() =>

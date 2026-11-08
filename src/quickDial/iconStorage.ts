@@ -6,10 +6,12 @@ import { createWriteQueue } from '@/storage/writeQueue'
 
 export type StoredIcon = { [key: string]: unknown; data: string; v: 1 }
 const EMPTY: StoredIcon = { data: '', v: 1 }
+const base64Data = /^(?:[a-z\d+/]{4})*(?:[a-z\d+/]{2}==|[a-z\d+/]{3}=)?$/i
 const dataUrl = (value: unknown): value is string =>
   typeof value === 'string' &&
   value.length <= ICON_DATA_URL_LIMIT &&
-  /^data:image\/(?:webp|png);base64,[a-z\d+/]*={0,2}$/i.test(value)
+  /^data:image\/(?:webp|png);base64,/i.test(value) &&
+  base64Data.test(value.slice(value.indexOf(',') + 1))
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
