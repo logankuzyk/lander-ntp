@@ -81,6 +81,14 @@ describe('the tour stories', () => {
           'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
         )
       }
+      if (name === 'MoveAndResize') {
+        expect(screen.getByRole('note').textContent).toContain(
+          'Drag a widget to move it, and drag the handle in its corner to resize it.',
+        )
+        expect(screen.getByRole('note').textContent).not.toMatch(
+          /keyboard|\bE\b|Tab|Enter|arrow|Shift/i,
+        )
+      }
       if (name === 'BackgroundStop') {
         expect(screen.getByRole('note').textContent).toContain(
           'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',

@@ -94,6 +94,16 @@ describe('the guided tour, from the welcome of a new install', () => {
     expect((await onboardingItem.getValue())?.welcomed).toBe(true)
   })
 
+  it('shows only dragging instructions at Move and resize', async () => {
+    await startTour()
+    await nextUntil('Move and resize')
+
+    expect(note().textContent).toContain(
+      'Drag a widget to move it, and drag the handle in its corner to resize it.',
+    )
+    expect(note().textContent).not.toMatch(/keyboard|\bE\b|Tab|Enter|arrow|Shift/i)
+  })
+
   it('is before the Grid and the Bottom bar in the Tab order', async () => {
     const { container } = await startTour()
 
@@ -650,6 +660,7 @@ describe('the tour for a Layout that a newer version wrote, which cannot be chan
 
     expect(progress()).toBe('1 of 4')
     expect(note().textContent).toContain('Update Lander to change it.')
+    expect(note().textContent).not.toMatch(/keyboard|\bE\b|Tab|Enter|arrow|Shift/i)
 
     press('Next')
     await act(async () => {})

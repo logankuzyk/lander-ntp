@@ -565,11 +565,14 @@ describe('Grid, keys that belong to a picked-up Widget', () => {
 })
 
 describe('Grid, the live region', () => {
+  const editingHelp =
+    'Editing widgets. Tab moves between widgets. Enter picks one up; the arrow keys move it, Shift with the arrows resizes it, Enter puts it down, Escape puts it back.'
+
   it('is the one it already has, polite, and says the editing help until something else is said', () => {
     const { box, said, view } = setup()
     expect(view.container.querySelectorAll('.grid + [aria-live="polite"]')).toHaveLength(1)
     expect(view.container.querySelector('[role="alert"], [aria-live="assertive"]')).toBeNull()
-    expect(said()).toBe('Editing widgets. Tab moves between widgets.')
+    expect(said()).toBe(editingHelp)
     box('clock').focus()
     key(box('clock'), 'Enter')
     expect(said()).not.toMatch(/Editing widgets/)
@@ -583,7 +586,7 @@ describe('Grid, the live region', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     expect(said()).toBe('')
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(said()).toBe('Editing widgets. Tab moves between widgets.')
+    expect(said()).toBe(editingHelp)
   })
 })
 

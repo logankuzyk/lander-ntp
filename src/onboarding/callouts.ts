@@ -99,16 +99,15 @@ export type TourStop = PageTourStop | SettingsStop
  */
 export const TOUR: readonly TourStop[] = [
   {
-    body: 'Press Edit, or E on the keyboard, to move things around and change what is on your page.',
+    body: 'Press Edit to move things around and change what is on your page.',
     id: 'tour-edit',
-    readOnlyBody:
-      'Press Edit, or E on the keyboard, to look at your page in edit mode. Update Lander to change it.',
+    readOnlyBody: 'Press Edit to look at your page in edit mode. Update Lander to change it.',
     show: { adding: false, editing: false },
     target: 'edit',
     title: 'Edit your page',
   },
   {
-    body: 'Drag a widget to move it, and drag the handle in its corner to resize it. From the keyboard, Tab to a widget, press Enter to pick it up, move it with the arrow keys (resize it with Shift and the arrows) and press Enter to put it down.',
+    body: 'Drag a widget to move it, and drag the handle in its corner to resize it.',
     changes: true,
     id: 'tour-move',
     show: { adding: false, editing: true },
@@ -145,7 +144,7 @@ export const TOUR: readonly TourStop[] = [
       'One that needs something from you, like a place for the weather, shows a button to set it up.',
   },
   {
-    body: 'Press Done, or E again, to leave edit mode. Each change is saved as you make it.',
+    body: 'Press Done to leave edit mode. Each change is saved as you make it.',
     id: 'tour-done',
     show: { adding: false, editing: true },
     target: 'edit',

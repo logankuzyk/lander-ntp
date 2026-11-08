@@ -64,19 +64,29 @@ describe('the tour', () => {
     }
   })
 
-  it('says in one sentence how to move and resize from the keyboard, as the page does it', () => {
-    const move = TOUR.find(({ id }) => id === 'tour-move')
-    // Enter picks a widget up and puts it down, the arrows move it and Shift with them resizes it
-    // (Grid.keys.test.tsx); the pointer way comes first, in the sentence before.
-    expect(move?.body).toMatch(/Drag a widget to move it/)
-    expect(move?.body).toMatch(/keyboard.*Enter.*arrow keys.*Shift.*Enter/)
-    expect(move?.body.split(/(?<=\.)\s/)).toHaveLength(2)
+  it('keeps keyboard shortcuts out of the new-install tour and update walk', () => {
+    const textForStop = ({ body, title, ...stop }: (typeof TOUR)[number]) => [
+      title,
+      body,
+      'readOnlyBody' in stop ? stop.readOnlyBody : undefined,
+    ]
+    const onboardingText = [
+      ...TOUR.flatMap(textForStop),
+      ...NEWS.flatMap(({ body, title, ...note }) => [
+        title,
+        body,
+        ...('walk' in note ? (note.walk ?? []).flatMap(textForStop) : []),
+      ]),
+    ]
+    for (const text of onboardingText) {
+      if (text !== undefined) expect(text).not.toMatch(/keyboard|\bE\b|Tab|Enter|arrow|Shift/i)
+    }
   })
 
-  it('says nothing about arrow keys, Enter or Shift anywhere else', () => {
-    for (const { body, id } of TOUR) {
-      if (id !== 'tour-move') expect(body).not.toMatch(/arrow|Enter|Shift/i)
-    }
+  it('keeps the Move and resize stop about dragging', () => {
+    expect(TOUR.find(({ id }) => id === 'tour-move')?.body).toBe(
+      'Drag a widget to move it, and drag the handle in its corner to resize it.',
+    )
   })
 })
 

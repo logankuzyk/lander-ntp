@@ -495,7 +495,9 @@ describe('Grid in edit mode', () => {
     expect(status.classList.contains('visually-hidden')).toBe(true)
 
     edit()
-    expect(status.textContent).toBe('Editing widgets. Tab moves between widgets.')
+    expect(status.textContent).toBe(
+      'Editing widgets. Tab moves between widgets. Enter picks one up; the arrow keys move it, Shift with the arrows resizes it, Enter puts it down, Escape puts it back.',
+    )
 
     fireEvent.click(screen.getByText('leave'))
     expect(status.textContent).toBe('')
@@ -530,7 +532,7 @@ describe('Grid in edit mode', () => {
     edit()
 
     expect(status.textContent).toBe(
-      'Editing widgets. Tab moves between widgets. Update Lander to change this.',
+      'Editing widgets. Tab moves between widgets. Enter picks one up; the arrow keys move it, Shift with the arrows resizes it, Enter puts it down, Escape puts it back. Update Lander to change this.',
     )
   })
 

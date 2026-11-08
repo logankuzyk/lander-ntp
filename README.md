@@ -11,6 +11,10 @@ Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
 ## Development
 
+### Keyboard editing
+
+In Edit mode, Tab moves between Widgets. Enter picks up the focused Widget; the arrow keys move it, and Shift with the arrows resizes it. Enter puts it down, and Escape puts it back.
+
 ```bash
 npm install
 npm run dev          # Chrome (same as dev:chrome)
