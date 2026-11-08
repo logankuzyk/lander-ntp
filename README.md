@@ -4,6 +4,11 @@ A minimal new tab page showing photography from [logankuzyk.com](https://loganku
 
 Built with [WXT](https://wxt.dev) and Preact for Chrome, Firefox and Edge.
 
+## Features
+
+- Optional account sign-in to sync your Layout, settings and onboarding between devices.
+- An optional Weather Widget for a place you choose.
+
 ## Install
 
 - [Chrome Web Store](https://chromewebstore.google.com/detail/lander/ocglhjclnhfbgbccffinhioaangigioa)
@@ -50,9 +55,9 @@ WXT_PHOTO_MANIFEST_URL=http://localhost:3000/new-tab/photos.json
 WXT_SERVER_URL=http://localhost:3000
 ```
 
-`WXT_SERVER_URL` overrides the account server address. For local account development, run the
-server on port 3000 and set this value in `.env.local`; the extension uses the production HTTPS
-address otherwise.
+For account server development, see [server/README.md](server/README.md). `WXT_SERVER_URL` overrides
+the account server address. Run the local server on port 3000 and set this value in `.env.local`;
+the extension uses the production HTTPS address otherwise.
 
 The weather widget asks [Open-Meteo](https://open-meteo.com/) directly. If that ever has to change, the same manifest can carry an optional `weather` block, which installed versions pick up with their next manifest refresh:
 
@@ -69,4 +74,4 @@ Each key is optional. A replacement address must be https, answer the same query
 
 ## Privacy
 
-Lander collects no personal data. The optional weather widget sends the place you pick to [Open-Meteo](https://open-meteo.com/), whose data (CC BY 4.0) it shows; icons are from [Lucide](https://lucide.dev) (ISC). See [PRIVACY.md](PRIVACY.md) for more information.
+No account needed: without one, Lander sends no account data to its server. It still stores your Layout and settings in your browser. An optional account sends your email and settings to Lander to sync them. The optional weather widget sends the place you pick to [Open-Meteo](https://open-meteo.com/) for its forecast. See [PRIVACY.md](PRIVACY.md) for details about account sync and other data handling.
