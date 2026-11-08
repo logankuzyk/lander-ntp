@@ -55,9 +55,9 @@ const STOPS = [
   ['Edit', 'Edit your page', '1 of 7'],
   ['MoveAndResize', 'Move and resize', '2 of 7'],
   ['Options', 'Options', '3 of 7'],
-  ['Add', 'Add a widget', '4 of 7'],
+  ['AddStop', 'Add a widget', '4 of 7'],
   ['Done', 'When you are done', '5 of 7'],
-  ['Photos', 'Photos', '6 of 7'],
+  ['BackgroundStop', 'Background', '6 of 7'],
   ['Font', 'Font', '7 of 7'],
   ['Setup', 'Set up a widget', '4 of 8'],
   ['ClockAndWeather', 'Move and resize', '2 of 7'],
@@ -76,6 +76,16 @@ describe('the tour stories', () => {
 
       expect(title()).toBe(wanted)
       expect(progress()).toBe(count)
+      if (name === 'AddStop') {
+        expect(screen.getByRole('note').textContent).toContain(
+          'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
+        )
+      }
+      if (name === 'BackgroundStop') {
+        expect(screen.getByRole('note').textContent).toContain(
+          'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
+        )
+      }
       expect(fetchSpy).not.toHaveBeenCalled()
     },
   )
@@ -90,7 +100,7 @@ describe('the tour stories', () => {
   })
 
   it('Add has the menu open by itself', async () => {
-    await seed('Add')
+    await seed('AddStop')
     render(<App />)
 
     await takeTour('Add a widget')

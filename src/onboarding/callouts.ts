@@ -135,7 +135,7 @@ export const TOUR: readonly TourStop[] = [
     when: 'setup',
   },
   {
-    body: 'Pick a widget from the Add menu and it goes in the free spot nearest the middle.',
+    body: 'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
     changes: true,
     id: 'tour-add',
     show: { adding: true, editing: true },
@@ -152,10 +152,10 @@ export const TOUR: readonly TourStop[] = [
     title: 'When you are done',
   },
   {
-    body: 'Choose how often the photo changes, and which tags to draw from. Or pick one from the gallery to keep.',
+    body: 'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
     id: 'tour-photos',
     section: 'photos',
-    title: 'Photos',
+    title: 'Background',
   },
   {
     body: 'Set the font for the clock and everything around it.',

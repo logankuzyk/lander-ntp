@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { NEWS, type PageTourStop, TOUR } from './callouts'
 
 describe('the tour', () => {
-  it('goes from Edit to Done on the page, then Photos and the font in the settings panel', () => {
+  it('goes from Edit to Done on the page, then Background and the font in the settings panel', () => {
     expect(TOUR.map(({ id }) => id)).toEqual([
       'tour-edit',
       'tour-move',
@@ -16,7 +16,31 @@ describe('the tour', () => {
     ])
   })
 
-  it('has a stop in the panel for Photos and one for the font, and none for the Clock or the Weather', () => {
+  it('mentions the free Widgets in Add and the Background in the existing Photos stop', () => {
+    expect(TOUR.map(({ id }) => id)).toEqual([
+      'tour-edit',
+      'tour-move',
+      'tour-options',
+      'tour-setup',
+      'tour-add',
+      'tour-done',
+      'tour-photos',
+      'tour-general',
+    ])
+    const add = TOUR.find(({ id }) => id === 'tour-add')
+    const background = TOUR.find(({ id }) => id === 'tour-photos')
+    expect(add?.body).toBe(
+      'The Date, Analog clock, Bookmarks and Quick dial are in the same menu. A Quick dial is one site; add one for each.',
+    )
+    expect(background).toMatchObject({
+      body: 'A photo that changes as often as you like, or one solid colour. The heart in photo details keeps favourites, and Favourites only cycles just those.',
+      id: 'tour-photos',
+      section: 'photos',
+      title: 'Background',
+    })
+  })
+
+  it('has a stop in the panel for Background and one for the font, and none for the Clock or the Weather', () => {
     expect(
       TOUR.filter(({ section }) => section !== undefined).map(({ section }) => section),
     ).toEqual(['photos', 'general'])
