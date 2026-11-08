@@ -16,3 +16,17 @@ Notes for coding agents working on Lander NTP. Start with [README.md](README.md)
 - Each Widget in `src/widgetSystem/registry.ts` needs, in `src/widgets/<Name>/*.stories.tsx`, `<Name>/Ready` stories at Smallest, Starting and Largest and an `AllSizes` story. With a `source` it also needs `Loading` and `Failed` at those sizes. For each need that has a label and an action it needs `<Name>/Setup/<Need>` at those sizes. `src/widgets/stories.test.ts` enforces this.
 - Chromatic publishes Storybook (`.github/workflows/chromatic.yml`) with `disableSnapshot`, so no visual tests run. Every PR description carries its branch link, `https://<branch>--6ad582e200912f972f91511a.chromatic.com`, once the PR's first run has published. Per Chromatic's docs, characters a subdomain can't hold in the branch name become dashes, dashes collapse, and 37 characters is the most; the docs don't say what happens to digits, so copy the link from Chromatic rather than working it out by hand. The run log's "View your Storybook" line is that build's own link and doesn't contain the branch. Links need a Chromatic sign-in while the project's Storybook visibility is private.
 - Store listings, data-disclosure forms and release notes are refreshed by the owner from the checklist in `docs/store-listing-refresh.md`; no listing is published from the repo.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and the widget roadmap live in the **Lander roadmap** Notion database, not GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical label names, split across two Notion select properties (`Category`, `Triage`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` plus `docs/adr/` at the repo root. See `docs/agents/domain.md`.
