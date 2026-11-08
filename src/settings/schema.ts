@@ -1,5 +1,9 @@
 import type { PhotoSettings } from '@/photos/rotation'
 
+import type { WeatherFieldSetting } from './weatherFields'
+
+export { WEATHER_FIELDS, type WeatherField, type WeatherFieldSetting } from './weatherFields'
+
 import type { FontId } from './fonts'
 
 export type Settings = {
@@ -24,13 +28,6 @@ export type Place = {
   /** As shown in the widget, e.g. "Victoria". */
   name: string
 }
-
-/** The optional lines under the temperature. */
-export const WEATHER_FIELDS = ['location', 'condition', 'feelsLike', 'highLow', 'sun'] as const
-
-export type WeatherField = (typeof WEATHER_FIELDS)[number]
-
-export type WeatherFieldSetting = { id: WeatherField; shown: boolean }
 
 export type WeatherSettings = {
   enabled: boolean

@@ -65,6 +65,13 @@ describe('settingsItem', () => {
     expect(await settingsItem.getValue()).toEqual(settings)
   })
 
+  it('keeps top-level settings another version added', async () => {
+    const settings = { ...DEFAULT_SETTINGS, futureSetting: { preserved: true } }
+    await storage.setItem(settingsItem.key, settings)
+
+    expect(await settingsItem.getValue()).toEqual(settings)
+  })
+
   it('keeps weather settings with a place', async () => {
     const settings: Settings = {
       ...DEFAULT_SETTINGS,

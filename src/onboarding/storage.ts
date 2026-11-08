@@ -1,6 +1,8 @@
 import * as v from 'valibot'
 import { storage } from 'wxt/utils/storage'
 
+import { syncedShapes } from '@/sync/shapes'
+
 export type Onboarding = {
   /** Ids of the news callouts that have been seen off, or never needed showing; see ./callouts. */
   dismissed: string[]
@@ -8,12 +10,11 @@ export type Onboarding = {
   welcomed: boolean
 }
 
-const OnboardingSchema = v.object({ dismissed: v.array(v.string()), welcomed: v.boolean() })
-
 /** Anything in another shape counts as nothing stored. */
 const current = (value: unknown): Onboarding | null => {
-  const result = v.safeParse(OnboardingSchema, value)
-  return result.success ? result.output : null
+  if (!syncedShapes.onboarding.check(value).ok) return null
+  const result = v.safeParse(syncedShapes.onboarding.schema, value)
+  return result.success ? (result.output as Onboarding) : null
 }
 
 const stored = storage.defineItem<Onboarding | null>('sync:onboarding', { fallback: null })

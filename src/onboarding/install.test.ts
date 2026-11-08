@@ -30,6 +30,13 @@ describe('recordInstall', () => {
     expect(await onboardingItem.getValue()).toEqual(existing)
   })
 
+  it('keeps onboarding keys another version added', async () => {
+    const existing = { dismissed: ['weather'], futureCallout: 2, welcomed: true }
+    await onboardingItem.setValue(existing)
+
+    expect(await onboardingItem.getValue()).toEqual(existing)
+  })
+
   it('ignores the browser itself updating', async () => {
     await recordInstall('chrome_update')
 
