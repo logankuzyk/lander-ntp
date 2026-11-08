@@ -10,6 +10,7 @@ type StoryName = Exclude<keyof typeof stories, 'default'>
 /** What each story opens, as its `play` does: the Widget whose Options button it presses. */
 const OPENS: Record<StoryName, string> = {
   ClockBeside: 'Clock',
+  Date: 'Date',
   NarrowWindow: 'Weather',
   NewerLayout: 'Clock',
   ShortWindow: 'Weather',
@@ -20,6 +21,7 @@ const OPENS: Record<StoryName, string> = {
 /** What the popover of each is called: its box's name, with the place for a Weather. */
 const DIALOGS: Record<string, string> = {
   Clock: 'Clock options',
+  Date: 'Date options',
   Weather: 'Weather, Victoria options',
 }
 

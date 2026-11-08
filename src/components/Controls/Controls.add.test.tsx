@@ -103,10 +103,11 @@ describe('Controls, the Add menu', () => {
       within(menu())
         .getAllByRole('menuitem')
         .map((el) => el.textContent),
-    ).toEqual(['Clock', 'Weather'])
+    ).toEqual(['Clock', 'Date', 'Weather'])
     expect(document.activeElement).toBe(item('Clock'))
     // Each is something a callout can point at.
     expect(item('Clock').getAttribute('data-callout-target')).toBe('menu:clock')
+    expect(item('Date').getAttribute('data-callout-target')).toBe('menu:date')
     expect(item('Weather').getAttribute('data-callout-target')).toBe('menu:weather')
   })
 
@@ -172,6 +173,8 @@ describe('Controls, the Add menu', () => {
     openMenu()
 
     fireEvent.keyDown(item('Clock'), { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(item('Date'))
+    fireEvent.keyDown(item('Date'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Weather'))
     fireEvent.keyDown(item('Weather'), { key: 'ArrowDown' })
     expect(document.activeElement).toBe(item('Clock'))
@@ -402,12 +405,13 @@ describe('Controls, at the Widget limit', () => {
       ].slice(0, n),
     })
 
-  it('says nothing before the limit: seven widgets, both items available', () => {
+  it('says nothing before the limit: seven widgets, every item available', () => {
     renderControls({ layout: weathers(7) })
     openMenu()
 
     expect(popup().textContent).not.toContain('widgets')
     expect(item('Clock').getAttribute('aria-disabled')).toBeNull()
+    expect(item('Date').getAttribute('aria-disabled')).toBeNull()
     expect(item('Weather').getAttribute('aria-disabled')).toBeNull()
   })
 
@@ -428,7 +432,7 @@ describe('Controls, at the Widget limit', () => {
     const { onCommit } = renderControls({ layout: weathers(8) })
     openMenu()
 
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Weather']) {
       const el = item(name)
       expect(el.getAttribute('aria-disabled')).toBe('true')
       expect(el.hasAttribute('disabled')).toBe(false)

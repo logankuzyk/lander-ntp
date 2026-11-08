@@ -36,19 +36,19 @@ async function openMenu() {
 }
 
 describe('the Add menu stories', () => {
-  it('Open seeds a new install whose menu offers the Clock and the Weather', async () => {
+  it('Open seeds a new install whose menu offers the Clock, Date and Weather', async () => {
     await seed('Open')
     render(<App />)
 
     const menu = await openMenu()
 
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Weather']) {
       expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBeNull()
     }
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('NoRoom seeds a Grid with no free cell, so that both items are unavailable', async () => {
+  it('NoRoom seeds a Grid with no free cell, so every item is unavailable', async () => {
     await seed('NoRoom')
     render(<App />)
 
@@ -60,10 +60,13 @@ describe('the Add menu stories', () => {
     expect(within(menu).getByRole('menuitem', { name: /Clock/ }).textContent).toContain(
       'There is no room for a Clock.',
     )
+    expect(within(menu).getByRole('menuitem', { name: /Date/ }).textContent).toContain(
+      'There is no room for a Date.',
+    )
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('AtLimit seeds eight Widgets, so that both items are unavailable under the Widget limit line', async () => {
+  it('AtLimit seeds eight Widgets, so every item is unavailable under the Widget limit line', async () => {
     await seed('AtLimit')
     const { container } = render(<App />)
     await waitFor(() => expect(container.querySelectorAll('.widget-box')).toHaveLength(8))
@@ -73,7 +76,7 @@ describe('the Add menu stories', () => {
     expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
       "That's all 8 widgets. Remove one to add another.",
     )
-    for (const name of ['Clock', 'Weather']) {
+    for (const name of ['Clock', 'Date', 'Weather']) {
       const item = within(menu).getByRole('menuitem', { name })
       expect(item.getAttribute('aria-disabled')).toBe('true')
       // The line is the menu's, once: not repeated in the item.
@@ -142,7 +145,7 @@ it('NewerLayout shows the update note and disables each Add choice', async () =>
   expect(menu.parentElement?.querySelector('.add-menu__note')?.textContent).toBe(
     'Update Lander to change this.',
   )
-  for (const name of ['Clock', 'Weather']) {
+  for (const name of ['Clock', 'Date', 'Weather']) {
     expect(within(menu).getByRole('menuitem', { name }).getAttribute('aria-disabled')).toBe('true')
   }
 })

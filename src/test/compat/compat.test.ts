@@ -1,3 +1,5 @@
+import { act, render, waitFor } from '@testing-library/preact'
+import { h } from 'preact'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeBrowser } from 'wxt/testing/fake-browser'
 
@@ -17,6 +19,7 @@ import { EXAMPLE_LAYOUT_JSON, exampleLayout } from '@/layout/fixtures'
 import { addWidget, removeWidget, restoreWidget, setOptions } from '@/layout/ops'
 import { layoutItem } from '@/layout/storage'
 import type { Layout } from '@/layout/types'
+import { useLayout } from '@/layout/useLayout'
 import { answerWelcome } from '@/onboarding/answerWelcome'
 import { NEWS } from '@/onboarding/callouts'
 import { dismissNews } from '@/onboarding/dismissNews'
@@ -74,7 +77,7 @@ const PHASE_3_LAYOUT = {
 }
 
 /** Add a row here whenever phase 3 adds a synced write that a v0.3.0 device must survive. */
-const PHASE_3_WRITES = [
+const V030_WRITES = [
   {
     change: { col: 1, id: 'clock', kind: 'move', row: 7 } as const,
     name: 'a v0.3.0 Clock move keeps all four newer Widget types byte for byte',
@@ -83,7 +86,7 @@ const PHASE_3_WRITES = [
 ]
 
 describe('the frozen v0.3.0 reader', () => {
-  it.each(PHASE_3_WRITES)('$name', async ({ change, rawSync }) => {
+  it.each(V030_WRITES)('$name', async ({ change, rawSync }) => {
     const after = await saveLikeV030(rawSync, change)
 
     expect(after.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(4)
@@ -235,6 +238,71 @@ const storeExampleLayout = async (): Promise<Layout> => {
 const changeLayout = (change: (layout: Layout) => Layout) => async () => {
   await layoutItem.setValue(change(await storeExampleLayout()))
 }
+
+/** Commits a Layout through the same hook the page uses. */
+async function commitThroughPage(next: Layout): Promise<void> {
+  const page = {} as ReturnType<typeof useLayout>
+  function Probe() {
+    Object.assign(page, useLayout(DEFAULT_SETTINGS))
+    return null
+  }
+  const { unmount } = render(h(Probe, {}))
+  await waitFor(() => expect(page.loaded).toBe(true))
+  await act(async () => {
+    page.commit(next)
+  })
+  await waitFor(async () => {
+    const { layout } = await fakeBrowser.storage.sync.get('layout')
+    expect(
+      (layout as { widgets?: { type?: string }[] } | undefined)?.widgets?.some(
+        (widget) => widget.type === 'date',
+      ),
+    ).toBe(true)
+  })
+  unmount()
+}
+
+const PHASE_3_WRITES = [
+  {
+    name: 'adding a Date writes sync:layout only through the page commit path',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const layout = await storeExampleLayout()
+      const before = await fakeBrowser.storage.sync.get(null)
+      const added = addWidget({ layout, readOnly: false }, 'date')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      await commitThroughPage(added.layout)
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+]
+
+describe('phase 3 synced writes', () => {
+  it.each(PHASE_3_WRITES)('$name', async ({ write }) => {
+    const { after: rawSync, before } = await write()
+
+    const changedKeys = [...new Set([...Object.keys(before), ...Object.keys(rawSync)])]
+      .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(rawSync[key]))
+      .sort()
+    expect(changedKeys).toEqual(['layout'])
+    expect(rawSync.settings).toEqual(before.settings)
+    expect(rawSync.onboarding).toEqual(before.onboarding)
+    expect(rawSync.layout).toMatchObject({
+      v: 1,
+      widgets: expect.arrayContaining([expect.objectContaining({ type: 'date' })]),
+    })
+
+    const v030 = await asV030(rawSync)
+    expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+    expect(
+      v030.raw.layout.widgets.find((widget) => (widget as { type?: string }).type === 'date'),
+    ).toMatchObject({
+      options: { format: 'short', monthGrid: true, showYear: false, weekNumbers: false },
+      type: 'date',
+    })
+  })
+})
 
 const LEFT = { cols: -1, rows: 0 }
 const RIGHT = { cols: 1, rows: 0 }
@@ -472,6 +540,15 @@ const PHASE_2_WRITES: PhaseTwoWrite[] = [
       const second = addWidget({ layout: first.layout, readOnly: false }, 'clock')
       if (!second.ok) throw new Error(`the add was refused: ${second.reason}`)
       await layoutItem.setValue(second.layout)
+    },
+  },
+  {
+    layoutOnly: true,
+    name: 'add a Date Widget (addWidget and commit: sync:layout only)',
+    write: async () => {
+      const added = addWidget({ layout: await storeExampleLayout(), readOnly: false }, 'date')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      await commitThroughPage(added.layout)
     },
   },
   {
