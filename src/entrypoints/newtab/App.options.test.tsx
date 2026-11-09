@@ -121,6 +121,27 @@ describe('App, the options popover', () => {
       expect(screen.getByRole('heading', { name: 'Weather, Victoria options' })).toBeTruthy()
     })
 
+    it('limits Weather line options to the cells the Widget currently occupies', async () => {
+      await drawn({
+        v: 1,
+        widgets: [
+          {
+            ...weather({ ...DEFAULT_SETTINGS.weather, place: PLACE, unit: 'celsius' }),
+            h: 1,
+            w: 1,
+          },
+        ],
+      })
+      edit()
+      open('Weather')
+
+      const extraLine = within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Show Conditions',
+      })
+      expect(extraLine.getAttribute('aria-disabled')).toBe('true')
+      expect(extraLine.getAttribute('title')).toBe('Make the Weather larger to show more lines.')
+    })
+
     it('opens a dialog labelled with the Widget’s name, focus on its first option', async () => {
       await drawn(THREE)
       edit()
