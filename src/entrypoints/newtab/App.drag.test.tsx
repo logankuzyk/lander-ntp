@@ -275,6 +275,8 @@ describe('App, dragging with the options popover open', () => {
 
     // Then edit mode.
     fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
 

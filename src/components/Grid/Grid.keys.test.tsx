@@ -349,8 +349,10 @@ describe('Grid, putting a picked-up Widget back', () => {
     expect(ghost()).toBeNull()
     expect(said()).toBe('Clock put back at column 5, row 4.')
     expect(document.activeElement).toBe(box('clock'))
-    // Still editing: the Done button is still there, and a second Escape leaves.
+    // Still editing: Escape clears the selection before another Escape leaves.
     expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+    key(box('clock'), 'Escape')
+    expect(box('clock').dataset.selected).toBe('false')
     key(box('clock'), 'Escape')
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })

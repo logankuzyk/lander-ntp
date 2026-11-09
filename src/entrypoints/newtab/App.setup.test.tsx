@@ -394,6 +394,8 @@ describe('App, the setup button', () => {
       expect(document.activeElement).toBe(setup())
 
       escape()
+      expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+      escape()
       expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
     })
 

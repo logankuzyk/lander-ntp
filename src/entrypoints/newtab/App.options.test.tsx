@@ -225,6 +225,8 @@ describe('App, the options popover', () => {
       expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
 
       fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+      expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
       expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
     })
 

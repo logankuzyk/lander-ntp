@@ -54,7 +54,7 @@ describe('the setup button styles', () => {
   it('draws no ring round a box that was handed focus outside edit mode, and keeps the frame ring in it', () => {
     expect(rule('.widget-box:focus')).toMatch(/outline:\s*none/)
     // The frame's ring is more specific (it names the grid), so it still wins in edit mode.
-    expect(rule('.grid--editing .widget-box:focus-visible')).toMatch(/outline:\s*2px solid/)
+    expect(rule(".grid--editing .widget-box[data-selected='true']")).toMatch(/outline:\s*3px solid/)
   })
 
   it('keeps clear of the Options button and the name in edit mode, in a box tall enough to', () => {

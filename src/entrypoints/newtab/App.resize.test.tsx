@@ -309,6 +309,8 @@ describe('App, resizing with the options popover open', () => {
     release(handle('clock'), 990, 590)
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
 })

@@ -137,14 +137,19 @@ body {
   border-radius: 0.5rem;
   background: rgb(255 255 255 / 6%);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 35%);
-  outline: 1px solid var(--page-fg);
-  outline-offset: -1px;
+  outline: none;
+}
+
+.grid--editing .widget-box[data-selected='true'] {
+  outline: 3px solid var(--page-fg);
+  outline-offset: -2px;
+  /* A dark line outside the white ring, so it shows on a bright photo too. */
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
 
 .grid--editing .widget-box:focus-visible {
-  outline: 2px solid var(--page-fg);
+  outline: 3px solid var(--page-fg);
   outline-offset: -2px;
-  /* A dark line outside the white ring, so it shows on a bright photo too. */
   box-shadow: 0 0 0 1px rgb(0 0 0 / 60%);
 }
 

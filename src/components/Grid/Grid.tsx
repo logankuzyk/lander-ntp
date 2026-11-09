@@ -1,5 +1,5 @@
 import type { JSX } from 'preact'
-import { useRef } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 
 import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { useEditMode } from '@/components/EditMode/useEditMode'
@@ -81,6 +81,32 @@ export function Grid({ commit, layout, page }: GridProps) {
   const grid = useRef<HTMLDivElement>(null)
   const pointer = useGridMove({ commit, grid, layout })
   const keys = useGridKeys({ commit, grid, layout })
+  const [selected, setSelected] = useState<string | null>(null)
+  useEffect(() => {
+    if (!editing) setSelected(null)
+  }, [editing])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        !selected ||
+        grid.current?.contains(event.target as Node)
+      )
+        return
+      if (
+        event.target instanceof Element &&
+        event.target.closest('.popover, dialog, [role="dialog"], .settings-panel')
+      )
+        return
+      if (document.querySelector('[data-popover-toggle][aria-expanded="true"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      setSelected(null)
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [selected])
   // One Widget is in the air at a time, by a pointer or by keys: whichever has an outline.
   const ghost = pointer.ghost ?? keys.ghost
   const { held } = keys
@@ -93,6 +119,32 @@ export function Grid({ commit, layout, page }: GridProps) {
         style={{ '--cols': String(COLS), '--rows': String(ROWS) } as JSX.CSSProperties}
         {...pointer.handlers}
         {...keys.handlers}
+        onClickCapture={(event) => {
+          const box = (event.target as Element).closest<HTMLElement>('.widget-box')
+          if (box?.dataset.widgetId) setSelected(box.dataset.widgetId)
+        }}
+        onKeyDownCapture={(event) => {
+          keys.handlers.onKeyDownCapture(event)
+          if (event.defaultPrevented) return
+          if (
+            event.target instanceof Element &&
+            (event.target.closest('.popover, dialog, [role="dialog"], .settings-panel') ||
+              event.target.closest('[data-popover-toggle][aria-expanded="true"]'))
+          )
+            return
+          if (document.querySelector('[data-popover-toggle][aria-expanded="true"]')) return
+          if (event.key === 'Escape' && selected) {
+            event.preventDefault()
+            event.stopPropagation()
+            setSelected(null)
+          }
+        }}
+        onPointerDownCapture={(event) => {
+          keys.handlers.onPointerDownCapture()
+          const box = (event.target as Element).closest<HTMLElement>('.widget-box')
+          if (box?.dataset.widgetId) setSelected(box.dataset.widgetId)
+          else if (event.target === event.currentTarget) setSelected(null)
+        }}
       >
         {editing && <Dots />}
         {ghost && (
@@ -120,9 +172,11 @@ export function Grid({ commit, layout, page }: GridProps) {
                 held={state}
                 id={widget.placed.id}
                 key={widget.placed.id}
+                onFocus={() => setSelected(widget.placed.id)}
                 options={widget.placed.options}
                 page={page}
                 rect={rect}
+                selected={selected === widget.placed.id}
               />
             ) : (
               <Box
@@ -131,8 +185,10 @@ export function Grid({ commit, layout, page }: GridProps) {
                 // Its panel says what it is, so no second name is drawn in edit mode.
                 label={null}
                 name={unknownWidgetName(layout, widget.placed.id)}
+                onFocus={() => setSelected(widget.placed.id)}
                 placedId={widget.placed.id}
                 rect={rect}
+                selected={selected === widget.placed.id}
                 widget={widget.placed.type}
               >
                 <WidgetState
