@@ -96,7 +96,7 @@ export function Grid({ commit, layout, page }: GridProps) {
         return
       if (
         event.target instanceof Element &&
-        event.target.closest('.popover, dialog, [role="dialog"], .settings-panel')
+        event.target.closest('.popover, dialog, [role="dialog"], [role="menu"], .settings-panel')
       )
         return
       if (document.querySelector('[data-popover-toggle][aria-expanded="true"]')) return
@@ -128,7 +128,9 @@ export function Grid({ commit, layout, page }: GridProps) {
           if (event.defaultPrevented) return
           if (
             event.target instanceof Element &&
-            (event.target.closest('.popover, dialog, [role="dialog"], .settings-panel') ||
+            (event.target.closest(
+              '.popover, dialog, [role="dialog"], [role="menu"], .settings-panel',
+            ) ||
               event.target.closest('[data-popover-toggle][aria-expanded="true"]'))
           )
             return

@@ -126,6 +126,25 @@ describe('App, adding a Widget from the Add menu', () => {
     expect(document.activeElement).toBe(box)
   })
 
+  it('lets Escape close the Add menu before clearing the selected Widget', async () => {
+    await drawn(v023({ clock: true, weather: true }))
+    edit()
+    const clock = screen.getByRole('group', { name: 'Clock' })
+    fireEvent.click(clock)
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const menu = screen.getByRole('menu')
+    const firstItem = within(menu).getAllByRole('menuitem')[0]!
+
+    fireEvent.keyDown(firstItem, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(clock.dataset.selected).toBe('true')
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(clock.dataset.selected).toBe('false')
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+  })
+
   it('writes sync:layout once, and nothing else', async () => {
     await drawn(v023({ clock: true, weather: true }))
     const settingsBefore = await stored('settings')

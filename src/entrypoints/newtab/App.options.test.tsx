@@ -220,8 +220,11 @@ describe('App, the options popover', () => {
       edit()
       open('Weather')
 
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+      fireEvent.keyDown(document.body, { key: 'Escape' })
       expect(dialog(WEATHER)).toBeNull()
+      expect(document.querySelector('[data-widget="weather"]')?.getAttribute('data-selected')).toBe(
+        'true',
+      )
       expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
 
       fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })

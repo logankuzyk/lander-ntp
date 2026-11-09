@@ -160,6 +160,19 @@ describe('Grid, selecting a Widget', () => {
     expect(box('clock').dataset.selected).toBe('false')
     expect(box('weather').dataset.selected).toBe('true')
   })
+
+  it('clears selection on an empty Grid press and when Done ends editing', () => {
+    const { box, grid } = setup()
+    fireEvent.click(box('clock'))
+    expect(box('clock').dataset.selected).toBe('true')
+
+    press(grid(), 100, 700)
+    expect(box('clock').dataset.selected).toBe('false')
+
+    fireEvent.click(box('clock'))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(box('clock').dataset.selected).toBe('false')
+  })
 })
 
 describe('Grid, the resize handle', () => {
