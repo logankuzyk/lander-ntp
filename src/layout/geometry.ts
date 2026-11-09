@@ -1,4 +1,4 @@
-import type { Cells, DefinitionOf } from '@/widgetSystem/definition'
+import { type Cells, type DefinitionOf, smallestSize } from '@/widgetSystem/definition'
 
 import type { KnownWidget, Layout, UnknownWidget } from './types'
 
@@ -85,8 +85,9 @@ export const nearestFreeToMiddle = (size: Cells, taken: readonly Rect[]): Rect |
   nearestFreeTo(size, taken, MIDDLE)
 
 /** `size` kept between the Widget's smallest and largest, one side at a time. */
-export function clampSize<O>(definition: DefinitionOf<O>, size: Cells): Cells {
-  const { largest, smallest } = definition.sizes
+export function clampSize<O>(definition: DefinitionOf<O>, size: Cells, options?: O): Cells {
+  const { largest } = definition.sizes
+  const smallest = smallestSize(definition.sizes, options as O)
   return {
     h: Math.min(Math.max(size.h, smallest.h), largest.h),
     w: Math.min(Math.max(size.w, smallest.w), largest.w),
@@ -113,8 +114,8 @@ export function fitNew<O>(
   options: O,
   taken: readonly Rect[],
 ): Rect | null {
-  const starting = clampSize(definition, definition.sizes.starting(options))
-  for (const size of sizesDownTo(starting, definition.sizes.smallest)) {
+  const starting = clampSize(definition, definition.sizes.starting(options), options)
+  for (const size of sizesDownTo(starting, smallestSize(definition.sizes, options))) {
     const place = nearestFreeToMiddle(size, taken)
     if (place) return place
   }

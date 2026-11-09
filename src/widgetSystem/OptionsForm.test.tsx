@@ -7,6 +7,7 @@ import { clockDefinition } from '@/widgets/Clock/definition'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 
 import type { PageValues, WidgetDefinition } from './definition'
+import { defaultOptions } from './options'
 import { OptionsForm } from './OptionsForm'
 
 const VICTORIA = { latitude: 48.44, longitude: -123.35, name: 'Victoria' }
@@ -98,6 +99,31 @@ afterEach(() => {
 })
 
 describe('OptionsForm', () => {
+  it('disables extra Weather lines at 1 by 1 and describes how to show them', () => {
+    const options = defaultOptions(weatherDefinition)
+    render(
+      <OptionsForm
+        cells={{ h: 1, w: 1 }}
+        definition={weatherDefinition}
+        onChange={vi.fn()}
+        onPageValueChange={vi.fn()}
+        options={options}
+        page={PAGE}
+      />,
+    )
+
+    const extraLine = screen.getByRole('button', { name: 'Show Conditions' })
+    expect(extraLine.getAttribute('aria-disabled')).toBe('true')
+    expect(extraLine.getAttribute('title')).toBe('Make the Weather larger to show more lines.')
+    const description = extraLine.getAttribute('aria-describedby')
+    expect(description).toBeTruthy()
+    expect(document.getElementById(description!)?.textContent).toBe(
+      'Make the Weather larger to show more lines.',
+    )
+    extraLine.focus()
+    expect(document.activeElement).toBe(extraLine)
+  })
+
   it('draws a pick option, focuses its trigger, and saves one picked value with unknown keys', async () => {
     const definition: WidgetDefinition<Record<string, unknown>> = {
       ...example,

@@ -176,7 +176,7 @@ describe('the tour stories’ seeds', () => {
     expect(await screen.findByRole('dialog', { name: 'Welcome to Lander' })).toBeTruthy()
     expect((await screen.findByRole('region', { name: 'Weather' })).textContent).toContain('13°')
     expect(widgets(container)).toEqual([
-      ['weather', '11 / span 2', '1 / span 2'],
+      ['weather', '12 / span 1', '1 / span 1'],
       ['clock', '5 / span 4', '4 / span 2'],
     ])
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -190,7 +190,7 @@ describe('the tour stories’ seeds', () => {
     await waitFor(() =>
       expect(container.querySelector('[data-callout-target="setup"]')).not.toBeNull(),
     )
-    expect(widgets(container)).toEqual([['weather', '11 / span 2', '1 / span 2']])
+    expect(widgets(container)).toEqual([['weather', '12 / span 1', '1 / span 1']])
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -230,7 +230,7 @@ describe('the Grid stories', () => {
     const weather = await screen.findByRole('region', { name: 'Weather' })
     expect(weather.textContent).toContain('13°')
     expect(boxes(container)).toEqual([
-      ['weather', '11 / span 2', '1 / span 2'],
+      ['weather', '12 / span 1', '1 / span 1'],
       ['clock', '5 / span 4', '4 / span 2'],
     ])
     expect(fetchSpy).not.toHaveBeenCalled()

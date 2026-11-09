@@ -156,10 +156,15 @@ export type Cells = { h: number; w: number }
 export type WidgetSizes<O> = {
   /** The most it may be resized to. */
   largest: Cells
-  /** The least it may be resized to. It holds everything the options can turn on at once. */
-  smallest: Cells
+  /** The least it may be resized to; may depend on which options are on. */
+  smallest: ((options: O) => Cells) | Cells
   /** Where it starts when added, which may depend on the options. Between smallest and largest. */
   starting: (options: O) => Cells
+}
+
+/** The least size for these options; most Widgets keep one fixed size. */
+export function smallestSize<O>(sizes: WidgetSizes<O>, options: O): Cells {
+  return typeof sizes.smallest === 'function' ? sizes.smallest(options) : sizes.smallest
 }
 
 /**

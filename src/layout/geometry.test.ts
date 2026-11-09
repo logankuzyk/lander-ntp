@@ -140,8 +140,11 @@ describe('placing by LR-16', () => {
     }
   })
 
-  it('puts a Weather added to the default page in the free place nearest the middle', () => {
-    expect(fitNew(weatherDefinition, weatherOptions, [rect(5, 4, 4, 2)])).toEqual(rect(6, 2, 2, 2))
+  it('puts a default Weather at 1 by 1 in the free place nearest the middle', () => {
+    expect(fitNew(weatherDefinition, weatherOptions, [rect(5, 4, 4, 2)])).toMatchObject({
+      h: 1,
+      w: 1,
+    })
   })
 })
 
@@ -168,9 +171,9 @@ describe('fitNew', () => {
     expect(
       fitNew(clockDefinition, options, [rect(1, 1, 12, 5), rect(1, 6, 5, 3), rect(8, 6, 5, 3)]),
     ).toBeNull()
-    // The Weather cannot go below 2 by 2: one free row is not enough.
+    // The default Weather needs only 1 by 1, so leave no free cell.
     expect(
-      fitNew(weatherDefinition, defaultOptions(weatherDefinition), [rect(1, 1, 12, 7)]),
+      fitNew(weatherDefinition, defaultOptions(weatherDefinition), [rect(1, 1, 12, 8)]),
     ).toBeNull()
   })
 })

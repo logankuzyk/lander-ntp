@@ -2,6 +2,7 @@ import { clampSize, collides, COLS, drawnRects, type Rect, ROWS } from '@/layout
 import { type Editable, moveWidget, placeWidget, resizeWidget } from '@/layout/ops'
 import type { Layout } from '@/layout/types'
 import type { Cells } from '@/widgetSystem/definition'
+import { smallestSize } from '@/widgetSystem/definition'
 import type { AnyWidgetDefinition } from '@/widgetSystem/registry'
 
 /**
@@ -49,6 +50,7 @@ export type ResizeSession = Held & {
   /** The Widget's definition, which its smallest and largest sizes are read from. */
   readonly definition: AnyWidgetDefinition
   readonly kind: 'resize'
+  readonly options: Record<string, unknown>
   /**
    * The size under the pointer, in cells and not snapped, kept between the Widget's smallest and
    * largest and on the Grid: what the Widget is drawn at while it follows the pointer.
@@ -128,6 +130,7 @@ export function pickUpResize(
     },
     id,
     kind: 'resize',
+    options: mine.widget.options,
     origin: rect,
     others: drawn.filter((other) => other !== mine).map((other) => other.rect),
     place: rect,
@@ -167,7 +170,7 @@ function moveTo(session: MoveSession, pointer: Point): MoveSession {
 }
 
 function resizeTo(session: ResizeSession, pointer: Point): ResizeSession {
-  const { definition, grab, origin } = session
+  const { definition, grab, options, origin } = session
   // The most that fits between its top left corner and the Grid's edge.
   const room = { h: ROWS - (origin.row - 1), w: COLS - (origin.col - 1) }
   const want = {
@@ -175,11 +178,19 @@ function resizeTo(session: ResizeSession, pointer: Point): ResizeSession {
     w: pointer.col - grab.col - (origin.col - 1),
   }
   const within = (value: number, most: number) => Math.min(Math.max(value, 1), most)
-  const size = clampSize(definition, { h: within(want.h, room.h), w: within(want.w, room.w) })
-  const snapped = clampSize(definition, {
-    h: within(Math.round(want.h), room.h),
-    w: within(Math.round(want.w), room.w),
-  })
+  const size = clampSize(
+    definition,
+    { h: within(want.h, room.h), w: within(want.w, room.w) },
+    options,
+  )
+  const snapped = clampSize(
+    definition,
+    {
+      h: within(Math.round(want.h), room.h),
+      w: within(Math.round(want.w), room.w),
+    },
+    options,
+  )
   // A Widget stored at the edge under its smallest size has less room than that. It is refused,
   // and drawn in the room it has, which keeps the outline on the Grid.
   const fits = snapped.w <= room.w && snapped.h <= room.h
@@ -252,6 +263,7 @@ export type KeySession = {
   readonly kind: 'keys'
   /** Why the last step stopped short, or null when it went through (or there was none yet). */
   readonly limit: KeyLimit | null
+  readonly options: Record<string, unknown>
   /** Where the Widget was drawn when it was picked up. */
   readonly origin: Rect
   /** Where every other Widget is drawn, which the Widget may not take cells of. */
@@ -280,6 +292,7 @@ export function pickUpKeys({ layout, readOnly }: Editable, id: string): KeySessi
     id,
     kind: 'keys',
     limit: null,
+    options: mine.widget.kind === 'known' ? mine.widget.options : {},
     origin: mine.rect,
     others: drawn.filter((other) => other !== mine).map((other) => other.rect),
     place: mine.rect,
@@ -319,6 +332,7 @@ export function stretch(session: KeySession, step: Step): KeySession {
     grab: { col: 0, row: 0 },
     id: session.id,
     kind: 'resize',
+    options: session.options ?? {},
     origin: place,
     others: session.others,
     place,
@@ -329,7 +343,8 @@ export function stretch(session: KeySession, step: Step): KeySession {
     col: place.col - 1 + place.w + step.cols,
     row: place.row - 1 + place.h + step.rows,
   })
-  const { largest, smallest } = definition.sizes
+  const { largest } = definition.sizes
+  const smallest = smallestSize(definition.sizes, pulled.options)
   const wanted = { h: place.h + step.rows, w: place.w + step.cols }
   const same = resized.place.w === place.w && resized.place.h === place.h
   const limit: KeyLimit | null = !same

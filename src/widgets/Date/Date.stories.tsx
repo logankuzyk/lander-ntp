@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
 import type { Rect } from '@/layout/geometry'
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions } from '@/widgetSystem/options'
 
 import { withBox } from '../../../.storybook/withBox'
@@ -8,7 +9,8 @@ import { withPage } from '../../../.storybook/withPage'
 import { Date } from './Date'
 import { dateDefinition } from './definition'
 
-const { largest, smallest, starting } = dateDefinition.sizes
+const { largest, starting } = dateDefinition.sizes
+const smallest = smallestSize(dateDefinition.sizes, defaultOptions(dateDefinition))
 const centred = ({ h, w }: { h: number; w: number }): Rect => ({
   col: 1 + Math.floor((12 - w) / 2),
   h,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
 
 import { dateDefinition } from './definition'
@@ -8,8 +9,9 @@ describe('Date definition', () => {
   it('starts within its smallest and largest sizes and exposes all five options', () => {
     const options = defaultOptions(dateDefinition)
     const { h, w } = dateDefinition.sizes.starting(options)
-    expect(w).toBeGreaterThanOrEqual(dateDefinition.sizes.smallest.w)
-    expect(h).toBeGreaterThanOrEqual(dateDefinition.sizes.smallest.h)
+    const smallest = smallestSize(dateDefinition.sizes, options)
+    expect(w).toBeGreaterThanOrEqual(smallest.w)
+    expect(h).toBeGreaterThanOrEqual(smallest.h)
     expect(w).toBeLessThanOrEqual(dateDefinition.sizes.largest.w)
     expect(h).toBeLessThanOrEqual(dateDefinition.sizes.largest.h)
     expect(dateDefinition.options.map(({ id }) => id)).toEqual([

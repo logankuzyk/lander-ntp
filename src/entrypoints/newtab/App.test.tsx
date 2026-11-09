@@ -638,7 +638,7 @@ describe('App, on the Grid', () => {
 
     await drawn(container)
     expect(boxes(container)).toEqual([
-      ['weather', '11 / span 2', '1 / span 2'],
+      ['weather', '12 / span 1', '1 / span 1'],
       ['clock', '5 / span 4', '4 / span 2'],
     ])
   })

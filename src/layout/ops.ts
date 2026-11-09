@@ -1,4 +1,4 @@
-import type { Cells } from '@/widgetSystem/definition'
+import { type Cells, smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
 import { widgetDefinition } from '@/widgetSystem/registry'
 
@@ -232,7 +232,8 @@ export function resizeWidget(
   if (!widget) return refused('not found')
   if (widget.kind === 'unknown') return refused('unknown type')
 
-  const { largest, smallest } = widget.definition.sizes
+  const { largest } = widget.definition.sizes
+  const smallest = smallestSize(widget.definition.sizes, widget.options)
   if (size.w < smallest.w || size.h < smallest.h) return refused('too small')
   if (size.w > largest.w || size.h > largest.h) return refused('too large')
   const current = drawnPlace(layout, widget)
@@ -275,7 +276,8 @@ export function placeWidget(
 
   if (to.w !== current.w || to.h !== current.h) {
     if (widget.kind === 'unknown') return refused('unknown type')
-    const { largest, smallest } = widget.definition.sizes
+    const { largest } = widget.definition.sizes
+    const smallest = smallestSize(widget.definition.sizes, widget.options)
     if (to.w < smallest.w || to.h < smallest.h) return refused('too small')
     if (to.w > largest.w || to.h > largest.h) return refused('too large')
   }

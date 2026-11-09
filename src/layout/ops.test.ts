@@ -104,12 +104,12 @@ describe('addWidget', () => {
       widgets: [
         {
           col: 6,
-          h: 2,
+          h: 1,
           id: expect.stringMatching(/^[a-z0-9]{8}$/) as unknown,
           options: defaultOptions(weatherDefinition),
           row: 4,
           type: 'weather',
-          w: 2,
+          w: 1,
         },
       ],
     })
@@ -524,6 +524,16 @@ describe('resizeWidget', () => {
     expect(
       placedOf(accepted(resizeWidget(editable(layout), 'b', { h: 3, w: 2 })), 'b'),
     ).toMatchObject({ h: 3, w: 2 })
+  })
+
+  it('allows a one-line Weather to shrink to 1 by 1 and refuses to shrink it further', () => {
+    const oneLine = layoutOf(weather('small', 11, 1))
+
+    expect(resizeWidget(editable(oneLine), 'small', { h: 1, w: 1 }).ok).toBe(true)
+    expect(resizeWidget(editable(oneLine), 'small', { h: 1, w: 0 })).toEqual({
+      ok: false,
+      reason: 'too small',
+    })
   })
 
   it.each([

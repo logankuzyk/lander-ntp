@@ -41,6 +41,13 @@ const SETTINGS: Settings = {
 
 /** The weather with no place chosen yet: what a Weather that was just added looks like. */
 const NO_PLACE: Settings = { ...SETTINGS, weather: { ...SETTINGS.weather, place: null } }
+const ONE_LINE: Settings = {
+  ...SETTINGS,
+  weather: {
+    ...SETTINGS.weather,
+    fields: SETTINGS.weather.fields.map((field) => ({ ...field, shown: field.id === 'highLow' })),
+  },
+}
 
 /** Puts these settings in the (fake) browser storage before the story is drawn. */
 const stored = (settings: Settings) => async () => {
@@ -134,6 +141,12 @@ export const Weather: Story = {
 export const WeatherNoPlace: Story = {
   args: { definition: weatherDefinition, focusOption: 'place' },
   beforeEach: stored(NO_PLACE),
+}
+
+/** At 1 by 1, the Weather keeps its one line and explains why another cannot be turned on. */
+export const WeatherAtSmallest: Story = {
+  args: { cells: { h: 1, w: 1 }, definition: weatherDefinition },
+  beforeEach: stored(ONE_LINE),
 }
 
 /** The options of a Widget that may not be changed: shown as they are, with nothing to press. */

@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
+import { smallestSize } from '@/widgetSystem/definition'
+import { defaultOptions } from '@/widgetSystem/options'
+
 import { withBox } from '../../../.storybook/withBox'
 import { withPage } from '../../../.storybook/withPage'
 import { AnalogClock } from './AnalogClock'
@@ -19,7 +22,13 @@ type Story = StoryObj<typeof meta>
 const rect = (w: number, h: number) => ({ col: Math.floor((12 - w) / 2) + 1, h, row: 2, w })
 const sizeRect = (size: 'largest' | 'smallest' | 'starting') => {
   if (size === 'starting') return rect(2, 2)
-  return rect(analogClockDefinition.sizes[size].w, analogClockDefinition.sizes[size].h)
+  const cells =
+    size === 'smallest'
+      ? smallestSize(analogClockDefinition.sizes, defaultOptions(analogClockDefinition))
+      : size === 'largest'
+        ? analogClockDefinition.sizes.largest
+        : analogClockDefinition.sizes.starting(defaultOptions(analogClockDefinition))
+  return rect(cells.w, cells.h)
 }
 
 /** A new Analog clock has the Minimal face and the Seconds hand on. */

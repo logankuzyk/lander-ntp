@@ -368,7 +368,7 @@ export const KeyboardRefused: Story = {
     return sendNothing()
   },
   play: async ({ canvasElement }) => {
-    await holdKeys(canvasElement, 'Clock', [...arrows('Up', 3), ...arrows('Right', 3)])
+    await holdKeys(canvasElement, 'Clock', [...arrows('Up', 3), ...arrows('Right', 4)])
   },
 }
 

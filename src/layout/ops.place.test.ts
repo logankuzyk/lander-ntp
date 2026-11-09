@@ -20,7 +20,15 @@ const weather = (id: string, col: number, row: number, w = 2, h = 2) => ({
   col,
   h,
   id,
-  options: {},
+  options: {
+    fields: [
+      { id: 'highLow', shown: true },
+      { id: 'location', shown: true },
+      { id: 'sun', shown: false },
+      { id: 'condition', shown: false },
+      { id: 'feelsLike', shown: false },
+    ],
+  },
   row,
   type: 'weather',
   w,

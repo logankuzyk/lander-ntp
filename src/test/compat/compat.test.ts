@@ -39,7 +39,7 @@ import { createWriteQueue } from '@/storage/writeQueue'
 import { makeManifest, makePhoto } from '@/test/fixtures'
 import { weatherDefinition } from '@/widgets/Weather/definition'
 import type { DefinitionOf } from '@/widgetSystem/definition'
-import { writeOptions } from '@/widgetSystem/options'
+import { defaultOptions, writeOptions } from '@/widgetSystem/options'
 
 import { asV023, asV030, saveLikeV023, saveLikeV030 } from './compat'
 
@@ -421,10 +421,14 @@ const changeLayout = (change: (layout: Layout) => Layout) => async () => {
 }
 
 /** Commits a Layout through the same hook the page uses. */
-async function commitThroughPage(next: Layout, type: string): Promise<void> {
+async function commitThroughPage(
+  next: Layout,
+  type: string,
+  settings: Settings = DEFAULT_SETTINGS,
+): Promise<void> {
   const page = {} as ReturnType<typeof useLayout>
   function Probe() {
-    Object.assign(page, useLayout(DEFAULT_SETTINGS))
+    Object.assign(page, useLayout(settings))
     return null
   }
   const { unmount } = render(h(Probe, {}))
@@ -571,6 +575,55 @@ const PHASE_3_WRITES = [
   },
   {
     expectedChangedKeys: ['layout'],
+    expectedOptions: defaultOptions(weatherDefinition),
+    expectedSettings: undefined,
+    expectedType: 'weather',
+    expectedUnknowns: 0,
+    name: 'adding a default Weather writes its 1 by 1 size through the page commit path',
+    write: async () => {
+      await settingsItem.setValue(SEED)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const layout = checkLayout({ v: 1, widgets: [] })
+      await layoutItem.setValue(layout)
+      const added = addWidget({ layout, readOnly: false }, 'weather')
+      if (!added.ok) throw new Error(`the add was refused: ${added.reason}`)
+      const weather = added.layout.widgets.find(
+        (widget) => widget.kind === 'known' && widget.placed.id === added.id,
+      )
+      expect(weather?.kind === 'known' && weather.placed).toMatchObject({ h: 1, w: 1 })
+      const before = await fakeBrowser.storage.sync.get(null)
+      await commitThroughPage(added.layout, 'weather')
+      return { after: await fakeBrowser.storage.sync.get(null), before }
+    },
+  },
+  {
+    expectedChangedKeys: ['layout'],
+    expectedOptions: { ...defaultOptions(weatherDefinition), place: VICTORIA },
+    expectedSettings: undefined,
+    expectedType: 'weather',
+    expectedUnknowns: 0,
+    name: 'committing a derived 0.2.3 Weather preserves its 1 by 1 starting size',
+    write: async () => {
+      await fakeBrowser.storage.sync.clear()
+      const settings = {
+        ...SEED,
+        weather: { ...DEFAULT_SETTINGS.weather, enabled: true, place: VICTORIA },
+      }
+      await settingsItem.setValue(settings)
+      await onboardingItem.setValue(SEED_ONBOARDING)
+      const before = await fakeBrowser.storage.sync.get(null)
+      const derived = deriveLayout(settings)
+      await commitThroughPage(derived, 'weather', settings)
+      const after = await fakeBrowser.storage.sync.get(null)
+      const storedWeather = (
+        after.layout as { widgets: { h: number; type: string; w: number }[] }
+      ).widgets.find((widget) => widget.type === 'weather')
+      expect(storedWeather).toMatchObject({ h: 1, w: 1 })
+      return { after, before }
+    },
+  },
+  {
+    expectedChangedKeys: ['layout'],
     expectedOptions: {
       colour: '#123456',
       icon: null,
@@ -665,7 +718,9 @@ describe('phase 3 synced writes', () => {
         widgets: expect.arrayContaining([expect.objectContaining({ type: expectedType })]),
       })
       const v030 = await asV030(rawSync)
-      expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(1)
+      expect(v030.layout.widgets.filter((widget) => widget.kind === 'unknown')).toHaveLength(
+        ('expectedUnknowns' in row ? row.expectedUnknowns : undefined) ?? 1,
+      )
       expect(
         v030.raw.layout.widgets.find(
           (widget) => (widget as { type?: string }).type === expectedType,
