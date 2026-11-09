@@ -33,7 +33,7 @@ type Story = StoryObj<typeof meta>
 /** The least room a Weather may have, with the lines a new one has on. */
 export const Smallest: Story = { parameters: { box: weatherBoxRect('smallest') } }
 
-/** Where a new Weather lands: 2 by 2, the same as its smallest. */
+/** Where a new Weather lands: 1 by 1, the same as its smallest. */
 export const Starting: Story = {}
 
 /** The most room a Weather may have. */
@@ -42,11 +42,24 @@ export const Largest: Story = { parameters: { box: weatherBoxRect('largest') } }
 /** The most it must hold: every optional line on, in the least room a Weather may have. */
 export const SmallestAllLines: Story = {
   args: { fields: fieldsWhere(true) },
-  parameters: { box: weatherBoxRect('smallest') },
+  parameters: {
+    box: weatherBoxRect('smallest', {
+      ...DEFAULT_SETTINGS.weather,
+      fields: fieldsWhere(true),
+    }),
+  },
 }
 
 /** Every optional line on, where a new Weather lands. */
-export const StartingAllLines: Story = { args: { fields: fieldsWhere(true) } }
+export const StartingAllLines: Story = {
+  args: { fields: fieldsWhere(true) },
+  parameters: {
+    box: weatherBoxRect('starting', {
+      ...DEFAULT_SETTINGS.weather,
+      fields: fieldsWhere(true),
+    }),
+  },
+}
 
 /** Every optional line on, in the most room a Weather may have. */
 export const LargestAllLines: Story = {
@@ -64,7 +77,12 @@ export const LongestLines: Story = {
     place: 'Saint-Jean-sur-Richelieu',
     weather: makeWeather({ code: 96, feelsLike: -12.2, temperature: -12.4 }),
   },
-  parameters: { box: weatherBoxRect('smallest') },
+  parameters: {
+    box: weatherBoxRect('smallest', {
+      ...DEFAULT_SETTINGS.weather,
+      fields: fieldsWhere(true),
+    }),
+  },
 }
 
 /** A different icon, for snow after dark. */

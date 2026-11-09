@@ -42,8 +42,8 @@ const FIELDS =
 const WEATHER_OPTIONS = (place: string, followDevice = false) =>
   `{"fields":${FIELDS},"followDevice":${followDevice},"place":${place},"unit":"celsius"}`
 
-const WEATHER = (place: string, followDevice = false) =>
-  `{"id":"weather0","type":"weather","col":11,"row":1,"w":2,"h":2,"options":${WEATHER_OPTIONS(place, followDevice)}}`
+const WEATHER = (place: string, followDevice = false, size = 1) =>
+  `{"id":"weather0","type":"weather","col":${13 - size},"row":1,"w":${size},"h":${size},"options":${WEATHER_OPTIONS(place, followDevice)}}`
 
 const CLOCK_WAITING = '{"showDate":false,"showSeconds":false}'
 
@@ -134,11 +134,12 @@ describe('deriveLayout, the Weather', () => {
   const shown = (count: number): Settings['weather']['fields'] =>
     DEFAULT_SETTINGS.weather.fields.map((field, i) => ({ ...field, shown: i < count }))
 
-  it('is 2 by 2 at column 11, row 1, whatever lines it shows (owner answer 1 on LR-19, over LR-16’s 2 by 1)', () => {
-    for (const count of [0, 1, 2, 3, 5]) {
+  it('starts at 1 by 1 with zero or one line, and 2 by 2 with more lines', () => {
+    for (const count of [0, 1, 2, 3, 4, 5]) {
       const { placed } = knownAt(deriveLayout(withWeather({ fields: shown(count) }, on)), 1)
 
-      expect(placed).toMatchObject({ col: 11, h: 2, row: 1, w: 2 })
+      const size = count <= 1 ? 1 : 2
+      expect(placed).toMatchObject({ col: 13 - size, h: size, row: 1, w: size })
     }
   })
 
@@ -168,7 +169,7 @@ describe('deriveLayout, the Weather', () => {
     const layout = deriveLayout(withClock({ showSeconds: true }, on))
 
     expect(knownAt(layout, 0).placed).toMatchObject({ col: 4, row: 4, w: 6 })
-    expect(knownAt(layout, 1).placed).toMatchObject({ col: 11, row: 1, w: 2 })
+    expect(knownAt(layout, 1).placed).toMatchObject({ col: 12, row: 1, w: 1 })
   })
 
   it('gets defaults for settings from before the Weather: they have no weather block', async () => {

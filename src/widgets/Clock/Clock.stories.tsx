@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/preact-vite'
 
 import type { Rect } from '@/layout/geometry'
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions } from '@/widgetSystem/options'
 
 import { withBox } from '../../../.storybook/withBox'
@@ -8,7 +9,8 @@ import { withPage } from '../../../.storybook/withPage'
 import { Clock } from './Clock'
 import { clockDefinition } from './definition'
 
-const { largest, smallest, starting } = clockDefinition.sizes
+const { largest, starting } = clockDefinition.sizes
+const smallest = smallestSize(clockDefinition.sizes, defaultOptions(clockDefinition))
 
 /** The box a size takes on the Grid, centred as far as whole cells allow (12 by 8). */
 const centred = ({ h, w }: { h: number; w: number }): Rect => ({

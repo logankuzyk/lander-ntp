@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { WEATHER_FIELDS, type WeatherField } from '@/settings/schema'
 import type { Weather as Reading } from '@/weather/openMeteo'
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions } from '@/widgetSystem/options'
 import { Box } from '@/widgetSystem/WidgetBox'
 
@@ -165,8 +166,11 @@ describe('Weather', () => {
 
 describe('the Weather at its smallest size', () => {
   it('draws all five lines, with nothing hidden by markup, so the box only has to be big enough', () => {
-    const { smallest } = weatherDefinition.sizes
     const options = defaultOptions(weatherDefinition)
+    const smallest = smallestSize(weatherDefinition.sizes, {
+      ...options,
+      fields: options.fields.map((field) => ({ ...field, shown: true })),
+    })
     const { View } = weatherDefinition
     const { container } = render(
       <Box name="Weather" rect={{ col: 11, row: 1, ...smallest }} widget="weather">

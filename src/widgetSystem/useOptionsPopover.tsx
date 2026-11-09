@@ -197,6 +197,7 @@ export function OptionsPopoverProvider({
       {opened && target && (
         <OptionsPopover
           box={boxOf(opened.id)}
+          cells={{ h: target.placed.h, w: target.placed.w }}
           definition={target.definition}
           disabled={!canChange || !loaded}
           focusOption={opened.focusOption}

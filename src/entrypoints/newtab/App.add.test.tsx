@@ -91,11 +91,11 @@ describe('App, adding a Widget from the Add menu', () => {
     add('Weather')
     await settled()
 
-    // The Clock (with seconds) is on rows 4 and 5, so the nearest free 2 by 2 is the one above,
+    // The Clock (with seconds) is on rows 4 and 5, so the nearest free 1 by 1 is above it,
     // in the middle columns: of the two equally near, the upper is taken.
     const box = await newestBox()
     expect(box.dataset.widget).toBe('weather')
-    expect([box.style.gridColumn, box.style.gridRow]).toEqual(['6 / span 2', '2 / span 2'])
+    expect([box.style.gridColumn, box.style.gridRow]).toEqual(['6 / span 1', '3 / span 1'])
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 

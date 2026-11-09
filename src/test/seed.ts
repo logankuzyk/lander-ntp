@@ -16,6 +16,7 @@ import { settingsItem } from '@/settings/storage'
 import { cacheKey, type Weather } from '@/weather/openMeteo'
 import { weatherSource } from '@/weather/weatherSource'
 import { weatherDefinition } from '@/widgets/Weather/definition'
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions } from '@/widgetSystem/options'
 
 import { makeManifest, makePlace, makeWeather, STORY_PHOTOS } from './fixtures'
@@ -565,10 +566,17 @@ export type WeatherBoxSize = 'largest' | 'smallest' | 'starting'
  * The cells a Weather is drawn in at one of its sizes, from the Grid's top right corner, where
  * an update puts it. Worked out from its definition, so the stories follow its sizes.
  */
-export function weatherBoxRect(size: WeatherBoxSize): Rect {
+export function weatherBoxRect(
+  size: WeatherBoxSize,
+  options = defaultOptions(weatherDefinition),
+): Rect {
   const { sizes } = weatherDefinition
   const { h, w } =
-    size === 'starting' ? sizes.starting(defaultOptions(weatherDefinition)) : sizes[size]
+    size === 'starting'
+      ? sizes.starting(options)
+      : size === 'smallest'
+        ? smallestSize(sizes, options)
+        : sizes.largest
   return { col: COLS + 1 - w, h, row: 1, w }
 }
 

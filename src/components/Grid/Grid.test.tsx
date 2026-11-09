@@ -165,7 +165,7 @@ describe('Grid', () => {
     )
     expect(boxes(grid)).toEqual([
       // Reading order: the Weather's row is above the Clock's.
-      ['weather', '11 / span 2', '1 / span 2'],
+      ['weather', '12 / span 1', '1 / span 1'],
       ['clock', '5 / span 4', '4 / span 2'],
     ])
   })
@@ -173,7 +173,7 @@ describe('Grid', () => {
   it('draws the Weather alone when the Clock is off, and nothing when both are', () => {
     const weatherOnly = settingsWith({ clock: { enabled: false }, weather: { enabled: true } })
     expect(boxes(drawnGrid(deriveLayout(weatherOnly)))).toEqual([
-      ['weather', '11 / span 2', '1 / span 2'],
+      ['weather', '12 / span 1', '1 / span 1'],
     ])
     const neither = settingsWith({ clock: { enabled: false } })
     const empty = drawnGrid(deriveLayout(neither))

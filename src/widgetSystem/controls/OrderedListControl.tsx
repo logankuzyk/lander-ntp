@@ -1,5 +1,5 @@
 import { Eye, EyeOff, GripVertical } from 'lucide-preact'
-import { useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { useId, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import type { ListEntry } from '../definition'
 
@@ -75,6 +75,8 @@ function useSlide(list: { current: HTMLElement | null }, order: string) {
 type OrderedListControlProps<E extends ListEntry> = {
   /** Shows the list as it is, out of reach: the order and what is shown may not be changed. */
   disabled?: boolean
+  /** A shown state that cannot be turned on in this Widget's current size, with its explanation. */
+  disabledItems?: readonly { id: E['id']; reason: string }[]
   /** The ids the list holds, with what to call each. */
   items: readonly { id: E['id']; label: string }[]
   /** The id of the heading that names the list. */
@@ -90,12 +92,15 @@ type OrderedListControlProps<E extends ListEntry> = {
  */
 export function OrderedListControl<E extends ListEntry>({
   disabled = false,
+  disabledItems = [],
   items,
   labelledBy,
   onChange,
   value: fields,
 }: OrderedListControlProps<E>) {
   const labelOf = (id: E['id']) => items.find((item) => item.id === id)?.label ?? id
+  const reasonOf = (id: E['id']) => disabledItems.find((item) => item.id === id)?.reason
+  const describedBy = useId()
 
   /** The order while a row is being dragged. Only the drop is passed on. */
   const [draft, setDraft] = useState<{ dragging: E['id']; fields: E[] } | null>(null)
@@ -194,20 +199,41 @@ export function OrderedListControl<E extends ListEntry>({
                 <GripVertical aria-hidden="true" size={14} />
               </button>
               <span class="fields__label">{label}</span>
-              <button
-                aria-label={`Show ${label}`}
-                aria-pressed={field.shown}
-                class="fields__eye"
-                disabled={disabled}
-                onClick={() => onChange(toggle(fields, field.id))}
-                type="button"
-              >
-                {field.shown ? (
-                  <Eye aria-hidden="true" size={16} />
-                ) : (
-                  <EyeOff aria-hidden="true" size={16} />
-                )}
-              </button>
+              {reasonOf(field.id) ? (
+                <button
+                  aria-describedby={`${describedBy}-${field.id}`}
+                  aria-disabled="true"
+                  aria-label={`Show ${label}`}
+                  aria-pressed={field.shown}
+                  class="fields__eye"
+                  title={reasonOf(field.id)}
+                  type="button"
+                >
+                  {field.shown ? (
+                    <Eye aria-hidden="true" size={16} />
+                  ) : (
+                    <EyeOff aria-hidden="true" size={16} />
+                  )}
+                  <span class="visually-hidden" id={`${describedBy}-${field.id}`}>
+                    {reasonOf(field.id)}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  aria-label={`Show ${label}`}
+                  aria-pressed={field.shown}
+                  class="fields__eye"
+                  disabled={disabled}
+                  onClick={() => onChange(toggle(fields, field.id))}
+                  type="button"
+                >
+                  {field.shown ? (
+                    <Eye aria-hidden="true" size={16} />
+                  ) : (
+                    <EyeOff aria-hidden="true" size={16} />
+                  )}
+                </button>
+              )}
             </li>
           )
         })}

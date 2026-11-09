@@ -97,6 +97,15 @@ describe('resizeSession, picking up the handle', () => {
 describe('resizeSession, resizing', () => {
   const layout = layoutOf(clock('clock0001', 5, 4), weather('wthr0001', 11, 1))
 
+  it('lets a one-line Weather follow the pointer down to 1 by 1, but no smaller', () => {
+    const session = held(layout, 'wthr0001')
+    const small = move(session, corner(session, -1, -1))
+    const smaller = move(session, corner(session, -2, -2))
+
+    expect(small.place).toMatchObject({ h: 1, w: 1 })
+    expect(smaller.place).toMatchObject({ h: 1, w: 1 })
+  })
+
   it('does not jump when it is picked up away from the corner: the grab is kept', () => {
     // The handle is a little inside the corner: 0.15 of a cell in and 0.1 up.
     const session = held(layout, 'clock0001', { col: 8.85, row: 5.9 })

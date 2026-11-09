@@ -1805,6 +1805,10 @@ body {
   cursor: pointer;
 }
 
+.fields__eye[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
 .fields__row--hidden .fields__eye {
   opacity: 0.45;
 }

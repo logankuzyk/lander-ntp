@@ -102,8 +102,8 @@ describe('the Grid keyboard stories', () => {
     const { restore, set } = await runStory(stories.KeyboardRefused as unknown as KeyStory)
 
     await waitFor(() => expect(ghost()?.dataset.valid).toBe('false'))
-    expect(ghost()?.style.gridColumn).toBe('8 / span 4')
-    expect(said()).toBe('Column 8, row 1. Another widget is there.')
+    expect(ghost()?.style.gridColumn).toBe('9 / span 4')
+    expect(said()).toBe('Column 9, row 1. Another widget is there.')
     expect(set).not.toHaveBeenCalled()
     restore()
   })

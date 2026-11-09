@@ -168,6 +168,17 @@ describe('keyboard session, resizing a cell at a time', () => {
     expect(stretch(session, UP).place).toEqual({ col: 3, h: 2, row: 3, w: 4 })
   })
 
+  it('lets a one-line Weather shrink to 1 by 1 with Shift and arrows', () => {
+    const session = held(layout, 'wthr0001')
+    const width = stretch(session, LEFT)
+    const small = stretch(width, UP)
+    const smaller = stretch(small, UP)
+
+    expect(small.place).toMatchObject({ h: 1, w: 1 })
+    expect(smaller.place).toMatchObject({ h: 1, w: 1 })
+    expect(smaller.limit).toBe('smallest')
+  })
+
   it('stops at the largest and the smallest, and says which', () => {
     let session = press(held(layout, 'clock0001'), RIGHT, 10, stretch)
     expect(session.place.w).toBe(8)

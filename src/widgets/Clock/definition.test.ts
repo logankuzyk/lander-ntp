@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_SETTINGS } from '@/settings/schema'
+import { smallestSize } from '@/widgetSystem/definition'
 import { defaultOptions, readOptions } from '@/widgetSystem/options'
 
 import { clockDefinition } from './definition'
@@ -75,7 +76,8 @@ describe('the Clock definition', () => {
   })
 
   it('starts at least at its smallest size and at most at its largest, whatever its options', () => {
-    const { largest, smallest, starting } = clockDefinition.sizes
+    const { largest, starting } = clockDefinition.sizes
+    const smallest = smallestSize(clockDefinition.sizes, defaultOptions(clockDefinition))
     for (const showDate of [false, true]) {
       for (const showSeconds of [false, true]) {
         const size = starting({ showDate, showSeconds })

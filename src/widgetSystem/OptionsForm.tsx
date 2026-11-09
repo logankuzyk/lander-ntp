@@ -12,6 +12,7 @@ import { PickFromList } from './controls/PickFromList'
 import { PlaceControl } from './controls/PlaceControl'
 import { Switch } from './controls/Switch'
 import type {
+  Cells,
   ListEntry,
   OptionDescription,
   PageValueName,
@@ -129,6 +130,8 @@ function NeedGate({ children, definition, option, options }: NeedGateProps) {
 }
 
 type OptionsFormProps = {
+  /** The current cells of the Widget, for options limited by the box it occupies. */
+  cells?: Cells
   definition: AnyWidgetDefinition
   /**
    * Draws each Widget option as it is and passes no change on, not even one a control was waiting
@@ -166,6 +169,7 @@ type OptionsFormProps = {
  * `onPageValueChange`, with a line saying it applies to the whole page.
  */
 export function OptionsForm({
+  cells,
   definition,
   disabled = false,
   focusOption,
@@ -258,15 +262,29 @@ export function OptionsForm({
         )
       case 'orderedList': {
         const heading = `${headings}-${option.id}`
+        const entries = read[option.id] as ListEntry[]
+        const disabledItems =
+          definition.type === 'weather' &&
+          cells?.w === 1 &&
+          cells.h === 1 &&
+          entries.some(({ shown }) => shown)
+            ? entries
+                .filter(({ shown }) => !shown)
+                .map(({ id }) => ({
+                  id,
+                  reason: 'Make the Weather larger to show more lines.',
+                }))
+            : undefined
         return (
           <>
             <h3 id={heading}>{option.label}</h3>
             <OrderedListControl
               disabled={off}
+              disabledItems={disabledItems}
               items={option.items}
               labelledBy={heading}
               onChange={(value) => change({ [option.id]: value })}
-              value={read[option.id] as ListEntry[]}
+              value={entries}
             />
           </>
         )

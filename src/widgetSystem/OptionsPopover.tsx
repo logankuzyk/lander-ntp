@@ -4,7 +4,7 @@ import { READ_ONLY_UPDATE_NOTE } from '@/components/EditMode/copy'
 import { CloseIcon } from '@/components/Popover/CloseIcon'
 import { usePopover } from '@/components/Popover/usePopover'
 
-import type { PageValueName, PageValues } from './definition'
+import type { Cells, PageValueName, PageValues } from './definition'
 import { focusBox } from './focusBox'
 import { OptionsForm } from './OptionsForm'
 import { placeBeside } from './placeBeside'
@@ -13,6 +13,7 @@ import type { AnyWidgetDefinition } from './registry'
 type OptionsPopoverProps = {
   /** The Widget's box on the page, which the popover sits beside and gives focus back to. */
   box: () => HTMLElement | null
+  cells?: Cells
   definition: AnyWidgetDefinition
   /** Shows the options and changes none: for a Layout that may not be changed. */
   disabled?: boolean
@@ -49,6 +50,7 @@ type OptionsPopoverProps = {
  */
 export function OptionsPopover({
   box,
+  cells,
   definition,
   disabled = false,
   focusOption,
@@ -135,6 +137,7 @@ export function OptionsPopover({
           <p class="settings__note options-popover__readonly">{READ_ONLY_UPDATE_NOTE}</p>
         )}
         <OptionsForm
+          cells={cells}
           definition={definition}
           disabled={disabled}
           focusOption={focusOption ?? definition.options[0]?.id}
