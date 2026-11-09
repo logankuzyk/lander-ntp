@@ -438,7 +438,9 @@ describe('Grid, Escape during a drag', () => {
     expect(commit).not.toHaveBeenCalled()
     expect(document.querySelector('.grid__ghost')).toBeNull()
 
-    // The next Escape, with nothing in the air, leaves edit mode as it always did.
+    // The next Escape clears selection; one more leaves edit mode.
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(clockBox.dataset.selected).toBe('false')
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
@@ -450,7 +452,8 @@ describe('Grid, Escape during a drag', () => {
     drag(clockBox, 250, 350)
     release(clockBox, 250, 350)
     fireEvent.keyDown(document.body, { key: 'Escape' })
-    // Nothing is held, so Escape leaves edit mode, as it did before there was a drag.
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
 })

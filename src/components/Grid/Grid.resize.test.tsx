@@ -150,6 +150,31 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
+describe('Grid, selecting a Widget', () => {
+  it('selects on click and focus, and exposes the selected state on the box', () => {
+    const { box } = setup()
+    expect(box('clock').dataset.selected).toBe('false')
+    fireEvent.click(box('clock'))
+    expect(box('clock').dataset.selected).toBe('true')
+    fireEvent.focus(box('weather'))
+    expect(box('clock').dataset.selected).toBe('false')
+    expect(box('weather').dataset.selected).toBe('true')
+  })
+
+  it('clears selection on an empty Grid press and when Done ends editing', () => {
+    const { box, grid } = setup()
+    fireEvent.click(box('clock'))
+    expect(box('clock').dataset.selected).toBe('true')
+
+    press(grid(), 100, 700)
+    expect(box('clock').dataset.selected).toBe('false')
+
+    fireEvent.click(box('clock'))
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(box('clock').dataset.selected).toBe('false')
+  })
+})
+
 describe('Grid, the resize handle', () => {
   it('is on every Widget it can resize in edit mode, as a round mark that is not a control', () => {
     const { handle } = setup()
@@ -602,7 +627,9 @@ describe('Grid, Escape during a resize', () => {
     expect(document.querySelector('.grid__ghost')).toBeNull()
     expect(box('clock').style.width).toBe('')
 
-    // The next Escape, with nothing in the air, leaves edit mode as it always did.
+    // Selection clears on the first Escape; the next one leaves edit mode.
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(box('clock').dataset.selected).toBe('false')
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
@@ -612,6 +639,8 @@ describe('Grid, Escape during a resize', () => {
     press(handle('clock'), HANDLE.x, HANDLE.y)
     drag(handle('clock'), 990, 590)
     release(handle('clock'), 990, 590)
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })

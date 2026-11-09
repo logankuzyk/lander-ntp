@@ -34,11 +34,13 @@ type WidgetBoxProps<O, R, C> = {
   held?: HeldState
   /** The id it is stored under, which its Options button opens its options by. */
   id?: string
+  onFocus?: () => void
   /** What is stored for this Widget, which may be missing or wrong; the definition reads it. */
   options: unknown
   page: PageValues
   /** The cells the Widget is drawn in: as the Grid says, not as stored. */
   rect: Rect
+  selected?: boolean
 }
 
 /** O on its own: not a held key, and not with a modifier (those are the browser's). */
@@ -81,10 +83,12 @@ export function Box({
   id,
   label,
   name,
+  onFocus,
   optionsLabel,
   placedId,
   rect,
   removeLabel,
+  selected = false,
   widget,
 }: {
   children?: ComponentChildren
@@ -99,6 +103,7 @@ export function Box({
   label?: string | null
   /** What people call it, such as "Clock" or "Weather, Victoria": read out, and drawn in edit mode. */
   name: string
+  onFocus?: () => void
   /**
    * What the Options button is called: "Weather options", the Widget's type and not its summary,
    * as the button is read inside the box's group, which has the full name. By default the box's.
@@ -109,6 +114,7 @@ export function Box({
   rect: Rect
   /** What the remove button is called, on the same terms as `optionsLabel`: "Remove Weather". */
   removeLabel?: string
+  selected?: boolean
   widget: string
 }) {
   const { canChange, editing } = useEditMode()
@@ -125,6 +131,7 @@ export function Box({
   // into anything else is that thing's).
   const frame = editing
     ? {
+        onFocus,
         onKeyDown:
           optionsId === undefined && removeId === undefined
             ? undefined
@@ -152,6 +159,7 @@ export function Box({
       // What a callout points at (see onboarding/target): a Widget by its type.
       data-callout-target={`widget:${widget}`}
       data-refused={held === 'refused' ? 'true' : undefined}
+      data-selected={String(selected)}
       data-widget={widget}
       data-widget-id={id ?? placedId}
       role="group"
@@ -432,18 +440,22 @@ export function WidgetBox<O, R, C>({
   definition,
   held,
   id,
+  onFocus,
   options,
   page,
   rect,
+  selected,
 }: WidgetBoxProps<O, R, C>) {
   return (
     <Box
       held={held}
       id={id}
       name={accessibleName(definition, readOptions(definition, options))}
+      onFocus={onFocus}
       optionsLabel={`${definition.name} options`}
       rect={rect}
       removeLabel={`Remove ${definition.name}`}
+      selected={selected}
       widget={definition.type}
     >
       <Contents

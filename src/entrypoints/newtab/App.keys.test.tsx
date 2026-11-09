@@ -220,6 +220,8 @@ describe('App, moving and resizing from the keyboard', () => {
     key(clock, 'Escape')
     expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
     key(clock, 'Escape')
+    expect(clock.dataset.selected).toBe('false')
+    key(clock, 'Escape')
     expect(screen.getByRole('button', { name: 'Edit' })).toBeTruthy()
   })
 
